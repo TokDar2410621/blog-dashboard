@@ -371,6 +371,15 @@ def _create_post_view(cursor, table, cols, cover_col, author_mode, author_fk_col
     else:
         pub = 'bp.created_at::date'
 
+    # New fields (language, translation_group) default to sensible values
+    # when the underlying table doesn't have them. Triggers ignore them on write.
+    lang_sel = "'fr'::varchar(2) as language"
+    tg_sel = "gen_random_uuid()::uuid as translation_group"
+    if 'language' in cols:
+        lang_sel = "COALESCE(bp.language, 'fr') as language"
+    if 'translation_group' in cols:
+        tg_sel = "COALESCE(bp.translation_group, gen_random_uuid())::uuid as translation_group"
+
     cursor.execute(f"""
         CREATE VIEW blog_blogpost AS
         SELECT
@@ -384,6 +393,8 @@ def _create_post_view(cursor, table, cols, cover_col, author_mode, author_fk_col
             bp.status,
             NULL::timestamptz as scheduled_at,
             {views} as view_count,
+            {lang_sel},
+            {tg_sel},
             {pub} as published_at,
             bp.created_at,
             bp.updated_at,
