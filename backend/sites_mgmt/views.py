@@ -1,6 +1,7 @@
 import os
 import uuid
 import base64
+import logging
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -24,6 +25,8 @@ import markdown as md_lib
 from .models import Site, UploadedImage, HostedPost, HostedCategory, HostedTag
 from .db_utils import ensure_site_connection, test_site_connection
 from .blog_adapter import detect_blog_tables, setup_blog_views
+
+logger = logging.getLogger(__name__)
 
 
 def _markdown_to_html(text):
@@ -616,6 +619,7 @@ class GenerateArticleView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
+            logger.exception("Article generation failed for site %s", site_id)
             return Response(
                 {'error': f'Erreur generation: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -704,6 +708,7 @@ class GenerateInlineView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as e:
+            logger.exception("Inline generation failed for site %s", site_id)
             return Response(
                 {'error': f'Erreur generation: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
