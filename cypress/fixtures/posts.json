@@ -1,0 +1,47 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "slug": "premier-article",
+      "title": "Premier article",
+      "status": "published",
+      "category": "Tech",
+      "view_count": 120,
+      "created_at": "2025-12-01T10:00:00Z",
+      "excerpt": "Un premier article de test",
+      "content": "## Introduction\n\nContenu de test.",
+      "tags": ["react", "test"],
+      "cover_image": "",
+      "featured": false
+    },
+    {
+      "slug": "article-brouillon",
+      "title": "Article en brouillon",
+      "status": "draft",
+      "category": "News",
+      "view_count": 0,
+      "created_at": "2025-12-15T14:00:00Z",
+      "excerpt": "",
+      "content": "",
+      "tags": [],
+      "cover_image": "",
+      "featured": false
+    },
+    {
+      "slug": "article-planifie",
+      "title": "Article planifie",
+      "status": "scheduled",
+      "category": "Tech",
+      "view_count": 0,
+      "created_at": "2025-12-20T08:00:00Z",
+      "excerpt": "Sera publie bientot",
+      "content": "## Contenu planifie\n\nCe contenu sera publie.",
+      "tags": ["scheduled"],
+      "cover_image": "",
+      "featured": true,
+      "scheduled_at": "2026-03-01T09:00:00Z"
+    }
+  ]
+}

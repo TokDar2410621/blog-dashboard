@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "Mon Blog Tech",
+    "domain": "https://tech.example.com",
+    "database_url": "postgres://...",
+    "blog_config": {}
+  },
+  {
+    "id": 2,
+    "name": "Blog Voyage",
+    "domain": "https://voyage.example.com",
+    "database_url": "postgres://...",
+    "blog_config": {}
+  }
+]
