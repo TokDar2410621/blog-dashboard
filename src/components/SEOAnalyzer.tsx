@@ -21,6 +21,7 @@ interface SEOAnalyzerProps {
   content: string;
   slug: string;
   coverImage?: string;
+  keyword?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
 }
 
@@ -34,27 +35,6 @@ interface SEOCheck {
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function countSyllables(word: string): number {
-  word = word.toLowerCase().replace(/[^a-z]/g, "");
-  if (word.length <= 3) return 1;
-  word = word.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "");
-  word = word.replace(/^y/, "");
-  const matches = word.match(/[aeiouy]{1,2}/g);
-  return matches ? matches.length : 1;
-}
-
-function fleschScore(text: string): number {
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-  const words = text.split(/\s+/).filter(Boolean);
-  if (sentences.length === 0 || words.length === 0) return 0;
-  const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
-  const score =
-    206.835 -
-    1.015 * (words.length / sentences.length) -
-    84.6 * (totalSyllables / words.length);
-  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function extractHeadings(markdown: string): { h2: number; h3: number } {
@@ -77,16 +57,43 @@ function countInternalLinks(markdown: string): number {
   return links.length;
 }
 
+function countExternalLinks(markdown: string): number {
+  const links = markdown.match(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g) || [];
+  return links.length;
+}
+
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function firstParagraph(markdown: string): string {
+  const stripped = markdown.replace(/^(#{1,6}\s.*|!\[.*?\]\(.*?\)|\s*)\n/gm, "");
+  const paras = stripped.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  return paras[0] || "";
+}
+
 export function SEOAnalyzer({
   title,
   excerpt,
   content,
   slug,
   coverImage,
+  keyword = "",
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
   const [expanded, setExpanded] = useState(true);
+  const [aiAuditLoading, setAiAuditLoading] = useState(false);
+  const [aiAudit, setAiAudit] = useState<{
+    score: number;
+    verdict: string;
+    strengths: string[];
+    weaknesses: string[];
+    actions: string[];
+  } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [fixLoading, setFixLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -171,23 +178,23 @@ export function SEOAnalyzer({
       });
     }
 
-    // Word count
+    // Word count (seuils révisés : 600/1000 au lieu de 800/1500)
     const words = countWords(content);
-    if (words >= 1500) {
+    if (words >= 1000) {
       results.push({
         id: "word-count",
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "good",
         detail: `${words} ${lang === "fr" ? "mots" : "words"}`,
-        score: 15,
+        score: 10,
       });
-    } else if (words >= 800) {
+    } else if (words >= 600) {
       results.push({
         id: "word-count",
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "warning",
-        detail: `${words} ${lang === "fr" ? "mots - visez 1500+" : "words - aim for 1500+"}`,
-        score: 10,
+        detail: `${words} ${lang === "fr" ? "mots - visez 1000+" : "words - aim for 1000+"}`,
+        score: 6,
       });
     } else {
       results.push({
@@ -195,35 +202,72 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "bad",
         detail: `${words} ${lang === "fr" ? "mots - trop court" : "words - too short"}`,
-        score: 3,
+        score: 2,
       });
     }
 
-    // Readability
-    const readability = fleschScore(content);
-    if (readability >= 60) {
+    // Keyword usage (primary keyword in title, first paragraph, H2s)
+    if (keyword.trim()) {
+      const kw = normalize(keyword);
+      const titleHit = normalize(title).includes(kw);
+      const introHit = normalize(firstParagraph(content)).includes(kw);
+      const h2s = content.match(/^## .+$/gm) || [];
+      const h2Hits = h2s.filter((h) => normalize(h).includes(kw)).length;
+      const hits = Number(titleHit) + Number(introHit) + Math.min(h2Hits, 2);
+
+      if (hits >= 3) {
+        results.push({
+          id: "keyword",
+          label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
+          status: "good",
+          detail: lang === "fr" ? `Présent dans titre, intro et H2` : `In title, intro and H2`,
+          score: 20,
+        });
+      } else if (hits >= 2) {
+        results.push({
+          id: "keyword",
+          label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
+          status: "warning",
+          detail: lang === "fr" ? `Présent dans ${hits}/3 zones clés (titre, intro, H2)` : `In ${hits}/3 key zones`,
+          score: 12,
+        });
+      } else {
+        results.push({
+          id: "keyword",
+          label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
+          status: "bad",
+          detail: lang === "fr" ? `Manque dans titre, intro ou H2` : `Missing in title/intro/H2`,
+          score: 4,
+        });
+      }
+    }
+
+    // Internal / external links
+    const internal = countInternalLinks(content);
+    const external = countExternalLinks(content);
+    if (internal >= 2) {
       results.push({
-        id: "readability",
-        label: lang === "fr" ? "Lisibilite" : "Readability",
+        id: "links",
+        label: lang === "fr" ? "Maillage interne" : "Internal links",
         status: "good",
-        detail: `Flesch: ${readability}/100`,
+        detail: lang === "fr" ? `${internal} liens internes, ${external} externes` : `${internal} internal, ${external} external`,
         score: 10,
       });
-    } else if (readability >= 40) {
+    } else if (internal >= 1) {
       results.push({
-        id: "readability",
-        label: lang === "fr" ? "Lisibilite" : "Readability",
+        id: "links",
+        label: lang === "fr" ? "Maillage interne" : "Internal links",
         status: "warning",
-        detail: `Flesch: ${readability}/100`,
-        score: 6,
+        detail: lang === "fr" ? `${internal} lien interne — visez 2+` : `${internal} internal — aim for 2+`,
+        score: 5,
       });
     } else {
       results.push({
-        id: "readability",
-        label: lang === "fr" ? "Lisibilite" : "Readability",
+        id: "links",
+        label: lang === "fr" ? "Maillage interne" : "Internal links",
         status: "bad",
-        detail: `Flesch: ${readability}/100 - ${lang === "fr" ? "difficile a lire" : "hard to read"}`,
-        score: 2,
+        detail: lang === "fr" ? "Aucun lien interne" : "No internal links",
+        score: 0,
       });
     }
 
@@ -330,7 +374,7 @@ export function SEOAnalyzer({
     }
 
     return results;
-  }, [title, excerpt, content, slug, coverImage, i18n.language]);
+  }, [title, excerpt, content, slug, coverImage, keyword, i18n.language]);
 
   const totalScore = useMemo(() => {
     const maxScore = 100;
@@ -353,6 +397,30 @@ export function SEOAnalyzer({
         : "bg-red-500/10";
 
   const hasIssues = checks.some((c) => c.status !== "good");
+
+  const handleAiAudit = async () => {
+    setAiAuditLoading(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/seo-audit/", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          excerpt,
+          content: content.slice(0, 5000),
+          keyword,
+          language: i18n.language,
+        }),
+      });
+      if (!res.ok) throw new Error("Audit failed");
+      const data = await res.json();
+      setAiAudit(data);
+    } catch {
+      toast.error(i18n.language === "fr" ? "Erreur audit IA" : "AI audit error");
+    } finally {
+      setAiAuditLoading(false);
+    }
+  };
 
   const handleFixAll = async () => {
     if (!onApplyFix) return;
@@ -501,6 +569,94 @@ export function SEOAnalyzer({
           </CardContent>
         </Card>
       )}
+
+      {/* AI Audit */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            {i18n.language === "fr" ? "Audit SEO par IA" : "AI SEO Audit"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAiAudit}
+            disabled={aiAuditLoading || !title}
+          >
+            {aiAuditLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr" ? "Analyse en cours..." : "Analyzing..."}
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-4 w-4 mr-1.5" />
+                {i18n.language === "fr" ? "Lancer l'audit" : "Run audit"}
+              </>
+            )}
+          </Button>
+
+          {aiAudit && (
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${
+                    aiAudit.score >= 70
+                      ? "bg-green-500/10 text-green-500"
+                      : aiAudit.score >= 40
+                      ? "bg-yellow-500/10 text-yellow-500"
+                      : "bg-red-500/10 text-red-500"
+                  }`}
+                >
+                  {aiAudit.score}
+                </div>
+                <p className="text-sm text-muted-foreground flex-1">{aiAudit.verdict}</p>
+              </div>
+
+              {aiAudit.strengths?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-1 text-green-500">
+                    ✓ {i18n.language === "fr" ? "Points forts" : "Strengths"}
+                  </p>
+                  <ul className="text-xs space-y-1 text-muted-foreground">
+                    {aiAudit.strengths.map((s, i) => (
+                      <li key={i}>• {s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiAudit.weaknesses?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-1 text-red-500">
+                    ✗ {i18n.language === "fr" ? "Points faibles" : "Weaknesses"}
+                  </p>
+                  <ul className="text-xs space-y-1 text-muted-foreground">
+                    {aiAudit.weaknesses.map((w, i) => (
+                      <li key={i}>• {w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiAudit.actions?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-1 text-primary">
+                    → {i18n.language === "fr" ? "Actions à faire" : "Action items"}
+                  </p>
+                  <ul className="text-xs space-y-1 text-muted-foreground">
+                    {aiAudit.actions.map((a, i) => (
+                      <li key={i}>• {a}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* AI Suggestions */}
       <Card>

@@ -1001,6 +1001,94 @@ Reponds UNIQUEMENT avec un JSON: {{"tags": ["tag1", "tag2", ...]}}"""
             )
 
 
+class SEOAuditView(APIView):
+    """Full SEO audit via Gemini — returns score + strengths + weaknesses + actions."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        title = request.data.get('title', '')
+        excerpt = request.data.get('excerpt', '')
+        content = request.data.get('content', '')
+        keyword = request.data.get('keyword', '')
+        language = request.data.get('language', 'fr')
+
+        if not title or not content:
+            return Response(
+                {'error': 'Titre et contenu requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        try:
+            from google import genai
+            import json
+
+            lang = 'French' if language == 'fr' else 'English'
+            kw_section = f'Primary keyword: {keyword}\n' if keyword else ''
+
+            prompt = f"""You are a senior SEO expert. Audit this blog article holistically.
+Focus on REAL SEO signals, not checklists. Write feedback in {lang}.
+
+{kw_section}Title: {title}
+Meta description: {excerpt}
+Content (first 5000 chars):
+{content[:5000]}
+
+Evaluate:
+- Search intent alignment (does the article answer what someone would Google?)
+- Keyword placement (title, intro, H2s, natural density — NOT stuffing)
+- Content depth & originality (is this the same as 100 other articles?)
+- E-E-A-T signals (experience, expertise, authority, trust cues)
+- Readability (sentence length, active voice, scannability)
+- Engagement hooks (intro, CTA, internal links)
+- Technical basics (meta description quality, H2 hierarchy, image alt if mentioned)
+
+Be honest and specific. Numbers and examples > platitudes.
+
+Respond in JSON only (no markdown):
+{{
+  "score": <integer 0-100>,
+  "verdict": "<1 sentence overall assessment>",
+  "strengths": ["<strength 1>", "<strength 2>", ...],
+  "weaknesses": ["<weakness 1>", "<weakness 2>", ...],
+  "actions": ["<concrete action 1>", "<concrete action 2>", ...]
+}}"""
+
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+            )
+
+            text = response.text.strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+
+            data = json.loads(text)
+            return Response({
+                'score': int(data.get('score', 0)),
+                'verdict': data.get('verdict', ''),
+                'strengths': data.get('strengths', []),
+                'weaknesses': data.get('weaknesses', []),
+                'actions': data.get('actions', []),
+            })
+
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur audit SEO: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class SEOFixView(APIView):
     """Fix SEO issues in an article using Gemini."""
     permission_classes = [IsAuthenticated]

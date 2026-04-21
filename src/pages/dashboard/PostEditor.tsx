@@ -669,6 +669,7 @@ export default function PostEditor() {
                 content={content}
                 slug={postSlug}
                 coverImage={coverImage}
+                keyword={tagsInput.split(",")[0]?.trim() || ""}
                 onApplyFix={(fixes) => {
                   if (fixes.title) setTitle(fixes.title);
                   if (fixes.excerpt) setExcerpt(fixes.excerpt);
