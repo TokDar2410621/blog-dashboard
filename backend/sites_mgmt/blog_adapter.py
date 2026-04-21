@@ -240,6 +240,47 @@ def _get_columns(cursor, table):
     return [row[0] for row in cursor.fetchall()]
 
 
+def _build_extra_inserts(cols, exclude):
+    """Given a list of columns, return SQL fragments for extra fields with
+    sensible defaults so INSTEAD OF INSERT triggers succeed on tables with
+    extra NOT NULL columns.
+    """
+    # Known fields with sensible defaults
+    defaults = {
+        'meta_title': "''",
+        'meta_description': "''",
+        'keywords': "''",
+        'featured_image': "''",
+        'featured_image_alt': "''",
+        'target_city': "''",
+        'target_region': "''",
+        'seo_score': '0',
+        'word_count': '0',
+        'reading_time': '5',
+        'has_internal_links': 'false',
+        'table_of_contents': "''",
+        'content_hash': "''",
+        'schema_type': "'BlogPosting'",
+        'faq_data': 'NULL',
+        'unique_visitors': '0',
+        'avg_time_on_page': '0',
+        'bounce_rate': '0',
+        'order': '0',
+        'is_published': 'false',
+        'created_at': 'NOW()',
+        'updated_at': 'NOW()',
+    }
+    extra_cols = []
+    extra_vals = []
+    for col in cols:
+        if col in exclude:
+            continue
+        if col in defaults:
+            extra_cols.append(f'"{col}"')
+            extra_vals.append(defaults[col])
+    return ', '.join(extra_cols), ', '.join(extra_vals)
+
+
 # ── Category ──
 
 def _create_category_view(cursor, table):
@@ -251,12 +292,21 @@ def _create_category_view(cursor, table):
         CREATE VIEW blog_category AS
         SELECT id, name, slug, {desc} as description FROM "{table}"
     """)
+
+    # Build INSERT with extra fields found in the source table (meta_title,
+    # meta_description, order, created_at, updated_at, etc.) using safe defaults.
+    extra_cols, extra_vals = _build_extra_inserts(cat_cols, exclude={
+        'id', 'name', 'slug', 'description'
+    })
+    ec_str = ', ' + extra_cols if extra_cols else ''
+    ev_str = ', ' + extra_vals if extra_vals else ''
+
     cursor.execute(f"""
         CREATE FUNCTION blog_category_insert_fn() RETURNS TRIGGER AS $$
         DECLARE v_id BIGINT;
         BEGIN
-            INSERT INTO "{table}" (name, slug, description)
-            VALUES (NEW.name, NEW.slug, NEW.description)
+            INSERT INTO "{table}" (name, slug, description{ec_str})
+            VALUES (NEW.name, NEW.slug, NEW.description{ev_str})
             RETURNING id INTO v_id;
             NEW.id := v_id;
             RETURN NEW;
@@ -310,15 +360,19 @@ def _create_tag_view(cursor, table):
         CREATE VIEW blog_tag AS SELECT id, name FROM "{table}"
     """)
     tag_cols = _get_columns(cursor, table)
-    slug_val = "NEW.name" if 'slug' in tag_cols else None
-    extra_cols = ', slug' if slug_val else ''
-    extra_vals = f', {slug_val}' if slug_val else ''
+    slug_piece_cols = ', slug' if 'slug' in tag_cols else ''
+    slug_piece_vals = ', NEW.name' if 'slug' in tag_cols else ''
+
+    extra_cols, extra_vals = _build_extra_inserts(tag_cols, exclude={'id', 'name', 'slug'})
+    ec_str = ', ' + extra_cols if extra_cols else ''
+    ev_str = ', ' + extra_vals if extra_vals else ''
+
     cursor.execute(f"""
         CREATE FUNCTION blog_tag_insert_fn() RETURNS TRIGGER AS $$
         DECLARE v_id BIGINT;
         BEGIN
-            INSERT INTO "{table}" (name{extra_cols})
-            VALUES (NEW.name{extra_vals})
+            INSERT INTO "{table}" (name{slug_piece_cols}{ec_str})
+            VALUES (NEW.name{slug_piece_vals}{ev_str})
             RETURNING id INTO v_id;
             NEW.id := v_id;
             RETURN NEW;
@@ -421,6 +475,18 @@ def _create_post_triggers(cursor, table, cover_col, author_mode, author_fk_col):
         a_col = 'author'
         a_val = 'NEW.author'
 
+    post_cols = _get_columns(cursor, table)
+    base_handled = {
+        'id', 'title', 'slug', 'excerpt', 'content',
+        (author_fk_col if author_mode == 'fk' else 'author'),
+        cover_col, 'reading_time', 'status', 'view_count', 'featured',
+        'published_at', 'created_at', 'updated_at', 'category_id',
+        'language', 'translation_group', 'scheduled_at',
+    }
+    extra_cols_str, extra_vals_str = _build_extra_inserts(post_cols, exclude=base_handled)
+    ec = ', ' + extra_cols_str if extra_cols_str else ''
+    ev = ', ' + extra_vals_str if extra_vals_str else ''
+
     cursor.execute(f"""
         CREATE FUNCTION blog_blogpost_insert_fn() RETURNS TRIGGER AS $$
         DECLARE
@@ -431,13 +497,13 @@ def _create_post_triggers(cursor, table, cover_col, author_mode, author_fk_col):
             INSERT INTO "{table}" (
                 title, slug, excerpt, content, {a_col},
                 "{cover_col}", reading_time, status, view_count,
-                published_at, created_at, updated_at, category_id
+                published_at, created_at, updated_at, category_id{ec}
             ) VALUES (
                 NEW.title, NEW.slug, NEW.excerpt, NEW.content, {a_val},
                 NEW.cover_image, COALESCE(NEW.reading_time, 5), NEW.status,
                 COALESCE(NEW.view_count, 0), COALESCE(NEW.published_at, CURRENT_DATE),
                 COALESCE(NEW.created_at, NOW()), COALESCE(NEW.updated_at, NOW()),
-                NEW.category_id
+                NEW.category_id{ev}
             ) RETURNING id INTO v_new_id;
             NEW.id := v_new_id;
             RETURN NEW;
