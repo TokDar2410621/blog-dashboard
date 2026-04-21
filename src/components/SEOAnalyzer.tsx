@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   CheckCircle,
   AlertTriangle,
@@ -11,6 +12,9 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  Gauge,
+  Smartphone,
+  Monitor,
 } from "lucide-react";
 import { fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -22,7 +26,19 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  articleUrl?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
+}
+
+interface PageSpeedResult {
+  performance_score: number | null;
+  seo_score: number | null;
+  a11y_score: number | null;
+  lcp_s: number | null;
+  cls: number | null;
+  fcp_s: number | null;
+  strategy: string;
+  tested_url: string;
 }
 
 interface SEOCheck {
@@ -82,6 +98,7 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  articleUrl,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -101,6 +118,10 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+
+  const [psiUrl, setPsiUrl] = useState<string>(articleUrl ?? "");
+  const [psiLoading, setPsiLoading] = useState<null | "mobile" | "desktop">(null);
+  const [psiResult, setPsiResult] = useState<PageSpeedResult | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -484,6 +505,89 @@ export function SEOAnalyzer({
     return <XCircle className="h-4 w-4 text-red-500" />;
   };
 
+  const runPageSpeed = async (strategy: "mobile" | "desktop") => {
+    const target = (articleUrl ?? psiUrl).trim();
+    if (!target) {
+      toast.error(
+        i18n.language === "fr" ? "URL requise" : "URL required"
+      );
+      return;
+    }
+    if (!/^https?:\/\//i.test(target)) {
+      toast.error(
+        i18n.language === "fr"
+          ? "URL invalide (http:// ou https://)"
+          : "Invalid URL (http:// or https://)"
+      );
+      return;
+    }
+
+    setPsiLoading(strategy);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/page-speed/", {
+        method: "POST",
+        body: JSON.stringify({ url: target, strategy }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "PageSpeed failed");
+      }
+      const data: PageSpeedResult = await res.json();
+      setPsiResult(data);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "PageSpeed error";
+      toast.error(
+        i18n.language === "fr" ? `Erreur PageSpeed: ${msg}` : `PageSpeed error: ${msg}`
+      );
+    } finally {
+      setPsiLoading(null);
+    }
+  };
+
+  const lcpColor = (v: number | null) => {
+    if (v === null) return "text-muted-foreground";
+    if (v <= 2.5) return "text-green-500";
+    if (v <= 4) return "text-yellow-500";
+    return "text-red-500";
+  };
+  const lcpBg = (v: number | null) => {
+    if (v === null) return "bg-muted";
+    if (v <= 2.5) return "bg-green-500/10";
+    if (v <= 4) return "bg-yellow-500/10";
+    return "bg-red-500/10";
+  };
+  const clsColor = (v: number | null) => {
+    if (v === null) return "text-muted-foreground";
+    if (v <= 0.1) return "text-green-500";
+    if (v <= 0.25) return "text-yellow-500";
+    return "text-red-500";
+  };
+  const clsBg = (v: number | null) => {
+    if (v === null) return "bg-muted";
+    if (v <= 0.1) return "bg-green-500/10";
+    if (v <= 0.25) return "bg-yellow-500/10";
+    return "bg-red-500/10";
+  };
+  const fcpColor = (v: number | null) => {
+    if (v === null) return "text-muted-foreground";
+    if (v <= 1.8) return "text-green-500";
+    if (v <= 3) return "text-yellow-500";
+    return "text-red-500";
+  };
+  const fcpBg = (v: number | null) => {
+    if (v === null) return "bg-muted";
+    if (v <= 1.8) return "bg-green-500/10";
+    if (v <= 3) return "bg-yellow-500/10";
+    return "bg-red-500/10";
+  };
+  const scoreCircleColor = (v: number | null) => {
+    if (v === null) return "text-muted-foreground bg-muted";
+    if (v >= 90) return "text-green-500 bg-green-500/10";
+    if (v >= 50) return "text-yellow-500 bg-yellow-500/10";
+    return "text-red-500 bg-red-500/10";
+  };
+
   return (
     <div className="space-y-4">
       {/* Score Card */}
@@ -569,6 +673,135 @@ export function SEOAnalyzer({
           </CardContent>
         </Card>
       )}
+
+      {/* Core Web Vitals */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Gauge className="h-4 w-4" />
+            {i18n.language === "fr" ? "Core Web Vitals" : "Core Web Vitals"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          {!articleUrl && (
+            <Input
+              type="url"
+              placeholder="https://exemple.com/mon-article"
+              value={psiUrl}
+              onChange={(e) => setPsiUrl(e.target.value)}
+              className="text-sm"
+            />
+          )}
+          {articleUrl && (
+            <p className="text-xs text-muted-foreground break-all">
+              {articleUrl}
+            </p>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => runPageSpeed("mobile")}
+              disabled={psiLoading !== null}
+            >
+              {psiLoading === "mobile" ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Smartphone className="h-4 w-4 mr-1.5" />
+              )}
+              {i18n.language === "fr" ? "Tester mobile" : "Test mobile"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => runPageSpeed("desktop")}
+              disabled={psiLoading !== null}
+            >
+              {psiLoading === "desktop" ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Monitor className="h-4 w-4 mr-1.5" />
+              )}
+              {i18n.language === "fr" ? "Tester desktop" : "Test desktop"}
+            </Button>
+          </div>
+
+          {psiResult && (
+            <div className="space-y-3 pt-2 border-t">
+              <p className="text-xs text-muted-foreground">
+                {i18n.language === "fr" ? "Strategie" : "Strategy"}:{" "}
+                <span className="font-medium">{psiResult.strategy}</span>
+              </p>
+
+              {/* Metric cards */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className={`rounded-lg p-3 text-center ${lcpBg(psiResult.lcp_s)}`}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    LCP
+                  </p>
+                  <p className={`text-lg font-bold ${lcpColor(psiResult.lcp_s)}`}>
+                    {psiResult.lcp_s !== null ? `${psiResult.lcp_s}s` : "—"}
+                  </p>
+                </div>
+                <div className={`rounded-lg p-3 text-center ${clsBg(psiResult.cls)}`}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    CLS
+                  </p>
+                  <p className={`text-lg font-bold ${clsColor(psiResult.cls)}`}>
+                    {psiResult.cls !== null ? psiResult.cls.toFixed(3) : "—"}
+                  </p>
+                </div>
+                <div className={`rounded-lg p-3 text-center ${fcpBg(psiResult.fcp_s)}`}>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    FCP
+                  </p>
+                  <p className={`text-lg font-bold ${fcpColor(psiResult.fcp_s)}`}>
+                    {psiResult.fcp_s !== null ? `${psiResult.fcp_s}s` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Score circles */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm ${scoreCircleColor(
+                      psiResult.performance_score
+                    )}`}
+                  >
+                    {psiResult.performance_score ?? "—"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {i18n.language === "fr" ? "Performance" : "Performance"}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm ${scoreCircleColor(
+                      psiResult.seo_score
+                    )}`}
+                  >
+                    {psiResult.seo_score ?? "—"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">SEO</p>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-sm ${scoreCircleColor(
+                      psiResult.a11y_score
+                    )}`}
+                  >
+                    {psiResult.a11y_score ?? "—"}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    {i18n.language === "fr" ? "Accessibilite" : "Accessibility"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* AI Audit */}
       <Card>
