@@ -344,6 +344,65 @@ export async function fetchSEOSuggestions(params: {
   return seoSuggestionsSchema.parse(data);
 }
 
+// Google Search Console
+export interface GSCQueryRow {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface GSCQueriesResponse {
+  page_url: string;
+  days: number;
+  queries: GSCQueryRow[];
+}
+
+export async function fetchGSCOAuthUrl(siteId: number): Promise<{ url: string }> {
+  const res = await authFetch(`/sites/${siteId}/gsc/oauth-url/`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || "GSC OAuth URL failed", res.status);
+  }
+  return res.json();
+}
+
+export async function submitGSCOAuthCallback(
+  siteId: number,
+  code: string,
+  state: string
+): Promise<{ success: boolean }> {
+  const res = await authFetch(`/sites/${siteId}/gsc/oauth-callback/`, {
+    method: "POST",
+    body: JSON.stringify({ code, state }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || "GSC OAuth callback failed", res.status);
+  }
+  return res.json();
+}
+
+export async function fetchGSCQueries(
+  siteId: number,
+  slug: string,
+  days = 28
+): Promise<GSCQueriesResponse> {
+  const res = await authFetch(
+    `/sites/${siteId}/gsc/queries/?slug=${encodeURIComponent(slug)}&days=${days}`
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      err.error || "GSC queries failed",
+      res.status,
+      err.code || undefined
+    );
+  }
+  return res.json();
+}
+
 // Upload inline image (returns { url })
 export async function uploadInlineImage(file: File): Promise<{ url: string }> {
   const formData = new FormData();

@@ -2645,3 +2645,291 @@ class PublicCategoriesView(APIView):
             }
             for c in cats
         ])
+
+
+# --- Google Search Console integration -------------------------------------
+#
+# These views let a user link a Site to a Google Search Console property via
+# OAuth2 and then pull real impressions/clicks/CTR/position per query for any
+# article slug. The OAuth client is configured via environment variables:
+#
+#   GSC_CLIENT_ID       Google Cloud OAuth2 client ID
+#   GSC_CLIENT_SECRET   Google Cloud OAuth2 client secret
+#   GSC_REDIRECT_URI    Must match an authorized redirect URI configured in
+#                       the Google Cloud console (ex: the frontend callback
+#                       page that POSTs {code, state} to /oauth-callback/).
+#
+# See backend/sites_mgmt/GSC_SETUP.md for setup instructions.
+
+GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
+GSC_TOKEN_URI = 'https://oauth2.googleapis.com/token'
+GSC_AUTH_URI = 'https://accounts.google.com/o/oauth2/auth'
+
+
+def _gsc_client_config():
+    """Return the OAuth2 client config dict from env vars, or None if missing."""
+    client_id = os.environ.get('GSC_CLIENT_ID', '').strip()
+    client_secret = os.environ.get('GSC_CLIENT_SECRET', '').strip()
+    redirect_uri = os.environ.get('GSC_REDIRECT_URI', '').strip()
+    if not (client_id and client_secret and redirect_uri):
+        return None
+    return {
+        'web': {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'auth_uri': GSC_AUTH_URI,
+            'token_uri': GSC_TOKEN_URI,
+            'redirect_uris': [redirect_uri],
+        }
+    }
+
+
+def _gsc_encode_state(site_id):
+    """Encode the site_id in a URL-safe base64 token."""
+    raw = str(site_id).encode('utf-8')
+    return base64.urlsafe_b64encode(raw).decode('utf-8').rstrip('=')
+
+
+def _gsc_decode_state(state):
+    """Decode a state token back to a site_id (int), or None on failure."""
+    if not state:
+        return None
+    try:
+        padded = state + '=' * (-len(state) % 4)
+        raw = base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8')
+        return int(raw)
+    except Exception:
+        return None
+
+
+class GSCOAuthUrlView(APIView):
+    """GET /api/sites/<site_id>/gsc/oauth-url/
+
+    Returns the Google OAuth2 consent URL the user should open in order to
+    authorize the dashboard to read their Search Console data.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        config = _gsc_client_config()
+        if not config:
+            return Response(
+                {'error': 'GSC OAuth client not configured on the server.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            from google_auth_oauthlib.flow import Flow
+        except ImportError:
+            return Response(
+                {'error': 'google-auth-oauthlib is not installed.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            flow = Flow.from_client_config(
+                config,
+                scopes=GSC_SCOPES,
+                redirect_uri=config['web']['redirect_uris'][0],
+            )
+            auth_url, _ = flow.authorization_url(
+                access_type='offline',
+                include_granted_scopes='true',
+                prompt='consent',
+                state=_gsc_encode_state(site.id),
+            )
+            return Response({'url': auth_url})
+        except Exception as e:
+            logger.exception("GSC oauth-url failed")
+            return Response(
+                {'error': f'Failed to build OAuth URL: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class GSCOAuthCallbackView(APIView):
+    """POST /api/sites/<site_id>/gsc/oauth-callback/
+
+    Body: {code, state}. Exchanges the code for tokens and stores the
+    refresh_token on the Site.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        code = (request.data or {}).get('code', '').strip()
+        state = (request.data or {}).get('state', '').strip()
+        if not code:
+            return Response({'error': 'Missing code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        expected_site_id = _gsc_decode_state(state)
+        if expected_site_id is not None and expected_site_id != site.id:
+            return Response({'error': 'State mismatch.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        config = _gsc_client_config()
+        if not config:
+            return Response(
+                {'error': 'GSC OAuth client not configured on the server.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            from google_auth_oauthlib.flow import Flow
+        except ImportError:
+            return Response(
+                {'error': 'google-auth-oauthlib is not installed.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            flow = Flow.from_client_config(
+                config,
+                scopes=GSC_SCOPES,
+                redirect_uri=config['web']['redirect_uris'][0],
+            )
+            flow.fetch_token(code=code)
+            creds = flow.credentials
+            if not creds.refresh_token:
+                return Response(
+                    {'error': 'No refresh token returned. Revoke app access on Google and retry.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            site.gsc_refresh_token = creds.refresh_token
+            site.save(update_fields=['gsc_refresh_token'])
+            return Response({'success': True})
+        except Exception as e:
+            logger.exception("GSC oauth-callback failed")
+            return Response(
+                {'error': f'Token exchange failed: {e}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class GSCQueriesView(APIView):
+    """GET /api/sites/<site_id>/gsc/queries/?slug=<slug>&days=28
+
+    Returns top queries for a given article (slug) from Search Console.
+    On auth failure returns 401 with code 'gsc_reauth_required'.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        slug = request.query_params.get('slug', '').strip()
+        try:
+            days = int(request.query_params.get('days', '28'))
+        except (TypeError, ValueError):
+            days = 28
+        days = max(1, min(days, 90))
+
+        if not slug:
+            return Response({'error': 'slug is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not site.gsc_property_url:
+            return Response(
+                {'error': 'No GSC property URL configured for this site.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not site.gsc_refresh_token:
+            return Response(
+                {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        config = _gsc_client_config()
+        if not config:
+            return Response(
+                {'error': 'GSC OAuth client not configured on the server.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            from datetime import date as _date, timedelta
+            from google.oauth2.credentials import Credentials
+            from google.auth.exceptions import RefreshError
+            from googleapiclient.discovery import build
+            from googleapiclient.errors import HttpError
+        except ImportError:
+            return Response(
+                {'error': 'Google API libraries are not installed.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Build a full page URL = property + slug/
+        property_url = site.gsc_property_url
+        if not property_url.endswith('/'):
+            property_url += '/'
+        page_url = property_url + slug.strip('/') + '/'
+
+        end = _date.today()
+        start = end - timedelta(days=days)
+
+        try:
+            creds = Credentials(
+                token=None,
+                refresh_token=site.gsc_refresh_token,
+                token_uri=GSC_TOKEN_URI,
+                client_id=config['web']['client_id'],
+                client_secret=config['web']['client_secret'],
+                scopes=GSC_SCOPES,
+            )
+            service = build(
+                'searchconsole', 'v1',
+                credentials=creds,
+                cache_discovery=False,
+            )
+            body = {
+                'startDate': start.isoformat(),
+                'endDate': end.isoformat(),
+                'dimensions': ['query'],
+                'rowLimit': 25,
+                'dimensionFilterGroups': [{
+                    'filters': [{
+                        'dimension': 'page',
+                        'operator': 'equals',
+                        'expression': page_url,
+                    }],
+                }],
+            }
+            resp = service.searchanalytics().query(
+                siteUrl=site.gsc_property_url,
+                body=body,
+            ).execute()
+        except RefreshError:
+            return Response(
+                {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except HttpError as e:
+            status_code = getattr(getattr(e, 'resp', None), 'status', 500)
+            if status_code in (401, 403):
+                return Response(
+                    {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            logger.exception("GSC searchanalytics HttpError")
+            return Response(
+                {'error': f'Search Console API error: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as e:
+            logger.exception("GSC searchanalytics failed")
+            return Response(
+                {'error': f'Unexpected error: {e}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        rows = resp.get('rows', []) or []
+        queries = []
+        for row in rows:
+            keys = row.get('keys') or []
+            query = keys[0] if keys else ''
+            queries.append({
+                'query': query,
+                'clicks': int(row.get('clicks', 0) or 0),
+                'impressions': int(row.get('impressions', 0) or 0),
+                'ctr': float(row.get('ctr', 0.0) or 0.0),
+                'position': float(row.get('position', 0.0) or 0.0),
+            })
+        queries.sort(key=lambda r: r['clicks'], reverse=True)
+        return Response({'page_url': page_url, 'days': days, 'queries': queries})

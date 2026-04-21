@@ -12,6 +12,7 @@ from .views import (
     PageSpeedView, LinkSuggestionsView, BacklinksView, SEOSchemaView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
+    GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
 )
 
 router = DefaultRouter()
@@ -45,6 +46,10 @@ urlpatterns = [
     path('page-speed/', PageSpeedView.as_view(), name='page-speed'),
     path('backlinks/', BacklinksView.as_view(), name='backlinks'),
     path('seo-schema/', SEOSchemaView.as_view(), name='seo-schema'),
+    # Google Search Console integration
+    path('sites/<int:site_id>/gsc/oauth-url/', GSCOAuthUrlView.as_view(), name='gsc-oauth-url'),
+    path('sites/<int:site_id>/gsc/oauth-callback/', GSCOAuthCallbackView.as_view(), name='gsc-oauth-callback'),
+    path('sites/<int:site_id>/gsc/queries/', GSCQueriesView.as_view(), name='gsc-queries'),
     # Public API — for site frontends
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),
