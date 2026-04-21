@@ -103,6 +103,27 @@ export function SEOAnalyzer({
   } | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
+    /*
+     * SEO weight rationale (2025 ranking factors)
+     * ------------------------------------------------------------------
+     * Weights are calibrated against Google's 2025 signal hierarchy, where
+     * keyword/intent alignment and content depth (E-E-A-T) dominate, while
+     * pure technical basics (meta tags, slug) play a diminished role.
+     *
+     * The heaviest weight (keyword = 25) reflects that query/intent
+     * alignment — the keyword living in the title, intro and H2s — is the
+     * single strongest on-page relevance signal Google still relies on in
+     * the post-HCU / AI Overview era. Content depth (word count = 15) and
+     * title relevance (15) come next, followed by structure (headings 12,
+     * internal links 10). Meta description (8), image alt-text (8), cover
+     * image (4) and slug (3) are secondary UX/CTR signals rather than
+     * direct ranking drivers.
+     *
+     * Good-state weights sum to exactly 100:
+     *   keyword 25 + word-count 15 + title 15 + headings 12 + links 10
+     *   + meta 8 + images 8 + cover 4 + slug 3 = 100
+     * ------------------------------------------------------------------
+     */
     const results: SEOCheck[] = [];
     const lang = i18n.language;
 
@@ -150,7 +171,7 @@ export function SEOAnalyzer({
         label: "Meta description",
         status: "good",
         detail: `${descLen}/160`,
-        score: 15,
+        score: 8,
       });
     } else if (descLen > 0 && descLen < 120) {
       results.push({
@@ -158,7 +179,7 @@ export function SEOAnalyzer({
         label: "Meta description",
         status: "warning",
         detail: lang === "fr" ? `${descLen}/160 - trop court` : `${descLen}/160 - too short`,
-        score: 8,
+        score: 4,
       });
     } else if (descLen > 160) {
       results.push({
@@ -166,7 +187,7 @@ export function SEOAnalyzer({
         label: "Meta description",
         status: "bad",
         detail: lang === "fr" ? `${descLen}/160 - trop long` : `${descLen}/160 - too long`,
-        score: 3,
+        score: 2,
       });
     } else {
       results.push({
@@ -186,7 +207,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "good",
         detail: `${words} ${lang === "fr" ? "mots" : "words"}`,
-        score: 10,
+        score: 15,
       });
     } else if (words >= 600) {
       results.push({
@@ -194,7 +215,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "warning",
         detail: `${words} ${lang === "fr" ? "mots - visez 1000+" : "words - aim for 1000+"}`,
-        score: 6,
+        score: 9,
       });
     } else {
       results.push({
@@ -202,7 +223,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Nombre de mots" : "Word count",
         status: "bad",
         detail: `${words} ${lang === "fr" ? "mots - trop court" : "words - too short"}`,
-        score: 2,
+        score: 3,
       });
     }
 
@@ -221,7 +242,7 @@ export function SEOAnalyzer({
           label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
           status: "good",
           detail: lang === "fr" ? `Présent dans titre, intro et H2` : `In title, intro and H2`,
-          score: 20,
+          score: 25,
         });
       } else if (hits >= 2) {
         results.push({
@@ -229,7 +250,7 @@ export function SEOAnalyzer({
           label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
           status: "warning",
           detail: lang === "fr" ? `Présent dans ${hits}/3 zones clés (titre, intro, H2)` : `In ${hits}/3 key zones`,
-          score: 12,
+          score: 15,
         });
       } else {
         results.push({
@@ -237,7 +258,7 @@ export function SEOAnalyzer({
           label: lang === "fr" ? "Mot-clé principal" : "Primary keyword",
           status: "bad",
           detail: lang === "fr" ? `Manque dans titre, intro ou H2` : `Missing in title/intro/H2`,
-          score: 4,
+          score: 5,
         });
       }
     }
@@ -279,7 +300,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Structure (H2/H3)" : "Structure (H2/H3)",
         status: "good",
         detail: `${headings.h2} H2, ${headings.h3} H3`,
-        score: 15,
+        score: 12,
       });
     } else if (headings.h2 >= 1) {
       results.push({
@@ -287,7 +308,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Structure (H2/H3)" : "Structure (H2/H3)",
         status: "warning",
         detail: lang === "fr" ? `${headings.h2} H2 - ajoutez-en plus` : `${headings.h2} H2 - add more`,
-        score: 8,
+        score: 6,
       });
     } else {
       results.push({
@@ -307,7 +328,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
         status: "good",
         detail: `${images.total} images, ${lang === "fr" ? "tous avec alt" : "all with alt"}`,
-        score: 15,
+        score: 8,
       });
     } else if (images.total > 0) {
       results.push({
@@ -315,7 +336,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
         status: "warning",
         detail: `${images.withAlt}/${images.total} ${lang === "fr" ? "avec alt-text" : "with alt-text"}`,
-        score: 8,
+        score: 4,
       });
     } else {
       results.push({
@@ -323,7 +344,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
         status: "bad",
         detail: lang === "fr" ? "Aucune image" : "No images",
-        score: 3,
+        score: 2,
       });
     }
 
@@ -334,7 +355,7 @@ export function SEOAnalyzer({
         label: lang === "fr" ? "Image de couverture" : "Cover image",
         status: "good",
         detail: "OK",
-        score: 10,
+        score: 4,
       });
     } else {
       results.push({
@@ -353,7 +374,7 @@ export function SEOAnalyzer({
         label: "Slug",
         status: "good",
         detail: `/${slug}`,
-        score: 5,
+        score: 3,
       });
     } else if (!slug) {
       results.push({
@@ -369,7 +390,7 @@ export function SEOAnalyzer({
         label: "Slug",
         status: "warning",
         detail: lang === "fr" ? "Trop long" : "Too long",
-        score: 3,
+        score: 1,
       });
     }
 
