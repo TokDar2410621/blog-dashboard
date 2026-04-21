@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     SiteViewSet, UserProfileView,
     SitePostsView, SitePostDetailView,
-    SiteStatsView, SiteCategoriesView, SiteTagsView,
+    SiteStatsView, SiteCategoriesView, SiteTagsView, SiteCannibalizationView,
     PexelsSearchView, SerperImageSearchView, GenerateImageView,
     GenerateArticleView, GenerateInlineView, GenerateTagsView,
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
@@ -24,6 +24,7 @@ urlpatterns = [
     path('sites/<int:site_id>/stats/', SiteStatsView.as_view(), name='site-stats'),
     path('sites/<int:site_id>/categories/', SiteCategoriesView.as_view(), name='site-categories'),
     path('sites/<int:site_id>/tags/', SiteTagsView.as_view(), name='site-tags'),
+    path('sites/<int:site_id>/cannibalization/', SiteCannibalizationView.as_view(), name='site-cannibalization'),
     path('sites/<int:site_id>/generate/', GenerateArticleView.as_view(), name='site-generate-article'),
     path('sites/<int:site_id>/generate-inline/', GenerateInlineView.as_view(), name='site-generate-inline'),
     path('pexels/search/', PexelsSearchView.as_view(), name='pexels-search'),

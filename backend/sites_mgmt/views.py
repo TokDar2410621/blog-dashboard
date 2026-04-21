@@ -423,6 +423,104 @@ class SitePostDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class SiteCannibalizationView(APIView):
+    """Detect cannibalization risks between published articles of a site.
+
+    Two articles compete for the same ranking when their titles or slugs are
+    highly similar AND they share the same language. We compute a similarity
+    based on title-token Jaccard + slug SequenceMatcher ratio.
+    """
+    permission_classes = [IsAuthenticated]
+
+    # Minimal FR+EN stopword list (kept inline to avoid external deps)
+    _STOPWORDS = {
+        # French
+        'les', 'des', 'une', 'aux', 'dans', 'pour', 'par', 'sur', 'avec', 'sans',
+        'est', 'sont', 'son', 'ses', 'leur', 'leurs', 'que', 'qui', 'quoi', 'dont',
+        'mais', 'donc', 'car', 'ainsi', 'aussi', 'plus', 'moins', 'tres', 'etre',
+        'avoir', 'faire', 'cela', 'cette', 'cet', 'ces', 'votre', 'notre', 'comme',
+        'tout', 'tous', 'toute', 'toutes', 'entre', 'chez', 'vers', 'depuis',
+        # English
+        'the', 'and', 'for', 'that', 'this', 'with', 'from', 'your', 'our', 'you',
+        'are', 'was', 'were', 'has', 'have', 'had', 'but', 'not', 'they', 'their',
+        'them', 'what', 'which', 'when', 'where', 'why', 'how', 'who', 'into',
+        'about', 'over', 'under', 'than', 'then', 'there', 'here', 'some', 'any',
+        'all', 'will', 'would', 'should', 'could', 'been', 'being',
+    }
+
+    def _title_tokens(self, title):
+        import re
+        words = re.findall(r"[\w]+", (title or '').lower(), flags=re.UNICODE)
+        return {w for w in words if len(w) >= 3 and w not in self._STOPWORDS}
+
+    def _jaccard(self, a, b):
+        if not a or not b:
+            return 0.0
+        inter = len(a & b)
+        union = len(a | b)
+        return inter / union if union else 0.0
+
+    def _compute_pairs(self, posts):
+        import difflib
+        # posts: list of dicts with title, slug, excerpt, language
+        enriched = []
+        for p in posts:
+            enriched.append({
+                **p,
+                '_tokens': self._title_tokens(p.get('title') or ''),
+            })
+
+        pairs = []
+        n = len(enriched)
+        for i in range(n):
+            a = enriched[i]
+            for j in range(i + 1, n):
+                b = enriched[j]
+                if (a.get('language') or '') != (b.get('language') or ''):
+                    continue
+                if a['slug'] == b['slug']:
+                    continue
+                tok_sim = self._jaccard(a['_tokens'], b['_tokens'])
+                slug_sim = difflib.SequenceMatcher(
+                    None, a['slug'] or '', b['slug'] or ''
+                ).ratio()
+                sim = max(tok_sim, slug_sim)
+                if sim < 0.55:
+                    continue
+                if tok_sim >= slug_sim:
+                    reason = f"Titres similaires ({int(tok_sim * 100)}% de mots communs)"
+                else:
+                    reason = f"Slugs similaires ({int(slug_sim * 100)}%)"
+                pairs.append({
+                    'slug_a': a['slug'],
+                    'slug_b': b['slug'],
+                    'title_a': a.get('title') or '',
+                    'title_b': b.get('title') or '',
+                    'language': a.get('language') or '',
+                    'similarity': round(sim, 3),
+                    'reason': reason,
+                })
+
+        pairs.sort(key=lambda p: p['similarity'], reverse=True)
+        return pairs[:30]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+
+        if site.is_hosted:
+            qs = HostedPost.objects.filter(site=site, status='published') \
+                .values('title', 'slug', 'excerpt', 'language')
+            posts = list(qs)
+        else:
+            alias = ensure_site_connection(site)
+            qs = BlogPost.objects.using(alias).filter(status='published') \
+                .values('title', 'slug', 'excerpt', 'language')
+            posts = list(qs)
+
+        pairs = self._compute_pairs(posts)
+        return Response({'pairs': pairs})
+
+
 class SiteStatsView(APIView):
     """Dashboard stats for a site."""
     permission_classes = [IsAuthenticated]
