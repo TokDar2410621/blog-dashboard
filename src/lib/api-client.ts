@@ -189,8 +189,9 @@ export async function fetchAllPosts(siteId: number, page = 1): Promise<Paginated
   return paginatedPostsSchema.parse(data);
 }
 
-export async function fetchPost(siteId: number, slug: string): Promise<PostDetail> {
-  const res = await authFetch(`/sites/${siteId}/posts/${slug}/`);
+export async function fetchPost(siteId: number, slug: string, language?: string): Promise<PostDetail> {
+  const suffix = language ? `?language=${encodeURIComponent(language)}` : "";
+  const res = await authFetch(`/sites/${siteId}/posts/${slug}/${suffix}`);
   if (!res.ok) throw new ApiError("Request failed", res.status, "REQUEST_FAILED");
   const data = await res.json();
   return postDetailSchema.parse(data);
@@ -209,8 +210,9 @@ export async function createPost(siteId: number, data: Record<string, unknown>):
   return postDetailSchema.parse(json);
 }
 
-export async function updatePost(siteId: number, slug: string, data: Record<string, unknown>): Promise<PostDetail> {
-  const res = await authFetch(`/sites/${siteId}/posts/${slug}/`, {
+export async function updatePost(siteId: number, slug: string, data: Record<string, unknown>, language?: string): Promise<PostDetail> {
+  const suffix = language ? `?language=${encodeURIComponent(language)}` : "";
+  const res = await authFetch(`/sites/${siteId}/posts/${slug}/${suffix}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -222,8 +224,9 @@ export async function updatePost(siteId: number, slug: string, data: Record<stri
   return postDetailSchema.parse(json);
 }
 
-export async function deletePost(siteId: number, slug: string): Promise<void> {
-  const res = await authFetch(`/sites/${siteId}/posts/${slug}/`, { method: "DELETE" });
+export async function deletePost(siteId: number, slug: string, language?: string): Promise<void> {
+  const suffix = language ? `?language=${encodeURIComponent(language)}` : "";
+  const res = await authFetch(`/sites/${siteId}/posts/${slug}/${suffix}`, { method: "DELETE" });
   if (!res.ok) throw new ApiError("Request failed", res.status, "REQUEST_FAILED");
 }
 

@@ -285,27 +285,44 @@ class SitePostDetailView(APIView):
 
     def get(self, request, site_id, slug):
         site = get_site_for_user(request, site_id)
+        language = request.query_params.get('language')
+
         if site.is_hosted:
-            post = get_object_or_404(
-                HostedPost.objects.select_related('category').prefetch_related('tags'),
-                site=site, slug=slug
-            )
+            qs = HostedPost.objects.filter(site=site, slug=slug) \
+                .select_related('category').prefetch_related('tags')
+            if language:
+                qs = qs.filter(language=language)
+            post = qs.first()
+            if not post:
+                from django.http import Http404
+                raise Http404
             return Response(_serialize_hosted_post(post))
 
         alias = ensure_site_connection(site)
-        post = get_object_or_404(
-            BlogPost.objects.using(alias).select_related('category').prefetch_related('tags'),
-            slug=slug
-        )
+        qs = BlogPost.objects.using(alias).filter(slug=slug) \
+            .select_related('category').prefetch_related('tags')
+        if language:
+            qs = qs.filter(language=language)
+        post = qs.first()
+        if not post:
+            from django.http import Http404
+            raise Http404
         serializer = BlogPostDetailSerializer(post)
         return Response(serializer.data)
 
     def patch(self, request, site_id, slug):
         site = get_site_for_user(request, site_id)
         data = request.data
+        language = request.query_params.get('language')
 
         if site.is_hosted:
-            post = get_object_or_404(HostedPost, site=site, slug=slug)
+            hosted_qs = HostedPost.objects.filter(site=site, slug=slug)
+            if language:
+                hosted_qs = hosted_qs.filter(language=language)
+            post = hosted_qs.first()
+            if not post:
+                from django.http import Http404
+                raise Http404
             for field in ['title', 'slug', 'excerpt', 'content', 'author',
                           'cover_image', 'reading_time', 'featured', 'status',
                           'scheduled_at', 'published_at', 'language', 'translation_group']:
@@ -331,7 +348,13 @@ class SitePostDetailView(APIView):
             return Response(_serialize_hosted_post(post))
 
         alias = ensure_site_connection(site)
-        post = get_object_or_404(BlogPost.objects.using(alias), slug=slug)
+        ext_qs = BlogPost.objects.using(alias).filter(slug=slug)
+        if language:
+            ext_qs = ext_qs.filter(language=language)
+        post = ext_qs.first()
+        if not post:
+            from django.http import Http404
+            raise Http404
 
         content_format = (site.blog_config or {}).get('content_format', 'markdown')
         if content_format == 'html' and 'content' in data:
@@ -371,14 +394,27 @@ class SitePostDetailView(APIView):
 
     def delete(self, request, site_id, slug):
         site = get_site_for_user(request, site_id)
+        language = request.query_params.get('language')
+        from django.http import Http404
+
         if site.is_hosted:
-            post = get_object_or_404(HostedPost, site=site, slug=slug)
+            qs = HostedPost.objects.filter(site=site, slug=slug)
+            if language:
+                qs = qs.filter(language=language)
+            post = qs.first()
+            if not post:
+                raise Http404
             post.delete()
             trigger_vercel_deploy(site)
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         alias = ensure_site_connection(site)
-        post = get_object_or_404(BlogPost.objects.using(alias), slug=slug)
+        qs = BlogPost.objects.using(alias).filter(slug=slug)
+        if language:
+            qs = qs.filter(language=language)
+        post = qs.first()
+        if not post:
+            raise Http404
         post.delete(using=alias)
         trigger_vercel_deploy(site)
         return Response(status=status.HTTP_204_NO_CONTENT)
