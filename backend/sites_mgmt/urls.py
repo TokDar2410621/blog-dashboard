@@ -9,7 +9,7 @@ from .views import (
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
     SEOSynonymsView, SEOCacheClearView, TranslatePostView, CompetitorAnalysisView,
     KeywordResearchView,
-    PageSpeedView, TranslatePostView,
+    PageSpeedView, LinkSuggestionsView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -27,6 +27,7 @@ urlpatterns = [
     path('sites/<int:site_id>/cannibalization/', SiteCannibalizationView.as_view(), name='site-cannibalization'),
     path('sites/<int:site_id>/generate/', GenerateArticleView.as_view(), name='site-generate-article'),
     path('sites/<int:site_id>/generate-inline/', GenerateInlineView.as_view(), name='site-generate-inline'),
+    path('sites/<int:site_id>/link-suggestions/', LinkSuggestionsView.as_view(), name='site-link-suggestions'),
     path('pexels/search/', PexelsSearchView.as_view(), name='pexels-search'),
     path('serper/images/', SerperImageSearchView.as_view(), name='serper-images'),
     path('generate-image/', GenerateImageView.as_view(), name='generate-image'),

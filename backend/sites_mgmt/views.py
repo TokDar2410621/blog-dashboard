@@ -1408,7 +1408,7 @@ class SEOSynonymsView(APIView):
     """Generate synonyms, variants and translations for a keyword using Gemini.
 
     Used by the frontend SEO analyzer to perform semantic keyword matching
-    (e.g. 'SEO' should match 'référencement' in French content).
+    (e.g. 'SEO' should match 'rÃ©fÃ©rencement' in French content).
     """
     permission_classes = [IsAuthenticated]
 
@@ -1447,7 +1447,7 @@ Target language: {lang_label}
 Rules:
 - Return short terms (1-3 words each).
 - Include the keyword itself if it's the most natural form.
-- Include common translations between French and English so a French article using "référencement" matches the keyword "SEO".
+- Include common translations between French and English so a French article using "rÃ©fÃ©rencement" matches the keyword "SEO".
 - Do NOT include generic unrelated words.
 
 Respond in JSON format only (no markdown, no code blocks):
@@ -1530,12 +1530,12 @@ class KeywordResearchView(APIView):
     permission_classes = [IsAuthenticated]
 
     COMMERCIAL_TOKENS = (
-        'prix', 'price', 'acheter', 'buy', 'cost', 'cout', 'coût', 'pas cher',
+        'prix', 'price', 'acheter', 'buy', 'cost', 'cout', 'coÃ»t', 'pas cher',
         'cheap', 'deal', 'promo', 'discount', 'tarif', 'abonnement', 'subscription',
     )
     TRANSACTIONAL_TOKENS = (
-        'commander', 'order', 'telecharger', 'télécharger', 'download',
-        'inscription', 'signup', 'sign up', 'reserver', 'réserver', 'book',
+        'commander', 'order', 'telecharger', 'tÃ©lÃ©charger', 'download',
+        'inscription', 'signup', 'sign up', 'reserver', 'rÃ©server', 'book',
         'login', 'se connecter',
     )
     NAVIGATIONAL_TOKENS = (
@@ -1545,11 +1545,11 @@ class KeywordResearchView(APIView):
     INFORMATIONAL_TOKENS = (
         'comment', 'how', 'pourquoi', 'why', 'qu\'est-ce', 'what is', 'what',
         'guide', 'tutoriel', 'tutorial', 'exemple', 'example', 'definition',
-        'définition', 'qui', 'who', 'quand', 'when',
+        'dÃ©finition', 'qui', 'who', 'quand', 'when',
     )
 
     def _estimate_intent(self, keyword):
-        """Infer intent from keyword tokens — lightweight heuristic."""
+        """Infer intent from keyword tokens â€” lightweight heuristic."""
         kw = keyword.lower()
         for token in self.TRANSACTIONAL_TOKENS:
             if token in kw:
@@ -1590,7 +1590,7 @@ class KeywordResearchView(APIView):
         deadline = time.monotonic() + 60.0
         collected = []  # list of (keyword, source)
 
-        # 1) Serper — relatedSearches + peopleAlsoAsk
+        # 1) Serper â€” relatedSearches + peopleAlsoAsk
         if serper_key:
             try:
                 remaining = max(1.0, deadline - time.monotonic())
@@ -1618,7 +1618,7 @@ class KeywordResearchView(APIView):
             except Exception as e:
                 logger.warning('Serper keyword research failed: %s', e)
 
-        # 2) Gemini — generate 10 long-tail variants
+        # 2) Gemini â€” generate 10 long-tail variants
         if gemini_key and (deadline - time.monotonic()) > 2.0:
             try:
                 from google import genai
@@ -1766,6 +1766,148 @@ class PageSpeedView(APIView):
             logger.exception('PageSpeed parsing failed')
             return Response(
                 {'error': f'Erreur parsing PageSpeed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class LinkSuggestionsView(APIView):
+    """Suggest internal links (existing site articles) for the current draft using Gemini."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+
+        title = request.data.get('title', '')
+        content = request.data.get('content', '')
+        current_slug = request.data.get('current_slug', '')
+        language = request.data.get('language', 'fr')
+
+        if not title and not content:
+            return Response(
+                {'error': 'Titre ou contenu requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Fetch candidate articles (published, same language, excluding current slug)
+        lang = language if language in ('fr', 'en', 'es') else 'fr'
+        candidates = []
+
+        if site.is_hosted:
+            qs = (
+                HostedPost.objects
+                .filter(site=site, language=lang, status='published')
+                .order_by('-published_at', '-created_at')
+            )
+            if current_slug:
+                qs = qs.exclude(slug=current_slug)
+            for p in qs[:50]:
+                candidates.append({
+                    'slug': p.slug,
+                    'title': p.title,
+                    'excerpt': (p.excerpt or '')[:300],
+                })
+        else:
+            try:
+                alias = ensure_site_connection(site)
+                qs = (
+                    BlogPost.objects.using(alias)
+                    .filter(language=lang, status='published')
+                    .order_by('-published_at', '-created_at')
+                )
+                if current_slug:
+                    qs = qs.exclude(slug=current_slug)
+                for p in qs[:50]:
+                    candidates.append({
+                        'slug': p.slug,
+                        'title': p.title,
+                        'excerpt': (getattr(p, 'excerpt', '') or '')[:300],
+                    })
+            except Exception as e:
+                return Response(
+                    {'error': f'Erreur connexion site: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        if not candidates:
+            return Response({'suggestions': []})
+
+        try:
+            from google import genai
+            import json
+
+            client = genai.Client(api_key=api_key)
+            prompt = (
+                "You are an SEO internal linking assistant. Given a draft article and a list "
+                "of existing articles on the same site, identify up to 5 highly relevant articles "
+                "to link to from the draft, and propose a natural anchor text + a short sentence "
+                "or phrase from the draft content where the link should be inserted.\n\n"
+                f"Draft title: {title}\n"
+                f"Draft content (first 3000 chars): {content[:3000]}\n\n"
+                "Existing articles (JSON):\n"
+                f"{json.dumps(candidates, ensure_ascii=False)}\n\n"
+                "Respond in JSON only:\n"
+                "{\n"
+                '  "suggestions": [\n'
+                '    {"slug": "...", "title": "...", "anchor_text": "...", '
+                '"insert_hint": "quote a sentence or phrase from the draft where this link fits naturally", '
+                '"reason": "why this link adds value"}\n'
+                "  ]\n"
+                "}"
+            )
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+            )
+
+            text = response.text.strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError:
+                return Response(
+                    {'error': 'Erreur parsing reponse IA'},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            # Only return suggestions whose slug is in our candidate list
+            valid_slugs = {c['slug']: c['title'] for c in candidates}
+            raw_suggestions = data.get('suggestions', []) or []
+            suggestions = []
+            for s in raw_suggestions[:5]:
+                slug = s.get('slug', '')
+                if slug in valid_slugs:
+                    suggestions.append({
+                        'slug': slug,
+                        'title': s.get('title') or valid_slugs[slug],
+                        'anchor_text': s.get('anchor_text', ''),
+                        'insert_hint': s.get('insert_hint', ''),
+                        'reason': s.get('reason', ''),
+                    })
+
+            return Response({'suggestions': suggestions})
+
+        except Exception as e:
+            error_msg = str(e)
+            if 'RESOURCE_EXHAUSTED' in error_msg or 'quota' in error_msg.lower():
+                return Response(
+                    {'error': 'Quota Gemini epuise'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            return Response(
+                {'error': f'Erreur suggestions de liens: {error_msg}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
