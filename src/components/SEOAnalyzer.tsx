@@ -43,13 +43,84 @@ function extractHeadings(markdown: string): { h2: number; h3: number } {
   return { h2, h3 };
 }
 
-function countImages(markdown: string): { total: number; withAlt: number } {
+interface AltTextAnalysis {
+  total: number;
+  withQuality: number;
+  withGeneric: number;
+  duplicates: number;
+  missing: number;
+  tooLong: number;
+}
+
+const GENERIC_ALT_LIST = ["image", "photo", "picture", "img", "bild", "cover"];
+const GENERIC_ALT_REGEX = /^(image|photo|pic|img|picture)\s*\d*$/i;
+const DIGITS_OR_WHITESPACE_REGEX = /^[\d\s]+$/;
+
+function isGenericAlt(alt: string): boolean {
+  const trimmed = alt.trim();
+  if (trimmed.length === 0) return false; // empty = missing, not generic
+  if (trimmed.length < 5) return true;
+  if (GENERIC_ALT_REGEX.test(trimmed)) return true;
+  if (DIGITS_OR_WHITESPACE_REGEX.test(trimmed)) return true;
+  if (GENERIC_ALT_LIST.includes(trimmed.toLowerCase())) return true;
+  return false;
+}
+
+function analyzeAltTexts(markdown: string): AltTextAnalysis {
   const images = markdown.match(/!\[([^\]]*)\]\([^)]+\)/g) || [];
-  const withAlt = images.filter((img: string) => {
-    const alt = img.match(/!\[([^\]]*)\]/)?.[1];
-    return alt && alt.trim().length > 0;
-  }).length;
-  return { total: images.length, withAlt };
+  const alts: string[] = images.map((img) => {
+    const m = img.match(/!\[([^\]]*)\]/);
+    return m?.[1] ?? "";
+  });
+
+  // Find duplicates among non-empty alts (case-insensitive, trimmed)
+  const altCounts = new Map<string, number>();
+  for (const alt of alts) {
+    const key = alt.trim().toLowerCase();
+    if (key.length === 0) continue;
+    altCounts.set(key, (altCounts.get(key) || 0) + 1);
+  }
+  const duplicateKeys = new Set<string>();
+  for (const [key, count] of altCounts.entries()) {
+    if (count > 1) duplicateKeys.add(key);
+  }
+
+  let withQuality = 0;
+  let withGeneric = 0;
+  let duplicates = 0;
+  let missing = 0;
+  let tooLong = 0;
+
+  for (const alt of alts) {
+    const trimmed = alt.trim();
+    const key = trimmed.toLowerCase();
+
+    if (trimmed.length === 0) {
+      missing++;
+      continue;
+    }
+
+    const isDuplicate = duplicateKeys.has(key);
+    const generic = isGenericAlt(trimmed);
+    const long = trimmed.length > 125;
+
+    if (isDuplicate) duplicates++;
+    if (generic) withGeneric++;
+    if (long) tooLong++;
+
+    if (!isDuplicate && !generic && !long && trimmed.length >= 5 && trimmed.length <= 125) {
+      withQuality++;
+    }
+  }
+
+  return {
+    total: images.length,
+    withQuality,
+    withGeneric,
+    duplicates,
+    missing,
+    tooLong,
+  };
 }
 
 function countInternalLinks(markdown: string): number {
@@ -320,31 +391,106 @@ export function SEOAnalyzer({
       });
     }
 
-    // Images & alt text
-    const images = countImages(content);
-    if (images.total > 0 && images.withAlt === images.total) {
+    // Images & alt text (quality-aware)
+    const images = analyzeAltTexts(content);
+    const imagesLabel = lang === "fr" ? "Images & alt-text" : "Images & alt-text";
+    const imgWord = lang === "fr" ? "images" : "images";
+
+    if (images.total === 0) {
       results.push({
         id: "images",
-        label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
-        status: "good",
-        detail: `${images.total} images, ${lang === "fr" ? "tous avec alt" : "all with alt"}`,
-        score: 8,
-      });
-    } else if (images.total > 0) {
-      results.push({
-        id: "images",
-        label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
-        status: "warning",
-        detail: `${images.withAlt}/${images.total} ${lang === "fr" ? "avec alt-text" : "with alt-text"}`,
-        score: 4,
-      });
-    } else {
-      results.push({
-        id: "images",
-        label: lang === "fr" ? "Images & alt-text" : "Images & alt-text",
+        label: imagesLabel,
         status: "bad",
         detail: lang === "fr" ? "Aucune image" : "No images",
         score: 2,
+      });
+    } else if (images.withQuality === images.total) {
+      // GOOD: all alts are high quality
+      results.push({
+        id: "images",
+        label: imagesLabel,
+        status: "good",
+        detail:
+          lang === "fr"
+            ? `${images.total} ${imgWord} — tous avec alt descriptif`
+            : `${images.total} ${imgWord} — all with descriptive alt`,
+        score: 15,
+      });
+    } else if (images.withQuality === 0) {
+      // BAD: nothing usable — all generic / duplicate / missing / too long
+      const parts: string[] = [];
+      if (images.missing > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.missing} sans alt`
+            : `${images.missing} missing alt`
+        );
+      }
+      if (images.withGeneric > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.withGeneric} générique${images.withGeneric > 1 ? "s" : ""}`
+            : `${images.withGeneric} generic`
+        );
+      }
+      if (images.duplicates > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.duplicates} doublon${images.duplicates > 1 ? "s" : ""}`
+            : `${images.duplicates} duplicate${images.duplicates > 1 ? "s" : ""}`
+        );
+      }
+      if (images.tooLong > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.tooLong} trop long${images.tooLong > 1 ? "s" : ""}`
+            : `${images.tooLong} too long`
+        );
+      }
+      results.push({
+        id: "images",
+        label: imagesLabel,
+        status: "bad",
+        detail: `${images.total} ${imgWord} — ${parts.join(", ")}`,
+        score: 2,
+      });
+    } else {
+      // WARNING: some quality, but generic/duplicate/tooLong/missing present
+      const parts: string[] = [];
+      if (images.missing > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.missing} sans alt`
+            : `${images.missing} missing alt`
+        );
+      }
+      if (images.withGeneric > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.withGeneric} générique${images.withGeneric > 1 ? "s" : ""}`
+            : `${images.withGeneric} generic`
+        );
+      }
+      if (images.duplicates > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.duplicates} doublon${images.duplicates > 1 ? "s" : ""}`
+            : `${images.duplicates} duplicate${images.duplicates > 1 ? "s" : ""}`
+        );
+      }
+      if (images.tooLong > 0) {
+        parts.push(
+          lang === "fr"
+            ? `${images.tooLong} trop long${images.tooLong > 1 ? "s" : ""}`
+            : `${images.tooLong} too long`
+        );
+      }
+      results.push({
+        id: "images",
+        label: imagesLabel,
+        status: "warning",
+        detail: `${images.total} ${imgWord} — ${parts.join(", ")}`,
+        score: 8,
       });
     }
 
