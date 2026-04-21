@@ -21,6 +21,7 @@ export const siteSchema = z.object({
   database_url: z.string().optional(),
   knowledge_base: z.string().optional(),
   vercel_deploy_hook: z.string().optional(),
+  gsc_property_url: z.string().optional(),
   api_key: z.string().optional(),
   is_hosted: z.boolean().optional(),
   blog_config: z.record(z.string(), z.unknown()).nullable().optional(),

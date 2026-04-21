@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,15 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  BarChart3,
 } from "lucide-react";
-import { fetchSEOSuggestions } from "@/lib/api-client";
+import {
+  fetchSEOSuggestions,
+  fetchGSCOAuthUrl,
+  fetchGSCQueries,
+  ApiError,
+  type GSCQueryRow,
+} from "@/lib/api-client";
 import { toast } from "sonner";
 
 interface SEOAnalyzerProps {
@@ -22,6 +29,8 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  siteId?: number;
+  articleUrl?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
 }
 
@@ -82,6 +91,8 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  siteId,
+  articleUrl,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -101,6 +112,80 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+
+  // --- Search Console (real perf) state ---
+  const [gscLoading, setGscLoading] = useState(false);
+  const [gscQueries, setGscQueries] = useState<GSCQueryRow[] | null>(null);
+  const [gscNeedsAuth, setGscNeedsAuth] = useState(false);
+  const [gscError, setGscError] = useState<string | null>(null);
+  const [gscConnecting, setGscConnecting] = useState(false);
+
+  const canFetchGsc = !!siteId && !!slug;
+
+  useEffect(() => {
+    if (!canFetchGsc) return;
+    let cancelled = false;
+    setGscLoading(true);
+    setGscError(null);
+    setGscNeedsAuth(false);
+    fetchGSCQueries(siteId as number, slug)
+      .then((data) => {
+        if (cancelled) return;
+        setGscQueries(data.queries);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          setGscNeedsAuth(true);
+          setGscQueries(null);
+        } else if (err instanceof ApiError) {
+          setGscError(err.message || "Search Console error");
+          setGscQueries(null);
+        } else {
+          setGscError("Search Console error");
+          setGscQueries(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setGscLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canFetchGsc, siteId, slug]);
+
+  const handleConnectGsc = async () => {
+    if (!siteId) return;
+    setGscConnecting(true);
+    try {
+      const { url } = await fetchGSCOAuthUrl(siteId);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : i18n.language === "fr"
+            ? "Impossible d'obtenir l'URL OAuth"
+            : "Failed to get OAuth URL";
+      toast.error(msg);
+    } finally {
+      setGscConnecting(false);
+    }
+  };
+
+  // Real perf score: capped(clicks * 2 + impressions / 100, 100).
+  const gscPerfScore = useMemo(() => {
+    if (!gscQueries || gscQueries.length === 0) return 0;
+    const totalClicks = gscQueries.reduce((s, q) => s + q.clicks, 0);
+    const totalImpr = gscQueries.reduce((s, q) => s + q.impressions, 0);
+    const raw = totalClicks * 2 + totalImpr / 100;
+    return Math.min(100, Math.round(raw));
+  }, [gscQueries]);
+
+  const sortedGscQueries = useMemo(() => {
+    if (!gscQueries) return [];
+    return [...gscQueries].sort((a, b) => b.clicks - a.clicks);
+  }, [gscQueries]);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -766,6 +851,150 @@ export function SEOAnalyzer({
           )}
         </CardContent>
       </Card>
+
+      {/* Search Console (real perf) */}
+      {canFetchGsc && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              {i18n.language === "fr"
+                ? "Search Console (vraie perf)"
+                : "Search Console (real performance)"}
+            </CardTitle>
+            {articleUrl && (
+              <p className="text-xs text-muted-foreground truncate">
+                {articleUrl}
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            {gscLoading && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr" ? "Chargement..." : "Loading..."}
+              </div>
+            )}
+
+            {!gscLoading && gscNeedsAuth && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  {i18n.language === "fr"
+                    ? "Connecte ton compte Google Search Console pour voir les vraies impressions et clics."
+                    : "Connect your Google Search Console account to see real impressions and clicks."}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleConnectGsc}
+                  disabled={gscConnecting}
+                >
+                  {gscConnecting ? (
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <BarChart3 className="h-4 w-4 mr-1.5" />
+                  )}
+                  {i18n.language === "fr"
+                    ? "Connecter Google Search Console"
+                    : "Connect Google Search Console"}
+                </Button>
+              </div>
+            )}
+
+            {!gscLoading && !gscNeedsAuth && gscError && (
+              <p className="text-xs text-red-500">{gscError}</p>
+            )}
+
+            {!gscLoading && !gscNeedsAuth && !gscError && gscQueries && (
+              <>
+                {gscQueries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {i18n.language === "fr"
+                      ? "Aucune donnée Search Console pour cet article sur la période."
+                      : "No Search Console data for this article in the range."}
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${
+                          gscPerfScore >= 70
+                            ? "bg-green-500/10 text-green-500"
+                            : gscPerfScore >= 40
+                              ? "bg-yellow-500/10 text-yellow-500"
+                              : "bg-red-500/10 text-red-500"
+                        }`}
+                      >
+                        {gscPerfScore}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {i18n.language === "fr"
+                            ? "Score perf réelle"
+                            : "Real perf score"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {i18n.language === "fr"
+                            ? "Basé sur clics & impressions"
+                            : "Based on clicks & impressions"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-muted-foreground border-b">
+                            <th className="py-1.5 pr-2 font-medium">
+                              {i18n.language === "fr" ? "Requête" : "Query"}
+                            </th>
+                            <th className="py-1.5 px-2 font-medium text-right">
+                              {i18n.language === "fr" ? "Clics" : "Clicks"}
+                            </th>
+                            <th className="py-1.5 px-2 font-medium text-right">
+                              Impr.
+                            </th>
+                            <th className="py-1.5 px-2 font-medium text-right">
+                              CTR
+                            </th>
+                            <th className="py-1.5 pl-2 font-medium text-right">
+                              {i18n.language === "fr" ? "Pos." : "Pos."}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedGscQueries.map((row) => (
+                            <tr
+                              key={row.query}
+                              className="border-b last:border-0"
+                            >
+                              <td className="py-1.5 pr-2 truncate max-w-[180px]">
+                                {row.query}
+                              </td>
+                              <td className="py-1.5 px-2 text-right">
+                                {row.clicks}
+                              </td>
+                              <td className="py-1.5 px-2 text-right">
+                                {row.impressions}
+                              </td>
+                              <td className="py-1.5 px-2 text-right">
+                                {(row.ctr * 100).toFixed(1)}%
+                              </td>
+                              <td className="py-1.5 pl-2 text-right">
+                                {row.position.toFixed(1)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

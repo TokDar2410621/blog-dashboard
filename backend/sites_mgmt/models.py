@@ -38,6 +38,14 @@ class Site(models.Model):
         verbose_name="Vercel Deploy Hook",
         help_text="URL du Deploy Hook Vercel pour redéployer le site après modification d'articles"
     )
+    gsc_property_url = models.URLField(
+        max_length=300, blank=True, default='',
+        help_text="URL de la propriété Search Console (ex: https://tokamdarius.ca/)"
+    )
+    gsc_refresh_token = models.TextField(
+        blank=True, default='',
+        help_text="OAuth2 refresh token chiffré"
+    )
     blog_config = models.JSONField(
         blank=True, null=True, default=None,
         verbose_name="Config tables blog",

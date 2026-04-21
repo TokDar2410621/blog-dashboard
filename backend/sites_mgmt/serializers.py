@@ -9,7 +9,8 @@ class SiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Site
         fields = ['id', 'name', 'database_url', 'domain', 'knowledge_base',
-                  'vercel_deploy_hook', 'api_key', 'is_hosted', 'created_at']
+                  'vercel_deploy_hook', 'gsc_property_url',
+                  'api_key', 'is_hosted', 'created_at']
         read_only_fields = ['id', 'created_at', 'api_key', 'is_hosted']
         extra_kwargs = {
             'database_url': {'required': False, 'allow_blank': True},
