@@ -32,3 +32,6 @@ backend/media/
 backend/staticfiles/
 backend/.env
 *.pyc
+
+# Claude worktrees (agent branches)
+.claude/

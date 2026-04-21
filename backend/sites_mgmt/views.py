@@ -1508,6 +1508,140 @@ Respond in JSON only (no markdown blocks):
             )
 
 
+class CompetitorAnalysisView(APIView):
+    """Analyze top 10 Google SERP competitors for a keyword via Serper."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        import re
+        from statistics import median
+
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if language == 'en':
+            hl, gl = 'en', 'us'
+        else:
+            hl, gl = 'fr', 'ca'
+
+        try:
+            serper_resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={
+                    'X-API-KEY': api_key,
+                    'Content-Type': 'application/json',
+                },
+                json={'q': keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                timeout=10,
+            )
+        except http_requests.Timeout:
+            return Response(
+                {'error': 'Delai de requete Serper depasse'},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Serper: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if serper_resp.status_code != 200:
+            return Response(
+                {'error': f'Erreur Serper: {serper_resp.status_code}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        organic = (serper_resp.json() or {}).get('organic', []) or []
+        organic = organic[:10]
+
+        tag_re = re.compile(r'<[^>]+>')
+        h2_re = re.compile(r'<h2[\s>]', re.IGNORECASE)
+        meta_re = re.compile(
+            r'<meta\s+[^>]*name=["\']description["\'][^>]*content=["\']([^"\']*)["\']',
+            re.IGNORECASE,
+        )
+        meta_re_alt = re.compile(
+            r'<meta\s+[^>]*content=["\']([^"\']*)["\'][^>]*name=["\']description["\']',
+            re.IGNORECASE,
+        )
+        script_re = re.compile(r'<(script|style)[^>]*>.*?</\1>', re.IGNORECASE | re.DOTALL)
+        ws_re = re.compile(r'\s+')
+
+        results = []
+        for idx, item in enumerate(organic, start=1):
+            url = item.get('link') or ''
+            entry = {
+                'rank': idx,
+                'url': url,
+                'title': item.get('title') or '',
+                'snippet': item.get('snippet') or '',
+                'word_count': None,
+                'h2_count': None,
+                'meta_description': None,
+                'fetch_error': False,
+            }
+
+            if not url:
+                entry['fetch_error'] = True
+                results.append(entry)
+                continue
+
+            try:
+                resp = http_requests.get(
+                    url,
+                    timeout=6,
+                    headers={'User-Agent': 'Mozilla/5.0 BlogDashboard/1.0'},
+                )
+                if not resp.ok:
+                    entry['fetch_error'] = True
+                    results.append(entry)
+                    continue
+                html = resp.text or ''
+
+                # H2 count on raw HTML
+                entry['h2_count'] = len(h2_re.findall(html))
+
+                # Meta description
+                m = meta_re.search(html) or meta_re_alt.search(html)
+                entry['meta_description'] = m.group(1).strip() if m else None
+
+                # Word count of visible text
+                cleaned = script_re.sub(' ', html)
+                text = tag_re.sub(' ', cleaned)
+                text = ws_re.sub(' ', text).strip()
+                entry['word_count'] = len([w for w in text.split(' ') if w]) if text else 0
+
+            except Exception:
+                entry['fetch_error'] = True
+
+            results.append(entry)
+
+        word_counts = [r['word_count'] for r in results if r['word_count'] is not None]
+        h2_counts = [r['h2_count'] for r in results if r['h2_count'] is not None]
+        median_words = int(median(word_counts)) if word_counts else None
+        median_h2 = int(median(h2_counts)) if h2_counts else None
+
+        return Response({
+            'results': results,
+            'keyword': keyword,
+            'median_words': median_words,
+            'median_h2': median_h2,
+        })
+
+
 # ==========================================================================
 # PUBLIC API — consumed by site frontends (no auth, optional API key check)
 # ==========================================================================

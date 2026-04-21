@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  Users,
+  ExternalLink,
 } from "lucide-react";
 import { authFetch, fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -193,6 +195,24 @@ export function SEOAnalyzer({
     keywords?: string[];
   } | null>(null);
   const [synonyms, setSynonyms] = useState<string[]>([]);
+  const [competitorLoading, setCompetitorLoading] = useState(false);
+  const [competitorData, setCompetitorData] = useState<{
+    results: Array<{
+      rank: number;
+      url: string;
+      title: string;
+      snippet: string;
+      word_count: number | null;
+      h2_count: number | null;
+      meta_description: string | null;
+      fetch_error: boolean;
+    }>;
+    keyword: string;
+    median_words: number | null;
+    median_h2: number | null;
+  } | null>(null);
+
+  const userWordCount = useMemo(() => countWords(content), [content]);
 
   // Debounced fetch of semantic synonyms for the primary keyword so that
   // matching can span languages/variants (e.g. "SEO" ↔ "référencement").
@@ -705,6 +725,32 @@ export function SEOAnalyzer({
     }
   };
 
+  const handleCompetitorAnalysis = async () => {
+    if (!keyword.trim()) return;
+    setCompetitorLoading(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/competitors/", {
+        method: "POST",
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          language: i18n.language,
+        }),
+      });
+      if (!res.ok) throw new Error("Competitor analysis failed");
+      const data = await res.json();
+      setCompetitorData(data);
+    } catch {
+      toast.error(
+        i18n.language === "fr"
+          ? "Erreur analyse concurrence"
+          : "Competitor analysis error"
+      );
+    } finally {
+      setCompetitorLoading(false);
+    }
+  };
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === "good") return <CheckCircle className="h-4 w-4 text-green-500" />;
     if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -988,6 +1034,142 @@ export function SEOAnalyzer({
                     ))}
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Competitor Analysis */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            {i18n.language === "fr"
+              ? "Analyse de la concurrence"
+              : "Competitor analysis"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCompetitorAnalysis}
+            disabled={competitorLoading || !keyword.trim()}
+          >
+            {competitorLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr"
+                  ? "Analyse en cours..."
+                  : "Analyzing..."}
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4 mr-1.5" />
+                {i18n.language === "fr"
+                  ? "Analyser le top 10"
+                  : "Analyze top 10"}
+              </>
+            )}
+          </Button>
+
+          {!keyword.trim() && (
+            <p className="text-xs text-muted-foreground">
+              {i18n.language === "fr"
+                ? "Definissez un mot-cle principal pour activer l'analyse."
+                : "Set a primary keyword to enable analysis."}
+            </p>
+          )}
+
+          {competitorData && (
+            <div className="space-y-3 pt-2 border-t">
+              {competitorData.median_words !== null && (
+                <div
+                  className={`text-xs p-2 rounded ${
+                    userWordCount >= competitorData.median_words
+                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                      : "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                  }`}
+                >
+                  {i18n.language === "fr"
+                    ? `Votre article fait ${userWordCount} mots, la mediane est ${competitorData.median_words} — vous etes ${
+                        userWordCount >= competitorData.median_words
+                          ? "au-dessus"
+                          : "sous"
+                      }`
+                    : `Your article is ${userWordCount} words, median is ${competitorData.median_words} — you are ${
+                        userWordCount >= competitorData.median_words
+                          ? "above"
+                          : "below"
+                      }`}
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="py-1.5 pr-2 font-medium">#</th>
+                      <th className="py-1.5 pr-2 font-medium">
+                        {i18n.language === "fr" ? "Titre" : "Title"}
+                      </th>
+                      <th className="py-1.5 pr-2 font-medium text-right">
+                        {i18n.language === "fr" ? "Mots" : "Words"}
+                      </th>
+                      <th className="py-1.5 font-medium text-right">H2</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {competitorData.results.map((r) => {
+                      const isBehind =
+                        r.word_count !== null &&
+                        userWordCount < r.word_count;
+                      return (
+                        <tr
+                          key={r.rank}
+                          className={`border-b last:border-0 ${
+                            isBehind ? "bg-red-500/10 text-red-600 dark:text-red-400" : ""
+                          }`}
+                        >
+                          <td className="py-1.5 pr-2 align-top">{r.rank}</td>
+                          <td className="py-1.5 pr-2 align-top max-w-[220px]">
+                            <a
+                              href={r.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 hover:underline truncate max-w-full"
+                              title={r.title}
+                            >
+                              <span className="truncate">
+                                {r.title || r.url}
+                              </span>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          </td>
+                          <td className="py-1.5 pr-2 align-top text-right">
+                            {r.fetch_error || r.word_count === null
+                              ? "—"
+                              : r.word_count}
+                          </td>
+                          <td className="py-1.5 align-top text-right">
+                            {r.fetch_error || r.h2_count === null
+                              ? "—"
+                              : r.h2_count}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {competitorData.median_h2 !== null && (
+                <p className="text-xs text-muted-foreground">
+                  {i18n.language === "fr"
+                    ? `Mediane H2: ${competitorData.median_h2}`
+                    : `Median H2: ${competitorData.median_h2}`}
+                </p>
               )}
             </div>
           )}
