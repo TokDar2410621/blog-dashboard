@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle,
   AlertTriangle,
@@ -11,6 +12,8 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  Code2,
+  Copy,
 } from "lucide-react";
 import { fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -22,6 +25,10 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  author?: string;
+  publishedAt?: string;
+  siteDomain?: string;
+  language?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
 }
 
@@ -82,6 +89,10 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  author,
+  publishedAt,
+  siteDomain,
+  language,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -100,6 +111,13 @@ export function SEOAnalyzer({
     meta_descriptions?: string[];
     title_suggestions?: string[];
     keywords?: string[];
+  } | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schema, setSchema] = useState<{
+    schema_type: string;
+    script_tag: string;
+    jsonld?: unknown;
+    warning?: string;
   } | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
@@ -478,6 +496,51 @@ export function SEOAnalyzer({
     }
   };
 
+  const handleGenerateSchema = async () => {
+    setSchemaLoading(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/seo-schema/", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          excerpt,
+          content,
+          author: author || "",
+          cover_image: coverImage || "",
+          published_at: publishedAt || "",
+          site_domain: siteDomain || "",
+          slug,
+          language: language || i18n.language,
+        }),
+      });
+      if (!res.ok) throw new Error("Schema failed");
+      const data = await res.json();
+      setSchema(data);
+      if (data.warning) {
+        toast.warning(
+          i18n.language === "fr"
+            ? "Schema genere sans detection IA"
+            : "Schema generated without AI detection"
+        );
+      }
+    } catch {
+      toast.error(
+        i18n.language === "fr"
+          ? "Erreur generation du schema"
+          : "Error generating schema"
+      );
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  const handleCopySchema = () => {
+    if (!schema) return;
+    navigator.clipboard.writeText(schema.script_tag);
+    toast.success(i18n.language === "fr" ? "Copie!" : "Copied!");
+  };
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === "good") return <CheckCircle className="h-4 w-4 text-green-500" />;
     if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -762,6 +825,67 @@ export function SEOAnalyzer({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Schema.org JSON-LD */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Code2 className="h-4 w-4" />
+            {i18n.language === "fr"
+              ? "Schema.org JSON-LD"
+              : "Schema.org JSON-LD"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleGenerateSchema}
+            disabled={schemaLoading || !title || !content}
+          >
+            {schemaLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr" ? "Generation..." : "Generating..."}
+              </>
+            ) : (
+              <>
+                <Code2 className="h-4 w-4 mr-1.5" />
+                {i18n.language === "fr"
+                  ? "Generer le schema"
+                  : "Generate schema"}
+              </>
+            )}
+          </Button>
+
+          {schema && (
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center justify-between gap-2">
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {schema.schema_type}
+                </Badge>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleCopySchema}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" />
+                  {i18n.language === "fr" ? "Copier" : "Copy"}
+                </Button>
+              </div>
+              <pre className="text-[11px] leading-relaxed p-3 bg-muted rounded-md overflow-x-auto max-h-80 whitespace-pre-wrap break-all font-mono">
+                <code>{schema.script_tag}</code>
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                {i18n.language === "fr"
+                  ? "Collez ce <script> dans le <head> de l'article pour activer les Rich Results Google."
+                  : "Paste this <script> into the article <head> to enable Google Rich Results."}
+              </p>
             </div>
           )}
         </CardContent>

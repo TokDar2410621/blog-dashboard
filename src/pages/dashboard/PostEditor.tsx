@@ -670,6 +670,13 @@ export default function PostEditor() {
                 slug={postSlug}
                 coverImage={coverImage}
                 keyword={tagsInput.split(",")[0]?.trim() || ""}
+                author={(existingPost as { author?: string | null } | undefined)?.author || ""}
+                publishedAt={
+                  (existingPost as { published_at?: string | null } | undefined)?.published_at ||
+                  ""
+                }
+                siteDomain={currentSite?.domain || ""}
+                language={language}
                 onApplyFix={(fixes) => {
                   if (fixes.title) setTitle(fixes.title);
                   if (fixes.excerpt) setExcerpt(fixes.excerpt);
