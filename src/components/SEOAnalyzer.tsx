@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   ChevronUp,
   Wand2,
 } from "lucide-react";
-import { fetchSEOSuggestions } from "@/lib/api-client";
+import { authFetch, fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
 
 interface SEOAnalyzerProps {
@@ -69,6 +69,26 @@ function normalize(s: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Returns true if any of the given terms appears in `text` as a whole word
+ * (bounded by non-word characters). Avoids false positives such as "SEO"
+ * matching "Seoul". Comparison is case-insensitive and diacritic-insensitive.
+ */
+function containsWholeWord(text: string, terms: string[]): boolean {
+  const normalizedText = normalize(text);
+  for (const term of terms) {
+    const t = normalize(term).trim();
+    if (!t) continue;
+    const re = new RegExp(`\\b${escapeRegExp(t)}\\b`, "i");
+    if (re.test(normalizedText)) return true;
+  }
+  return false;
+}
+
 function firstParagraph(markdown: string): string {
   const stripped = markdown.replace(/^(#{1,6}\s.*|!\[.*?\]\(.*?\)|\s*)\n/gm, "");
   const paras = stripped.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
@@ -101,6 +121,43 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+  const [synonyms, setSynonyms] = useState<string[]>([]);
+
+  // Debounced fetch of semantic synonyms for the primary keyword so that
+  // matching can span languages/variants (e.g. "SEO" ↔ "référencement").
+  useEffect(() => {
+    const kw = keyword.trim();
+    if (!kw) {
+      setSynonyms([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await authFetch("/seo-synonyms/", {
+          method: "POST",
+          body: JSON.stringify({
+            keyword: kw,
+            language: i18n.language === "fr" ? "fr" : "en",
+          }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data: { synonyms?: string[] } = await res.json();
+        if (Array.isArray(data.synonyms)) {
+          setSynonyms(data.synonyms.filter((s) => typeof s === "string" && s.trim().length > 0));
+        }
+      } catch {
+        // silent — fallback to keyword-only matching
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [keyword, i18n.language]);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -207,12 +264,15 @@ export function SEOAnalyzer({
     }
 
     // Keyword usage (primary keyword in title, first paragraph, H2s)
+    // Uses word-boundary regex over keyword + Gemini-generated synonyms to
+    // avoid false positives ("SEO" ≠ "Seoul") and false negatives
+    // ("SEO" matches "référencement" via synonyms).
     if (keyword.trim()) {
-      const kw = normalize(keyword);
-      const titleHit = normalize(title).includes(kw);
-      const introHit = normalize(firstParagraph(content)).includes(kw);
+      const terms = [keyword, ...synonyms];
+      const titleHit = containsWholeWord(title, terms);
+      const introHit = containsWholeWord(firstParagraph(content), terms);
       const h2s = content.match(/^## .+$/gm) || [];
-      const h2Hits = h2s.filter((h) => normalize(h).includes(kw)).length;
+      const h2Hits = h2s.filter((h) => containsWholeWord(h, terms)).length;
       const hits = Number(titleHit) + Number(introHit) + Math.min(h2Hits, 2);
 
       if (hits >= 3) {
@@ -374,7 +434,7 @@ export function SEOAnalyzer({
     }
 
     return results;
-  }, [title, excerpt, content, slug, coverImage, keyword, i18n.language]);
+  }, [title, excerpt, content, slug, coverImage, keyword, synonyms, i18n.language]);
 
   const totalScore = useMemo(() => {
     const maxScore = 100;

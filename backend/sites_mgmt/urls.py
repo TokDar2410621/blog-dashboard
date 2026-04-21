@@ -7,7 +7,7 @@ from .views import (
     PexelsSearchView, SerperImageSearchView, GenerateImageView,
     GenerateArticleView, GenerateInlineView, GenerateTagsView,
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
-    TranslatePostView,
+    SEOSynonymsView, TranslatePostView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -34,6 +34,7 @@ urlpatterns = [
     path('seo-audit/', SEOAuditView.as_view(), name='seo-audit'),
     path('seo-fix/', SEOFixView.as_view(), name='seo-fix'),
     path('seo-suggest/', SEOSuggestView.as_view(), name='seo-suggest'),
+    path('seo-synonyms/', SEOSynonymsView.as_view(), name='seo-synonyms'),
     # Public API — for site frontends
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),
