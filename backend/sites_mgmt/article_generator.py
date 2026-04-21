@@ -154,6 +154,66 @@ class ArticleGenerator:
         self.serper_images = []
         self.logs = []
 
+    # === KNOWLEDGE BASE ===
+
+    def _split_kb_chunks(self):
+        """Split knowledge base into chunks for targeted retrieval.
+        Splits by markdown headings (##) or double newlines.
+        """
+        if not self.knowledge_base:
+            return []
+        text = self.knowledge_base.strip()
+        # Prefer markdown heading splits
+        if '##' in text or '#' in text.split('\n', 1)[0]:
+            raw_chunks = re.split(r'\n(?=#{1,3}\s)', text)
+        else:
+            raw_chunks = re.split(r'\n\s*\n', text)
+        return [c.strip() for c in raw_chunks if c.strip()]
+
+    def _select_kb_chunks(self, topic_hint, max_chunks=5, max_chars=4000):
+        """Pick KB chunks most relevant to topic_hint via keyword overlap.
+        Returns a string, bounded by max_chars.
+        """
+        chunks = self._split_kb_chunks()
+        if not chunks:
+            return ''
+        # If KB fits, return everything
+        full = '\n\n'.join(chunks)
+        if len(full) <= max_chars:
+            return full
+
+        # Keyword-based scoring
+        hint = (topic_hint or '').lower()
+        hint_words = set(re.findall(r'\w{4,}', hint))  # words ≥4 chars
+        if not hint_words:
+            return full[:max_chars]
+
+        scored = []
+        for chunk in chunks:
+            chunk_lower = chunk.lower()
+            score = sum(1 for w in hint_words if w in chunk_lower)
+            if score > 0:
+                scored.append((score, chunk))
+
+        # Always keep the first chunk (often the "about me" section)
+        selected = [chunks[0]] if chunks else []
+        scored.sort(key=lambda x: -x[0])
+        for _, chunk in scored[:max_chunks - 1]:
+            if chunk not in selected:
+                selected.append(chunk)
+
+        out = '\n\n'.join(selected)
+        return out[:max_chars] if len(out) > max_chars else out
+
+    def _kb_summary(self, max_chars=500):
+        """Short KB summary (first chunk / first paragraph) for prompts that
+        only need author identity, not full expertise detail."""
+        chunks = self._split_kb_chunks()
+        if not chunks:
+            return ''
+        first = chunks[0]
+        return first[:max_chars] + ('…' if len(first) > max_chars else '')
+
     def log(self, message):
         self.logs.append(message)
 
@@ -488,10 +548,21 @@ Reponds UNIQUEMENT au format JSON:
   "category": "Nom parmi les 4 categories ci-dessus"
 }}'''
         else:
+            kb_hint = ''
+            kb_summary = self._kb_summary(max_chars=600)
+            if kb_summary:
+                kb_hint = f'''
+PROFIL DE L'AUTEUR:
+{kb_summary}
+
+=> Choisis un sujet ALIGNE avec l'expertise/l'experience de l'auteur.
+'''
+
             prompt = f'''Voici des recherches sur un sujet business/produit/entrepreneuriat:
 
 {search_results}
 
+{kb_hint}
 ARTICLES DEJA PUBLIES (a eviter):
 {existing_str}
 
@@ -579,16 +650,25 @@ Inclus ces mots-cles naturellement: {', '.join(self.seo_keywords)}
 
 Commence directement (pas de titre H1).'''
         else:
-            # Knowledge base context
+            # Knowledge base context — smart retrieval of relevant chunks only
             kb_context = ""
             if self.knowledge_base:
-                kb_context = f"""
-## CONTEXTE PERSONNEL DE L'AUTEUR
-{self.knowledge_base}
+                topic_hint = ' '.join([
+                    topic_analysis.get('title', ''),
+                    topic_analysis.get('topic', ''),
+                    topic_analysis.get('angle', ''),
+                    ' '.join(topic_analysis.get('keyPoints', [])),
+                ])
+                kb_relevant = self._select_kb_chunks(topic_hint, max_chunks=5, max_chars=4000)
+                if kb_relevant:
+                    kb_context = f"""
+## CONTEXTE PERSONNEL DE L'AUTEUR (extraits pertinents)
+{kb_relevant}
 
 IMPORTANT: Utilise ces informations pour ecrire avec la voix et le ton de l'auteur.
 Integre naturellement ses experiences, anecdotes et opinions dans l'article.
 """
+                    self.log(f'[KB] Utilise {len(kb_relevant)} chars de KB pertinents')
 
             prompt = f'''Tu es un auteur de blog professionnel.
 
