@@ -1,6 +1,7 @@
 import os
 import uuid
 import base64
+import hashlib
 import logging
 
 from rest_framework import viewsets, status
@@ -11,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import UserRateThrottle
 from django.shortcuts import get_object_or_404
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Sum
 from django.utils.text import slugify
 from django.core.management import call_command
@@ -943,6 +945,16 @@ class SerperImageSearchView(APIView):
             )
 
 
+SEO_CACHE_TTL = 3600  # 1 hour
+
+
+def _seo_cache_key(prefix, *parts):
+    """Build a deterministic cache key from hashed input parts."""
+    raw = ''.join(parts)
+    digest = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+    return f"{prefix}{digest}"
+
+
 class GenerateTagsView(APIView):
     """Generate relevant tags for a blog post using Gemini."""
     permission_classes = [IsAuthenticated]
@@ -964,6 +976,13 @@ class GenerateTagsView(APIView):
                 {'error': 'GEMINI_API_KEY non configuree'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        cache_key = _seo_cache_key('gen-tags:', title, excerpt, content[:5000])
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp['X-Cache'] = 'HIT'
+            return resp
 
         try:
             from google import genai
@@ -992,7 +1011,11 @@ Reponds UNIQUEMENT avec un JSON: {{"tags": ["tag1", "tag2", ...]}}"""
                 text = text.strip()
 
             data = json.loads(text)
-            return Response({'tags': data.get('tags', [])})
+            result = {'tags': data.get('tags', [])}
+            cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+            resp = Response(result)
+            resp['X-Cache'] = 'MISS'
+            return resp
 
         except Exception as e:
             return Response(
@@ -1024,6 +1047,13 @@ class SEOAuditView(APIView):
                 {'error': 'GEMINI_API_KEY non configuree'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        cache_key = _seo_cache_key('seo-audit:', title, excerpt, content[:5000], keyword, language)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp['X-Cache'] = 'HIT'
+            return resp
 
         try:
             from google import genai
@@ -1074,13 +1104,17 @@ Respond in JSON only (no markdown):
                 text = text.strip()
 
             data = json.loads(text)
-            return Response({
+            result = {
                 'score': int(data.get('score', 0)),
                 'verdict': data.get('verdict', ''),
                 'strengths': data.get('strengths', []),
                 'weaknesses': data.get('weaknesses', []),
                 'actions': data.get('actions', []),
-            })
+            }
+            cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+            resp = Response(result)
+            resp['X-Cache'] = 'MISS'
+            return resp
 
         except Exception as e:
             return Response(
@@ -1112,6 +1146,13 @@ class SEOFixView(APIView):
                 {'error': 'GEMINI_API_KEY non configuree'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        cache_key = _seo_cache_key('seo-fix:', title, excerpt, content[:5000], issues, language)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp['X-Cache'] = 'HIT'
+            return resp
 
         try:
             from google import genai
@@ -1165,7 +1206,10 @@ Respond in JSON only (no markdown blocks):
             if data.get('content'):
                 result['content'] = data['content']
 
-            return Response(result)
+            cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+            resp = Response(result)
+            resp['X-Cache'] = 'MISS'
+            return resp
 
         except Exception as e:
             return Response(
@@ -1196,6 +1240,13 @@ class SEOSuggestView(APIView):
                 {'error': 'GEMINI_API_KEY non configuree'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        cache_key = _seo_cache_key('seo-suggest:', title, excerpt, content[:5000], language)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp['X-Cache'] = 'HIT'
+            return resp
 
         try:
             from google import genai
@@ -1231,7 +1282,10 @@ Respond in JSON format only (no markdown, no code blocks):
                 text = text.strip()
 
             data = json.loads(text)
-            return Response(data)
+            cache.set(cache_key, data, timeout=SEO_CACHE_TTL)
+            resp = Response(data)
+            resp['X-Cache'] = 'MISS'
+            return resp
 
         except json.JSONDecodeError:
             return Response(
@@ -1249,6 +1303,20 @@ Respond in JSON format only (no markdown, no code blocks):
                 {'error': f'Erreur suggestions SEO: {error_msg}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class SEOCacheClearView(APIView):
+    """Admin-only endpoint to flush the SEO AI cache."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Admin requis'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        cache.clear()
+        return Response({'cleared': True})
 
 
 class TranslatePostView(APIView):

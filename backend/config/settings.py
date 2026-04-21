@@ -142,6 +142,13 @@ SIMPLE_JWT = {
 
 DATABASE_ROUTERS = ['config.db_router.BlogRouter']
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'seo-cache',
+    }
+}
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
