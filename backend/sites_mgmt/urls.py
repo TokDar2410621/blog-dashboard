@@ -9,7 +9,7 @@ from .views import (
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
     SEOSynonymsView, SEOCacheClearView, TranslatePostView, CompetitorAnalysisView,
     KeywordResearchView,
-    PageSpeedView, LinkSuggestionsView, BacklinksView,
+    PageSpeedView, LinkSuggestionsView, BacklinksView, SEOSchemaView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -44,6 +44,7 @@ urlpatterns = [
     path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),
     path('page-speed/', PageSpeedView.as_view(), name='page-speed'),
     path('backlinks/', BacklinksView.as_view(), name='backlinks'),
+    path('seo-schema/', SEOSchemaView.as_view(), name='seo-schema'),
     # Public API — for site frontends
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),

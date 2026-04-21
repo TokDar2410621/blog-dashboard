@@ -677,6 +677,10 @@ export default function PostEditor() {
                     ? `https://${currentSite.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}/blog/${postSlug}`
                     : undefined
                 }
+                author={currentSite?.name || "Admin"}
+                publishedAt={new Date().toISOString()}
+                siteDomain={currentSite?.domain || ""}
+                language={language}
                 onApplyFix={(fixes) => {
                   if (fixes.title) setTitle(fixes.title);
                   if (fixes.excerpt) setExcerpt(fixes.excerpt);

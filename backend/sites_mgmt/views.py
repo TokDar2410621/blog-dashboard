@@ -2031,6 +2031,211 @@ class BacklinksView(APIView):
             )
 
 
+class SEOSchemaView(APIView):
+    """Generate Schema.org JSON-LD for a blog article via Gemini.
+
+    Detects whether the article is structured as an FAQPage or HowTo and
+    enriches the JSON-LD accordingly. Falls back to a plain BlogPosting.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _strip_code_fence(self, text):
+        text = text.strip()
+        if text.startswith('```'):
+            text = text.split('\n', 1)[1] if '\n' in text else text[3:]
+            if text.endswith('```'):
+                text = text[:-3]
+        return text.strip()
+
+    def _build_page_url(self, site_domain, slug):
+        if not site_domain:
+            return slug or ''
+        domain = site_domain.strip()
+        if not domain.startswith(('http://', 'https://')):
+            domain = 'https://' + domain
+        domain = domain.rstrip('/')
+        if slug:
+            return f"{domain}/{slug.lstrip('/')}"
+        return domain
+
+    def post(self, request):
+        title = request.data.get('title', '') or ''
+        excerpt = request.data.get('excerpt', '') or ''
+        content = request.data.get('content', '') or ''
+        author = request.data.get('author', '') or ''
+        cover_image = request.data.get('cover_image', '') or ''
+        published_at = request.data.get('published_at', '') or ''
+        site_domain = request.data.get('site_domain', '') or ''
+        slug = request.data.get('slug', '') or ''
+        language = request.data.get('language', 'fr') or 'fr'
+
+        if not title or not content:
+            return Response(
+                {'error': 'Titre et contenu requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        page_url = self._build_page_url(site_domain, slug)
+
+        # Base BlogPosting JSON-LD.
+        jsonld = {
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            'headline': title,
+            'description': excerpt,
+            'inLanguage': language,
+            'mainEntityOfPage': {
+                '@type': 'WebPage',
+                '@id': page_url,
+            },
+        }
+        if cover_image:
+            jsonld['image'] = cover_image
+        if published_at:
+            jsonld['datePublished'] = published_at
+            jsonld['dateModified'] = published_at
+        if author:
+            jsonld['author'] = {
+                '@type': 'Person',
+                'name': author,
+            }
+
+        schema_type = 'BlogPosting'
+        usage_hint = (
+            "Collez ce <script> dans le <head> de la page de l'article "
+            "pour enrichir le SEO (Google Rich Results)."
+            if language == 'fr'
+            else
+            "Paste this <script> into the page <head> to enrich SEO (Google Rich Results)."
+        )
+
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            # Still return the base BlogPosting even if Gemini unavailable.
+            import json as _json
+            script_tag = (
+                '<script type="application/ld+json">'
+                + _json.dumps(jsonld, ensure_ascii=False, indent=2)
+                + '</script>'
+            )
+            return Response({
+                'schema_type': schema_type,
+                'jsonld': jsonld,
+                'script_tag': script_tag,
+                'usage_hint': usage_hint,
+            })
+
+        try:
+            from google import genai
+            import json as _json
+
+            client = genai.Client(api_key=api_key)
+
+            # Step 1: detect schema type + extract structured data.
+            detect_prompt = f"""You are a Schema.org expert. Analyze this blog article and decide which structured-data type fits best.
+
+Rules:
+- "FAQPage" if the article is mostly a list of questions & answers (markdown headings like "## Questions", "## FAQ", or repeated "Q:" / "A:" patterns, or interrogative H2/H3 followed by an answer paragraph).
+- "HowTo" if the article is a step-by-step guide (headings like "## Étapes", "## Steps", or numbered steps "1.", "2.", "Étape 1", "Step 1").
+- Otherwise "BlogPosting".
+
+Title: {title}
+Excerpt: {excerpt}
+Content (first 4000 chars):
+{content[:4000]}
+
+Respond in strict JSON (no markdown, no code fences) with this exact shape:
+{{
+  "schema_type": "FAQPage" | "HowTo" | "BlogPosting",
+  "faq": [{{"question": "...", "answer": "..."}}],
+  "steps": [{{"name": "...", "text": "..."}}]
+}}
+- Fill "faq" only when schema_type is "FAQPage" (else []).
+- Fill "steps" only when schema_type is "HowTo" (else []).
+- Extract up to 10 FAQ pairs or steps, using the article's original language ({language}).
+- Keep answers / step texts concise (<= 400 chars, plain text, no markdown)."""
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[detect_prompt],
+            )
+            raw = self._strip_code_fence(response.text or '')
+            try:
+                data = _json.loads(raw)
+            except Exception:
+                data = {'schema_type': 'BlogPosting', 'faq': [], 'steps': []}
+
+            detected = data.get('schema_type', 'BlogPosting')
+            if detected == 'FAQPage':
+                faq = data.get('faq') or []
+                if faq:
+                    schema_type = 'FAQPage'
+                    jsonld['@type'] = ['BlogPosting', 'FAQPage']
+                    jsonld['mainEntity'] = [
+                        {
+                            '@type': 'Question',
+                            'name': (item.get('question') or '').strip(),
+                            'acceptedAnswer': {
+                                '@type': 'Answer',
+                                'text': (item.get('answer') or '').strip(),
+                            },
+                        }
+                        for item in faq
+                        if item.get('question') and item.get('answer')
+                    ]
+            elif detected == 'HowTo':
+                steps = data.get('steps') or []
+                if steps:
+                    schema_type = 'HowTo'
+                    jsonld['@type'] = ['BlogPosting', 'HowTo']
+                    jsonld['name'] = title
+                    jsonld['step'] = [
+                        {
+                            '@type': 'HowToStep',
+                            'position': idx + 1,
+                            'name': (step.get('name') or f'Step {idx + 1}').strip(),
+                            'text': (step.get('text') or '').strip(),
+                        }
+                        for idx, step in enumerate(steps)
+                        if step.get('text')
+                    ]
+
+            script_tag = (
+                '<script type="application/ld+json">'
+                + _json.dumps(jsonld, ensure_ascii=False, indent=2)
+                + '</script>'
+            )
+
+            return Response({
+                'schema_type': schema_type,
+                'jsonld': jsonld,
+                'script_tag': script_tag,
+                'usage_hint': usage_hint,
+            })
+
+        except Exception as e:
+            error_msg = str(e)
+            if 'RESOURCE_EXHAUSTED' in error_msg or 'quota' in error_msg.lower():
+                return Response(
+                    {'error': 'Quota Gemini epuise'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            # Graceful fallback: return base BlogPosting on AI error.
+            import json as _json
+            script_tag = (
+                '<script type="application/ld+json">'
+                + _json.dumps(jsonld, ensure_ascii=False, indent=2)
+                + '</script>'
+            )
+            return Response({
+                'schema_type': schema_type,
+                'jsonld': jsonld,
+                'script_tag': script_tag,
+                'usage_hint': usage_hint,
+                'warning': f'AI detection failed: {error_msg}',
+            })
+
+
 class TranslatePostView(APIView):
     """Translate a post to another language using Gemini. Does NOT save."""
     permission_classes = [IsAuthenticated]
