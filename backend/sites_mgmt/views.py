@@ -1251,6 +1251,109 @@ Respond in JSON format only (no markdown, no code blocks):
             )
 
 
+class SEOSynonymsView(APIView):
+    """Generate synonyms, variants and translations for a keyword using Gemini.
+
+    Used by the frontend SEO analyzer to perform semantic keyword matching
+    (e.g. 'SEO' should match 'référencement' in French content).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        keyword = (request.data.get('keyword') or '').strip()
+        language = request.data.get('language', 'fr')
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if language not in ('fr', 'en'):
+            language = 'fr'
+
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        try:
+            from google import genai
+
+            client = genai.Client(api_key=api_key)
+
+            lang_label = 'French' if language == 'fr' else 'English'
+            other_lang = 'English' if language == 'fr' else 'French'
+            prompt = f"""You are an SEO and linguistics expert. Given a keyword, return 5 to 8 semantically equivalent terms: synonyms, spelling variants, singular/plural forms, acronyms, and translations from {other_lang} to {lang_label} (and vice-versa) that would be relevant for SEO matching in {lang_label} content.
+
+Keyword: {keyword}
+Target language: {lang_label}
+
+Rules:
+- Return short terms (1-3 words each).
+- Include the keyword itself if it's the most natural form.
+- Include common translations between French and English so a French article using "référencement" matches the keyword "SEO".
+- Do NOT include generic unrelated words.
+
+Respond in JSON format only (no markdown, no code blocks):
+{{
+  "synonyms": ["term1", "term2", "term3", "term4", "term5"]
+}}"""
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+            )
+
+            import json
+            text = response.text.strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+
+            data = json.loads(text)
+            synonyms = data.get('synonyms', [])
+            if not isinstance(synonyms, list):
+                synonyms = []
+            # Normalize: keep only non-empty strings, dedupe preserving order.
+            seen = set()
+            clean = []
+            for s in synonyms:
+                if not isinstance(s, str):
+                    continue
+                s = s.strip()
+                if not s:
+                    continue
+                key = s.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                clean.append(s)
+
+            return Response({'synonyms': clean[:8]})
+
+        except json.JSONDecodeError:
+            return Response(
+                {'error': 'Erreur parsing reponse IA'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if 'RESOURCE_EXHAUSTED' in error_msg or 'quota' in error_msg.lower():
+                return Response(
+                    {'error': 'Quota Gemini epuise'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS,
+                )
+            return Response(
+                {'error': f'Erreur synonymes SEO: {error_msg}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class TranslatePostView(APIView):
     """Translate a post to another language using Gemini. Does NOT save."""
     permission_classes = [IsAuthenticated]
