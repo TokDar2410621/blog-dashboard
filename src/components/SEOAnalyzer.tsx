@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  GitCompare,
 } from "lucide-react";
 import { fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -22,7 +23,19 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  siteId?: number;
+  currentSlug?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
+}
+
+interface CannibalizationPair {
+  slug_a: string;
+  slug_b: string;
+  title_a: string;
+  title_b: string;
+  language: string;
+  similarity: number;
+  reason: string;
 }
 
 interface SEOCheck {
@@ -82,6 +95,8 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  siteId,
+  currentSlug,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -101,6 +116,37 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+  const [cannibPairs, setCannibPairs] = useState<CannibalizationPair[] | null>(null);
+  const [cannibLoading, setCannibLoading] = useState(false);
+
+  useEffect(() => {
+    if (!siteId) return;
+    let cancelled = false;
+    setCannibLoading(true);
+    (async () => {
+      try {
+        const { authFetch } = await import("@/lib/api-client");
+        const res = await authFetch(`/sites/${siteId}/cannibalization/`);
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        if (!cancelled) setCannibPairs(data.pairs || []);
+      } catch {
+        if (!cancelled) setCannibPairs([]);
+      } finally {
+        if (!cancelled) setCannibLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [siteId]);
+
+  const relevantCannibPairs = useMemo(() => {
+    if (!cannibPairs || !currentSlug) return [];
+    return cannibPairs.filter(
+      (p) => p.slug_a === currentSlug || p.slug_b === currentSlug
+    );
+  }, [cannibPairs, currentSlug]);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -566,6 +612,69 @@ export function SEOAnalyzer({
                 </div>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cannibalization */}
+      {siteId && currentSlug && (
+        <Card>
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <GitCompare className="h-4 w-4" />
+              {i18n.language === "fr" ? "Cannibalisation" : "Cannibalization"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-2">
+            {cannibLoading ? (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {i18n.language === "fr" ? "Analyse en cours..." : "Analyzing..."}
+              </div>
+            ) : relevantCannibPairs.length === 0 ? (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                {i18n.language === "fr"
+                  ? "Aucun conflit détecté ✅"
+                  : "No conflict detected ✅"}
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-red-500 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {i18n.language === "fr"
+                    ? `${relevantCannibPairs.length} article(s) en conflit`
+                    : `${relevantCannibPairs.length} conflicting article(s)`}
+                </p>
+                <ul className="space-y-1.5">
+                  {relevantCannibPairs.map((p, i) => {
+                    const otherSlug = p.slug_a === currentSlug ? p.slug_b : p.slug_a;
+                    const otherTitle = p.slug_a === currentSlug ? p.title_b : p.title_a;
+                    return (
+                      <li
+                        key={i}
+                        className="text-xs p-2 rounded border border-red-500/30 bg-red-500/5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{otherTitle}</p>
+                            <p className="text-muted-foreground truncate">
+                              /{otherSlug}
+                            </p>
+                            <p className="text-muted-foreground mt-0.5">
+                              {p.reason}
+                            </p>
+                          </div>
+                          <span className="text-red-500 font-semibold whitespace-nowrap">
+                            {Math.round(p.similarity * 100)}%
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
