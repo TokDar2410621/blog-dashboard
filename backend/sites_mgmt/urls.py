@@ -7,7 +7,7 @@ from .views import (
     PexelsSearchView, SerperImageSearchView, GenerateImageView,
     GenerateArticleView, GenerateInlineView, GenerateTagsView,
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
-    TranslatePostView,
+    LinkSuggestionsView, TranslatePostView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -24,6 +24,7 @@ urlpatterns = [
     path('sites/<int:site_id>/tags/', SiteTagsView.as_view(), name='site-tags'),
     path('sites/<int:site_id>/generate/', GenerateArticleView.as_view(), name='site-generate-article'),
     path('sites/<int:site_id>/generate-inline/', GenerateInlineView.as_view(), name='site-generate-inline'),
+    path('sites/<int:site_id>/link-suggestions/', LinkSuggestionsView.as_view(), name='site-link-suggestions'),
     path('pexels/search/', PexelsSearchView.as_view(), name='pexels-search'),
     path('serper/images/', SerperImageSearchView.as_view(), name='serper-images'),
     path('generate-image/', GenerateImageView.as_view(), name='generate-image'),

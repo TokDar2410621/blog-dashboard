@@ -11,7 +11,10 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  Link as LinkIcon,
+  Copy,
 } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 import { fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
 
@@ -22,7 +25,17 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  siteId?: number;
+  currentSlug?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
+}
+
+interface LinkSuggestion {
+  slug: string;
+  title: string;
+  anchor_text: string;
+  insert_hint: string;
+  reason: string;
 }
 
 interface SEOCheck {
@@ -82,6 +95,8 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  siteId,
+  currentSlug,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -101,6 +116,8 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkSuggestions, setLinkSuggestions] = useState<LinkSuggestion[] | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -478,6 +495,42 @@ export function SEOAnalyzer({
     }
   };
 
+  const handleLinkSuggest = async () => {
+    if (!siteId) return;
+    setLinkLoading(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch(`/sites/${siteId}/link-suggestions/`, {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          content,
+          current_slug: currentSlug || "",
+          language: i18n.language,
+        }),
+      });
+      if (!res.ok) throw new Error("Link suggestions failed");
+      const data = await res.json();
+      setLinkSuggestions(data.suggestions || []);
+    } catch {
+      toast.error(
+        i18n.language === "fr"
+          ? "Erreur suggestions de liens"
+          : "Link suggestions error"
+      );
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const copyMarkdownLink = (anchor: string, linkSlug: string) => {
+    const md = `[${anchor}](/${linkSlug})`;
+    navigator.clipboard.writeText(md);
+    toast.success(
+      i18n.language === "fr" ? "Markdown copie!" : "Markdown copied!"
+    );
+  };
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === "good") return <CheckCircle className="h-4 w-4 text-green-500" />;
     if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -762,6 +815,102 @@ export function SEOAnalyzer({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Internal Link Suggestions */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            {i18n.language === "fr"
+              ? "Suggestions de liens internes"
+              : "Internal link suggestions"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleLinkSuggest}
+            disabled={linkLoading || !siteId || !content.trim()}
+          >
+            {linkLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr" ? "Analyse..." : "Analyzing..."}
+              </>
+            ) : (
+              <>
+                <LinkIcon className="h-4 w-4 mr-1.5" />
+                {i18n.language === "fr" ? "Suggerer des liens" : "Suggest links"}
+              </>
+            )}
+          </Button>
+
+          {linkSuggestions && linkSuggestions.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {i18n.language === "fr"
+                ? "Aucune suggestion pertinente trouvee."
+                : "No relevant suggestions found."}
+            </p>
+          )}
+
+          {linkSuggestions && linkSuggestions.length > 0 && (
+            <div className="space-y-2">
+              {linkSuggestions.map((s, i) => (
+                <div
+                  key={`${s.slug}-${i}`}
+                  className="border rounded-md p-3 space-y-2 bg-muted/30"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold break-words">
+                        {s.anchor_text}
+                      </p>
+                      <p className="text-xs mt-0.5">
+                        <span className="text-muted-foreground">
+                          {"\u2192 "}
+                        </span>
+                        {siteId ? (
+                          <RouterLink
+                            to={`/dashboard/${siteId}/articles/${s.slug}`}
+                            className="text-primary hover:underline"
+                          >
+                            {s.title}
+                          </RouterLink>
+                        ) : (
+                          <span className="text-primary">{s.title}</span>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="shrink-0 h-7 px-2 text-xs"
+                      onClick={() => copyMarkdownLink(s.anchor_text, s.slug)}
+                      title={
+                        i18n.language === "fr"
+                          ? "Copier le markdown"
+                          : "Copy markdown"
+                      }
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      {i18n.language === "fr" ? "Copier" : "Copy"}
+                    </Button>
+                  </div>
+                  {s.insert_hint && (
+                    <p className="text-xs italic text-muted-foreground border-l-2 border-primary/30 pl-2">
+                      "{s.insert_hint}"
+                    </p>
+                  )}
+                  {s.reason && (
+                    <p className="text-xs text-muted-foreground">{s.reason}</p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
