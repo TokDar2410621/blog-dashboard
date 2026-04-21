@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   CheckCircle,
   AlertTriangle,
@@ -13,9 +15,18 @@ import {
   Wand2,
   Users,
   ExternalLink,
+  Search,
 } from "lucide-react";
 import { authFetch, fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
+
+type KeywordSource = "serper_related" | "serper_paa" | "gemini_longtail";
+
+interface KeywordResult {
+  keyword: string;
+  source: KeywordSource;
+  estimated_intent: "informational" | "commercial" | "navigational" | "transactional";
+}
 
 interface SEOAnalyzerProps {
   title: string;
@@ -249,6 +260,9 @@ export function SEOAnalyzer({
       controller.abort();
     };
   }, [keyword, i18n.language]);
+  const [kwSeed, setKwSeed] = useState("");
+  const [kwLoading, setKwLoading] = useState(false);
+  const [kwResults, setKwResults] = useState<KeywordResult[] | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
     /*
@@ -751,6 +765,42 @@ export function SEOAnalyzer({
     }
   };
 
+  const handleKeywordResearch = async () => {
+    const seed = kwSeed.trim();
+    if (!seed) return;
+    setKwLoading(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/keyword-research/", {
+        method: "POST",
+        body: JSON.stringify({
+          seed_keyword: seed,
+          language: i18n.language,
+        }),
+      });
+      if (!res.ok) throw new Error("Keyword research failed");
+      const data = await res.json();
+      setKwResults(data.keywords || []);
+    } catch {
+      toast.error(
+        i18n.language === "fr"
+          ? "Erreur recherche de mots-cles"
+          : "Keyword research error"
+      );
+    } finally {
+      setKwLoading(false);
+    }
+  };
+
+  const copyKeyword = async (kw: string) => {
+    try {
+      await navigator.clipboard.writeText(kw);
+      toast.success(i18n.language === "fr" ? "Copie !" : "Copied!");
+    } catch {
+      toast.error(i18n.language === "fr" ? "Erreur copie" : "Copy error");
+    }
+  };
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === "good") return <CheckCircle className="h-4 w-4 text-green-500" />;
     if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -1171,6 +1221,116 @@ export function SEOAnalyzer({
                     : `Median H2: ${competitorData.median_h2}`}
                 </p>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Keyword Research */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            {i18n.language === "fr"
+              ? "Recherche de mots-cles"
+              : "Keyword research"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <div className="flex gap-2">
+            <Input
+              value={kwSeed}
+              onChange={(e) => setKwSeed(e.target.value)}
+              placeholder={
+                i18n.language === "fr"
+                  ? "Mot-cle de depart..."
+                  : "Seed keyword..."
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !kwLoading) {
+                  e.preventDefault();
+                  handleKeywordResearch();
+                }
+              }}
+              disabled={kwLoading}
+              className="h-9 text-sm"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleKeywordResearch}
+              disabled={kwLoading || !kwSeed.trim()}
+            >
+              {kwLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  {i18n.language === "fr" ? "Recherche..." : "Searching..."}
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-1.5" />
+                  {i18n.language === "fr" ? "Rechercher" : "Search"}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {kwResults && kwResults.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {i18n.language === "fr"
+                ? "Aucun mot-cle trouve."
+                : "No keywords found."}
+            </p>
+          )}
+
+          {kwResults && kwResults.length > 0 && (
+            <div className="space-y-3 pt-1">
+              {(
+                [
+                  {
+                    source: "serper_related" as KeywordSource,
+                    labelFr: "Recherches associees",
+                    labelEn: "Related searches",
+                  },
+                  {
+                    source: "serper_paa" as KeywordSource,
+                    labelFr: "Les gens demandent aussi",
+                    labelEn: "People also ask",
+                  },
+                  {
+                    source: "gemini_longtail" as KeywordSource,
+                    labelFr: "Long-tail (IA)",
+                    labelEn: "Long-tail (AI)",
+                  },
+                ]
+              ).map((group) => {
+                const items = kwResults.filter((k) => k.source === group.source);
+                if (items.length === 0) return null;
+                return (
+                  <div key={group.source}>
+                    <p className="text-xs font-medium mb-2">
+                      {i18n.language === "fr" ? group.labelFr : group.labelEn}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {items.map((item, i) => (
+                        <Badge
+                          key={`${group.source}-${i}`}
+                          variant="secondary"
+                          className="cursor-pointer hover:bg-primary/20 transition-colors text-xs font-normal"
+                          title={`${item.estimated_intent} - ${
+                            i18n.language === "fr"
+                              ? "Cliquer pour copier"
+                              : "Click to copy"
+                          }`}
+                          onClick={() => copyKeyword(item.keyword)}
+                        >
+                          {item.keyword}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

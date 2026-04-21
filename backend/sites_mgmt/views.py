@@ -1422,6 +1422,158 @@ class SEOCacheClearView(APIView):
         return Response({'cleared': True})
 
 
+class KeywordResearchView(APIView):
+    """Keyword research combining Serper (related + PAA) and Gemini long-tail generation.
+
+    Input: {seed_keyword, language}
+    Returns a merged, deduplicated list of keywords with source and estimated intent.
+    """
+    permission_classes = [IsAuthenticated]
+
+    COMMERCIAL_TOKENS = (
+        'prix', 'price', 'acheter', 'buy', 'cost', 'cout', 'coût', 'pas cher',
+        'cheap', 'deal', 'promo', 'discount', 'tarif', 'abonnement', 'subscription',
+    )
+    TRANSACTIONAL_TOKENS = (
+        'commander', 'order', 'telecharger', 'télécharger', 'download',
+        'inscription', 'signup', 'sign up', 'reserver', 'réserver', 'book',
+        'login', 'se connecter',
+    )
+    NAVIGATIONAL_TOKENS = (
+        'login', 'connexion', 'site officiel', 'official site', 'website',
+        'facebook', 'youtube', 'twitter', 'instagram', 'linkedin',
+    )
+    INFORMATIONAL_TOKENS = (
+        'comment', 'how', 'pourquoi', 'why', 'qu\'est-ce', 'what is', 'what',
+        'guide', 'tutoriel', 'tutorial', 'exemple', 'example', 'definition',
+        'définition', 'qui', 'who', 'quand', 'when',
+    )
+
+    def _estimate_intent(self, keyword):
+        """Infer intent from keyword tokens — lightweight heuristic."""
+        kw = keyword.lower()
+        for token in self.TRANSACTIONAL_TOKENS:
+            if token in kw:
+                return 'transactional'
+        for token in self.COMMERCIAL_TOKENS:
+            if token in kw:
+                return 'commercial'
+        for token in self.NAVIGATIONAL_TOKENS:
+            if token in kw:
+                return 'navigational'
+        for token in self.INFORMATIONAL_TOKENS:
+            if token in kw:
+                return 'informational'
+        return 'informational'
+
+    def post(self, request):
+        import time
+        import json
+
+        seed_keyword = (request.data.get('seed_keyword') or '').strip()
+        language = request.data.get('language', 'fr')
+
+        if not seed_keyword:
+            return Response(
+                {'error': 'Le mot-cle de depart est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serper_key = os.environ.get('SERPER_API_KEY')
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+
+        if not serper_key and not gemini_key:
+            return Response(
+                {'error': 'SERPER_API_KEY ou GEMINI_API_KEY requise'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        deadline = time.monotonic() + 60.0
+        collected = []  # list of (keyword, source)
+
+        # 1) Serper — relatedSearches + peopleAlsoAsk
+        if serper_key:
+            try:
+                remaining = max(1.0, deadline - time.monotonic())
+                resp = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={
+                        'X-API-KEY': serper_key,
+                        'Content-Type': 'application/json',
+                    },
+                    json={'q': seed_keyword, 'num': 10},
+                    timeout=min(30.0, remaining),
+                )
+                if resp.status_code == 200:
+                    data = resp.json() or {}
+                    for item in data.get('relatedSearches') or []:
+                        q = (item or {}).get('query')
+                        if q:
+                            collected.append((q, 'serper_related'))
+                    for item in data.get('peopleAlsoAsk') or []:
+                        q = (item or {}).get('question')
+                        if q:
+                            collected.append((q, 'serper_paa'))
+            except http_requests.Timeout:
+                logger.warning('Serper keyword research timeout')
+            except Exception as e:
+                logger.warning('Serper keyword research failed: %s', e)
+
+        # 2) Gemini — generate 10 long-tail variants
+        if gemini_key and (deadline - time.monotonic()) > 2.0:
+            try:
+                from google import genai
+
+                lang_label = 'French' if language == 'fr' else (
+                    'Spanish' if language == 'es' else 'English'
+                )
+                prompt = f"""You are an SEO keyword research expert. For the seed keyword below,
+generate exactly 10 long-tail keyword variants (3-6 words each) that real users
+would search. Mix question-based and descriptive variants. Write them in {lang_label}.
+
+Seed keyword: {seed_keyword}
+
+Respond in JSON only (no markdown, no code blocks):
+{{"keywords": ["keyword 1", "keyword 2", ...]}}"""
+
+                client = genai.Client(api_key=gemini_key)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[prompt],
+                )
+
+                text = (response.text or '').strip()
+                if text.startswith('```'):
+                    text = text.split('\n', 1)[1]
+                    if text.endswith('```'):
+                        text = text[:-3]
+                    text = text.strip()
+
+                parsed = json.loads(text)
+                for kw in parsed.get('keywords') or []:
+                    if isinstance(kw, str) and kw.strip():
+                        collected.append((kw.strip(), 'gemini_longtail'))
+            except Exception as e:
+                logger.warning('Gemini long-tail generation failed: %s', e)
+
+        # 3) Dedupe case-insensitively, preserving the first occurrence's source
+        seen = set()
+        keywords = []
+        seed_norm = seed_keyword.lower().strip()
+        for kw, source in collected:
+            norm = kw.lower().strip()
+            if not norm or norm == seed_norm or norm in seen:
+                continue
+            seen.add(norm)
+            keywords.append({
+                'keyword': kw,
+                'source': source,
+                'estimated_intent': self._estimate_intent(kw),
+            })
+
+        return Response({'keywords': keywords})
+
+
 class TranslatePostView(APIView):
     """Translate a post to another language using Gemini. Does NOT save."""
     permission_classes = [IsAuthenticated]

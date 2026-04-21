@@ -8,6 +8,7 @@ from .views import (
     GenerateArticleView, GenerateInlineView, GenerateTagsView,
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
     SEOSynonymsView, SEOCacheClearView, TranslatePostView, CompetitorAnalysisView,
+    KeywordResearchView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -37,6 +38,7 @@ urlpatterns = [
     path('seo-synonyms/', SEOSynonymsView.as_view(), name='seo-synonyms'),
     path('seo-cache/clear/', SEOCacheClearView.as_view(), name='seo-cache-clear'),
     path('competitors/', CompetitorAnalysisView.as_view(), name='competitors'),
+    path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),
     # Public API — for site frontends
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),
