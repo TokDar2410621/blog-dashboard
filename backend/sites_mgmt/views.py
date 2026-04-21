@@ -3,6 +3,7 @@ import uuid
 import base64
 import hashlib
 import logging
+from urllib.parse import quote
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -1572,6 +1573,103 @@ Respond in JSON only (no markdown, no code blocks):
             })
 
         return Response({'keywords': keywords})
+class PageSpeedView(APIView):
+    """Fetch Core Web Vitals + category scores from Google PageSpeed Insights."""
+    permission_classes = [IsAuthenticated]
+
+    PSI_ENDPOINT = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed'
+
+    def post(self, request):
+        url = (request.data.get('url') or '').strip()
+        strategy = request.data.get('strategy') or 'mobile'
+
+        if not url:
+            return Response(
+                {'error': 'Le parametre "url" est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if strategy not in ('mobile', 'desktop'):
+            return Response(
+                {'error': 'Strategy invalide (mobile ou desktop)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not (url.startswith('http://') or url.startswith('https://')):
+            return Response(
+                {'error': 'URL invalide (http:// ou https:// requis)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        psi_url = (
+            f'{self.PSI_ENDPOINT}'
+            f'?url={quote(url, safe="")}'
+            f'&strategy={strategy}'
+            f'&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY'
+        )
+
+        try:
+            resp = http_requests.get(psi_url, timeout=30)
+        except http_requests.Timeout:
+            return Response(
+                {'error': 'Delai PageSpeed Insights depasse'},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur PageSpeed: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if resp.status_code != 200:
+            try:
+                err_body = resp.json()
+                err_msg = err_body.get('error', {}).get('message', f'HTTP {resp.status_code}')
+            except Exception:
+                err_msg = f'HTTP {resp.status_code}'
+            return Response(
+                {'error': f'PageSpeed Insights: {err_msg}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        try:
+            data = resp.json()
+            lh = data.get('lighthouseResult', {}) or {}
+            categories = lh.get('categories', {}) or {}
+            audits = lh.get('audits', {}) or {}
+
+            def cat_score(key):
+                cat = categories.get(key) or {}
+                score = cat.get('score')
+                if score is None:
+                    return None
+                return round(float(score) * 100)
+
+            def audit_numeric(key):
+                audit = audits.get(key) or {}
+                val = audit.get('numericValue')
+                if val is None:
+                    return None
+                return float(val)
+
+            lcp_ms = audit_numeric('largest-contentful-paint')
+            fcp_ms = audit_numeric('first-contentful-paint')
+            cls_val = audit_numeric('cumulative-layout-shift')
+
+            return Response({
+                'performance_score': cat_score('performance'),
+                'seo_score': cat_score('seo'),
+                'a11y_score': cat_score('accessibility'),
+                'lcp_s': round(lcp_ms / 1000, 2) if lcp_ms is not None else None,
+                'cls': round(cls_val, 3) if cls_val is not None else None,
+                'fcp_s': round(fcp_ms / 1000, 2) if fcp_ms is not None else None,
+                'strategy': strategy,
+                'tested_url': url,
+            })
+        except Exception as e:
+            logger.exception('PageSpeed parsing failed')
+            return Response(
+                {'error': f'Erreur parsing PageSpeed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class TranslatePostView(APIView):

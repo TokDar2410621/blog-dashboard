@@ -9,6 +9,7 @@ from .views import (
     UploadImageView, ServeImageView, SEOAuditView, SEOFixView, SEOSuggestView,
     SEOSynonymsView, SEOCacheClearView, TranslatePostView, CompetitorAnalysisView,
     KeywordResearchView,
+    PageSpeedView, TranslatePostView,
     PublicSiteView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
 )
@@ -39,6 +40,7 @@ urlpatterns = [
     path('seo-cache/clear/', SEOCacheClearView.as_view(), name='seo-cache-clear'),
     path('competitors/', CompetitorAnalysisView.as_view(), name='competitors'),
     path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),
+    path('page-speed/', PageSpeedView.as_view(), name='page-speed'),
     # Public API — for site frontends
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),
