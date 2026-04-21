@@ -670,6 +670,11 @@ export default function PostEditor() {
                 slug={postSlug}
                 coverImage={coverImage}
                 keyword={tagsInput.split(",")[0]?.trim() || ""}
+                articleUrl={
+                  currentSite?.domain && postSlug
+                    ? `https://${currentSite.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}/blog/${postSlug}`
+                    : undefined
+                }
                 onApplyFix={(fixes) => {
                   if (fixes.title) setTitle(fixes.title);
                   if (fixes.excerpt) setExcerpt(fixes.excerpt);

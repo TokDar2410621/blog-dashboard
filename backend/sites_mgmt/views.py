@@ -1251,6 +1251,125 @@ Respond in JSON format only (no markdown, no code blocks):
             )
 
 
+class BacklinksView(APIView):
+    """Lightweight backlink discovery via Serper (Google `link:` operator).
+
+    This is an approximation: Google heavily deprecates the `link:` operator and
+    real backlink data requires paid tools (Ahrefs/SEMrush/Moz). The response
+    surfaces results grouped by referring hostname as a best-effort signal.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from urllib.parse import urlparse
+
+        url = (request.data.get('url') or '').strip()
+        warning = (
+            'Serper results are approximations — for real data use Ahrefs/SEMrush'
+        )
+
+        if not url:
+            return Response(
+                {'error': 'Le parametre "url" est requis', 'warning': warning},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree', 'warning': warning},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Normalize the source URL so we can skip self-references
+        try:
+            source_host = urlparse(url).hostname or ''
+        except Exception:
+            source_host = ''
+        source_host = source_host.lower().lstrip('www.')
+
+        try:
+            resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={
+                    'X-API-KEY': api_key,
+                    'Content-Type': 'application/json',
+                },
+                json={'q': f'link:{url}', 'num': 20},
+                timeout=10,
+            )
+
+            if resp.status_code != 200:
+                return Response(
+                    {
+                        'error': f'Erreur Serper: {resp.status_code}',
+                        'warning': warning,
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            data = resp.json()
+            organic = data.get('organic', []) or []
+
+            domain_map = {}
+            raw_count = 0
+            for item in organic:
+                link = item.get('link') or ''
+                if not link:
+                    continue
+                raw_count += 1
+                try:
+                    host = (urlparse(link).hostname or '').lower()
+                except Exception:
+                    continue
+                if not host:
+                    continue
+                if host.startswith('www.'):
+                    host = host[4:]
+                # Skip self-references (same host as the source URL)
+                if source_host and host == source_host:
+                    continue
+                bucket = domain_map.setdefault(
+                    host, {'mentions': 0, 'sample_url': link}
+                )
+                bucket['mentions'] += 1
+
+            top_domains = sorted(
+                (
+                    {
+                        'domain': d,
+                        'mentions': info['mentions'],
+                        'sample_url': info['sample_url'],
+                    }
+                    for d, info in domain_map.items()
+                ),
+                key=lambda x: x['mentions'],
+                reverse=True,
+            )
+
+            return Response({
+                'total_referring_domains': len(domain_map),
+                'top_domains': top_domains,
+                'raw_count': raw_count,
+                'warning': warning,
+            })
+
+        except http_requests.Timeout:
+            return Response(
+                {
+                    'error': 'Delai de requete Serper depasse',
+                    'warning': warning,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as e:
+            logger.exception("Backlinks lookup failed for %s", url)
+            return Response(
+                {'error': str(e), 'warning': warning},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+
 class TranslatePostView(APIView):
     """Translate a post to another language using Gemini. Does NOT save."""
     permission_classes = [IsAuthenticated]

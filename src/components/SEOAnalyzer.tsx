@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Wand2,
+  Link as LinkIcon,
 } from "lucide-react";
 import { fetchSEOSuggestions } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -22,7 +23,21 @@ interface SEOAnalyzerProps {
   slug: string;
   coverImage?: string;
   keyword?: string;
+  articleUrl?: string;
   onApplyFix?: (fixes: { title?: string; excerpt?: string; content?: string }) => void;
+}
+
+interface BacklinkDomain {
+  domain: string;
+  mentions: number;
+  sample_url: string;
+}
+
+interface BacklinkResult {
+  total_referring_domains: number;
+  top_domains: BacklinkDomain[];
+  raw_count: number;
+  warning: string;
 }
 
 interface SEOCheck {
@@ -82,6 +97,7 @@ export function SEOAnalyzer({
   slug,
   coverImage,
   keyword = "",
+  articleUrl,
   onApplyFix,
 }: SEOAnalyzerProps) {
   const { i18n } = useTranslation();
@@ -101,6 +117,9 @@ export function SEOAnalyzer({
     title_suggestions?: string[];
     keywords?: string[];
   } | null>(null);
+  const [backlinksLoading, setBacklinksLoading] = useState(false);
+  const [backlinks, setBacklinks] = useState<BacklinkResult | null>(null);
+  const [backlinksError, setBacklinksError] = useState<string | null>(null);
 
   const checks = useMemo<SEOCheck[]>(() => {
     const results: SEOCheck[] = [];
@@ -478,6 +497,44 @@ export function SEOAnalyzer({
     }
   };
 
+  const handleBacklinks = async () => {
+    if (!articleUrl) return;
+    setBacklinksLoading(true);
+    setBacklinksError(null);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch("/backlinks/", {
+        method: "POST",
+        body: JSON.stringify({ url: articleUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBacklinksError(
+          data?.error ||
+            (i18n.language === "fr"
+              ? "Erreur lors de la recherche"
+              : "Lookup failed")
+        );
+        if (data?.warning) {
+          setBacklinks({
+            total_referring_domains: 0,
+            top_domains: [],
+            raw_count: 0,
+            warning: data.warning,
+          });
+        }
+        return;
+      }
+      setBacklinks(data);
+    } catch {
+      setBacklinksError(
+        i18n.language === "fr" ? "Erreur reseau" : "Network error"
+      );
+    } finally {
+      setBacklinksLoading(false);
+    }
+  };
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === "good") return <CheckCircle className="h-4 w-4 text-green-500" />;
     if (status === "warning") return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
@@ -652,6 +709,116 @@ export function SEOAnalyzer({
                     ))}
                   </ul>
                 </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Backlinks */}
+      <Card>
+        <CardHeader className="py-3 px-4">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            {i18n.language === "fr" ? "Backlinks" : "Backlinks"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          {!articleUrl && (
+            <p className="text-xs text-muted-foreground">
+              {i18n.language === "fr"
+                ? "Publiez d'abord l'article et renseignez un domaine de site pour verifier les backlinks."
+                : "Publish the article and set a site domain first to check backlinks."}
+            </p>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBacklinks}
+            disabled={backlinksLoading || !articleUrl}
+          >
+            {backlinksLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                {i18n.language === "fr" ? "Recherche..." : "Searching..."}
+              </>
+            ) : (
+              <>
+                <LinkIcon className="h-4 w-4 mr-1.5" />
+                {i18n.language === "fr"
+                  ? "Verifier les backlinks"
+                  : "Check backlinks"}
+              </>
+            )}
+          </Button>
+
+          {articleUrl && (
+            <p className="text-[10px] text-muted-foreground break-all">
+              {i18n.language === "fr" ? "URL analysee : " : "URL: "}
+              {articleUrl}
+            </p>
+          )}
+
+          {backlinksError && (
+            <p className="text-xs text-red-500">{backlinksError}</p>
+          )}
+
+          {backlinks && (
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold bg-primary/10 text-primary">
+                  {backlinks.total_referring_domains}
+                </div>
+                <p className="text-sm text-muted-foreground flex-1">
+                  {i18n.language === "fr"
+                    ? `domaines referents trouves (${backlinks.raw_count} resultats bruts)`
+                    : `referring domains found (${backlinks.raw_count} raw results)`}
+                </p>
+              </div>
+
+              {backlinks.top_domains.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-1">
+                    {i18n.language === "fr" ? "Top domaines" : "Top domains"}
+                  </p>
+                  <ul className="text-xs space-y-1">
+                    {backlinks.top_domains.slice(0, 5).map((d) => (
+                      <li
+                        key={d.domain}
+                        className="flex items-center justify-between gap-2 border-b pb-1 last:border-0"
+                      >
+                        <a
+                          href={d.sample_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate hover:underline text-primary"
+                          title={d.sample_url}
+                        >
+                          {d.domain}
+                        </a>
+                        <span className="text-muted-foreground whitespace-nowrap">
+                          {d.mentions}{" "}
+                          {i18n.language === "fr" ? "mention(s)" : "mention(s)"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {backlinks.top_domains.length === 0 && !backlinksError && (
+                <p className="text-xs text-muted-foreground">
+                  {i18n.language === "fr"
+                    ? "Aucun domaine referent detecte."
+                    : "No referring domains detected."}
+                </p>
+              )}
+
+              {backlinks.warning && (
+                <p className="text-[11px] text-yellow-600 dark:text-yellow-500 flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                  <span>{backlinks.warning}</span>
+                </p>
               )}
             </div>
           )}
