@@ -1232,6 +1232,9 @@ class SEOFixView(APIView):
         content = request.data.get('content', '')
         issues = request.data.get('issues', '')
         language = request.data.get('language', 'fr')
+        keyword = (request.data.get('keyword') or '').strip()
+        competitor_summary = (request.data.get('competitor_summary') or '').strip()
+        audit_context = (request.data.get('audit_context') or '').strip()
 
         if not title:
             return Response(
@@ -1246,7 +1249,10 @@ class SEOFixView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        cache_key = _seo_cache_key('seo-fix:', title, excerpt, content[:5000], issues, language)
+        cache_key = _seo_cache_key(
+            'seo-fix:', title, excerpt, content[:5000], issues, language,
+            keyword, competitor_summary, audit_context,
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             resp = Response(cached)
@@ -1258,29 +1264,53 @@ class SEOFixView(APIView):
             import json
 
             client = genai.Client(api_key=api_key)
-            lang = 'French' if language == 'fr' else 'English'
+
+            lang_names = {
+                'fr': ('French', 'français'),
+                'en': ('English', 'English'),
+                'es': ('Spanish', 'español'),
+            }
+            lang_en, lang_native = lang_names.get(language, ('French', 'français'))
+
+            keyword_block = ''
+            if keyword:
+                keyword_block = f"""
+PRIMARY KEYWORD: {keyword}
+- The keyword (or a close variant) MUST appear naturally in the title, the first paragraph, and at least one H2.
+- Do NOT stuff it — one occurrence per zone is enough.
+"""
+
+            competitor_block = f"\nCOMPETITOR CONTEXT:\n{competitor_summary}\n" if competitor_summary else ''
+            audit_block = f"\nFULL AI AUDIT:\n{audit_context}\n" if audit_context else ''
+
             prompt = f"""You are an SEO expert. Fix the following issues in this blog article.
-Write in {lang}.
+
+CRITICAL LANGUAGE RULE:
+The article is written in {lang_en} ({lang_native}).
+You MUST respond in {lang_en} ({lang_native}) ONLY.
+Do NOT translate to English if the article is in French. Do NOT mix languages.
+Every field you return (title, excerpt, content) must be in {lang_en} ({lang_native}).
 
 Current title: {title}
 Current excerpt (meta description): {excerpt}
 Current content (first 3000 chars): {content[:3000]}
-
-SEO issues to fix:
+{keyword_block}{competitor_block}{audit_block}
+SEO ISSUES TO FIX:
 {issues}
 
-Rules:
-- Title should be 50-60 characters, compelling, with keywords
-- Excerpt/meta description should be 120-160 characters
-- If content is too short, expand it with relevant paragraphs (keep markdown format)
-- Keep the same tone and style as the original
-- Only return fields that need changes
+RULES:
+- Title: 50-60 characters, compelling, contains the primary keyword if provided
+- Excerpt/meta description: 120-160 characters, contains the primary keyword if provided
+- If content is too short or weaker than competitors, expand with relevant paragraphs (keep markdown format, same tone)
+- Respect and reinforce the author's existing voice and style
+- Only return fields that actually need changes — null for fields already good
+- Use the competitor and audit context above to inform depth, structure, and angle
 
 Respond in JSON only (no markdown blocks):
 {{
-  "title": "optimized title or null if already good",
-  "excerpt": "optimized excerpt or null if already good",
-  "content": "full improved content in markdown or null if only title/excerpt changed"
+  "title": "optimized title in {lang_native} or null",
+  "excerpt": "optimized excerpt in {lang_native} or null",
+  "content": "full improved content in markdown, in {lang_native}, or null"
 }}"""
 
             response = client.models.generate_content(

@@ -889,6 +889,39 @@ export function SEOAnalyzer({
         .map((c) => `${c.label}: ${c.detail}`)
         .join("\n");
 
+      // Build competitor summary (if the user ran the competitor analysis)
+      let competitorSummary = "";
+      if (competitorData) {
+        const medianW = competitorData.median_words;
+        const medianH2 = competitorData.median_h2;
+        const topTitles = competitorData.results
+          .slice(0, 5)
+          .filter((r) => !r.fetch_error)
+          .map((r) => `  - "${r.title}" (${r.word_count ?? "?"} mots, ${r.h2_count ?? "?"} H2)`)
+          .join("\n");
+        competitorSummary = `Top SERP for this keyword (median ${medianW ?? "?"} words, ${medianH2 ?? "?"} H2):\n${topTitles}`;
+      }
+
+      // Build audit context (if the user ran the AI audit)
+      let auditContext = "";
+      if (aiAudit) {
+        auditContext = [
+          `AI audit score: ${aiAudit.score}/100`,
+          `Verdict: ${aiAudit.verdict}`,
+          aiAudit.weaknesses?.length
+            ? `Weaknesses:\n${aiAudit.weaknesses.map((w) => `- ${w}`).join("\n")}`
+            : "",
+          aiAudit.actions?.length
+            ? `Actions:\n${aiAudit.actions.map((a) => `- ${a}`).join("\n")}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+      }
+
+      // Prefer the article's own language (prop) over the UI language
+      const lang = language || i18n.language || "fr";
+
       const res = await authFetch("/seo-fix/", {
         method: "POST",
         body: JSON.stringify({
@@ -896,7 +929,10 @@ export function SEOAnalyzer({
           excerpt,
           content: content.slice(0, 4000),
           issues,
-          language: i18n.language,
+          language: lang,
+          keyword: keyword || undefined,
+          competitor_summary: competitorSummary || undefined,
+          audit_context: auditContext || undefined,
         }),
       });
       if (!res.ok) throw new Error("Erreur");
