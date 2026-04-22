@@ -38,7 +38,7 @@ export default function Login() {
     setLoading(true);
     try {
       const tokens = await login(username, password);
-      setTokens(tokens.access, tokens.refresh);
+      setTokens(tokens.access);
       await checkAuth();
       toast.success(t("login.success"));
       navigate("/");
