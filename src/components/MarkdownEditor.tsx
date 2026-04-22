@@ -173,6 +173,7 @@ export function MarkdownEditor({
     >
       {/* Toolbar */}
       <div className="flex items-center gap-1 p-2 bg-muted/50 border-b flex-wrap">
+        {/* eslint-disable-next-line react-hooks/refs */}
         {tools.map((tool, i) =>
           "type" in tool && tool.type === "separator" ? (
             <Separator key={i} orientation="vertical" className="h-6 mx-1" />

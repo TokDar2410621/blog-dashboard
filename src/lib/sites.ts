@@ -24,7 +24,7 @@ export function getToken(): string | null {
   return null;
 }
 
-export function setTokens(access: string, _refresh?: string): void {
+export function setTokens(access: string): void {
   // Keep access token in sessionStorage only (reduced persistence surface)
   sessionStorage.setItem(LS_KEY.TOKEN, access);
   // Defensive cleanup for older builds that stored refresh in localStorage

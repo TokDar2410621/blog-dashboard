@@ -1,18 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAllPosts, useDeletePost } from "@/hooks/useDashboard";
 import { PostStatusBadge } from "@/components/PostStatusBadge";
 import { TemplateSelector } from "@/components/TemplateSelector";
-import type { MarkdownTemplate, VisualTemplate, AITemplate } from "@/lib/templates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,

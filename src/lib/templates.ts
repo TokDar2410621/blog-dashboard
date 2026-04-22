@@ -11,8 +11,6 @@ import {
   Columns3,
   BookMarked,
   Zap,
-  FileText,
-  Lightbulb,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 

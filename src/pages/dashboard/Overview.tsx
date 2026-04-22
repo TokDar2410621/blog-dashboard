@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Eye, PenLine, Clock, Loader2 } from "lucide-react";
+import { FileText, Eye, PenLine, Clock } from "lucide-react";
 
 export default function Overview() {
   const { t, i18n } = useTranslation();

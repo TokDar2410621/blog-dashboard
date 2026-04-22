@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { aiTemplates } from "@/lib/templates";
 import { useGenerateArticle } from "@/hooks/useDashboard";
-import { MarkdownPreview } from "@/components/MarkdownPreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Loader2, Send, Pencil, RefreshCw } from "lucide-react";
+import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AIGenerator() {
@@ -41,6 +40,7 @@ export default function AIGenerator() {
   const [dryRun, setDryRun] = useState(false);
 
   // Template pre-fill from query params
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const tplId = searchParams.get("tpl_id");
     if (!tplId) return;
@@ -51,6 +51,7 @@ export default function AIGenerator() {
       setSearchMethod(tpl.params.search);
     }
   }, [searchParams]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [result, setResult] = useState<{
     output: string;

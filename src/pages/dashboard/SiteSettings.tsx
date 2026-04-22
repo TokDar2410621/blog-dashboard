@@ -25,6 +25,7 @@ export default function SiteSettings() {
   const [knowledgeBase, setKnowledgeBase] = useState("");
   const [vercelDeployHook, setVercelDeployHook] = useState("");
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (site) {
       setName(site.name || "");
@@ -33,6 +34,7 @@ export default function SiteSettings() {
       setVercelDeployHook(site.vercel_deploy_hook || "");
     }
   }, [site]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSave = async () => {
     try {
