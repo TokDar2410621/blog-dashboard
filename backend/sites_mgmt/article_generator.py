@@ -220,7 +220,8 @@ class ArticleGenerator:
     # === MAIN ENTRY POINT ===
 
     def generate(self, search_method='serper', topic=None, title=None,
-                 article_type='news', length='medium', keywords=None, dry_run=False):
+                 article_type='news', length='medium', keywords=None, dry_run=False,
+                 language='fr'):
         """
         Generate an article and optionally save it to the site's database.
         Returns dict with 'output' (text log) and 'post_count'.
@@ -229,6 +230,7 @@ class ArticleGenerator:
         self.forced_title = title
         self.article_type = article_type
         self.custom_topic = topic
+        self.language = language if language in ('fr', 'en', 'es') else 'fr'
         self.seo_keywords = [k.strip() for k in keywords.split(',')] if keywords else []
 
         config = LENGTH_CONFIG[length]
@@ -468,10 +470,14 @@ Sois factuel et precis.'''}]}],
         )
         existing_str = '\n'.join(f'- {t}' for t in existing_titles) if existing_titles else 'Aucun article existant'
 
+        _lang_map = {'fr': 'français', 'en': 'English', 'es': 'español'}
+        _lang_native = _lang_map.get(getattr(self, 'language', 'fr'), 'français')
+        language_rule = f"\n**LANGUE OBLIGATOIRE:** tous les champs JSON (title, topic, angle, keyPoints, category) doivent etre ecrits en {_lang_native}. Ne melange pas les langues.\n"
+
         if self.forced_title:
             self.log(f'[TITLE] Titre force: {self.forced_title}')
             prompt = f'''Tu dois structurer un article avec ce TITRE EXACT (ne le modifie PAS):
-
+{language_rule}
 TITRE IMPOSE: {self.forced_title}
 
 Contexte de recherche:
@@ -505,7 +511,7 @@ IMPORTANT: Le champ "title" DOIT etre EXACTEMENT "{self.forced_title}".'''
 
         if self.article_type == 'local':
             prompt = f'''Voici des resultats de recherche sur des entreprises/professionnels locaux:
-
+{language_rule}
 {search_results}
 
 SUJET IMPOSE: {self.custom_topic or "entreprises locales"}
@@ -522,7 +528,7 @@ Reponds UNIQUEMENT au format JSON:
 }}'''
         elif self.custom_topic:
             prompt = f'''Voici des recherches sur le sujet: "{self.custom_topic}"
-
+{language_rule}
 {search_results}
 
 ARTICLES DEJA PUBLIES (a eviter):
@@ -559,7 +565,7 @@ PROFIL DE L'AUTEUR:
 '''
 
             prompt = f'''Voici des recherches sur un sujet business/produit/entrepreneuriat:
-
+{language_rule}
 {search_results}
 
 {kb_hint}
@@ -670,7 +676,15 @@ Integre naturellement ses experiences, anecdotes et opinions dans l'article.
 """
                     self.log(f'[KB] Utilise {len(kb_relevant)} chars de KB pertinents')
 
+            lang_map = {'fr': ('français', 'French'), 'en': ('English', 'English'), 'es': ('español', 'Spanish')}
+            lang_native, lang_en = lang_map.get(self.language, ('français', 'French'))
+
             prompt = f'''Tu es un auteur de blog professionnel.
+
+**REGLE CRITIQUE DE LANGUE:**
+Cet article doit etre ecrit ENTIEREMENT en {lang_native} ({lang_en}).
+Toute la sortie (titre, intro, H2, paragraphes, conclusion) doit etre en {lang_native}.
+NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le francais.
 
 {kb_context}
 
@@ -1028,7 +1042,7 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
             defaults={'name': category_name}
         )
 
-        # Create article
+        # Create article — respect target language
         post = BlogPost(
             title=title,
             slug=slug,
@@ -1040,6 +1054,7 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
             reading_time=reading_time,
             featured=False,
             published_at=date.today(),
+            language=getattr(self, 'language', 'fr'),
         )
         post.save(using=self.alias)
 

@@ -712,6 +712,9 @@ class GenerateArticleView(APIView):
         length = request.data.get('length', 'medium')
         keywords = request.data.get('keywords', None) or None
         dry_run = request.data.get('dry_run', False)
+        language = request.data.get('language', 'fr')
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
 
         # Validate inputs
         if search_method not in ('serper', 'gemini'):
@@ -742,6 +745,7 @@ class GenerateArticleView(APIView):
                 length=length,
                 keywords=keywords,
                 dry_run=dry_run,
+                language=language,
             )
 
             trigger_vercel_deploy(site)
@@ -779,6 +783,9 @@ class GenerateInlineView(APIView):
         length = request.data.get('length', 'medium')
         keywords = request.data.get('keywords') or None
         context_urls = request.data.get('context_urls') or []
+        language = request.data.get('language', 'fr')
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
 
         # Fetch context from URLs
         url_context = ''
@@ -812,6 +819,7 @@ class GenerateInlineView(APIView):
                 length=length,
                 keywords=keywords,
                 dry_run=True,
+                language=language,
             )
 
             # Extract the generated data from the generator's internal state

@@ -36,6 +36,7 @@ export default function AIGenerator() {
   const [searchMethod, setSearchMethod] = useState("serper");
   const [articleType, setArticleType] = useState("news");
   const [length, setLength] = useState("medium");
+  const [language, setLanguage] = useState<string>("fr");
   const [keywords, setKeywords] = useState("");
   const [dryRun, setDryRun] = useState(false);
 
@@ -63,6 +64,7 @@ export default function AIGenerator() {
       search: searchMethod,
       type: articleType,
       length,
+      language,
       dry_run: dryRun,
     };
     if (topic) params.topic = topic;
@@ -160,6 +162,20 @@ export default function AIGenerator() {
                     {t("ai.lengthMedium")}
                   </SelectItem>
                   <SelectItem value="long">{t("ai.lengthLong")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Langue</Label>
+              <Select value={language} onValueChange={setLanguage}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="es">Español</SelectItem>
                 </SelectContent>
               </Select>
             </div>

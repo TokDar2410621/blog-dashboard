@@ -212,6 +212,7 @@ export default function PostEditor() {
           length: aiLength,
           keywords: aiKeywords || undefined,
           context_urls: urls.length > 0 ? urls : undefined,
+          language,
         }),
       });
       if (!res.ok) {
