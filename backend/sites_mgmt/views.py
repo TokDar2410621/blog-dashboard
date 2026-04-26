@@ -715,6 +715,13 @@ class GenerateArticleView(APIView):
         language = request.data.get('language', 'fr')
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
+        # Enforce per-site allowed languages if configured
+        allowed = site.available_languages
+        if allowed and language not in allowed:
+            return Response(
+                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(allowed)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Validate inputs
         if search_method not in ('serper', 'gemini'):
@@ -786,6 +793,13 @@ class GenerateInlineView(APIView):
         language = request.data.get('language', 'fr')
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
+        # Enforce per-site allowed languages if configured
+        allowed = site.available_languages
+        if allowed and language not in allowed:
+            return Response(
+                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(allowed)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Fetch context from URLs
         url_context = ''

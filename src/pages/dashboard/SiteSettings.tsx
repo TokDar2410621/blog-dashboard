@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -24,6 +24,7 @@ export default function SiteSettings() {
   const [domain, setDomain] = useState("");
   const [knowledgeBase, setKnowledgeBase] = useState("");
   const [vercelDeployHook, setVercelDeployHook] = useState("");
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -32,9 +33,16 @@ export default function SiteSettings() {
       setDomain(site.domain || "");
       setKnowledgeBase(site.knowledge_base || "");
       setVercelDeployHook(site.vercel_deploy_hook || "");
+      setAvailableLanguages(site.available_languages || []);
     }
   }, [site]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const toggleLanguage = (code: string) => {
+    setAvailableLanguages((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  };
 
   const handleSave = async () => {
     try {
@@ -43,6 +51,7 @@ export default function SiteSettings() {
         domain,
         knowledge_base: knowledgeBase,
         vercel_deploy_hook: vercelDeployHook,
+        available_languages: availableLanguages.length > 0 ? availableLanguages : null,
       });
       toast.success(t("settings.saved"));
     } catch {
@@ -134,6 +143,39 @@ export default function SiteSettings() {
           </CardContent>
         </Card>
       )}
+
+      {/* Available Languages */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Languages className="h-5 w-5" />
+            Langues disponibles
+          </CardTitle>
+          <CardDescription>
+            Sélectionnez les langues acceptées par le backend de ce site. Si rien n'est coché, toutes les langues sont autorisées (fr/en/es).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex gap-3 flex-wrap">
+          {[
+            { code: "fr", label: "Français" },
+            { code: "en", label: "English" },
+            { code: "es", label: "Español" },
+          ].map((l) => {
+            const active = availableLanguages.includes(l.code);
+            return (
+              <Button
+                key={l.code}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                onClick={() => toggleLanguage(l.code)}
+              >
+                {l.label}
+              </Button>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       {/* Vercel Deploy Hook */}
       <Card>

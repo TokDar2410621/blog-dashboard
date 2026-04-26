@@ -51,6 +51,11 @@ class Site(models.Model):
         verbose_name="Config tables blog",
         help_text="Mapping des tables/colonnes si le site n'utilise pas les tables blog_* standard"
     )
+    available_languages = models.JSONField(
+        blank=True, null=True, default=None,
+        verbose_name="Langues disponibles",
+        help_text="Liste de codes ISO acceptés par le site (ex: ['fr','en']). Null = toutes (fr/en/es)."
+    )
     api_key = models.CharField(
         max_length=64, blank=True, default='',
         verbose_name="Clé API publique",

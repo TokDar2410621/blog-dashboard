@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { aiTemplates } from "@/lib/templates";
-import { useGenerateArticle } from "@/hooks/useDashboard";
+import { useGenerateArticle, useSites } from "@/hooks/useDashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,17 @@ export default function AIGenerator() {
   const [searchParams] = useSearchParams();
   const base = `/dashboard/${siteId}`;
   const generateArticle = useGenerateArticle();
+  const { data: sites = [] } = useSites();
+  const currentSite = sites.find((s: { id: number }) => s.id === Number(siteId));
+  const ALL_LANGUAGES: { code: string; label: string }[] = [
+    { code: "fr", label: "Français" },
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+  ];
+  const allowedLanguages =
+    currentSite?.available_languages && currentSite.available_languages.length > 0
+      ? ALL_LANGUAGES.filter((l) => currentSite.available_languages!.includes(l.code))
+      : ALL_LANGUAGES;
 
   const [topic, setTopic] = useState("");
   const [title, setTitle] = useState("");
@@ -173,9 +184,9 @@ export default function AIGenerator() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fr">Français</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
+                  {allowedLanguages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

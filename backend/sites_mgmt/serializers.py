@@ -10,6 +10,7 @@ class SiteSerializer(serializers.ModelSerializer):
         model = Site
         fields = ['id', 'name', 'database_url', 'domain', 'knowledge_base',
                   'vercel_deploy_hook', 'gsc_property_url',
+                  'available_languages',
                   'api_key', 'is_hosted', 'created_at']
         read_only_fields = ['id', 'created_at', 'api_key', 'is_hosted']
         extra_kwargs = {

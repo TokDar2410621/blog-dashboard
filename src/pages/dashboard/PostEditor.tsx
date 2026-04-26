@@ -741,9 +741,20 @@ export default function PostEditor() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="fr">Français</SelectItem>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="es">Español</SelectItem>
+                          {(() => {
+                            const all = [
+                              { code: "fr", label: "Français" },
+                              { code: "en", label: "English" },
+                              { code: "es", label: "Español" },
+                            ];
+                            const allowed =
+                              currentSite?.available_languages && currentSite.available_languages.length > 0
+                                ? all.filter((l) => currentSite.available_languages!.includes(l.code))
+                                : all;
+                            return allowed.map((l) => (
+                              <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+                            ));
+                          })()}
                         </SelectContent>
                       </Select>
                     </div>

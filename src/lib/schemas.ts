@@ -24,6 +24,7 @@ export const siteSchema = z.object({
   gsc_property_url: z.string().optional(),
   api_key: z.string().optional(),
   is_hosted: z.boolean().optional(),
+  available_languages: z.array(z.string()).nullable().optional(),
   blog_config: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
 });
