@@ -119,10 +119,32 @@ export default function PostList() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredPosts.map((post: PostListItem) => (
+                  filteredPosts.map((post: PostListItem) => {
+                    // Group translations: posts with same translation_group
+                    const translations = post.translation_group
+                      ? filteredPosts.filter(
+                          (p) => p.translation_group === post.translation_group
+                        )
+                      : [];
+                    return (
                       <TableRow key={post.slug}>
                         <TableCell className="font-medium max-w-xs truncate">
-                          {post.title}
+                          <div className="flex items-center gap-2">
+                            <span className="truncate">{post.title}</span>
+                            {translations.length > 1 && (
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono shrink-0"
+                                title={`Disponible en ${translations.map(t => t.language?.toUpperCase()).join(", ")}`}
+                              >
+                                {translations.map(t => t.language?.toUpperCase()).join("/")}
+                              </span>
+                            )}
+                            {translations.length <= 1 && post.language && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono shrink-0">
+                                {post.language.toUpperCase()}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <PostStatusBadge
@@ -184,7 +206,8 @@ export default function PostList() {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

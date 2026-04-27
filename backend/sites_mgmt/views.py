@@ -2651,7 +2651,13 @@ class PublicPostDetailView(APIView):
 
 
 class PublicTranslationsView(APIView):
-    """GET /api/public/sites/<id>/posts/<slug>/translations/ — all translations of an article."""
+    """GET /api/public/sites/<id>/posts/<slug>/translations/ — all language versions of an article.
+
+    Returns every published article sharing the same translation_group, INCLUDING
+    the current one. This lets the frontend render a complete language switcher
+    by indexing on `language`. Each entry includes a relative URL ready to use
+    (e.g. `/blog/<slug>`).
+    """
     permission_classes = []
 
     def get(self, request, site_id, slug):
@@ -2659,28 +2665,39 @@ class PublicTranslationsView(APIView):
         if not site:
             return Response({'error': 'Invalid API key'}, status=status.HTTP_403_FORBIDDEN)
 
+        def serialize(p, is_current):
+            return {
+                'slug': p.slug,
+                'language': p.language,
+                'title': p.title,
+                'url': f'/blog/{p.slug}',
+                'is_current': is_current,
+            }
+
         if site.is_hosted:
             post = get_object_or_404(HostedPost, site=site, slug=slug, status='published')
             translations = HostedPost.objects.filter(
                 site=site,
                 translation_group=post.translation_group,
                 status='published',
-            ).exclude(pk=post.pk)
-            return Response([
-                {'slug': p.slug, 'language': p.language, 'title': p.title}
-                for p in translations
-            ])
+            )
+            return Response({
+                'current_language': post.language,
+                'translation_group': str(post.translation_group),
+                'translations': [serialize(p, p.pk == post.pk) for p in translations],
+            })
 
         alias = ensure_site_connection(site)
         post = get_object_or_404(BlogPost.objects.using(alias), slug=slug, status='published')
         translations = BlogPost.objects.using(alias).filter(
             translation_group=post.translation_group,
             status='published',
-        ).exclude(pk=post.pk)
-        return Response([
-            {'slug': p.slug, 'language': p.language, 'title': p.title}
-            for p in translations
-        ])
+        )
+        return Response({
+            'current_language': post.language,
+            'translation_group': str(post.translation_group),
+            'translations': [serialize(p, p.pk == post.pk) for p in translations],
+        })
 
 
 class PublicCategoriesView(APIView):

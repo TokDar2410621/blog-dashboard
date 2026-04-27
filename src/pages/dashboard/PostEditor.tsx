@@ -265,6 +265,9 @@ export default function PostEditor() {
       if (!translationGroup) setTranslationGroup(groupId);
 
       const { authFetch: af } = await import("@/lib/api-client");
+      // Mirror the source article's status so the translation is immediately
+      // available on the public frontend when the user switches language.
+      // (Drafts get translated as drafts, scheduled stay scheduled, etc.)
       const createRes = await af(`/sites/${siteId}/posts/`, {
         method: "POST",
         body: JSON.stringify({
@@ -275,7 +278,7 @@ export default function PostEditor() {
           category,
           tags_input: tagsInput.split(",").map((t: string) => t.trim()).filter(Boolean),
           cover_image: coverImage,
-          status: POST_STATUS.DRAFT,
+          status,
           featured,
           language: targetLang,
           translation_group: groupId,
