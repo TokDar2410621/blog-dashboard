@@ -2542,6 +2542,48 @@ def _public_get_site(site_id, request):
     return site
 
 
+def _lang_score(lang, preferred, default):
+    """Higher = better candidate to represent a translation_group."""
+    if preferred and lang == preferred:
+        return 2
+    if default and lang == default:
+        return 1
+    return 0
+
+
+def _dedupe_by_translation_group(posts, preferred_language=None, default_language=None):
+    """Materialize an iterable of posts and keep ONE per translation_group.
+
+    Selection priority within a group: preferred_language match > default_language
+    match > first encountered (caller is expected to pre-sort by recency).
+    Posts without a translation_group are kept as-is, in their original order.
+    """
+    chosen = {}        # tg_str -> post
+    chosen_order = {}  # tg_str -> position index for stable output ordering
+    extras = []        # (position, post) for posts without tg
+    pos = 0
+    for p in posts:
+        tg = getattr(p, 'translation_group', None)
+        if not tg:
+            extras.append((pos, p))
+            pos += 1
+            continue
+        key = str(tg)
+        if key not in chosen:
+            chosen[key] = p
+            chosen_order[key] = pos
+            pos += 1
+        else:
+            cur_score = _lang_score(chosen[key].language, preferred_language, default_language)
+            new_score = _lang_score(p.language, preferred_language, default_language)
+            if new_score > cur_score:
+                chosen[key] = p  # keep original slot in chosen_order
+    # Merge by original position so ordering matches the input sort
+    merged = [(chosen_order[k], v) for k, v in chosen.items()] + extras
+    merged.sort(key=lambda t: t[0])
+    return [p for _, p in merged]
+
+
 class PublicSiteView(APIView):
     """GET /api/public/sites/<id>/ — basic site info."""
     permission_classes = []
@@ -2573,6 +2615,8 @@ class PublicPostsView(APIView):
         page = int(request.query_params.get('page', 1))
         page_size = min(int(request.query_params.get('page_size', 20)), 100)
 
+        default_language = getattr(site, 'default_language', None) or 'fr'
+
         if site.is_hosted:
             posts = HostedPost.objects.filter(site=site, status='published').select_related('category').prefetch_related('tags')
             if featured == 'true':
@@ -2584,12 +2628,15 @@ class PublicPostsView(APIView):
             if search:
                 posts = posts.filter(title__icontains=search)
             posts = posts.order_by('-published_at')
-            total = posts.count()
+            deduped = _dedupe_by_translation_group(
+                posts, preferred_language=language, default_language=default_language
+            )
+            total = len(deduped)
             start = (page - 1) * page_size
             end = start + page_size
             return Response({
                 'count': total,
-                'results': [_serialize_hosted_post(p, detail=False) for p in posts[start:end]],
+                'results': [_serialize_hosted_post(p, detail=False) for p in deduped[start:end]],
                 'next': page + 1 if end < total else None,
                 'previous': page - 1 if page > 1 else None,
             })
@@ -2610,10 +2657,13 @@ class PublicPostsView(APIView):
             posts = posts.filter(language=language)
         if search:
             posts = posts.filter(title__icontains=search)
-        total = posts.count()
+        deduped = _dedupe_by_translation_group(
+            posts, preferred_language=language, default_language=default_language
+        )
+        total = len(deduped)
         start = (page - 1) * page_size
         end = start + page_size
-        serializer = BlogPostListSerializer(posts[start:end], many=True)
+        serializer = BlogPostListSerializer(deduped[start:end], many=True)
         return Response({
             'count': total,
             'results': serializer.data,
