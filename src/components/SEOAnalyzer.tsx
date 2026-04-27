@@ -879,6 +879,53 @@ export function SEOAnalyzer({
     }
   };
 
+  const [fixingItem, setFixingItem] = useState<string | null>(null);
+
+  const handleFixSingle = async (issue: string, kind: "weakness" | "action") => {
+    if (!onApplyFix) return;
+    const itemKey = `${kind}:${issue}`;
+    setFixingItem(itemKey);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const lang = language || i18n.language || "fr";
+      const auditCtx = aiAudit
+        ? `Score actuel: ${aiAudit.score}/100. Verdict: ${aiAudit.verdict}.`
+        : "";
+      const issueLabel =
+        kind === "weakness"
+          ? `Faiblesse a corriger: ${issue}`
+          : `Action a appliquer: ${issue}`;
+      const res = await authFetch("/seo-fix/", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          excerpt,
+          content: content.slice(0, 4000),
+          issues: issueLabel,
+          language: lang,
+          keyword: keyword || undefined,
+          audit_context: auditCtx || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Erreur");
+      const data = await res.json();
+      onApplyFix({
+        title: data.title || undefined,
+        excerpt: data.excerpt || undefined,
+        content: data.content || undefined,
+      });
+      toast.success(
+        i18n.language === "fr" ? "Correction appliquée" : "Fix applied"
+      );
+    } catch {
+      toast.error(
+        i18n.language === "fr" ? "Erreur correction" : "Fix error"
+      );
+    } finally {
+      setFixingItem(null);
+    }
+  };
+
   const handleFixAll = async () => {
     if (!onApplyFix) return;
     setFixLoading(true);
@@ -1581,10 +1628,39 @@ export function SEOAnalyzer({
                   <p className="text-xs font-semibold mb-1 text-red-500">
                     ✗ {i18n.language === "fr" ? "Points faibles" : "Weaknesses"}
                   </p>
-                  <ul className="text-xs space-y-1 text-muted-foreground">
-                    {aiAudit.weaknesses.map((w, i) => (
-                      <li key={i}>• {w}</li>
-                    ))}
+                  <ul className="text-xs space-y-1.5">
+                    {aiAudit.weaknesses.map((w, i) => {
+                      const key = `weakness:${w}`;
+                      const busy = fixingItem === key;
+                      return (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 group"
+                        >
+                          <span className="text-muted-foreground flex-1">
+                            • {w}
+                          </span>
+                          {onApplyFix && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs shrink-0 opacity-70 group-hover:opacity-100"
+                              disabled={busy || fixingItem !== null}
+                              onClick={() => handleFixSingle(w, "weakness")}
+                            >
+                              {busy ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <Wand2 className="h-3 w-3 mr-1" />
+                                  {i18n.language === "fr" ? "Corriger" : "Fix"}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -1594,11 +1670,66 @@ export function SEOAnalyzer({
                   <p className="text-xs font-semibold mb-1 text-primary">
                     → {i18n.language === "fr" ? "Actions à faire" : "Action items"}
                   </p>
-                  <ul className="text-xs space-y-1 text-muted-foreground">
-                    {aiAudit.actions.map((a, i) => (
-                      <li key={i}>• {a}</li>
-                    ))}
+                  <ul className="text-xs space-y-1.5">
+                    {aiAudit.actions.map((a, i) => {
+                      const key = `action:${a}`;
+                      const busy = fixingItem === key;
+                      return (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 group"
+                        >
+                          <span className="text-muted-foreground flex-1">
+                            • {a}
+                          </span>
+                          {onApplyFix && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs shrink-0 opacity-70 group-hover:opacity-100"
+                              disabled={busy || fixingItem !== null}
+                              onClick={() => handleFixSingle(a, "action")}
+                            >
+                              {busy ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <>
+                                  <Wand2 className="h-3 w-3 mr-1" />
+                                  {i18n.language === "fr" ? "Appliquer" : "Apply"}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
+                </div>
+              )}
+
+              {onApplyFix && (aiAudit.weaknesses?.length > 0 || aiAudit.actions?.length > 0) && (
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleFixAll}
+                    disabled={fixLoading || fixingItem !== null}
+                    className="w-full"
+                  >
+                    {fixLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                        {i18n.language === "fr" ? "Correction en cours..." : "Fixing..."}
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4 mr-1.5" />
+                        {i18n.language === "fr"
+                          ? "Tout corriger en une fois"
+                          : "Fix everything at once"}
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </div>
