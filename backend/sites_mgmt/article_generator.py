@@ -217,6 +217,53 @@ class ArticleGenerator:
     def log(self, message):
         self.logs.append(message)
 
+    # === DUPLICATE DETECTION ===
+
+    @staticmethod
+    def _title_tokens(s):
+        """Normalize title to a set of meaningful tokens (lowercase, no
+        accents, no stopwords, ≥3 chars). Used for cannibalization checks."""
+        import re
+        text = (s or '').lower()
+        # strip accents
+        try:
+            import unicodedata
+            text = ''.join(
+                c for c in unicodedata.normalize('NFD', text)
+                if unicodedata.category(c) != 'Mn'
+            )
+        except Exception:
+            pass
+        words = re.findall(r"[a-z0-9]+", text)
+        stop = {
+            'les', 'des', 'pour', 'que', 'qui', 'votre', 'vos', 'mes', 'son',
+            'sur', 'dans', 'avec', 'mon', 'ses', 'cette', 'cet', 'aux', 'une',
+            'tout', 'tous', 'sans', 'sous', 'plus', 'lui', 'eux', 'nos',
+            'the', 'and', 'for', 'with', 'your', 'our', 'how', 'why', 'what',
+            'are', 'this', 'that', 'from', 'their',
+        }
+        return {w for w in words if len(w) >= 3 and w not in stop}
+
+    def _is_too_similar(self, candidate_title, existing_titles, threshold=0.55):
+        """Return (matched_title, similarity) if candidate_title is too
+        similar to any existing title — Jaccard on token sets."""
+        a = self._title_tokens(candidate_title)
+        if not a:
+            return None
+        best = (None, 0.0)
+        for ex in existing_titles:
+            b = self._title_tokens(ex)
+            if not b:
+                continue
+            inter = len(a & b)
+            union = len(a | b)
+            sim = inter / union if union else 0.0
+            if sim > best[1]:
+                best = (ex, sim)
+        if best[1] >= threshold:
+            return best
+        return None
+
     # === MAIN ENTRY POINT ===
 
     def generate(self, search_method='serper', topic=None, title=None,
@@ -259,6 +306,22 @@ class ArticleGenerator:
         # 2. Analyze and pick topic
         topic_analysis = self.analyze_and_pick_topic(search_results)
         self.log(f'[OK] Sujet: {topic_analysis["title"]}')
+
+        # 2.5 Cannibalization guard: refuse to generate a near-duplicate of
+        # an existing article (unless the user forced the title explicitly).
+        if not self.forced_title:
+            existing_titles = list(
+                BlogPost.objects.using(self.alias)
+                .values_list('title', flat=True)[:60]
+            )
+            match = self._is_too_similar(topic_analysis['title'], existing_titles, threshold=0.55)
+            if match:
+                matched_title, sim = match
+                self.log(f'[CANNIBAL] Trop similaire ({int(sim * 100)}%) a: "{matched_title}"')
+                raise ValueError(
+                    f'Cet article serait trop similaire ({int(sim * 100)}%) a un article existant: '
+                    f'"{matched_title}". Reformule le sujet ou modifie l\'article existant.'
+                )
 
         # 3. Generate article content
         content = self.generate_article_content(topic_analysis, search_results)
@@ -531,8 +594,14 @@ Reponds UNIQUEMENT au format JSON:
 {language_rule}
 {search_results}
 
-ARTICLES DEJA PUBLIES (a eviter):
+ARTICLES DEJA PUBLIES — NE PAS DUPLIQUER NI PARAPHRASER:
 {existing_str}
+
+REGLE STRICTE: Le titre que tu proposes DOIT etre fondamentalement different
+de chacun de ces articles existants. Pas de simple reformulation
+("L'IA pour les PME" ↔ "IA pour PME"). Si le sujet propose chevauche
+un article existant, choisis un ANGLE OPPOSE OU COMPLEMENTAIRE
+(ex: critique, contre-exemple, mise a jour 2026, niche specifique).
 
 ---
 
@@ -569,8 +638,14 @@ PROFIL DE L'AUTEUR:
 {search_results}
 
 {kb_hint}
-ARTICLES DEJA PUBLIES (a eviter):
+ARTICLES DEJA PUBLIES — NE PAS DUPLIQUER NI PARAPHRASER:
 {existing_str}
+
+REGLE STRICTE: Le titre que tu proposes DOIT etre fondamentalement different
+de chacun de ces articles existants. Pas de simple reformulation
+("L'IA pour les PME" ↔ "IA pour PME"). Si le sujet propose chevauche
+un article existant, choisis un ANGLE OPPOSE OU COMPLEMENTAIRE
+(ex: critique, contre-exemple, mise a jour 2026, niche specifique).
 
 ---
 
