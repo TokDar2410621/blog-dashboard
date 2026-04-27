@@ -1747,23 +1747,35 @@ class PageSpeedView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Cache results for 30 min — PSI is slow and quota-limited
+        cache_key = _seo_cache_key('page-speed:', url, strategy)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp_obj = Response(cached)
+            resp_obj['X-Cache'] = 'HIT'
+            return resp_obj
+
+        # Optional API key removes rate limits (free at console.cloud.google.com)
+        api_key = os.environ.get('PAGESPEED_API_KEY', '').strip()
         psi_url = (
             f'{self.PSI_ENDPOINT}'
             f'?url={quote(url, safe="")}'
             f'&strategy={strategy}'
             f'&category=PERFORMANCE&category=SEO&category=ACCESSIBILITY'
         )
+        if api_key:
+            psi_url += f'&key={api_key}'
 
         try:
-            resp = http_requests.get(psi_url, timeout=30)
+            resp = http_requests.get(psi_url, timeout=120)
         except http_requests.Timeout:
             return Response(
-                {'error': 'Delai PageSpeed Insights depasse'},
+                {'error': 'Delai PageSpeed Insights depasse (>120s). Reessayez dans quelques secondes.'},
                 status=status.HTTP_504_GATEWAY_TIMEOUT,
             )
         except Exception as e:
             return Response(
-                {'error': f'Erreur PageSpeed: {str(e)}'},
+                {'error': f'Erreur reseau PageSpeed: {str(e)}'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -1773,8 +1785,14 @@ class PageSpeedView(APIView):
                 err_msg = err_body.get('error', {}).get('message', f'HTTP {resp.status_code}')
             except Exception:
                 err_msg = f'HTTP {resp.status_code}'
+            # Common: 429 quota exceeded — guide the user
+            hint = ''
+            if resp.status_code == 429:
+                hint = ' Configure PAGESPEED_API_KEY (gratuit chez Google Cloud) pour eviter les limites.'
+            elif resp.status_code in (400, 404):
+                hint = ' Verifie que l\'URL est publique et accessible.'
             return Response(
-                {'error': f'PageSpeed Insights: {err_msg}'},
+                {'error': f'PageSpeed Insights: {err_msg}.{hint}'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -1802,7 +1820,7 @@ class PageSpeedView(APIView):
             fcp_ms = audit_numeric('first-contentful-paint')
             cls_val = audit_numeric('cumulative-layout-shift')
 
-            return Response({
+            result = {
                 'performance_score': cat_score('performance'),
                 'seo_score': cat_score('seo'),
                 'a11y_score': cat_score('accessibility'),
@@ -1811,7 +1829,11 @@ class PageSpeedView(APIView):
                 'fcp_s': round(fcp_ms / 1000, 2) if fcp_ms is not None else None,
                 'strategy': strategy,
                 'tested_url': url,
-            })
+            }
+            cache.set(cache_key, result, timeout=1800)  # 30 min
+            resp_obj = Response(result)
+            resp_obj['X-Cache'] = 'MISS'
+            return resp_obj
         except Exception as e:
             logger.exception('PageSpeed parsing failed')
             return Response(
