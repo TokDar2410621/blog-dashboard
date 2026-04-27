@@ -24,9 +24,15 @@ export const siteSchema = z.object({
   gsc_property_url: z.string().optional(),
   api_key: z.string().optional(),
   is_hosted: z.boolean().optional(),
+  is_active: z.boolean().optional(),
+  description: z.string().optional(),
+  og_image_url: z.string().optional(),
+  default_author: z.string().optional(),
+  default_language: z.string().optional(),
   available_languages: z.array(z.string()).nullable().optional(),
   blog_config: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
+  updated_at: z.string().optional(),
 });
 export type Site = z.infer<typeof siteSchema>;
 

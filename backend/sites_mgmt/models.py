@@ -21,66 +21,137 @@ class UploadedImage(models.Model):
 
 
 class Site(models.Model):
+    LANGUAGE_CHOICES = [('fr', 'Français'), ('en', 'English'), ('es', 'Español')]
+
+    # ── Identité ──────────────────────────────────────────────────────
     name = models.CharField(max_length=200, verbose_name="Nom du site")
+    domain = models.CharField(
+        max_length=255, blank=True, db_index=True,
+        verbose_name="Domaine du site",
+        help_text="Sans https:// ni slash final (ex: tokamdarius.ca)"
+    )
+    description = models.TextField(
+        blank=True, default='',
+        verbose_name="Description",
+        help_text="Courte description (utilisée pour Open Graph / about-page)"
+    )
+    og_image_url = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="Image OG par défaut",
+        help_text="URL de l'image utilisée comme fallback Open Graph quand un article n'a pas de cover"
+    )
+
+    # ── Config IA ─────────────────────────────────────────────────────
+    knowledge_base = models.TextField(
+        blank=True, default='',
+        verbose_name="Base de connaissances",
+        help_text="Contexte personnel pour la génération d'articles (qui tu es, tes projets, ton ton, etc.)"
+    )
+    default_author = models.CharField(
+        max_length=100, blank=True, default='',
+        verbose_name="Auteur par défaut",
+        help_text="Nom d'auteur attribué aux articles générés (utilisé aussi pour Schema.org). Vide = 'Admin'."
+    )
+    default_language = models.CharField(
+        max_length=2, choices=LANGUAGE_CHOICES, default='fr',
+        verbose_name="Langue par défaut",
+        help_text="Langue présélectionnée dans l'éditeur et la génération IA"
+    )
+    available_languages = models.JSONField(
+        blank=True, default=list,
+        verbose_name="Langues disponibles",
+        help_text="Liste de codes ISO acceptés (ex: ['fr','en']). Vide = toutes (fr/en/es)."
+    )
+
+    # ── Stockage des articles ─────────────────────────────────────────
     database_url = models.TextField(
         blank=True, default='',
         verbose_name="DATABASE_URL PostgreSQL",
         help_text="Laisser vide pour utiliser le stockage hébergé du dashboard"
-    )
-    domain = models.CharField(max_length=255, blank=True, verbose_name="Domaine du site")
-    knowledge_base = models.TextField(
-        blank=True, default='',
-        verbose_name="Base de connaissances",
-        help_text="Contexte personnel pour la generation d'articles (qui tu es, tes projets, ton ton, etc.)"
-    )
-    vercel_deploy_hook = models.URLField(
-        max_length=500, blank=True, default='',
-        verbose_name="Vercel Deploy Hook",
-        help_text="URL du Deploy Hook Vercel pour redéployer le site après modification d'articles"
-    )
-    gsc_property_url = models.URLField(
-        max_length=300, blank=True, default='',
-        help_text="URL de la propriété Search Console (ex: https://tokamdarius.ca/)"
-    )
-    gsc_refresh_token = models.TextField(
-        blank=True, default='',
-        help_text="OAuth2 refresh token chiffré"
     )
     blog_config = models.JSONField(
         blank=True, null=True, default=None,
         verbose_name="Config tables blog",
         help_text="Mapping des tables/colonnes si le site n'utilise pas les tables blog_* standard"
     )
-    available_languages = models.JSONField(
-        blank=True, null=True, default=None,
-        verbose_name="Langues disponibles",
-        help_text="Liste de codes ISO acceptés par le site (ex: ['fr','en']). Null = toutes (fr/en/es)."
+
+    # ── Intégrations externes ─────────────────────────────────────────
+    vercel_deploy_hook = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="Vercel Deploy Hook",
+        help_text="URL du Deploy Hook pour redéployer Vercel après chaque modification d'article"
     )
+    gsc_property_url = models.URLField(
+        max_length=300, blank=True, default='',
+        verbose_name="Search Console — URL propriété",
+        help_text="URL de la propriété Search Console (ex: https://tokamdarius.ca/)"
+    )
+    gsc_refresh_token = models.TextField(
+        blank=True, default='',
+        verbose_name="Search Console — refresh token",
+        help_text="OAuth2 refresh token (sensible — ne pas exposer côté frontend)"
+    )
+
+    # ── API publique ──────────────────────────────────────────────────
     api_key = models.CharField(
-        max_length=64, blank=True, default='',
+        max_length=64, blank=True, default='', db_index=True,
         verbose_name="Clé API publique",
-        help_text="Utilisée pour accéder aux articles depuis le frontend du site"
+        help_text="Utilisée comme header X-Api-Key pour les endpoints publics. Auto-générée."
+    )
+
+    # ── Méta ──────────────────────────────────────────────────────────
+    is_active = models.BooleanField(
+        default=True, db_index=True,
+        verbose_name="Actif",
+        help_text="Décoche pour suspendre le site (lectures bloquées, génération désactivée)"
     )
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sites')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Site"
         verbose_name_plural = "Sites"
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['owner', 'name'],
+                name='uniq_site_owner_name',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['owner', 'is_active']),
+        ]
 
     @property
     def is_hosted(self):
         """Site without database_url uses the dashboard's hosted storage."""
         return not self.database_url
 
+    @property
+    def author_for_articles(self):
+        """Default author name to attribute on generated articles."""
+        return self.default_author or 'Admin'
+
+    @property
+    def effective_languages(self):
+        """List of language codes accepted by this site (always non-empty)."""
+        return list(self.available_languages) if self.available_languages else ['fr', 'en', 'es']
+
+    def supports_language(self, code):
+        """True if `code` is allowed for this site."""
+        return code in self.effective_languages
+
     def save(self, *args, **kwargs):
         if not self.api_key:
             self.api_key = uuid.uuid4().hex
+        # Normalize domain: strip scheme + trailing slash
+        if self.domain:
+            self.domain = self.domain.replace('https://', '').replace('http://', '').rstrip('/')
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.domain or 'no domain'})"
 
 
 class HostedCategory(models.Model):

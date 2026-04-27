@@ -715,11 +715,10 @@ class GenerateArticleView(APIView):
         language = request.data.get('language', 'fr')
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
-        # Enforce per-site allowed languages if configured
-        allowed = site.available_languages
-        if allowed and language not in allowed:
+        # Enforce per-site allowed languages
+        if not site.supports_language(language):
             return Response(
-                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(allowed)}'},
+                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(site.effective_languages)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -793,11 +792,10 @@ class GenerateInlineView(APIView):
         language = request.data.get('language', 'fr')
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
-        # Enforce per-site allowed languages if configured
-        allowed = site.available_languages
-        if allowed and language not in allowed:
+        # Enforce per-site allowed languages
+        if not site.supports_language(language):
             return Response(
-                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(allowed)}'},
+                {'error': f'La langue "{language}" n\'est pas autorisee pour ce site. Langues disponibles: {", ".join(site.effective_languages)}'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
