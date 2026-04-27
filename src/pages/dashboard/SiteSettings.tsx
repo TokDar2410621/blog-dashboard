@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -25,6 +25,10 @@ export default function SiteSettings() {
   const [knowledgeBase, setKnowledgeBase] = useState("");
   const [vercelDeployHook, setVercelDeployHook] = useState("");
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
+  const [ogImageUrl, setOgImageUrl] = useState("");
+  const [defaultAuthor, setDefaultAuthor] = useState("");
+  const [defaultLanguage, setDefaultLanguage] = useState<string>("fr");
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -34,6 +38,10 @@ export default function SiteSettings() {
       setKnowledgeBase(site.knowledge_base || "");
       setVercelDeployHook(site.vercel_deploy_hook || "");
       setAvailableLanguages(site.available_languages || []);
+      setDescription(site.description || "");
+      setOgImageUrl(site.og_image_url || "");
+      setDefaultAuthor(site.default_author || "");
+      setDefaultLanguage(site.default_language || "fr");
     }
   }, [site]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -51,7 +59,11 @@ export default function SiteSettings() {
         domain,
         knowledge_base: knowledgeBase,
         vercel_deploy_hook: vercelDeployHook,
-        available_languages: availableLanguages.length > 0 ? availableLanguages : null,
+        available_languages: availableLanguages,
+        description,
+        og_image_url: ogImageUrl,
+        default_author: defaultAuthor,
+        default_language: defaultLanguage,
       });
       toast.success(t("settings.saved"));
     } catch {
@@ -195,6 +207,101 @@ export default function SiteSettings() {
             placeholder="https://api.vercel.com/v1/integrations/deploy/prj_.../..."
             type="url"
           />
+        </CardContent>
+      </Card>
+
+      {/* Branding */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Branding
+          </CardTitle>
+          <CardDescription>
+            Identité du site utilisée pour Open Graph (partages sociaux), la page "à propos" et les articles générés.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm">
+              Description
+            </Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Courte description du site, utilisée pour les meta tags et les partages sociaux"
+              rows={3}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground">
+              {description.length} caractères {description.length > 160 && "(trop long pour Open Graph — visez ≤160)"}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5 text-sm">
+              <ImageIcon className="h-3.5 w-3.5" />
+              Image Open Graph par défaut
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                value={ogImageUrl}
+                onChange={(e) => setOgImageUrl(e.target.value)}
+                placeholder="https://exemple.com/og-image.png"
+                type="url"
+                className="flex-1"
+              />
+              {ogImageUrl && (
+                <img
+                  src={ogImageUrl}
+                  alt="OG preview"
+                  className="h-10 w-16 object-cover rounded border"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Image affichée sur Facebook/Twitter/LinkedIn quand un article n'a pas de cover. Recommandé: 1200×630.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <UserIcon className="h-3.5 w-3.5" />
+                Auteur par défaut
+              </Label>
+              <Input
+                value={defaultAuthor}
+                onChange={(e) => setDefaultAuthor(e.target.value)}
+                placeholder="Admin"
+              />
+              <p className="text-xs text-muted-foreground">
+                Nom attribué aux articles générés par l'IA et utilisé dans le Schema.org
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <Languages className="h-3.5 w-3.5" />
+                Langue par défaut
+              </Label>
+              <select
+                value={defaultLanguage}
+                onChange={(e) => setDefaultLanguage(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="es">Español</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Présélectionnée dans l'éditeur et la génération IA
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
