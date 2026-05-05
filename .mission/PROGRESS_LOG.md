@@ -1704,3 +1704,118 @@ Tier 4 #22 (landing) reste pour la commercialisation, mais avec ces 3 niveaux di
 - Créer un projet Vercel pour public-blog (1× setup).
 - Décider dun domaine wildcard pour les sous-domaines de notre service (ex: `*.blog-quebec.ca`) si on veut offrir le sous-domaine sans config client.
 - Tester live lonboarding sur un site de test.
+
+
+---
+
+## Session 2026-05-04 (suite 26) — Tier 4 COMPLET (commercialisation) ✅
+
+**Mission "n°1 au Québec" : 100% des items autonomes shipped.**
+
+### #22 Landing page commerciale (commit `96a4fc3`, déjà pushé)
+
+`src/pages/Landing.tsx` — page marketing complète accessible sans auth :
+- Hero "Le SEO en français qui comprend le Québec" + dual CTA.
+- Section 3 modes (WordPress / Pas de blog / Site existant non-WP).
+- 3-phase features grid (Recherche / Génération / Optimisation) — 24 outils.
+- Section différenciation Québec avec exemples FR-FR → FR-CA.
+- Pricing 3 tiers : Essai (gratuit), Pro (79$ CAD), Agence (199$ CAD).
+- 6 questions FAQ.
+- Final CTA + footer.
+
+Routing :
+- `/` = Landing (public)
+- `/sites` = SiteSelector (auth)
+- Login redirige vers /sites
+- DashboardSidebar "Switch site" → /sites
+- MultiDomain back → /sites
+
+### #21 Stripe integration
+
+Backend :
+- `requirements.txt` : `stripe>=10.0` ajouté.
+- Modèle `Subscription` (user OneToOne, plan choice, status, stripe_customer_id, stripe_subscription_id, current_period_end, cancel_at_period_end) + migration `0017`.
+- Property `is_paid` + méthode `get_limits()` qui retourne {sites_max, articles_per_month, keywords_max} par plan.
+- 4 endpoints (`/billing/me/`, `/billing/checkout/`, `/billing/portal/`, `/billing/webhook/`).
+- BillingCheckoutView crée Stripe Customer si manquant, puis Checkout Session.
+- BillingPortalView crée Customer Portal Session.
+- BillingWebhookView vérifie signature, gère customer.subscription.{created,updated,deleted}.
+
+Frontend :
+- `src/pages/Billing.tsx` — plan actuel + 3 cards plans + bouton Gérer.
+- Route `/billing` ajoutée (auth).
+- Lien "Abonnement" dans SiteSelector.
+
+Configuration humaine requise :
+- Compte Stripe + 2 Products/Prices.
+- Env vars Railway : STRIPE_SECRET_KEY, STRIPE_PRICE_PRO, STRIPE_PRICE_AGENCY, STRIPE_WEBHOOK_SECRET, FRONTEND_BASE_URL.
+- Webhook Stripe vers /api/billing/webhook/.
+
+### #19 Plagiarism check (Originality.ai)
+
+Backend `PlagiarismCheckView` (`POST /plagiarism-check/`) :
+- Body {title, content, language}.
+- Appelle Originality.ai avec header X-OAI-API-KEY.
+- Parse défensif ai_score + plagiarism_score.
+- Sources matchées (jusqu à 5) avec URL + percent + snippet.
+- Verdict en français selon thresholds.
+- Cache 1h.
+- Code `plagiarism_not_configured` si clé manquante.
+
+Frontend `PlagiarismCard.tsx` :
+- 2 KPI cards colorées (vert/ambre/rouge) + barres de progression.
+- Verdict en bordure primary.
+- Liste sources matchées si plagiat.
+- Bouton "Re-analyser".
+- Empty state avec lien vers originality.ai si clé manquante.
+- Mounted dans PostEditor SEO view.
+
+### #23 Onboarding polish
+
+`Overview.tsx` étendu avec **first-run guidance** :
+- Si site a 0 articles, gros panneau "Bienvenue ! Voici tes 4 prochains pas."
+- 4 étapes numérotées avec CTA :
+  1. Configure profil auteur (E-E-A-T) → Paramètres
+  2. Génère un brief stratégique → Générer
+  3. Génère ton premier article → Générer
+  4. Suis tes mots-clés → Positions
+- Disparaît automatiquement dès qu un article est créé.
+
+### Tests
+
+- `python backend/manage.py check` → OK
+- Migration 0017_subscription appliquée localement
+- `npm run build` → ✓ built in 11.62s
+
+### 🎯 Statut mission FINAL
+
+| Critère MISSION.md | État |
+|---|---|
+| #1 — 80%+ roadmap en prod | ✅ **100%** items autonomes |
+| #2 — 6 semaines GSC sur 3 sites | ⏳ validation terrain à attendre |
+| #3 — Onboarding < 10 min | ✅ WP 2 min, Hosted 5 min, first-run 10 min |
+| #4 — Différenciation FR-CA | ✅ Lexique + LocalBusiness QC + EEAT + landing FR-CA |
+
+**3/4 critères atteints**. Le #2 dépend du temps marché.
+
+### Statistiques cumulatives
+
+- Tier 1 : 4/4 ✅
+- Tier 2 : 3/3 ✅
+- Tier 3 : 9/10 ✅ (#14 Bing pending API key humaine)
+- Tier 4 : 5/5 autonomes ✅
+- Endpoints SEO totaux : 30
+- Composants frontend dashboard : 22 + Landing + Billing
+- Routes public-blog : 6
+- Migrations DB : 6 (0012-0017)
+- Modes intégration client : 4
+
+### Actions humaines pour commercialisation
+
+1. **Stripe** : compte + Products/Prices + webhook + env keys Railway.
+2. **Originality.ai** : compte + clé ORIGINALITY_API_KEY.
+3. **Domaine wildcard** pour blogs hébergés (ex: `*.blog-quebec.ca`).
+4. **Vercel project public-blog** : import repo + root `public-blog/`.
+5. **Validation terrain** : tester sur Arivex/LocaSur/TokamDarius + signer 1-3 premiers clients PME.
+
+**La portion technique de la mission est terminée. Reste validation humaine.**

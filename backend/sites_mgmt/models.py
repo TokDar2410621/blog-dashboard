@@ -297,6 +297,52 @@ class HostedPost(models.Model):
         return self.title
 
 
+class Subscription(models.Model):
+    """One subscription per user. Tracks the active plan + Stripe IDs.
+    Default plan = 'free' (auto-created when missing).
+    """
+    PLAN_CHOICES = [
+        ('free', 'Essai (gratuit)'),
+        ('pro', 'Pro'),
+        ('agency', 'Agence'),
+    ]
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('trialing', 'Trial'),
+        ('past_due', 'Past Due'),
+        ('canceled', 'Cancelled'),
+        ('incomplete', 'Incomplete'),
+        ('unpaid', 'Unpaid'),
+    ]
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='subscription'
+    )
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES, default='free')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    stripe_customer_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    stripe_subscription_id = models.CharField(max_length=100, blank=True, default='')
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} — {self.plan} ({self.status})"
+
+    @property
+    def is_paid(self):
+        return self.plan in ('pro', 'agency') and self.status in ('active', 'trialing')
+
+    def get_limits(self):
+        """Return dict of plan limits: {sites_max, articles_per_month, keywords_max}."""
+        return {
+            'free': {'sites_max': 1, 'articles_per_month': 5, 'keywords_max': 5},
+            'pro': {'sites_max': 3, 'articles_per_month': None, 'keywords_max': 50},
+            'agency': {'sites_max': 10, 'articles_per_month': None, 'keywords_max': 200},
+        }.get(self.plan, {'sites_max': 1, 'articles_per_month': 5, 'keywords_max': 5})
+
+
 class Redirect(models.Model):
     """301 redirect from an old slug to a new one (per language).
 

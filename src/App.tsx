@@ -11,6 +11,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Landing = lazy(() => import("./pages/Landing"));
 const SiteSelector = lazy(() => import("./pages/SiteSelector"));
 const MultiDomain = lazy(() => import("./pages/MultiDomain"));
+const Billing = lazy(() => import("./pages/Billing"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -55,6 +56,14 @@ function App() {
                   element={
                     <AuthGuard>
                       <MultiDomain />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/billing"
+                  element={
+                    <AuthGuard>
+                      <Billing />
                     </AuthGuard>
                   }
                 />

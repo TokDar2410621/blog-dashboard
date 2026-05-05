@@ -59,12 +59,14 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [ ] Bing Webmaster integration
 - [x] Search trends FR-CA
 
-### Tier 4 (finition / commercialisation) — 3/5 autonomes done, 2 blocks human
-- [x] Weekly digest (rapport téléchargeable, sans SMTP — `/dashboard/<id>/digest`)
-- [x] EEAT author profile (Schema.org Person, all fields in Site model + UI in SiteSettings)
-- [ ] Plagiarism / originality check (action humaine pour clé API)
-- [x] Multi-domain comparison (page `/compare` avec table cross-site + KPIs + couverture GSC/EEAT)
-- [ ] Pricing + Stripe (action humaine requise)
+### Tier 4 (finition / commercialisation) — 5/5 autonomes done ✅
+- [x] Weekly digest (rapport téléchargeable, sans SMTP)
+- [x] EEAT author profile (Schema.org Person + UI SiteSettings)
+- [x] Plagiarism / originality check (Originality.ai integration — env key requise pour activation)
+- [x] Multi-domain comparison (page `/compare`)
+- [x] Pricing + Stripe (Subscription model + 4 endpoints + Billing page — env keys Stripe requises pour activation)
+- [x] Landing page commerciale (`/` public + 3-tier pricing)
+- [x] Onboarding flow (first-run guide 4 étapes sur Overview)
 
 ## Quand "presque accompli"
 

@@ -28,7 +28,7 @@ import markdown as md_lib
 
 from .models import (
     Site, UploadedImage, HostedPost, HostedCategory, HostedTag,
-    TrackedKeyword, SerpRank, Redirect,
+    TrackedKeyword, SerpRank, Redirect, Subscription,
 )
 from .db_utils import ensure_site_connection, test_site_connection
 from .blog_adapter import detect_blog_tables, setup_blog_views
@@ -3580,6 +3580,140 @@ class SearchTrendsView(APIView):
         return Response(result)
 
 
+class PlagiarismCheckView(APIView):
+    """Check an article for AI-generated content + plagiarism via Originality.ai.
+
+    POST /plagiarism-check/ {title, content, language='fr'}
+
+    Reads ORIGINALITY_API_KEY from env. Returns {ai_score, plagiarism_score,
+    sources_matched, full_response}. ai_score is the % of content detected as
+    AI-generated (0-100). plagiarism_score is the % matched to existing web
+    content. Scores ≥50 are flagged.
+
+    Cached 1h per content hash.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        title = (request.data.get('title') or '').strip()
+        content = (request.data.get('content') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not content or len(content) < 50:
+            return Response(
+                {'error': 'Contenu trop court pour analyse (50 caractères minimum).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('ORIGINALITY_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'ORIGINALITY_API_KEY non configurée. Configure-la sur Railway pour activer ce module.',
+                 'code': 'plagiarism_not_configured'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        cache_key = _seo_cache_key('plagiarism:', title, content[:5000])
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        try:
+            resp = http_requests.post(
+                'https://api.originality.ai/api/v1/scan/ai-and-plagiarism',
+                headers={
+                    'X-OAI-API-KEY': api_key,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'title': title or 'Untitled',
+                    'content': content[:50000],
+                    'aiModelVersion': '3.0',
+                    'storeScan': 'false',
+                },
+                timeout=60,
+            )
+        except http_requests.Timeout:
+            return Response(
+                {'error': 'Timeout Originality.ai (60s).'},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Originality.ai: {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if resp.status_code != 200:
+            return Response(
+                {'error': f'Originality.ai {resp.status_code}: {resp.text[:200]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        data = resp.json() or {}
+
+        # Extract scores — defensive parsing since the API shape can vary
+        ai_score_raw = (
+            data.get('aiScore')
+            or data.get('ai', {}).get('score')
+            or 0
+        )
+        plagiarism_raw = (
+            data.get('plagiarismScore')
+            or data.get('plagiarism', {}).get('score')
+            or 0
+        )
+        try:
+            ai_score = round(float(ai_score_raw) * (100 if ai_score_raw <= 1 else 1), 1)
+        except (TypeError, ValueError):
+            ai_score = 0.0
+        try:
+            plagiarism_score = round(
+                float(plagiarism_raw) * (100 if plagiarism_raw <= 1 else 1), 1
+            )
+        except (TypeError, ValueError):
+            plagiarism_score = 0.0
+
+        sources = data.get('plagiarism', {}).get('matches') or data.get('matches') or []
+        sources_matched = [
+            {
+                'url': s.get('url', ''),
+                'percent': s.get('percent') or s.get('score') or 0,
+                'snippet': (s.get('snippet') or s.get('text') or '')[:200],
+            }
+            for s in sources[:5]
+            if isinstance(s, dict)
+        ]
+
+        result = {
+            'ai_score': ai_score,
+            'plagiarism_score': plagiarism_score,
+            'sources_matched': sources_matched,
+            'verdict': self._verdict(ai_score, plagiarism_score, language),
+            'credits_used': data.get('credits_used'),
+        }
+        cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+        return Response(result)
+
+    def _verdict(self, ai_score, plagiarism, lang):
+        if ai_score >= 80 and plagiarism < 20:
+            return ("Contenu très probablement IA (sans plagiat). "
+                    "Ajoute des anecdotes, des données spécifiques, des citations "
+                    "pour humaniser.")
+        if plagiarism >= 30:
+            return (f"Plagiat détecté ({plagiarism:.1f}%). "
+                    "Réécris les passages signalés ou cite explicitement les sources.")
+        if ai_score >= 50:
+            return ("Contenu mixte IA/humain. Acceptable, mais ajoute des "
+                    "éléments personnels (photos, expérience, opinion).")
+        if ai_score < 30 and plagiarism < 10:
+            return "Contenu humain et original. Excellent pour Google."
+        return "Score acceptable, pas d'action urgente."
+
+
 class CommunityQuestionsView(APIView):
     """Harvest questions and discussions about a keyword from Reddit and Quora
     via Serper. Useful to find the real-world phrasing people use when they
@@ -4080,6 +4214,223 @@ class LocalBusinessSchemaView(APIView):
             area_served=request.data.get('area_served'),
         )
         return Response({'schema': schema})
+
+
+# ==========================================================================
+# BILLING — Stripe subscriptions
+# ==========================================================================
+
+# Plan slug → env var of the Stripe Price ID. Configured by the operator.
+PLAN_PRICE_ENV = {
+    'pro': 'STRIPE_PRICE_PRO',
+    'agency': 'STRIPE_PRICE_AGENCY',
+}
+
+
+def _get_or_create_subscription(user):
+    sub, _ = Subscription.objects.get_or_create(user=user)
+    return sub
+
+
+def _serialize_subscription(sub):
+    return {
+        'plan': sub.plan,
+        'status': sub.status,
+        'is_paid': sub.is_paid,
+        'current_period_end': sub.current_period_end.isoformat() if sub.current_period_end else None,
+        'cancel_at_period_end': sub.cancel_at_period_end,
+        'limits': sub.get_limits(),
+    }
+
+
+class BillingMeView(APIView):
+    """GET /billing/me/ — current user's subscription state."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        sub = _get_or_create_subscription(request.user)
+        return Response(_serialize_subscription(sub))
+
+
+class BillingCheckoutView(APIView):
+    """POST /billing/checkout/ {plan: 'pro'|'agency'} → returns Stripe Checkout URL.
+
+    Frontend redirects the user to that URL. After payment, Stripe redirects
+    back to /billing/success and /billing/cancel based on the URLs we pass.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        plan = (request.data.get('plan') or '').strip().lower()
+        if plan not in PLAN_PRICE_ENV:
+            return Response(
+                {'error': "Plan invalide (pro, agency)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        secret = os.environ.get('STRIPE_SECRET_KEY')
+        if not secret:
+            return Response(
+                {'error': 'STRIPE_SECRET_KEY non configurée'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        price_id = os.environ.get(PLAN_PRICE_ENV[plan])
+        if not price_id:
+            return Response(
+                {'error': f"{PLAN_PRICE_ENV[plan]} non configuré"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        import stripe
+        stripe.api_key = secret
+
+        sub = _get_or_create_subscription(request.user)
+        # Create a Stripe Customer if we don't have one yet
+        if not sub.stripe_customer_id:
+            try:
+                customer = stripe.Customer.create(
+                    email=request.user.email or None,
+                    name=request.user.username,
+                    metadata={'user_id': str(request.user.id)},
+                )
+                sub.stripe_customer_id = customer.id
+                sub.save(update_fields=['stripe_customer_id'])
+            except Exception as e:
+                return Response(
+                    {'error': f'Erreur Stripe: {str(e)[:120]}'},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+        # Build success/cancel URLs
+        frontend_base = os.environ.get('FRONTEND_BASE_URL', 'https://blog-dashboard-ebon.vercel.app')
+
+        try:
+            session = stripe.checkout.Session.create(
+                customer=sub.stripe_customer_id,
+                mode='subscription',
+                line_items=[{'price': price_id, 'quantity': 1}],
+                success_url=f'{frontend_base}/billing?status=success',
+                cancel_url=f'{frontend_base}/billing?status=cancel',
+                allow_promotion_codes=True,
+                metadata={'user_id': str(request.user.id), 'plan': plan},
+                subscription_data={
+                    'metadata': {'user_id': str(request.user.id), 'plan': plan},
+                },
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Stripe: {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({'url': session.url})
+
+
+class BillingPortalView(APIView):
+    """POST /billing/portal/ → returns Stripe Customer Portal URL.
+    User can update card, cancel subscription, view invoices.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        secret = os.environ.get('STRIPE_SECRET_KEY')
+        if not secret:
+            return Response(
+                {'error': 'STRIPE_SECRET_KEY non configurée'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        sub = _get_or_create_subscription(request.user)
+        if not sub.stripe_customer_id:
+            return Response(
+                {'error': "Aucun compte Stripe associé. Souscris d'abord à un plan."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        import stripe
+        stripe.api_key = secret
+
+        frontend_base = os.environ.get('FRONTEND_BASE_URL', 'https://blog-dashboard-ebon.vercel.app')
+        try:
+            session = stripe.billing_portal.Session.create(
+                customer=sub.stripe_customer_id,
+                return_url=f'{frontend_base}/billing',
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Stripe: {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response({'url': session.url})
+
+
+class BillingWebhookView(APIView):
+    """POST /billing/webhook/ — Stripe webhook handler.
+    Updates Subscription rows on customer.subscription.{created,updated,deleted}.
+    No auth — verified via Stripe signature.
+    """
+    permission_classes = []
+
+    def post(self, request):
+        import stripe
+        secret = os.environ.get('STRIPE_SECRET_KEY')
+        webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+        if not secret or not webhook_secret:
+            return Response({'error': 'Stripe non configurée'}, status=503)
+
+        stripe.api_key = secret
+
+        sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+        payload = request.body
+
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        except Exception as e:
+            logger.warning('Stripe webhook signature failed: %s', e)
+            return Response({'error': 'invalid signature'}, status=400)
+
+        event_type = event['type']
+        data = event['data']['object']
+
+        if event_type in (
+            'customer.subscription.created',
+            'customer.subscription.updated',
+            'customer.subscription.deleted',
+        ):
+            customer_id = data.get('customer')
+            sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
+            if sub_obj:
+                sub_obj.stripe_subscription_id = data.get('id', '')
+                stripe_status = data.get('status', 'active')
+                sub_obj.status = stripe_status
+                sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
+                # Determine plan from price id
+                items = data.get('items', {}).get('data', [])
+                if items:
+                    price_id = items[0].get('price', {}).get('id', '')
+                    for plan_key, env_key in PLAN_PRICE_ENV.items():
+                        if os.environ.get(env_key) == price_id:
+                            sub_obj.plan = plan_key
+                            break
+                # Period end
+                period_end = data.get('current_period_end')
+                if period_end:
+                    from datetime import datetime, timezone as tz
+                    sub_obj.current_period_end = datetime.fromtimestamp(period_end, tz=tz.utc)
+                if event_type == 'customer.subscription.deleted':
+                    sub_obj.plan = 'free'
+                    sub_obj.status = 'canceled'
+                sub_obj.save()
+                logger.info('Stripe webhook updated subscription for user=%s plan=%s status=%s',
+                            sub_obj.user_id, sub_obj.plan, sub_obj.status)
+
+        return Response({'received': True})
+
+
+# ==========================================================================
+# WORDPRESS — discover & connect
+# ==========================================================================
 
 
 class WordPressDiscoverView(APIView):

@@ -38,6 +38,7 @@ import {
   Database,
   BarChart3,
   Sparkles,
+  CreditCard,
 } from "lucide-react";
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { toast } from "sonner";
@@ -261,6 +262,11 @@ export default function SiteSelector() {
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>
             <BarChart3 className="h-4 w-4 mr-2" />
             {t("sites.compare", "Comparer mes sites")}
+          </Button>
+          <span className="text-muted-foreground">·</span>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/billing")}>
+            <CreditCard className="h-4 w-4 mr-2" />
+            Abonnement
           </Button>
           <span className="text-muted-foreground">·</span>
           <Button variant="ghost" size="sm" onClick={handleLogout}>

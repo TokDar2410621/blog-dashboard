@@ -12,6 +12,7 @@ import { SEOPreview } from "@/components/SEOPreview";
 import { SEOAnalyzer } from "@/components/SEOAnalyzer";
 import { ReadabilityCard } from "@/components/ReadabilityCard";
 import { LexiconCard } from "@/components/LexiconCard";
+import { PlagiarismCard } from "@/components/PlagiarismCard";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -672,6 +673,7 @@ export default function PostEditor() {
             <div className="max-w-2xl space-y-6">
               <ReadabilityCard content={content} language={language} />
               <LexiconCard content={content} language={language} />
+              <PlagiarismCard title={title} content={content} language={language} />
               <SEOAnalyzer
                 title={title}
                 excerpt={excerpt}
