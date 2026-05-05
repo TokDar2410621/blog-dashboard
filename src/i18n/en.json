@@ -564,7 +564,10 @@
     "saved": "Settings saved!",
     "saveError": "Error saving settings",
     "saving": "Saving...",
-    "save": "Save"
+    "save": "Save",
+    "lbGenerated": "LocalBusiness schema generated",
+    "lbError": "Schema generation error",
+    "lbCopied": "Schema copied to clipboard"
   },
 
   "seo": {

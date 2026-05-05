@@ -564,7 +564,10 @@
     "saved": "Parametres sauvegardes !",
     "saveError": "Erreur lors de la sauvegarde",
     "saving": "Sauvegarde...",
-    "save": "Sauvegarder"
+    "save": "Sauvegarder",
+    "lbGenerated": "Schema LocalBusiness genere",
+    "lbError": "Erreur generation schema",
+    "lbCopied": "Schema copie dans le presse-papiers"
   },
 
   "seo": {

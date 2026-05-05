@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSite, useUpdateSite } from "@/hooks/useDashboard";
+import { authFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,13 +14,59 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
   const { t } = useTranslation();
+  const { siteId } = useParams<{ siteId: string }>();
   const { data: site, isLoading } = useSite();
   const updateSite = useUpdateSite();
+
+  // LocalBusiness schema form
+  const [lbStreet, setLbStreet] = useState("");
+  const [lbLocality, setLbLocality] = useState("");
+  const [lbPostal, setLbPostal] = useState("");
+  const [lbPhone, setLbPhone] = useState("");
+  const [lbPriceRange, setLbPriceRange] = useState("");
+  const [lbSchema, setLbSchema] = useState<unknown | null>(null);
+  const [lbGenerating, setLbGenerating] = useState(false);
+  const [lbCopied, setLbCopied] = useState(false);
+
+  const generateLbSchema = async () => {
+    setLbGenerating(true);
+    try {
+      const res = await authFetch(`/sites/${siteId}/local-business-schema/`, {
+        method: "POST",
+        body: JSON.stringify({
+          address: {
+            streetAddress: lbStreet || undefined,
+            addressLocality: lbLocality || undefined,
+            postalCode: lbPostal || undefined,
+          },
+          phone: lbPhone || undefined,
+          price_range: lbPriceRange || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("schema generation failed");
+      const data = await res.json();
+      setLbSchema(data.schema);
+      toast.success(t("settings.lbGenerated"));
+    } catch {
+      toast.error(t("settings.lbError"));
+    } finally {
+      setLbGenerating(false);
+    }
+  };
+
+  const copyLbSchema = () => {
+    if (!lbSchema) return;
+    const tag = `<script type="application/ld+json">\n${JSON.stringify(lbSchema, null, 2)}\n</script>`;
+    navigator.clipboard.writeText(tag);
+    setLbCopied(true);
+    toast.success(t("settings.lbCopied"));
+    setTimeout(() => setLbCopied(false), 1500);
+  };
 
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
@@ -450,6 +498,110 @@ export default function SiteSettings() {
           <p className="text-xs text-muted-foreground">
             Ces 3 URLs alimentent <code>sameAs</code> dans le JSON-LD Person — Google les utilise pour vérifier ton identité.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* LocalBusiness Schema (Quebec-tuned) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Schema LocalBusiness (Québec)
+          </CardTitle>
+          <CardDescription>
+            Génère un JSON-LD <code className="text-xs">LocalBusiness</code> avec <code>addressCountry=CA</code>, <code>addressRegion=QC</code>, <code>areaServed=Québec</code>. À coller dans le <code>&lt;head&gt;</code> de ton site public.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Rue</Label>
+              <Input
+                value={lbStreet}
+                onChange={(e) => setLbStreet(e.target.value)}
+                placeholder="123 rue Saint-Denis"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Ville</Label>
+              <Input
+                value={lbLocality}
+                onChange={(e) => setLbLocality(e.target.value)}
+                placeholder="Montréal"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Code postal</Label>
+              <Input
+                value={lbPostal}
+                onChange={(e) => setLbPostal(e.target.value)}
+                placeholder="H2X 1Y2"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Téléphone</Label>
+              <Input
+                value={lbPhone}
+                onChange={(e) => setLbPhone(e.target.value)}
+                placeholder="+1 514 555 0123"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-xs">Gamme de prix (optionnel)</Label>
+              <Input
+                value={lbPriceRange}
+                onChange={(e) => setLbPriceRange(e.target.value)}
+                placeholder="$$ ou 30$ - 80$"
+                className="h-9 text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Convention Schema.org : "$" très accessible, "$$$$" haut de gamme.
+              </p>
+            </div>
+          </div>
+
+          <Button
+            onClick={generateLbSchema}
+            disabled={lbGenerating}
+            variant="outline"
+          >
+            {lbGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Génération...
+              </>
+            ) : (
+              <>
+                <Code className="h-4 w-4 mr-2" />
+                Générer le schema
+              </>
+            )}
+          </Button>
+
+          {lbSchema !== null && (
+            <div className="space-y-2 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono uppercase tracking-wide text-muted-foreground">
+                  JSON-LD prêt à coller
+                </span>
+                <Button size="sm" variant="outline" onClick={copyLbSchema}>
+                  {lbCopied ? (
+                    <Check className="h-3 w-3 mr-1 text-green-600" />
+                  ) : (
+                    <Copy className="h-3 w-3 mr-1" />
+                  )}
+                  Copier
+                </Button>
+              </div>
+              <pre className="text-[10px] bg-muted/50 rounded p-3 overflow-x-auto max-h-64 font-mono">
+                {JSON.stringify(lbSchema, null, 2)}
+              </pre>
+            </div>
+          )}
         </CardContent>
       </Card>
 
