@@ -65,3 +65,41 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 **Blocages** : aucun. Toutes les APIs (Serper, Gemini) sont déjà configurées en env Railway.
 
 **Actions humaines en attente** : aucune. Voir `PENDING_HUMAN.md` quand existera.
+
+---
+
+## Session 2026-05-04 (suite) — Content Brief Generator (backend)
+
+**Fait** :
+- Backend `ContentBriefView` ajouté dans `backend/sites_mgmt/views.py` (entre `CompetitorAnalysisView` et la section public API).
+  - Input : `{keyword, language: 'fr'|'en'|'es'}` (`site_id` optionnel mais ignoré pour l'instant — réservé pour usages futurs comme contextualiser sur un site).
+  - Étape 1 : Serper SERP top 10 + `peopleAlsoAsk` + `relatedSearches` (best-effort, l'absence de `SERPER_API_KEY` n'est pas bloquante).
+  - Étape 2 : Gemini 2.5 flash avec un prompt structuré qui demande JSON :
+    `search_intent`, `intent_explanation`, `recommended_titles[3]`, `outline[]` (level 2/3),
+    `word_count_target`, `faq[{question, answer_hint}]`, `entities[]`,
+    `schemas_suggested[]`, `eeat_signals[]`.
+  - Cache 1h via `_seo_cache_key('content-brief:', keyword, language)`.
+  - Retour : `{keyword, language, serp_competitors, people_also_ask, related_searches, brief}`.
+- Route `path('content-brief/', ContentBriefView.as_view(), name='content-brief')` ajoutée dans `urls.py` (juste après `keyword-research/`).
+- Import `ContentBriefView` ajouté.
+
+**Tests** :
+- `python backend/manage.py check` → "System check identified no issues (0 silenced)". OK.
+- AST parse OK pour `views.py` et `urls.py`.
+- **Test live à faire (humain)** : `curl -X POST .../content-brief/ -H "Authorization: Bearer ..." -d '{"keyword":"automatisation pme quebec","language":"fr"}'` quand le backend tournera (nécessite GEMINI_API_KEY + idéalement SERPER_API_KEY déjà configurées sur Railway).
+
+**Branches/commits** : commit local à venir, **pas de push** (cf workflow local-first).
+
+**Prochain bloc concret** :
+- **Frontend du Content Brief**. Créer `src/components/ContentBrief.tsx` :
+  - Input : champ mot-clé + select langue (réutiliser le pattern de `SEOAnalyzer.tsx` pour cohérence visuelle).
+  - Bouton "Générer le brief" → mutation react-query vers `/content-brief/`.
+  - Affichage du brief reçu : sections collapsibles pour search intent, titles (cards cliquables → copie au clipboard), outline (en arborescence), word count, FAQ (expansibles), entities (tags), schemas (badges), EEAT (checklist).
+  - Skeleton pendant chargement.
+  - i18n FR + EN dans `src/i18n/locales/fr.json` et `en.json`.
+- **Intégration** : ajouter étape 0 "Brief avant génération" dans `src/pages/dashboard/AIGenerator.tsx` (lire le fichier existant pour comprendre le wizard actuel). Le brief généré peut être passé en contexte au pipeline `/sites/<id>/generate/` (déjà existant).
+- **Tests** : `npm run build` doit passer.
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : aucune.

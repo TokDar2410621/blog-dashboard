@@ -5,7 +5,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 ## Tier 1 — différenciation immédiate
 
 ### 1. Content Brief Generator ⏱ 4-6h
-- [ ] Backend `POST /content-brief/` — combine Serper SERP + PAA + competitor + Gemini synthesis → JSON brief :
+- [x] Backend `POST /content-brief/` — combine Serper SERP + PAA + competitor + Gemini synthesis → JSON brief :
   - search_intent (informational/commercial/transactional/navigational)
   - top 5 competitors (titles + headings extraits)
   - recommended_title patterns (3 variantes)

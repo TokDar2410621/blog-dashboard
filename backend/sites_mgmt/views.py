@@ -2528,6 +2528,196 @@ class CompetitorAnalysisView(APIView):
         })
 
 
+class ContentBriefView(APIView):
+    """Generate a pre-writing content brief for a target keyword.
+
+    Combines Serper (SERP top 10 + People Also Ask) with Gemini synthesis to
+    return a structured JSON brief: search intent, recommended titles, outline,
+    word-count target, FAQ, entities, schemas, EEAT signals. Cached 1h.
+
+    Input: {keyword: str, language: 'fr'|'en'|'es', site_id?: int}
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        import json
+        import time
+
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle cible est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': "Langue invalide (fr, en, es)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+        if not gemini_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        cache_key = _seo_cache_key('content-brief:', keyword, language)
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        # 1) Serper — SERP top 10 + People Also Ask (best-effort)
+        serper_key = os.environ.get('SERPER_API_KEY')
+        organic = []
+        paa = []
+        related = []
+        if serper_key:
+            hl, gl = ('en', 'us') if language == 'en' else (
+                ('es', 'es') if language == 'es' else ('fr', 'ca')
+            )
+            try:
+                resp = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={
+                        'X-API-KEY': serper_key,
+                        'Content-Type': 'application/json',
+                    },
+                    json={'q': keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    data = resp.json() or {}
+                    organic = (data.get('organic') or [])[:10]
+                    paa = [
+                        (item or {}).get('question')
+                        for item in (data.get('peopleAlsoAsk') or [])
+                        if (item or {}).get('question')
+                    ]
+                    related = [
+                        (item or {}).get('query')
+                        for item in (data.get('relatedSearches') or [])
+                        if (item or {}).get('query')
+                    ]
+            except http_requests.Timeout:
+                logger.warning('Serper SERP timeout for content brief')
+            except Exception as e:
+                logger.warning('Serper SERP failed for content brief: %s', e)
+
+        # 2) Build SERP context block for Gemini
+        serp_lines = []
+        for idx, item in enumerate(organic, start=1):
+            title = (item.get('title') or '').strip()
+            snippet = (item.get('snippet') or '').strip()
+            if title:
+                serp_lines.append(f"{idx}. {title} — {snippet}")
+        serp_block = '\n'.join(serp_lines) if serp_lines else '(no SERP data available)'
+        paa_block = '\n'.join(f"- {q}" for q in paa[:10]) if paa else '(no PAA available)'
+        related_block = ', '.join(related[:10]) if related else '(none)'
+
+        lang_label = {'fr': 'French (Quebec)', 'en': 'English', 'es': 'Spanish'}[language]
+
+        prompt = f"""You are an SEO strategist producing a content brief for a blog article.
+
+TARGET KEYWORD: {keyword}
+TARGET LANGUAGE: {lang_label}
+
+SERP TOP 10 (titles + snippets):
+{serp_block}
+
+PEOPLE ALSO ASK:
+{paa_block}
+
+RELATED SEARCHES: {related_block}
+
+Produce a content brief as JSON. The brief MUST be in {lang_label}. Be specific and
+actionable — a writer should be able to start writing from it without further research.
+
+For "search_intent" choose ONE of: informational, commercial, transactional, navigational.
+
+For "recommended_titles" produce 3 click-worthy variants under 60 chars.
+
+For "outline" propose 6-12 H2 sections (level 2) with a few H3 sub-sections (level 3) where
+useful. Prefer answering search intent and PAA questions. Order matters (top to bottom of article).
+
+For "word_count_target" pick a number that matches the depth of top-ranking results
+(typical 1200-2500 for informational FR-CA content).
+
+For "faq" extract or generate 4-8 FAQ pairs ready to be turned into FAQPage schema. Each
+"question" should be exactly the user's natural phrasing; "answer_hint" should be a 1-2
+sentence summary the writer will expand.
+
+For "entities" list 8-15 named entities, concepts, or LSI keywords the article should
+mention to demonstrate topical breadth.
+
+For "schemas_suggested" list which schema.org types fit (Article, BlogPosting, HowTo,
+FAQPage, Question, LocalBusiness, etc.).
+
+For "eeat_signals" list 3-6 concrete things to add to the article to satisfy E-E-A-T
+(author bio with credentials, citation of regulators or studies, recent dates, etc.).
+
+Respond with JSON only (no markdown code fences):
+{{
+  "search_intent": "...",
+  "intent_explanation": "...",
+  "recommended_titles": ["...", "...", "..."],
+  "outline": [
+    {{"level": 2, "text": "..."}},
+    {{"level": 3, "text": "..."}}
+  ],
+  "word_count_target": 1500,
+  "faq": [{{"question": "...", "answer_hint": "..."}}],
+  "entities": ["...", "..."],
+  "schemas_suggested": ["...", "..."],
+  "eeat_signals": ["...", "..."]
+}}"""
+
+        try:
+            from google import genai
+
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+            )
+            text = (response.text or '').strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+            brief = json.loads(text)
+        except Exception as e:
+            logger.warning('Gemini content brief failed: %s', e)
+            return Response(
+                {'error': f'Erreur generation brief: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        result = {
+            'keyword': keyword,
+            'language': language,
+            'serp_competitors': [
+                {
+                    'rank': idx,
+                    'title': (item.get('title') or '').strip(),
+                    'url': item.get('link') or '',
+                    'snippet': (item.get('snippet') or '').strip(),
+                }
+                for idx, item in enumerate(organic, start=1)
+            ],
+            'people_also_ask': paa[:10],
+            'related_searches': related[:10],
+            'brief': brief,
+        }
+        cache.set(cache_key, result, SEO_CACHE_TTL)
+        return Response(result)
+
+
 # ==========================================================================
 # PUBLIC API — consumed by site frontends (no auth, optional API key check)
 # ==========================================================================
