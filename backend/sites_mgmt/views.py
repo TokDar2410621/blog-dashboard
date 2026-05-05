@@ -816,6 +816,9 @@ class GenerateInlineView(APIView):
         length = request.data.get('length', 'medium')
         keywords = request.data.get('keywords') or None
         context_urls = request.data.get('context_urls') or []
+        brief = request.data.get('brief')
+        if not isinstance(brief, dict):
+            brief = None
         language = request.data.get('language', 'fr')
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
@@ -859,6 +862,7 @@ class GenerateInlineView(APIView):
                 keywords=keywords,
                 dry_run=True,
                 language=language,
+                brief=brief,
             )
 
             # Extract the generated data from the generator's internal state
