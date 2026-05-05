@@ -199,6 +199,19 @@
     "error": "Erreur lors de la generation"
   },
 
+  "hreflang": {
+    "title": "Sante hreflang multi-langue",
+    "subtitle": "Verifie que tes articles ont bien leurs traductions publiees dans toutes les langues du site.",
+    "totalGroups": "Groupes",
+    "complete": "Complets",
+    "incomplete": "Incomplets",
+    "expectedLanguages": "Langues attendues",
+    "incompleteGroupsTitle": "Groupes incomplets (langues manquantes)",
+    "missing": "Langue manquante",
+    "orphans": "{{count}} articles publies dans une seule langue (orphelins potentiels a traduire).",
+    "error": "Impossible de charger l'analyse hreflang."
+  },
+
   "paa": {
     "title": "People Also Ask + FAQ schema",
     "subtitle": "Recupere les questions Google PAA pour ton mot-cle, genere des reponses courtes, et produit un schema FAQPage pret a coller.",

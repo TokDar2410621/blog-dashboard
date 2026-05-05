@@ -2718,6 +2718,137 @@ Respond with JSON only (no markdown code fences):
         return Response(result)
 
 
+class HreflangCheckView(APIView):
+    """Validate translation_group consistency across published articles of a site.
+
+    Two modes:
+    - Per-group: pass {site_id, translation_group} → returns the siblings + which
+      languages are missing from the site's `available_languages`.
+    - Site-wide: pass {site_id} only → returns aggregate stats: groups with
+      missing translations, articles without a group that look orphaned.
+
+    No external API calls; pure DB introspection. Cache 5 min.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        site_id = request.data.get('site_id')
+        translation_group = (request.data.get('translation_group') or '').strip()
+
+        if not site_id:
+            return Response(
+                {'error': 'site_id requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            site = get_site_for_user(request, int(site_id))
+        except (ValueError, TypeError):
+            return Response(
+                {'error': 'site_id invalide'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = _seo_cache_key(
+            'hreflang:', str(site.id), translation_group or '_all'
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        expected_langs = list(site.effective_languages)
+
+        # Helper to extract published rows in (translation_group, slug, lang, title) tuples
+        def _all_published():
+            if site.is_hosted:
+                qs = HostedPost.objects.filter(site=site, status='published').values(
+                    'translation_group', 'slug', 'language', 'title'
+                )
+            else:
+                alias = ensure_site_connection(site)
+                qs = BlogPost.objects.using(alias).filter(status='published').values(
+                    'translation_group', 'slug', 'language', 'title'
+                )
+            return list(qs)
+
+        rows = _all_published()
+
+        # Per-group mode
+        if translation_group:
+            siblings = [
+                r for r in rows if str(r.get('translation_group')) == translation_group
+            ]
+            languages_present = sorted({r['language'] for r in siblings if r.get('language')})
+            missing = [lang for lang in expected_langs if lang not in languages_present]
+            result = {
+                'mode': 'group',
+                'translation_group': translation_group,
+                'expected_languages': expected_langs,
+                'languages_present': languages_present,
+                'missing_languages': missing,
+                'is_complete': len(missing) == 0 and len(siblings) > 0,
+                'siblings': [
+                    {
+                        'slug': r['slug'],
+                        'language': r['language'],
+                        'title': r.get('title') or '',
+                    }
+                    for r in siblings
+                ],
+            }
+            cache.set(cache_key, result, timeout=300)
+            return Response(result)
+
+        # Site-wide mode: aggregate
+        groups = {}  # tg -> [rows]
+        for r in rows:
+            tg = str(r.get('translation_group') or '')
+            if tg:
+                groups.setdefault(tg, []).append(r)
+
+        groups_incomplete = []
+        groups_complete = 0
+        for tg, members in groups.items():
+            langs = sorted({m['language'] for m in members if m.get('language')})
+            missing = [lang for lang in expected_langs if lang not in langs]
+            if missing:
+                groups_incomplete.append({
+                    'translation_group': tg,
+                    'languages_present': langs,
+                    'missing_languages': missing,
+                    'sample_title': members[0].get('title') or '',
+                    'sample_slug': members[0]['slug'],
+                })
+            else:
+                groups_complete += 1
+
+        # Articles published in only ONE language across the whole site,
+        # whose group has no siblings — candidates for translation.
+        single_lang_orphans = [
+            {
+                'slug': members[0]['slug'],
+                'language': members[0]['language'],
+                'title': members[0].get('title') or '',
+                'translation_group': tg,
+            }
+            for tg, members in groups.items()
+            if len(members) == 1
+        ]
+
+        result = {
+            'mode': 'site',
+            'site_id': site.id,
+            'expected_languages': expected_langs,
+            'total_groups': len(groups),
+            'groups_complete': groups_complete,
+            'groups_incomplete': groups_incomplete,
+            'single_lang_orphans': single_lang_orphans[:50],
+            'orphan_count': len(single_lang_orphans),
+        }
+        cache.set(cache_key, result, timeout=300)
+        return Response(result)
+
+
 class PAAView(APIView):
     """Harvest People Also Ask questions from Google SERP, optionally generate
     short answers via Gemini, and return both the raw list and a ready-to-paste

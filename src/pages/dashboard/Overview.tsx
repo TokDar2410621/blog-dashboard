@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Eye, PenLine, Clock } from "lucide-react";
+import { HreflangCard } from "@/components/HreflangCard";
 
 export default function Overview() {
   const { t, i18n } = useTranslation();
@@ -76,6 +77,9 @@ export default function Overview() {
           icon={Clock}
         />
       </div>
+
+      {/* Hreflang health */}
+      {siteId && <HreflangCard siteId={siteId} />}
 
       {/* Recent Posts */}
       {stats?.recent_posts && stats.recent_posts.length > 0 && (

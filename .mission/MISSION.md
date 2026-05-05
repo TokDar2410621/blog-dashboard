@@ -41,7 +41,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Content Brief Generator (intent + competitors + outline + FAQ + entités)
 - [x] People Also Ask harvester + auto-FAQ schema
 - [ ] Bulk SEO audit
-- [ ] Hreflang validator
+- [x] Hreflang validator
 
 ### Tier 2 (feedback loop)
 - [ ] Rank tracking (GSC + Serper history, alertes décay)

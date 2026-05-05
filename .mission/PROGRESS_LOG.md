@@ -192,3 +192,57 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Actions humaines en attente** : aucune nouvelle.
 
+---
+
+## Session 2026-05-04 (suite 4) — Hreflang validator ✅ Tier 1 #4 DONE
+
+**Fait** :
+- Backend `HreflangCheckView` ajouté dans `views.py` (juste avant `PAAView`).
+  - Endpoint `POST /hreflang-check/`. Deux modes selon les inputs :
+    - **Per-group** : `{site_id, translation_group}` → renvoie les siblings, langues présentes vs attendues, missing list, flag `is_complete`.
+    - **Site-wide** : `{site_id}` seul → renvoie agrégat (total_groups, groups_complete, groups_incomplete avec sample title/slug, single_lang_orphans).
+  - Pure DB introspection (HostedPost ou BlogPost via `using(alias)`), pas d'appel externe.
+  - Cache 5 min via `_seo_cache_key('hreflang:', site_id, translation_group_or_all)`.
+  - Utilise `site.effective_languages` (la propriété qui retourne `available_languages` ou défaut fr/en/es).
+- Route `path('hreflang-check/', HreflangCheckView.as_view(), name='hreflang-check')` ajoutée dans `urls.py`.
+- Composant `src/components/HreflangCard.tsx` (mode site-wide pour Overview) :
+  - 3 stats cards : total groups, complete, incomplete (avec icônes CheckCircle2 et AlertTriangle).
+  - Liste des langues attendues du site.
+  - Liste scrollable des groupes incomplets (jusqu'à 20) : titre + slug → lien vers PostEditor + badges colorés (langues présentes en bleu, langues manquantes en ambre avec "+lang").
+  - Footer : compte d'orphelins single-language.
+- Intégration dans `Overview.tsx` : `<HreflangCard siteId={siteId} />` placé avant la section "Recent Posts".
+- 10 nouvelles clés `hreflang.*` dans fr.json + en.json.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 10.88s
+- **Test live à faire (humain)** : aller sur `/dashboard/<siteId>` (Overview), voir la nouvelle carte "Santé hreflang multi-langue", vérifier que les stats sont cohérentes avec les articles publiés (pour Arivex qui a des FR/EN traduits, devrait montrer des groupes complets et/ou incomplets).
+
+**Branches/commits** : commit local à venir (pas de push).
+
+**Prochain bloc concret** :
+
+**Tier 1 #3 — Bulk SEO audit** (estimé 3h) :
+
+1. Ouvrir `backend/sites_mgmt/views.py`. Ajouter `class BulkSEOAuditView(APIView)` après `HreflangCheckView`.
+2. Endpoint `GET /sites/<site_id>/audit-all/` (ou POST avec body `{site_id, async?: bool}`).
+3. Logique :
+   - Itérer les articles publiés du site (limite 50 pour MVP, paginer ensuite).
+   - Pour chaque, appeler la même logique que `SEOAuditView` (extraire dans une fonction helper `_run_seo_audit(title, excerpt, content, keyword, language)` partagée).
+   - Cache par article via `_seo_cache_key`.
+   - Agréger : score moyen, distribution scores (excellent/bon/moyen/faible), top 5 weakness les plus fréquentes, top 5 actions les plus fréquentes, articles les plus faibles (top 10 par score asc).
+4. Pour gros sites : optionnel `async: true` → spawn `threading.Thread`, retourne immédiatement un job_id, endpoint de polling `GET /audit-jobs/<id>/`. **Skipper l'async pour le MVP** — sites de Darius < 50 articles, OK synchrone.
+5. Frontend : nouvelle page `src/pages/dashboard/BulkAudit.tsx` avec :
+   - Bouton "Lancer l'audit complet du site" (bloquant, peut prendre 1-2 min).
+   - Loader pendant exécution.
+   - Résultat : score moyen en gros, donut chart distribution (recharts), liste des top issues, table des articles les plus faibles cliquables.
+6. Route React `/dashboard/<siteId>/audit-global` ajoutée dans le router (chercher où sont définies les routes).
+7. Lien dans `DashboardSidebar.tsx`.
+8. i18n.
+9. Tests : check + build.
+
+**Blocages** : aucun. Sites de prod ont des contenus réels donc l'agrégat sera utile.
+
+**Actions humaines en attente** : aucune nouvelle.
+

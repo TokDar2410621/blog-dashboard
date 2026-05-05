@@ -32,9 +32,12 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [ ] Pour gros sites : tâche async via `threading.Thread` + endpoint de polling status (MVP simple).
 - [ ] Frontend : page `/dashboard/<siteId>/audit-global` avec dashboard agrégé + drill-down article.
 
-### 4. Hreflang validator ⏱ 1h
-- [ ] Dans `SEOAuditView` ajouter check : si `translation_group` a 2+ articles publiés, vérifier que chacun déclare les `<link rel="alternate" hreflang>` corrects.
-- [ ] Listing dans l'audit des articles dont les translations existent mais ne sont pas annoncées.
+### 4. Hreflang validator ✅ DONE
+- [x] Endpoint dédié `POST /hreflang-check/` (mieux que dans audit pour ne pas polluer le cache audit).
+- [x] Deux modes : per-group (siblings + missing langs) et site-wide (agrégat groups_complete/incomplete + orphelins).
+- [x] Frontend `HreflangCard.tsx` dans Overview avec 3 stats + liste des groupes incomplets cliquables.
+- [x] i18n FR + EN.
+- (Validation des `<link rel="alternate" hreflang>` HTML serait redondante : c'est le frontend qui les rend depuis `/translations/` endpoint. La consistency DB est ce qui compte.)
 
 ## Tier 2 — feedback loop (après Tier 1)
 
