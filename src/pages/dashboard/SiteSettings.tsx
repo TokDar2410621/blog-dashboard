@@ -320,7 +320,7 @@ export default function SiteSettings() {
               className="resize-y"
             />
             <p className="text-xs text-muted-foreground">
-              {description.length} caractères {description.length > 160 && "(trop long pour Open Graph — visez ≤160)"}
+              {description.length} caractères {description.length > 160 && "(trop long pour Open Graph - visez ≤160)"}
             </p>
           </div>
 
@@ -391,7 +391,7 @@ export default function SiteSettings() {
         </CardContent>
       </Card>
 
-      {/* EEAT — Author profile (Schema.org Person) */}
+      {/* EEAT - Author profile (Schema.org Person) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -452,7 +452,7 @@ export default function SiteSettings() {
               className="resize-y"
             />
             <p className="text-xs text-muted-foreground">
-              {authorBio.length} caractères — vise une bio concise qui établit ton expérience pratique.
+              {authorBio.length} caractères - vise une bio concise qui établit ton expérience pratique.
             </p>
           </div>
 
@@ -512,7 +512,7 @@ export default function SiteSettings() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Ces 3 URLs alimentent <code>sameAs</code> dans le JSON-LD Person — Google les utilise pour vérifier ton identité.
+            Ces 3 URLs alimentent <code>sameAs</code> dans le JSON-LD Person - Google les utilise pour vérifier ton identité.
           </p>
         </CardContent>
       </Card>
@@ -525,7 +525,7 @@ export default function SiteSettings() {
             Blog public (frontend hébergé)
           </CardTitle>
           <CardDescription>
-            Configure le frontend Next.js qu&apos;on héberge pour toi. Le visiteur lit tes articles via une URL dédiée — sous-domaine custom (<code>blog.tonsite.ca</code>) ou inclusion sous-chemin (<code>tonsite.ca/blog</code>).
+            Configure le frontend Next.js qu&apos;on héberge pour toi. Le visiteur lit tes articles via une URL dédiée - sous-domaine custom (<code>blog.tonsite.ca</code>) ou inclusion sous-chemin (<code>tonsite.ca/blog</code>).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -547,7 +547,7 @@ export default function SiteSettings() {
               <div className="flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <strong>Étape DNS — chez ton registrar :</strong>
+                  <strong>Étape DNS - chez ton registrar :</strong>
                   <p>
                     Ajoute un <strong>CNAME</strong> :{" "}
                     <code className="px-1 rounded bg-muted font-mono">

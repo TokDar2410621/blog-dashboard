@@ -183,7 +183,7 @@
 
   "community": {
     "title": "Reddit / Quora questions",
-    "subtitle": "Discover how people actually phrase their questions on this topic — rich source for crafting H2s and FAQs with your audience's real words.",
+    "subtitle": "Discover how people actually phrase their questions on this topic - rich source for crafting H2s and FAQs with your audience's real words.",
     "keyword": "Keyword",
     "keywordPlaceholder": "e.g. how to retain developers",
     "keywordRequired": "Keyword is required",
@@ -542,7 +542,7 @@
 
   "brief": {
     "title": "Content Brief",
-    "subtitle": "Generate a strategic plan before writing — intent, titles, outline, FAQ, entities, schemas, EEAT signals.",
+    "subtitle": "Generate a strategic plan before writing - intent, titles, outline, FAQ, entities, schemas, EEAT signals.",
     "keyword": "Target keyword",
     "keywordPlaceholder": "e.g. automation small business quebec",
     "keywordRequired": "Target keyword is required",

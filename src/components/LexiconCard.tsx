@@ -49,7 +49,7 @@ export function LexiconCard({
     staleTime: 60 * 1000,
   });
 
-  // Only render for French articles — lexicon is FR-FR vs FR-CA only.
+  // Only render for French articles - lexicon is FR-FR vs FR-CA only.
   if (language !== "fr") return null;
   if (debounced.trim().length <= 50) return null;
 

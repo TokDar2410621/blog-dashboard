@@ -59,7 +59,7 @@ export default function Overview() {
         </p>
       </div>
 
-      {/* First-run guidance — only shown when the site has 0 articles */}
+      {/* First-run guidance - only shown when the site has 0 articles */}
       {isFirstRun && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6 space-y-4">

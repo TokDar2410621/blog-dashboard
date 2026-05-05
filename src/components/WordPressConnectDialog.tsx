@@ -141,7 +141,7 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
           ))}
         </div>
 
-        {/* Step 1 — URL */}
+        {/* Step 1 - URL */}
         {step === 1 && (
           <div className="space-y-3">
             <Label className="text-sm">{t("wpConnect.step1Title")}</Label>
@@ -169,7 +169,7 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* Step 2 — Instructions for app password */}
+        {/* Step 2 - Instructions for app password */}
         {step === 2 && discovery && (
           <div className="space-y-4">
             <div className="rounded border border-green-500/30 bg-green-500/5 p-3 flex items-start gap-2 text-sm">
@@ -233,7 +233,7 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
           </div>
         )}
 
-        {/* Step 3 — Credentials */}
+        {/* Step 3 - Credentials */}
         {step === 3 && (
           <div className="space-y-3">
             <div className="space-y-2">

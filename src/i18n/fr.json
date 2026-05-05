@@ -196,7 +196,7 @@
 
   "community": {
     "title": "Questions Reddit / Quora",
-    "subtitle": "Decouvre comment les gens posent vraiment leurs questions sur ce sujet — source riche pour formuler tes H2 et FAQ avec les vrais mots de ton audience.",
+    "subtitle": "Decouvre comment les gens posent vraiment leurs questions sur ce sujet - source riche pour formuler tes H2 et FAQ avec les vrais mots de ton audience.",
     "keyword": "Mot-cle",
     "keywordPlaceholder": "Ex: comment retenir les developpeurs",
     "keywordRequired": "Le mot-cle est requis",
@@ -555,7 +555,7 @@
 
   "brief": {
     "title": "Brief de contenu",
-    "subtitle": "Genere un plan strategique avant d'ecrire — intent, titres, plan, FAQ, entites, schemas, signaux EEAT.",
+    "subtitle": "Genere un plan strategique avant d'ecrire - intent, titres, plan, FAQ, entites, schemas, signaux EEAT.",
     "keyword": "Mot-cle cible",
     "keywordPlaceholder": "Ex: automatisation pme quebec",
     "keywordRequired": "Le mot-cle cible est requis",

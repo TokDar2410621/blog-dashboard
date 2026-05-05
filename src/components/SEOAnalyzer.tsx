@@ -323,7 +323,7 @@ export function SEOAnalyzer({
           setSynonyms(data.synonyms.filter((s) => typeof s === "string" && s.trim().length > 0));
         }
       } catch {
-        // silent — fallback to keyword-only matching
+        // silent - fallback to keyword-only matching
       }
     }, 500);
 
@@ -469,7 +469,7 @@ export function SEOAnalyzer({
      * pure technical basics (meta tags, slug) play a diminished role.
      *
      * The heaviest weight (keyword = 25) reflects that query/intent
-     * alignment — the keyword living in the title, intro and H2s — is the
+     * alignment - the keyword living in the title, intro and H2s - is the
      * single strongest on-page relevance signal Google still relies on in
      * the post-HCU / AI Overview era. Content depth (word count = 15) and
      * title relevance (15) come next, followed by structure (headings 12,
@@ -640,7 +640,7 @@ export function SEOAnalyzer({
         id: "links",
         label: lang === "fr" ? "Maillage interne" : "Internal links",
         status: "warning",
-        detail: lang === "fr" ? `${internal} lien interne — visez 2+` : `${internal} internal — aim for 2+`,
+        detail: lang === "fr" ? `${internal} lien interne - visez 2+` : `${internal} internal - aim for 2+`,
         score: 5,
       });
     } else {
@@ -702,12 +702,12 @@ export function SEOAnalyzer({
         status: "good",
         detail:
           lang === "fr"
-            ? `${images.total} ${imgWord} — tous avec alt descriptif`
-            : `${images.total} ${imgWord} — all with descriptive alt`,
+            ? `${images.total} ${imgWord} - tous avec alt descriptif`
+            : `${images.total} ${imgWord} - all with descriptive alt`,
         score: 15,
       });
     } else if (images.withQuality === 0) {
-      // BAD: nothing usable — all generic / duplicate / missing / too long
+      // BAD: nothing usable - all generic / duplicate / missing / too long
       const parts: string[] = [];
       if (images.missing > 0) {
         parts.push(
@@ -741,7 +741,7 @@ export function SEOAnalyzer({
         id: "images",
         label: imagesLabel,
         status: "bad",
-        detail: `${images.total} ${imgWord} — ${parts.join(", ")}`,
+        detail: `${images.total} ${imgWord} - ${parts.join(", ")}`,
         score: 2,
       });
     } else {
@@ -779,7 +779,7 @@ export function SEOAnalyzer({
         id: "images",
         label: imagesLabel,
         status: "warning",
-        detail: `${images.total} ${imgWord} — ${parts.join(", ")}`,
+        detail: `${images.total} ${imgWord} - ${parts.join(", ")}`,
         score: 8,
       });
     }
@@ -1440,7 +1440,7 @@ export function SEOAnalyzer({
                     LCP
                   </p>
                   <p className={`text-lg font-bold ${lcpColor(psiResult.lcp_s)}`}>
-                    {psiResult.lcp_s !== null ? `${psiResult.lcp_s}s` : "—"}
+                    {psiResult.lcp_s !== null ? `${psiResult.lcp_s}s` : "-"}
                   </p>
                 </div>
                 <div className={`rounded-lg p-3 text-center ${clsBg(psiResult.cls)}`}>
@@ -1448,7 +1448,7 @@ export function SEOAnalyzer({
                     CLS
                   </p>
                   <p className={`text-lg font-bold ${clsColor(psiResult.cls)}`}>
-                    {psiResult.cls !== null ? psiResult.cls.toFixed(3) : "—"}
+                    {psiResult.cls !== null ? psiResult.cls.toFixed(3) : "-"}
                   </p>
                 </div>
                 <div className={`rounded-lg p-3 text-center ${fcpBg(psiResult.fcp_s)}`}>
@@ -1456,7 +1456,7 @@ export function SEOAnalyzer({
                     FCP
                   </p>
                   <p className={`text-lg font-bold ${fcpColor(psiResult.fcp_s)}`}>
-                    {psiResult.fcp_s !== null ? `${psiResult.fcp_s}s` : "—"}
+                    {psiResult.fcp_s !== null ? `${psiResult.fcp_s}s` : "-"}
                   </p>
                 </div>
               </div>
@@ -1469,7 +1469,7 @@ export function SEOAnalyzer({
                       psiResult.performance_score
                     )}`}
                   >
-                    {psiResult.performance_score ?? "—"}
+                    {psiResult.performance_score ?? "-"}
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {i18n.language === "fr" ? "Performance" : "Performance"}
@@ -1481,7 +1481,7 @@ export function SEOAnalyzer({
                       psiResult.seo_score
                     )}`}
                   >
-                    {psiResult.seo_score ?? "—"}
+                    {psiResult.seo_score ?? "-"}
                   </div>
                   <p className="text-[10px] text-muted-foreground">SEO</p>
                 </div>
@@ -1491,7 +1491,7 @@ export function SEOAnalyzer({
                       psiResult.a11y_score
                     )}`}
                   >
-                    {psiResult.a11y_score ?? "—"}
+                    {psiResult.a11y_score ?? "-"}
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {i18n.language === "fr" ? "Accessibilite" : "Accessibility"}
@@ -2009,12 +2009,12 @@ export function SEOAnalyzer({
                   }`}
                 >
                   {i18n.language === "fr"
-                    ? `Votre article fait ${userWordCount} mots, la mediane est ${competitorData.median_words} — vous etes ${
+                    ? `Votre article fait ${userWordCount} mots, la mediane est ${competitorData.median_words} - vous etes ${
                         userWordCount >= competitorData.median_words
                           ? "au-dessus"
                           : "sous"
                       }`
-                    : `Your article is ${userWordCount} words, median is ${competitorData.median_words} — you are ${
+                    : `Your article is ${userWordCount} words, median is ${competitorData.median_words} - you are ${
                         userWordCount >= competitorData.median_words
                           ? "above"
                           : "below"
@@ -2065,12 +2065,12 @@ export function SEOAnalyzer({
                           </td>
                           <td className="py-1.5 pr-2 align-top text-right">
                             {r.fetch_error || r.word_count === null
-                              ? "—"
+                              ? "-"
                               : r.word_count}
                           </td>
                           <td className="py-1.5 align-top text-right">
                             {r.fetch_error || r.h2_count === null
-                              ? "—"
+                              ? "-"
                               : r.h2_count}
                           </td>
                         </tr>

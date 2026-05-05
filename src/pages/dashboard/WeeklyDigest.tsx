@@ -103,7 +103,7 @@ export default function WeeklyDigest() {
             <h1 className="text-3xl font-bold">{data.site.name}</h1>
             <p className="text-sm text-gray-600">{data.site.domain}</p>
             <p className="text-sm text-gray-600">
-              {t("digest.report")}: {fmtDate(data.period.start)} —{" "}
+              {t("digest.report")}: {fmtDate(data.period.start)} -{" "}
               {fmtDate(data.period.end)}
             </p>
           </div>

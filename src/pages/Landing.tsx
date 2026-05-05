@@ -65,7 +65,7 @@ export default function Landing() {
           </h1>
           <p className="mt-8 text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
             Un Ahrefs en anglais te coûte 200&nbsp;US$ et écrit "shopping". Nous, on
-            génère, audite et optimise tes articles en lexique québécois — pour les PME
+            génère, audite et optimise tes articles en lexique québécois - pour les PME
             qui veulent enfin ranker.
           </p>
           <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center">
@@ -97,7 +97,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Three modes — sticky to brand promise */}
+      {/* Three modes - sticky to brand promise */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-24 border-t border-white/5">
         <div className="text-center mb-16">
           <p className="text-xs font-mono uppercase tracking-wider text-zinc-500 mb-4">
@@ -124,7 +124,7 @@ export default function Landing() {
             icon={Zap}
             title="Site existant non-WP"
             tag="Wix, Shopify, custom"
-            body="Cloudflare Worker, Vercel rewrites, Nginx — guides clé-en-main pour servir notre blog sous tonsite.ca/blog."
+            body="Cloudflare Worker, Vercel rewrites, Nginx - guides clé-en-main pour servir notre blog sous tonsite.ca/blog."
           />
         </div>
       </section>
@@ -144,7 +144,7 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Phase 1 — Recherche */}
+        {/* Phase 1 - Recherche */}
         <FeatureRow
           phase="01"
           icon={Search}
@@ -153,14 +153,14 @@ export default function Landing() {
           features={[
             "Brief de contenu (intent + outline + FAQ + entités + EEAT)",
             "People Also Ask + schema FAQPage prêt à coller",
-            "Questions Reddit / Quora — la vraie phrasing de tes lecteurs",
+            "Questions Reddit / Quora - la vraie phrasing de tes lecteurs",
             "Google Trends FR-CA avec graphique 12 mois",
             "Top 10 SERP avec word count médian + structure",
           ]}
           mockup={<BriefMockup />}
         />
 
-        {/* Phase 2 — Génération */}
+        {/* Phase 2 - Génération */}
         <FeatureRow
           phase="02"
           icon={PenLine}
@@ -177,7 +177,7 @@ export default function Landing() {
           reverse
         />
 
-        {/* Phase 3 — Optimisation */}
+        {/* Phase 3 - Optimisation */}
         <FeatureRow
           phase="03"
           icon={BarChart3}
@@ -525,7 +525,7 @@ function ActivityFeed() {
           </div>
           <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Activité — tokamdarius.ca
+            Activité - tokamdarius.ca
           </div>
           <span className="text-[10px] text-zinc-600">live</span>
         </div>
@@ -690,7 +690,7 @@ function MockupFrame({ children, label }: { children: React.ReactNode; label: st
 
 function BriefMockup() {
   return (
-    <MockupFrame label="brief — automatisation pme québec">
+    <MockupFrame label="brief - automatisation pme québec">
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 uppercase tracking-wider">
           <Search className="h-3 w-3" />
@@ -738,7 +738,7 @@ function BriefMockup() {
 
 function LexiconMockup() {
   return (
-    <MockupFrame label="éditeur — lisibilité + lexique fr-ca">
+    <MockupFrame label="éditeur - lisibilité + lexique fr-ca">
       <div className="space-y-4">
         <div className="space-y-2 font-mono text-xs">
           <div className="text-zinc-500 uppercase tracking-wider mb-2 flex items-center gap-2">
@@ -804,7 +804,7 @@ function RankMockup() {
     .join(" ");
 
   return (
-    <MockupFrame label="suivi positions — automatisation pme québec">
+    <MockupFrame label="suivi positions - automatisation pme québec">
       <div className="space-y-4">
         <div className="flex items-end justify-between">
           <div>
@@ -885,7 +885,7 @@ function LexiconLiveMockup() {
             <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
           </div>
           <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400">
-            lexique québécois — live
+            lexique québécois - live
           </span>
           <span />
         </div>
@@ -1008,7 +1008,7 @@ const FAQS = [
   },
   {
     q: "Combien d'articles puis-je générer par mois ?",
-    a: "Plan Essai : 5/mois. Plans Pro et Agence : illimité. Le seul vrai coût pour nous c'est l'API Claude — on absorbe ça dans le prix.",
+    a: "Plan Essai : 5/mois. Plans Pro et Agence : illimité. Le seul vrai coût pour nous c'est l'API Claude - on absorbe ça dans le prix.",
   },
   {
     q: "Et si je veux annuler ?",

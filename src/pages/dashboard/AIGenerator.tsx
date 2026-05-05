@@ -115,7 +115,7 @@ export default function AIGenerator() {
         </p>
       </div>
 
-      {/* Content Brief — pre-writing brief (optional, fills the form when applied) */}
+      {/* Content Brief - pre-writing brief (optional, fills the form when applied) */}
       <ContentBriefPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
@@ -127,7 +127,7 @@ export default function AIGenerator() {
         }}
       />
 
-      {/* PAA harvester — questions + FAQ schema */}
+      {/* PAA harvester - questions + FAQ schema */}
       <PAAPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
@@ -139,7 +139,7 @@ export default function AIGenerator() {
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
       />
 
-      {/* Google Trends — interest over time + related/rising queries */}
+      {/* Google Trends - interest over time + related/rising queries */}
       <SearchTrendsPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
@@ -253,7 +253,7 @@ export default function AIGenerator() {
                 <div className="flex items-center gap-2 text-xs">
                   <Sparkles className="h-3 w-3 text-primary" />
                   <span>
-                    <strong>{t("ai.briefActive")}</strong> —{" "}
+                    <strong>{t("ai.briefActive")}</strong> -{" "}
                     {t("ai.briefActiveHint", {
                       sections: activeBrief.outline?.length || 0,
                       faq: activeBrief.faq?.length || 0,

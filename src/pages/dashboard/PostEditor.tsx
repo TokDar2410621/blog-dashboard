@@ -412,7 +412,7 @@ export default function PostEditor() {
 
   useEffect(() => {
     if (autoSlug && !isEditing) {
-      // Client-side slug preview only — backend generates the canonical slug
+      // Client-side slug preview only - backend generates the canonical slug
       const preview = title
         .toLowerCase()
         .normalize("NFD")
