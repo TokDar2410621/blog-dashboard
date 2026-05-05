@@ -53,7 +53,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [ ] Broken link checker
 - [ ] Auto-redirect 301 sur slug change
 - [ ] Image SEO (WebP, srcset)
-- [ ] Readability scores FR/EN
+- [x] Readability scores FR/EN
 - [ ] Quebec lexicon (FR-CA, schema LocalBusiness)
 - [ ] Bing Webmaster integration
 - [ ] Search trends FR-CA

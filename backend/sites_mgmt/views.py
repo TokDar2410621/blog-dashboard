@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import base64
 import hashlib
@@ -3204,6 +3205,130 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         }
         cache.set(cache_key, result, SEO_CACHE_TTL)
         return Response(result)
+
+
+def _count_syllables_en(word):
+    """Heuristic English syllable count. Good enough for Flesch — not perfect."""
+    word = word.lower().strip(".,!?;:'\"()[]{}—–-")
+    if len(word) <= 3:
+        return 1
+    word = re.sub(r'(?:[^laeiouy]es|ed|[^laeiouy]e)$', '', word)
+    word = re.sub(r'^y', '', word)
+    matches = re.findall(r'[aeiouy]+', word)
+    return max(1, len(matches))
+
+
+def _count_syllables_fr(word):
+    """Heuristic French syllable count."""
+    word = word.lower().strip(".,!?;:'\"()[]{}—–-")
+    if len(word) <= 2:
+        return 1
+    # Remove silent terminal 'e' (very common in French)
+    if word.endswith('e') and len(word) > 2 and word[-2] not in 'aeiouéèêë':
+        word = word[:-1]
+    # Vowel groups (FR diphthongs treated as single)
+    matches = re.findall(r'[aeiouyàâäéèêëîïôöùûüœ]+', word)
+    return max(1, len(matches))
+
+
+def _compute_readability(text, language='fr'):
+    """Compute Flesch-Kincaid Reading Ease + ARI for a text. Language-aware
+    syllable counting. Returns a dict with metrics and a qualitative level.
+    """
+    import re as _re
+
+    if not text or not text.strip():
+        return {
+            'words': 0, 'sentences': 0, 'syllables': 0, 'characters': 0,
+            'flesch': None, 'ari': None, 'level': None, 'level_label': '',
+        }
+
+    # Strip markdown / HTML noise
+    cleaned = _re.sub(r'```[\s\S]*?```', ' ', text)  # code blocks
+    cleaned = _re.sub(r'`[^`]+`', ' ', cleaned)  # inline code
+    cleaned = _re.sub(r'!\[[^\]]*\]\([^)]+\)', ' ', cleaned)  # images
+    cleaned = _re.sub(r'\[[^\]]*\]\(([^)]+)\)', r'\1', cleaned)  # links
+    cleaned = _re.sub(r'<[^>]+>', ' ', cleaned)  # HTML tags
+    cleaned = _re.sub(r'#{1,6}\s+', '', cleaned)  # heading markers
+    cleaned = _re.sub(r'[*_~]+', '', cleaned)  # bold/italic markers
+
+    # Sentences
+    sentences = [s for s in _re.split(r'[.!?]+\s+', cleaned) if s.strip()]
+    sentence_count = max(1, len(sentences))
+
+    # Words
+    words = _re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ']+", cleaned)
+    word_count = len(words)
+    if word_count == 0:
+        return {
+            'words': 0, 'sentences': sentence_count, 'syllables': 0,
+            'characters': 0, 'flesch': None, 'ari': None, 'level': None,
+            'level_label': '',
+        }
+
+    # Syllables
+    counter = _count_syllables_fr if language == 'fr' else _count_syllables_en
+    syllables = sum(counter(w) for w in words)
+
+    # Characters (letters only)
+    chars = sum(len(w) for w in words)
+
+    # Flesch Reading Ease
+    if language == 'fr':
+        # Kandel & Moles French adaptation
+        flesch = 207 - 1.015 * (word_count / sentence_count) - 73.6 * (syllables / word_count)
+    else:
+        flesch = 206.835 - 1.015 * (word_count / sentence_count) - 84.6 * (syllables / word_count)
+    flesch = round(flesch, 1)
+
+    # ARI (Automated Readability Index)
+    ari = 4.71 * (chars / word_count) + 0.5 * (word_count / sentence_count) - 21.43
+    ari = round(ari, 1)
+
+    # Qualitative level (5 buckets)
+    if flesch >= 80:
+        level, label = 'very_easy', 'Très facile'
+    elif flesch >= 70:
+        level, label = 'easy', 'Facile'
+    elif flesch >= 60:
+        level, label = 'standard', 'Standard'
+    elif flesch >= 50:
+        level, label = 'fairly_difficult', 'Assez difficile'
+    elif flesch >= 30:
+        level, label = 'difficult', 'Difficile'
+    else:
+        level, label = 'very_difficult', 'Très difficile'
+
+    return {
+        'words': word_count,
+        'sentences': sentence_count,
+        'syllables': syllables,
+        'characters': chars,
+        'avg_words_per_sentence': round(word_count / sentence_count, 1),
+        'avg_syllables_per_word': round(syllables / word_count, 2),
+        'flesch': flesch,
+        'ari': ari,
+        'level': level,
+        'level_label': label,
+    }
+
+
+class ReadabilityView(APIView):
+    """Compute Flesch-Kincaid Reading Ease + ARI for a text.
+
+    POST /readability/ {content: str, language: 'fr'|'en'}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '') or ''
+        language = (request.data.get('language') or 'fr').strip().lower()
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
+        # Spanish: not specifically tuned, fall back to FR-style syllable rules.
+        if language == 'es':
+            language = 'fr'
+        return Response(_compute_readability(content, language=language))
 
 
 class LinkGraphView(APIView):

@@ -89,6 +89,31 @@
     "logout": "Logout"
   },
 
+  "readability": {
+    "title": "Readability",
+    "subtitle": "Flesch-Kincaid + ARI score computed on your content (refreshed 800 ms after the last keystroke).",
+    "fleschScore": "Flesch score",
+    "level": {
+      "very_easy": "Very easy (~10 yo reader)",
+      "easy": "Easy (~12 yo reader)",
+      "standard": "Standard (~14 yo reader)",
+      "fairly_difficult": "Fairly difficult (high school)",
+      "difficult": "Difficult (college)",
+      "very_difficult": "Very difficult (specialist)"
+    },
+    "veryEasy": "very easy",
+    "veryDifficult": "very difficult",
+    "words": "Words",
+    "sentences": "Sentences",
+    "wps": "Words/sentence",
+    "ari": "ARI",
+    "tipsTitle": "Suggestions",
+    "tipLongSentences": "Sentences too long (>25 words/sentence). Break them into shorter ones.",
+    "tipComplexWords": "Complex words (1.9+ syllables/word). Prefer common vocabulary.",
+    "tipFlesch": "Flesch < 50: hard for general audience. Simplify the style.",
+    "tooShort": "Text too short for a reliable score."
+  },
+
   "linkGraph": {
     "title": "Internal link graph",
     "subtitle": "Identifies orphans (no incoming link), hubs (5+ incoming) and dead-ends (no outgoing) to optimize your link juice.",

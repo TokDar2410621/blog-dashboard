@@ -645,3 +645,88 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 - Tester les pages dashboard nouvellement créées.
 - Décider du déploiement (10 commits non poussés sont safe).
 
+---
+
+## Session 2026-05-04 (suite 12) — Readability scores ✅ Tier 3 #12 DONE (end-to-end, sans API externe)
+
+**Fait** :
+- Backend : ajout de `import re` global dans `views.py` (manquait).
+- Helpers ajoutés (juste avant `LinkGraphView`) :
+  - `_count_syllables_en(word)` — heuristique simple (vowel groups + silent e + leading y).
+  - `_count_syllables_fr(word)` — règle "e final muet" + groupes vocaliques avec accents et œ.
+  - `_compute_readability(text, language)` :
+    - Strip markdown/HTML noise (code blocks, inline code, images, links, tags, headings, bold/italic).
+    - Compte phrases (split sur `[.!?]+`), mots (regex Latin1 + accentués), syllabes, caractères.
+    - **Flesch FR** (Kandel & Moles) : `207 - 1.015·(words/sentences) - 73.6·(syllables/words)`
+    - **Flesch EN** : `206.835 - 1.015·(...) - 84.6·(...)`
+    - **ARI** : `4.71·(chars/words) + 0.5·(words/sentences) - 21.43`
+    - 6 buckets de niveau (very_easy → very_difficult) avec label texte.
+- `ReadabilityView` (POST `/readability/`) — wrapper, accepte `{content, language}`.
+- Route `path('readability/', ReadabilityView.as_view(), name='readability')`.
+- Frontend `src/components/ReadabilityCard.tsx` :
+  - Debounce 800ms après la dernière frappe avant d'appeler le backend.
+  - Cache 30s côté react-query.
+  - Affichage : score Flesch en gros + label niveau + barre de progression colorée (vert→rouge selon niveau) + axes 0-100.
+  - Grid 4 stats : mots, phrases, mots/phrase, ARI.
+  - Suggestions auto (3 règles) :
+    - Phrases > 25 mots/phrase → "Coupe en plusieurs phrases courtes."
+    - Syllabes > 1.9/mot → "Privilégie le vocabulaire courant."
+    - Flesch < 50 → "Difficile pour le grand public, simplifie."
+  - Caché si contenu < 50 chars (pas pertinent).
+- Mounted dans `PostEditor.tsx` au-dessus du `<SEOAnalyzer>` dans la vue SEO.
+- Clés i18n FR + EN sous `readability.*` (incl. sub-keys `level.*`).
+
+**Tests** :
+- Test manuel Python avec deux phrases courtes FR + EN → Flesch ~94 / 103 (very_easy) ✅.
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 13.11s
+- **Test live à faire (humain)** : éditer un article dans `/dashboard/<siteId>/articles/<slug>`, switcher en vue SEO, voir la card "Lisibilité" en haut. Modifier le contenu et observer le score se rafraîchir après 800ms.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend (helpers + endpoint) + frontend (composant + mount) + i18n dans la même session.
+
+**Prochain bloc concret** :
+
+**Tier 3 #10 — Auto-redirect 301 sur slug change** (estimé 2h, end-to-end). Architecture :
+
+1. **DB** : nouveau modèle `Redirect` dans `models.py` :
+   ```python
+   class Redirect(models.Model):
+       site = FK(Site)
+       from_slug = CharField(max_length=255)  # le vieux slug
+       to_slug = CharField(max_length=255)    # le nouveau
+       language = CharField(max_length=2, choices=LANGUAGE_CHOICES)
+       hit_count = PositiveIntegerField(default=0)
+       created_at = DateTimeField(auto_now_add=True)
+       updated_at = DateTimeField(auto_now=True)
+       class Meta:
+           unique_together = [['site', 'from_slug', 'language']]
+   ```
+2. Migration `0013_redirect`.
+3. **Hook auto** dans `SitePostDetailView.patch` : avant de sauvegarder le slug, si `slug` change, créer une `Redirect(from=ancien, to=nouveau)`.
+4. **Endpoint public** modif dans `PublicPostDetailView.get` : si slug demandé n'existe pas, vérifier `Redirect.objects.filter(site, from_slug=slug, language=...)`. Si trouvé → incrémenter `hit_count` et retourner JSON `{redirect: <new_slug>}` avec status 301-friendly (DRF ne fait pas de 301 directement mais le frontend peut le gérer via cette payload, ou on retourne `HttpResponseRedirect`).
+5. **Endpoints CRUD** dashboard :
+   - `GET /sites/<id>/redirects/` (liste).
+   - `POST /sites/<id>/redirects/` (créer manuellement).
+   - `DELETE /sites/<id>/redirects/<pk>/`.
+6. **Frontend** : page `/dashboard/<id>/redirects` :
+   - Liste table : from → to, langue, hits, date.
+   - Form d'ajout manuel (from_slug + to_slug + language).
+   - Bouton suppression.
+7. Sidebar link "Redirects" + i18n + build.
+
+**Statistiques fin de session 12** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 3/9 (#7 clusters, #8 link graph, #12 readability)
+- Endpoints SEO ajoutés cumulés : 12
+- Composants frontend ajoutés cumulés : 9 (… + ReadabilityCard)
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les pages.
+- Décider du déploiement (11 commits non poussés).
+

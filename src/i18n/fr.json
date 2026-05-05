@@ -89,6 +89,31 @@
     "logout": "Deconnexion"
   },
 
+  "readability": {
+    "title": "Lisibilite",
+    "subtitle": "Score Flesch-Kincaid + ARI calcule sur ton contenu (rafraichi 800 ms apres ta derniere frappe).",
+    "fleschScore": "Score Flesch",
+    "level": {
+      "very_easy": "Tres facile (lecteur ~10 ans)",
+      "easy": "Facile (lecteur ~12 ans)",
+      "standard": "Standard (lecteur ~14 ans)",
+      "fairly_difficult": "Assez difficile (lyceen)",
+      "difficult": "Difficile (etudiant)",
+      "very_difficult": "Tres difficile (specialiste)"
+    },
+    "veryEasy": "tres facile",
+    "veryDifficult": "tres difficile",
+    "words": "Mots",
+    "sentences": "Phrases",
+    "wps": "Mots/phrase",
+    "ari": "ARI",
+    "tipsTitle": "Suggestions",
+    "tipLongSentences": "Phrases trop longues (>25 mots/phrase). Coupe en plusieurs phrases courtes.",
+    "tipComplexWords": "Mots complexes (1.9+ syllabes/mot). Privilegie le vocabulaire courant.",
+    "tipFlesch": "Score Flesch < 50 : ton article est dur a lire pour le grand public. Simplifie le style.",
+    "tooShort": "Texte trop court pour un score fiable."
+  },
+
   "linkGraph": {
     "title": "Graphe de maillage interne",
     "subtitle": "Identifie les articles orphelins (sans lien entrant), les hubs (>=5 liens entrants) et les dead-ends (sans lien sortant) pour optimiser ton link juice.",

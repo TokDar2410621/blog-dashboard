@@ -73,7 +73,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [ ] **9. Broken link checker** (sortants + internes) ⏱ 3h
 - [ ] **10. Auto-redirect 301 sur slug change** ⏱ 2h (modèle Redirect + middleware)
 - [ ] **11. Image SEO** (WebP auto, srcset, descriptive filenames) ⏱ 4h
-- [ ] **12. Readability scores FR/EN** (Flesch-Kincaid, ARI) ⏱ 2h, branche dans audit
+- [x] **12. Readability scores FR/EN** (Flesch-Kincaid, ARI) — endpoint `/readability/`, helpers FR/EN avec syllable-counter heuristique, ReadabilityCard mounted in PostEditor SEO view, suggestions auto.
 - [ ] **13. Quebec lexicon** (FR-CA dictionnaire, schema LocalBusiness) ⏱ 4h
 - [ ] **14. Bing Webmaster integration** ⏱ 6h (action humaine pour API key)
 - [ ] **15. Search trends FR-CA** (Google Trends via pytrends) ⏱ 3h
