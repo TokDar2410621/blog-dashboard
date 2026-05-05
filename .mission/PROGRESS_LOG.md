@@ -1533,3 +1533,75 @@ Items autonomes restants :
 **Blocages** : aucun.
 
 **Actions humaines en attente** : push (24 commits), Stripe, Bing, Plagiarism API, décisions landing/onboarding.
+
+
+---
+
+## Session 2026-05-04 (suite 24) — WordPress integration MVP ✅ (le pivot commercial)
+
+**Pourquoi ce chantier** : Darius a identifié le vrai blocage commercial — larchitecture actuelle exige soit une DB Postgres, soit un frontend custom. Pour les PME québécoises (resto, salon, comptable), aucun des deux nest viable. WordPress est ~60% des PME → on sy connecte directement.
+
+**Fait** :
+
+**Backend (commit `56d8012`)** :
+- `Site` model : 3 nouveaux champs `wp_url`, `wp_username`, `wp_app_password` + migration `0015`.
+- Property `is_wordpress` + `is_hosted` ajusté pour exclure le mode WP.
+- `wordpress_adapter.py` : `WordPressClient` complet (discover, test_auth, list/get/create/update/delete posts, list_categories, list_tags) avec sérialisation au shape `BlogPost` du dashboard.
+- 2 nouveaux endpoints : `POST /wp/discover/`, `POST /wp/connect/`.
+- `SitePostsView`, `SitePostDetailView`, `SiteCategoriesView`, `SiteTagsView` branchent sur `is_wordpress` → délègue à WPClient.
+- `ArticleGenerator` : nouvelle prop `wp_site`, save_article via REST API (markdown→HTML), cannibalization guard via WP REST, internal-link validation idem, related-articles section skipée.
+- `GenerateArticleView` + `GenerateInlineView` passent `wp_site=site if site.is_wordpress else None`.
+
+**Frontend (commit à venir)** :
+- `WordPressConnectDialog.tsx` : wizard 3 étapes (URL → instructions Application Password → credentials → connect).
+- Step 2 inclut un **lien direct vers `/wp-admin/profile.php`** du site detecté + instructions step-by-step pour générer lApplication Password (natif WP 5.6+, pas de plugin).
+- Bouton primaire "Connecter un site WordPress" dans `SiteSelector` (au-dessus du bouton "Ajouter un site" qui devient secondaire).
+- Sur connect réussi : navigate to `/dashboard/<id>` → lutilisateur entre directement dans le dashboard avec ses articles WP listés.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- Migration appliquée
+- JSON i18n valide
+- `npm run build` → ✓ built in 27s, plus de warning chunks
+
+**Comment ça marche pour le client final** :
+1. Le client va sur la landing/dashboard, clique "Connecter un site WordPress".
+2. Tape `https://monsite.ca` → on confirme que cest bien WP via `/wp-json/`.
+3. On lui montre les instructions : aller dans WP admin → Profil → Application Passwords → créer un.
+4. Il colle username + app password (24 chars) → on test lauth → on crée la `Site` row.
+5. Redirect vers le dashboard, ses articles WP apparaissent dans la liste, il peut les éditer (PATCH back to WP), faire des audits, générer de nouveaux (auto-publié sur WP).
+
+**Note règle dor** : ✅ respectée. Backend (model + adapter + endpoints + intégration) + frontend (dialog + bouton + i18n) shipped end-to-end.
+
+**Limitations connues du MVP** :
+- Pas de gestion des featured_media (cover image WP) — TODO.
+- Pas de support Polylang/WPML (multilingue WP) — articles considérés monolingues.
+- Audit-all/cannibalization/decay/etc. ne couvrent pas encore les sites WP (ils itèrent toujours via using(alias)). Audit per-article fonctionne car il prend juste `content` en input.
+- Le visiteur du site WP voit toujours le rendu WP standard, pas le nôtre — cest le but.
+
+**Prochain bloc concret (à pivoter pour ladoption)** :
+
+Le chemin commercial maintenant ouvert. Restes :
+- **Tester live** : Darius doit créer un site WP de test (ou utiliser un existant), aller dans le dashboard, cliquer "Connecter", voir si lonboarding marche bout en bout.
+- **WP Polish** :
+  - Gestion featured_media (lire et écrire la cover image)
+  - Refactorer audit-all + cannibalization + decay pour parcourir aussi les WP via WPClient.
+  - Plugin WordPress.org officiel (shipping plus propre que credentials manuels).
+- **Tier 4 commercialisation** :
+  - Landing page mettant laccent sur "Pour les sites WordPress québécois" (premier hook copy).
+  - Stripe pour pricing.
+  - Onboarding flow guidé.
+
+**Statistiques fin de session 24** :
+- WP integration : DB + adapter + 2 nouveaux endpoints + refactor 4 vues + generator
+- Endpoints SEO cumulés : 26
+- Composants/pages frontend cumulés : 18 (… + WordPressConnectDialog)
+- Migrations DB : 4 (0012, 0013, 0014, 0015)
+- Commits locaux non poussés : 2 (backend + frontend WP)
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester lonboarding WP sur un vrai site WordPress.
+- Push.
+- Refactorer les outils SEO bulk (audit-all, etc.) pour couvrir les sites WP — peut être reporté en attendant validation terrain.

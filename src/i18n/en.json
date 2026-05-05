@@ -112,6 +112,33 @@
     "generatedAt": "Generated on"
   },
 
+  "wpConnect": {
+    "title": "Connect your WordPress site",
+    "subtitle": "3 steps: URL, generate an Application Password, connect. No plugin to install.",
+    "step1Title": "Your WordPress site URL",
+    "step1Hint": "e.g. https://myrestaurant.com (no /wp-admin). We'll auto-detect WordPress.",
+    "step2Title": "Create an Application Password (1 minute)",
+    "step2Item1": "Go to",
+    "step2Item2": "Scroll to the \"Application Passwords\" section.",
+    "step2Item3": "Enter an application name:",
+    "step2Item4": "Click \"Add New Application Password\". Copy the generated 24-char password.",
+    "step2Cta": "I have my Application Password",
+    "step2Note": "If you don't see the section, your host may have disabled it. Ask them to enable it (native to WP 5.6+).",
+    "back": "Back",
+    "usernameLabel": "WordPress username",
+    "usernameHint": "The username of your WordPress admin account.",
+    "appPasswordLabel": "Application Password",
+    "appPasswordHint": "The 24 characters separated by spaces (paste exactly as shown).",
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "connected": "WordPress site connected!",
+    "notWordPress": "This site is not WordPress, or the REST API is disabled.",
+    "connectError": "Connection error",
+    "detectedTitle": "WordPress detected!",
+    "detectedDefault": "WordPress site",
+    "detectedPosts": "{{count}} published posts"
+  },
+
   "multiDomain": {
     "title": "Multi-site comparison",
     "subtitle": "Overview of all your sites in one page. Spot which ones need attention.",

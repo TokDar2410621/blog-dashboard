@@ -37,7 +37,9 @@ import {
   CheckCircle,
   Database,
   BarChart3,
+  Sparkles,
 } from "lucide-react";
+import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { toast } from "sonner";
 
 export default function SiteSelector() {
@@ -47,6 +49,7 @@ export default function SiteSelector() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [wpDialogOpen, setWpDialogOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [databaseUrl, setDatabaseUrl] = useState("");
@@ -192,9 +195,20 @@ export default function SiteSelector() {
           </Card>
         )}
 
+        {/* WordPress quick-connect — primary path for non-technical users */}
+        <Button
+          className="w-full"
+          size="lg"
+          variant="default"
+          onClick={() => setWpDialogOpen(true)}
+        >
+          <Sparkles className="h-5 w-5 mr-2" />
+          {t("sites.connectWordpress", "Connecter un site WordPress")}
+        </Button>
+
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full" size="lg">
+            <Button className="w-full" size="lg" variant="outline">
               <Plus className="h-5 w-5 mr-2" />
               {t("sites.addSite")}
             </Button>
@@ -225,6 +239,8 @@ export default function SiteSelector() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <WordPressConnectDialog open={wpDialogOpen} onOpenChange={setWpDialogOpen} />
 
         <div className="text-center flex items-center justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>

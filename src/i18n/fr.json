@@ -112,6 +112,33 @@
     "generatedAt": "Genere le"
   },
 
+  "wpConnect": {
+    "title": "Connecter ton site WordPress",
+    "subtitle": "3 etapes : URL, generation d'un Application Password, connexion. Aucun plugin a installer.",
+    "step1Title": "URL de ton site WordPress",
+    "step1Hint": "Ex: https://monrestaurant.ca (sans /wp-admin). On va detecter automatiquement WordPress.",
+    "step2Title": "Cree un Application Password (1 minute)",
+    "step2Item1": "Va sur",
+    "step2Item2": "Descends jusqu'a la section \"Application Passwords\".",
+    "step2Item3": "Saisis un nom d'application :",
+    "step2Item4": "Clique \"Add New Application Password\". Copie le mot de passe genere (24 caracteres).",
+    "step2Cta": "J'ai genere mon Application Password",
+    "step2Note": "Si tu ne vois pas la section, ton hebergeur a peut-etre desactive cette fonctionnalite. Demande-leur de l'activer (c'est natif WP 5.6+).",
+    "back": "Retour",
+    "usernameLabel": "Username WordPress",
+    "usernameHint": "Le nom d'utilisateur de ton compte admin WordPress.",
+    "appPasswordLabel": "Application Password",
+    "appPasswordHint": "Les 24 caracteres separes par espaces (collage exact, espaces inclus).",
+    "connect": "Connecter",
+    "connecting": "Connexion en cours...",
+    "connected": "Site WordPress connecte !",
+    "notWordPress": "Ce site n'est pas WordPress ou la REST API est desactivee.",
+    "connectError": "Erreur de connexion",
+    "detectedTitle": "WordPress detecte !",
+    "detectedDefault": "Site WordPress",
+    "detectedPosts": "{{count}} articles publies"
+  },
+
   "multiDomain": {
     "title": "Comparaison multi-sites",
     "subtitle": "Vue d'ensemble de tous tes sites en une page. Identifie quels sites ont besoin d'attention.",
