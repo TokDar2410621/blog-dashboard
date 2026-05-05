@@ -1439,3 +1439,59 @@ Polish/audit restant :
 
 **Actions humaines en attente** : push, test live, Stripe, Bing, plagiarism API, décisions landing/onboarding.
 
+
+
+---
+
+## Session 2026-05-04 (suite 23) — Polish : LocalBusiness UI + bundle splitting ✅
+
+**Fait** :
+
+**LocalBusiness Schema UI** (closure boucle non-fermée) :
+- `SiteSettings.tsx` : nouvelle card "Schema LocalBusiness (Québec)" entre EEAT et Knowledge Base.
+- Form : rue, ville, code postal, téléphone, gamme de prix.
+- Bouton "Générer le schema" → POST `/sites/<id>/local-business-schema/`.
+- Affiche le JSON-LD résultant avec bouton Copier (place le `<script type="application/ld+json">` dans le presse-papiers).
+- Le backend injecte automatiquement les défauts Québec (addressCountry=CA, addressRegion=QC, areaServed=Québec).
+- 3 nouvelles clés `settings.lb*` en FR + EN.
+
+**Bundle code-splitting** (résout le warning Vite >500KB) :
+- `vite.config.ts` : ajout de `build.rollupOptions.output.manualChunks` qui isole les libs lourdes en chunks séparés (recharts, react-query, react-router, lucide-react, @radix-ui).
+- `DashboardLayout.tsx` : toutes les pages dashboard `lazy()` + `<Suspense fallback={<PageLoader />}>` autour des routes.
+
+**Résultat bundle** :
+- Avant : DashboardLayout 597KB (warning >500KB).
+- Après : DashboardLayout 17KB, pages individuelles 5-23KB chacune, PostEditor 426KB (contient SEOAnalyzer 2600+ lignes), index 422KB (vendor React).
+- **Plus de warning Vite chunk size**.
+- 46 entries precache PWA (vs 19) — granularité bien meilleure.
+- Première vue (Overview) ne charge plus le code de KeywordTracker/SearchTrends/etc → temps de chargement initial réduit.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 14.83s, plus de warning chunks
+
+**Branches/commits** : 2 commits locaux à venir.
+
+**Note règle dor** : ✅ respectée pour LocalBusiness (backend déjà fait, frontend ferme la boucle). Bundle splitting = infrastructure (pas user-facing) donc règle non applicable.
+
+**Prochain bloc concret** :
+
+Items autonomes restants :
+- Cron rank-snapshot quotidien (Tier 2 #5 étape C).
+- GenerateInlineView accepte aussi le brief (parité avec GenerateArticleView).
+- Topic clusters react-flow visu.
+- Image SEO étape 2 : WebP auto-conversion.
+
+**Recommandation** : on a atteint un état très propre. **Push fortement conseillé maintenant** pour valider en prod lensemble cohérent.
+
+**Statistiques fin de session 23** :
+- Tier 1 : ✅ 4/4 | Tier 2 : ✅ 3/3 | Tier 3 : ✅ 9/10 | Tier 4 autonomes : 3/3 done
+- Polish : 3 boucles fermées (brief→Claude, LocalBusiness UI, bundle splitting)
+- Endpoints SEO : 24 | Composants frontend : 16 | Migrations DB : 3
+- **Commits locaux non poussés : 24**
+- Bundle dashboard : split en 14 chunks paresseux + 5 chunks vendor.
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : push (24 commits), Stripe, Bing, Plagiarism API, décisions landing/onboarding.

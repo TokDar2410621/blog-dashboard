@@ -49,4 +49,36 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            // Heavy single-purpose libraries get their own chunk so they're
+            // cached independently and don't bloat the route bundles that
+            // don't use them.
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'recharts';
+            }
+            if (id.includes('@tanstack/react-query')) {
+              return 'react-query';
+            }
+            if (id.includes('react-router')) {
+              return 'react-router';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons';
+            }
+            if (
+              id.includes('@radix-ui') ||
+              id.includes('class-variance-authority') ||
+              id.includes('cmdk')
+            ) {
+              return 'ui';
+            }
+          }
+        },
+      },
+    },
+  },
 })
