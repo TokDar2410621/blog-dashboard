@@ -380,3 +380,24 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 - Tester live les nouveaux écrans dashboard (priorité moyenne, pas bloquant pour la suite).
 - Décider du déploiement : tu veux pousser ces 6 commits sur `main` (ils sont safe, pas de breaking change) ou attendre d'avoir Tier 2 fini ?
 
+---
+
+## Session 2026-05-04 (suite 7) — Règle d'or "no backend without frontend"
+
+**Fait** :
+- Darius a explicité la règle de fond : *"le meilleur backend ne vaut rien sans front"*.
+- Section §7 ajoutée à `.mission/WORKFLOW.md` avec 6 sous-règles concrètes (slicer en vertical end-to-end, UI moche > pas d'UI, critère "done" mis à jour pour exiger l'UI, etc.).
+- Section "GOLDEN RULE" ajoutée au skill `~/.claude/skills/mission/SKILL.md` — applicable à TOUTES les missions futures, pas seulement celle-ci.
+
+**Tests** : N/A (changement de règles, pas de code).
+
+**Branches/commits** : commit local à venir.
+
+**Application immédiate** : la roadmap restante est déjà naturellement front-aware (graphe recharts, Bing Webmaster, Quebec lexicon → tous touchent l'UI). Mais à partir de maintenant, Tier 3 #10 "Auto-redirect 301" qui semblait backend-only doit aussi avoir une UI minimale (page de listing des redirects + form d'ajout).
+
+**Prochain bloc concret** (inchangé) : étape D (graphe recharts dans KeywordTracker, ~2h) puis étape C (cron snapshot quotidien).
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : aucune nouvelle.
+

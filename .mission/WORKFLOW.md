@@ -64,6 +64,32 @@ Pour tout le reste : **agir, ne pas demander.**
 - Ne pas accumuler des fichiers mémoire stale.
 - Ne pas supprimer/renommer un endpoint existant sans vérifier qu'aucun frontend ne l'utilise.
 
+## 7. RÈGLE D'OR — Pas de backend sans frontend
+
+> **"Le meilleur backend ne vaut rien sans front."** — Darius, 2026-05-04
+
+Aucune feature n'est terminée tant que Darius ne peut pas l'utiliser via l'UI du dashboard. Un endpoint testable seulement par curl est un demi-livrable.
+
+**Comment l'appliquer** :
+
+1. **Ne jamais committer un endpoint backend sans le composant React qui le consomme dans le même cycle de travail** (idéalement même commit, ou commits consécutifs qui se suivent immédiatement). Pas de "je fais le backend aujourd'hui, le frontend demain peut-être".
+
+2. **Si la feature est complexe**, découper en tranches **end-to-end verticales** plutôt qu'en couches horizontales. Tranche 1 = endpoint minimal + UI minimale qui marche bout en bout. Tranche 2 = enrichir les deux.
+
+3. **Si vraiment court en temps**, préférer une **UI minimale et moche** (textarea, table brute, JSON pretty-printed) qui fonctionne, à un backend sophistiqué sans UI. Le polish vient ensuite.
+
+4. **Le `Prochain bloc concret` doit toujours, à terme, déboucher sur un écran utilisateur**. Si une session ne livre que du backend, la session suivante DOIT compléter le frontend correspondant — sans laisser le backend orphelin sur la prochaine roadmap.
+
+5. **Critère "done" mis à jour** : une feature est "done" quand :
+   - Endpoint backend OK (`python manage.py check`)
+   - **ET** route frontend accessible
+   - **ET** composant React qui rend le résultat sans erreur TS
+   - **ET** lien sidebar / point d'entrée UI clair pour que Darius trouve la feature
+   - **ET** build passe (`npm run build`)
+   - **ET** trace dans `PROGRESS_LOG.md` mentionnant l'écran exact où tester
+
+6. **Exception** : seules les **fonctions internes / helpers utilitaires** peuvent rester backend-only. Tout ce qui produit une donnée ou un effet visible pour l'utilisateur final passe par une UI.
+
 ## 7. Cloud `/schedule` agent — spécificités
 
 L'agent cloud :
