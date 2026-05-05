@@ -4,21 +4,21 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 ## Tier 1 — différenciation immédiate
 
-### 1. Content Brief Generator ⏱ 4-6h
+### 1. Content Brief Generator ✅ DONE (sauf wire-up generator)
 - [x] Backend `POST /content-brief/` — combine Serper SERP + PAA + competitor + Gemini synthesis → JSON brief :
   - search_intent (informational/commercial/transactional/navigational)
-  - top 5 competitors (titles + headings extraits)
+  - top 10 competitors (rank, title, url, snippet)
   - recommended_title patterns (3 variantes)
   - outline (H2/H3 suggérés)
-  - word_count_target (médiane top 10)
-  - faq[] (extraits de PAA)
+  - word_count_target (suggéré par Gemini selon SERP top 10)
+  - faq[] (questions PAA + answer_hint)
   - entities[] (LSI keywords à mentionner)
   - schemas[] suggérés (Article, HowTo, FAQ, etc.)
   - eeat_signals[] (auteur expert, sources, dates fraîches)
-- [ ] Cache 1h via `_seo_cache_key`.
-- [ ] Frontend `src/components/ContentBrief.tsx` + intégration dans `AIGenerator.tsx` (étape 0 "Brief avant article").
-- [ ] Wire-up dans `GenerateArticleView` pour consommer le brief si fourni.
-- [ ] i18n FR + EN.
+- [x] Cache 1h via `_seo_cache_key`.
+- [x] Frontend `src/components/ContentBrief.tsx` + intégration dans `AIGenerator.tsx`.
+- [ ] (Optionnel, futur) Wire-up dans `GenerateArticleView` pour consommer le brief comme contexte au pipeline Claude — actuellement le brief préfille seulement les champs du formulaire.
+- [x] i18n FR + EN.
 - **Pourquoi prio 1** : transforme "audit après écriture" → "guide avant écriture". Différenciation forte vs Ahrefs/Semrush en FR-CA.
 
 ### 2. People Also Ask + auto-FAQ schema ⏱ 2h

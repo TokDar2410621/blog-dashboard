@@ -199,6 +199,30 @@
     "error": "Error during generation"
   },
 
+  "brief": {
+    "title": "Content Brief",
+    "subtitle": "Generate a strategic plan before writing — intent, titles, outline, FAQ, entities, schemas, EEAT signals.",
+    "keyword": "Target keyword",
+    "keywordPlaceholder": "e.g. automation small business quebec",
+    "keywordRequired": "Target keyword is required",
+    "generate": "Generate brief",
+    "briefDetails": "Show brief",
+    "applyToGenerator": "Use this brief",
+    "applied": "Brief applied to the form",
+    "copied": "Copied!",
+    "error": "Error generating brief",
+    "searchIntent": "Search intent",
+    "recommendedTitles": "Recommended titles",
+    "outline": "Article outline",
+    "wordCountTarget": "Target length",
+    "words": "words",
+    "faq": "FAQ (ready for schema)",
+    "entities": "Entities to mention",
+    "schemas": "Suggested schemas",
+    "eeat": "EEAT signals to include",
+    "competitors": "SERP competitors"
+  },
+
   "images": {
     "title": "Images",
     "subtitle": "Manage your uploaded images",

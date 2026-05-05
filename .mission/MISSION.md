@@ -38,7 +38,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 ## Capacités à ajouter (= la roadmap, voir `ROADMAP.md`)
 
 ### Tier 1 (différenciation immédiate)
-- [ ] Content Brief Generator (intent + competitors + outline + FAQ + entités)
+- [x] Content Brief Generator (intent + competitors + outline + FAQ + entités)
 - [ ] People Also Ask harvester + auto-FAQ schema
 - [ ] Bulk SEO audit
 - [ ] Hreflang validator

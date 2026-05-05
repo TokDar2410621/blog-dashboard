@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { ContentBriefPanel } from "@/components/ContentBrief";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -101,6 +102,17 @@ export default function AIGenerator() {
           {t("ai.subtitle")}
         </p>
       </div>
+
+      {/* Content Brief — pre-writing brief (optional, fills the form when applied) */}
+      <ContentBriefPanel
+        language={language}
+        defaultKeyword={keywords.split(",")[0]?.trim() || topic}
+        onApply={({ topic: t2, title: ti2, keywords: kw2 }) => {
+          if (t2) setTopic(t2);
+          if (ti2) setTitle(ti2);
+          if (kw2) setKeywords(kw2);
+        }}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Form */}

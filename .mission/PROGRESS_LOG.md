@@ -90,16 +90,54 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 **Branches/commits** : commit local à venir, **pas de push** (cf workflow local-first).
 
-**Prochain bloc concret** :
-- **Frontend du Content Brief**. Créer `src/components/ContentBrief.tsx` :
-  - Input : champ mot-clé + select langue (réutiliser le pattern de `SEOAnalyzer.tsx` pour cohérence visuelle).
-  - Bouton "Générer le brief" → mutation react-query vers `/content-brief/`.
-  - Affichage du brief reçu : sections collapsibles pour search intent, titles (cards cliquables → copie au clipboard), outline (en arborescence), word count, FAQ (expansibles), entities (tags), schemas (badges), EEAT (checklist).
-  - Skeleton pendant chargement.
-  - i18n FR + EN dans `src/i18n/locales/fr.json` et `en.json`.
-- **Intégration** : ajouter étape 0 "Brief avant génération" dans `src/pages/dashboard/AIGenerator.tsx` (lire le fichier existant pour comprendre le wizard actuel). Le brief généré peut être passé en contexte au pipeline `/sites/<id>/generate/` (déjà existant).
-- **Tests** : `npm run build` doit passer.
+**Prochain bloc concret** : (voir entrée suivante — frontend fait dans la même session)
 
 **Blocages** : aucun.
 
 **Actions humaines en attente** : aucune.
+
+---
+
+## Session 2026-05-04 (suite 2) — Content Brief Generator (frontend) ✅ Tier 1 #1 DONE
+
+**Fait** :
+- Composant `src/components/ContentBrief.tsx` (`ContentBriefPanel`) — UI complète :
+  - Input mot-clé + bouton générer (mutation react-query → `POST /content-brief/`).
+  - Skeleton pendant chargement.
+  - Brief reçu : sections collapsibles (search intent badge, 3 titres cliquables → clipboard, outline H2/H3 indenté, word count target, FAQ expandable details, entities en tags, schemas en badges, EEAT en checklist verte, top 5 concurrents SERP).
+  - Prop `onApply` pour auto-remplir un formulaire parent.
+- Intégration dans `src/pages/dashboard/AIGenerator.tsx` :
+  - `<ContentBriefPanel>` placé au-dessus du grid form/result.
+  - `onApply` rempli : `topic`, `title` (premier titre recommandé), `keywords` (6 premières entities) → préfille les champs du générateur quand l'utilisateur clique "Utiliser ce brief".
+- i18n FR + EN : 21 nouvelles clés `brief.*` dans `src/i18n/fr.json` et `src/i18n/en.json`.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide (parse OK)
+- `npm install` → OK
+- `npm run build` → ✓ built in 11.45s, 2256 modules transformed, sortie complète dans `dist/`. Warning chunk size > 500KB sur DashboardLayout (déjà présent avant cette session, hors scope).
+- **Test live à faire (humain)** : aller sur `/dashboard/<siteId>/generer`, voir le panneau "Brief de contenu" en haut, taper un mot-clé FR, cliquer Générer, vérifier que le brief s'affiche correctement et que "Utiliser ce brief" préfille les champs en bas.
+
+**Branches/commits** : commit local à venir (pas de push).
+
+**Prochain bloc concret** :
+
+**Tier 1 #2 — People Also Ask harvester + auto-FAQ schema** (estimé 2h) :
+
+1. Lire dans `backend/sites_mgmt/views.py` la classe `KeywordResearchView` (~ligne 1574) qui appelle déjà Serper avec `peopleAlsoAsk`. Réutiliser le pattern.
+2. Ajouter `class PAAView(APIView)` après `ContentBriefView`. Body :
+   - Input : `{keyword, language}`.
+   - Cache key `_seo_cache_key('paa:', keyword, language)`.
+   - Étape A : Serper SERP → `peopleAlsoAsk` array.
+   - Étape B (optionnel mais utile) : pour chaque question, demander à Gemini une réponse courte (1-2 phrases) factuelle, prête pour le schema FAQPage.
+   - Retour : `{questions: [{question, answer}], faq_schema: {…JSON-LD FAQPage…}}`.
+3. Ajouter route `path('paa/', PAAView.as_view(), name='paa')` dans `urls.py`.
+4. Frontend : ajouter une section dans `src/components/SEOAnalyzer.tsx` (le hub SEO) — ou un nouveau composant `PAAPanel.tsx` — avec champ mot-clé, bouton "Récupérer PAA", liste questions/réponses, bouton "Insérer FAQ schema dans l'article courant" (insère le JSON-LD dans `<script type="application/ld+json">`).
+5. i18n `paa.*` keys.
+6. `python manage.py check` + `npm run build` doivent passer.
+
+**Alternative** (si tu veux varier) : Tier 1 #4 — Hreflang validator (1h, plus rapide) ou Tier 1 #3 — Bulk SEO audit (3h, plus impactant).
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : aucune (la PR éventuellement ouverte par le run cloud déclenché plus tôt peut être ignorée/fermée — la feature est faite en local).

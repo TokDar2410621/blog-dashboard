@@ -199,6 +199,30 @@
     "error": "Erreur lors de la generation"
   },
 
+  "brief": {
+    "title": "Brief de contenu",
+    "subtitle": "Genere un plan strategique avant d'ecrire — intent, titres, plan, FAQ, entites, schemas, signaux EEAT.",
+    "keyword": "Mot-cle cible",
+    "keywordPlaceholder": "Ex: automatisation pme quebec",
+    "keywordRequired": "Le mot-cle cible est requis",
+    "generate": "Generer le brief",
+    "briefDetails": "Voir le brief",
+    "applyToGenerator": "Utiliser ce brief",
+    "applied": "Brief applique au formulaire",
+    "copied": "Copie!",
+    "error": "Erreur lors de la generation du brief",
+    "searchIntent": "Intention de recherche",
+    "recommendedTitles": "Titres recommandes",
+    "outline": "Plan d'article",
+    "wordCountTarget": "Longueur cible",
+    "words": "mots",
+    "faq": "FAQ (pretes pour schema)",
+    "entities": "Entites a mentionner",
+    "schemas": "Schemas suggeres",
+    "eeat": "Signaux EEAT a inclure",
+    "competitors": "Concurrents SERP"
+  },
+
   "images": {
     "title": "Images",
     "subtitle": "Gerez vos images uploadees sur Cloudinary",
