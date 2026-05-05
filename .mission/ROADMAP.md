@@ -5,7 +5,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 ## Tier 1 — différenciation immédiate
 
 ### 1. Content Brief Generator ⏱ 4-6h
-- [ ] Backend `POST /content-brief/` — combine Serper SERP + PAA + competitor + Gemini synthesis → JSON brief :
+- [x] Backend `POST /content-brief/` — combine Serper SERP + PAA + competitor + Gemini synthesis → JSON brief :
   - search_intent (informational/commercial/transactional/navigational)
   - top 5 competitors (titles + headings extraits)
   - recommended_title patterns (3 variantes)
@@ -15,7 +15,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
   - entities[] (LSI keywords à mentionner)
   - schemas[] suggérés (Article, HowTo, FAQ, etc.)
   - eeat_signals[] (auteur expert, sources, dates fraîches)
-- [ ] Cache 1h via `_seo_cache_key`.
+- [x] Cache 1h via `_seo_cache_key`.
 - [ ] Frontend `src/components/ContentBrief.tsx` + intégration dans `AIGenerator.tsx` (étape 0 "Brief avant article").
 - [ ] Wire-up dans `GenerateArticleView` pour consommer le brief si fourni.
 - [ ] i18n FR + EN.
