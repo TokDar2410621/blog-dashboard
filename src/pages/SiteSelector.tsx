@@ -196,15 +196,30 @@ export default function SiteSelector() {
         )}
 
         {/* WordPress quick-connect — primary path for non-technical users */}
-        <Button
-          className="w-full"
-          size="lg"
-          variant="default"
-          onClick={() => setWpDialogOpen(true)}
-        >
-          <Sparkles className="h-5 w-5 mr-2" />
-          {t("sites.connectWordpress", "Connecter un site WordPress")}
-        </Button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Button
+            className="w-full"
+            size="lg"
+            variant="default"
+            onClick={() => setWpDialogOpen(true)}
+          >
+            <Sparkles className="h-5 w-5 mr-2" />
+            {t("sites.connectWordpress", "Connecter un site WordPress")}
+          </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            variant="outline"
+            onClick={() => setOpen(true)}
+          >
+            <Newspaper className="h-5 w-5 mr-2" />
+            {t("sites.hostedBlog", "Créer un blog clé-en-main")}
+          </Button>
+        </div>
+
+        <p className="text-xs text-muted-foreground text-center -mt-2">
+          {t("sites.hostedHint", "Pas encore de blog ? On t'en bâtit un complet en 5 minutes (Next.js, SEO Québec, hébergé chez nous, sur ton sous-domaine).")}
+        </p>
 
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>

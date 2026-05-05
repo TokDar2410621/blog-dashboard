@@ -112,6 +112,19 @@
     "generatedAt": "Genere le"
   },
 
+  "publicBlog": {
+    "title": "Blog public hebergé",
+    "subtitle": "Frontend Next.js qu'on heberge pour toi. Sous-domaine ou sous-chemin selon ton choix.",
+    "blogDomain": "Domaine du blog public",
+    "blogDomainHint": "Hostname où le blog est servi (ex: blog.tonsite.ca).",
+    "brandColor": "Couleur principale",
+    "brandFg": "Couleur du texte",
+    "logoUrl": "URL du logo",
+    "dnsTitle": "Étape DNS",
+    "dnsHint": "Chez ton registrar, ajoute un CNAME : {{sub}} → cname.vercel-dns.com",
+    "visitBlog": "Visiter le blog public"
+  },
+
   "wpConnect": {
     "title": "Connecter ton site WordPress",
     "subtitle": "3 etapes : URL, generation d'un Application Password, connexion. Aucun plugin a installer.",

@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-color: #2563eb;
+  --brand-fg: #ffffff;
+  --font-sans: system-ui, sans-serif;
+  --font-display: Georgia, serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --fg: #ededed;
+  }
+  body {
+    background: var(--bg, #0a0a0a);
+    color: var(--fg, #ededed);
+  }
+}

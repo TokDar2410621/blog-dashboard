@@ -14,6 +14,7 @@ class SiteSerializer(serializers.ModelSerializer):
                   'author_role', 'author_bio', 'author_credentials',
                   'author_image_url', 'author_linkedin', 'author_twitter',
                   'author_website',
+                  'public_blog_domain', 'theme_config',
                   'vercel_deploy_hook', 'gsc_property_url',
                   'api_key', 'is_hosted', 'is_active',
                   'created_at', 'updated_at',

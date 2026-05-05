@@ -5553,6 +5553,33 @@ def _dedupe_by_translation_group(posts, preferred_language=None, default_languag
     return [p for _, p in merged]
 
 
+def _serialize_public_site(site):
+    """Shared serialization for the public Site endpoint and the
+    site-by-domain lookup. Includes EEAT author + theme_config."""
+    return {
+        'id': site.id,
+        'name': site.name,
+        'domain': site.domain,
+        'public_blog_domain': site.public_blog_domain,
+        'description': site.description,
+        'og_image_url': site.og_image_url,
+        'default_language': site.default_language,
+        'available_languages': site.effective_languages,
+        'theme_config': site.theme_config or None,
+        'author': {
+            'name': site.default_author or 'Admin',
+            'role': site.author_role,
+            'bio': site.author_bio,
+            'credentials': site.author_credentials,
+            'image_url': site.author_image_url,
+            'linkedin': site.author_linkedin,
+            'twitter': site.author_twitter,
+            'website': site.author_website,
+        },
+        'person_schema': _generate_person_schema(site),
+    }
+
+
 class PublicSiteView(APIView):
     """GET /api/public/sites/<id>/ — basic site info + EEAT author profile."""
     permission_classes = []
@@ -5561,26 +5588,40 @@ class PublicSiteView(APIView):
         site = _public_get_site(site_id, request)
         if not site:
             return Response({'error': 'Invalid API key'}, status=status.HTTP_403_FORBIDDEN)
-        return Response({
-            'id': site.id,
-            'name': site.name,
-            'domain': site.domain,
-            'description': site.description,
-            'og_image_url': site.og_image_url,
-            'default_language': site.default_language,
-            'available_languages': site.effective_languages,
-            'author': {
-                'name': site.default_author or 'Admin',
-                'role': site.author_role,
-                'bio': site.author_bio,
-                'credentials': site.author_credentials,
-                'image_url': site.author_image_url,
-                'linkedin': site.author_linkedin,
-                'twitter': site.author_twitter,
-                'website': site.author_website,
-            },
-            'person_schema': _generate_person_schema(site),
-        })
+        return Response(_serialize_public_site(site))
+
+
+class PublicSiteByDomainView(APIView):
+    """GET /api/public/site-by-domain/?domain=<host>
+
+    Used by the public-blog Next.js app to resolve the current site from
+    the request Host header. Match priority: `public_blog_domain` exact match
+    first, then `domain` exact match. Both stored without scheme.
+    No auth — this is intentionally public so the Next.js SSR can fetch it.
+    """
+    permission_classes = []
+
+    def get(self, request):
+        domain = (request.query_params.get('domain') or '').strip().lower()
+        if not domain:
+            return Response(
+                {'error': 'Le parametre "domain" est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Strip scheme/port if a frontend mistakenly passes them
+        domain = domain.replace('https://', '').replace('http://', '')
+        domain = domain.split('/')[0].split(':')[0]
+
+        site = (
+            Site.objects.filter(public_blog_domain__iexact=domain, is_active=True).first()
+            or Site.objects.filter(domain__iexact=domain, is_active=True).first()
+        )
+        if not site:
+            return Response(
+                {'error': f'Aucun site associé au domaine "{domain}".'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(_serialize_public_site(site))
 
 
 class PublicPostsView(APIView):

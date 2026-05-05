@@ -37,6 +37,8 @@ export const siteSchema = z.object({
   author_linkedin: z.string().optional(),
   author_twitter: z.string().optional(),
   author_website: z.string().optional(),
+  public_blog_domain: z.string().optional(),
+  theme_config: z.record(z.string(), z.unknown()).nullable().optional(),
   blog_config: z.record(z.string(), z.unknown()).nullable().optional(),
   created_at: z.string(),
   updated_at: z.string().optional(),

@@ -108,6 +108,17 @@ class Site(models.Model):
         verbose_name="Config tables blog",
         help_text="Mapping des tables/colonnes si le site n'utilise pas les tables blog_* standard"
     )
+    # ── Public blog (mode hosted: notre frontend Next.js) ─────────────
+    public_blog_domain = models.CharField(
+        max_length=255, blank=True, default='', db_index=True,
+        verbose_name="Domaine du blog public",
+        help_text="Hostname où le blog est servi (ex: blog.restaurant.ca, restofoo.blog-quebec.ca). Différent de `domain` qui désigne la marque."
+    )
+    theme_config = models.JSONField(
+        blank=True, null=True, default=None,
+        verbose_name="Configuration du thème",
+        help_text="Couleurs, polices, logo pour le frontend public. Format: {brand_color, brand_fg, font_sans, font_display, logo_url}"
+    )
     # ── WordPress integration (mode "WP") ─────────────────────────────
     wp_url = models.URLField(
         max_length=500, blank=True, default='',

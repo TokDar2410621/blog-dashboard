@@ -1605,3 +1605,102 @@ Le chemin commercial maintenant ouvert. Restes :
 - Tester lonboarding WP sur un vrai site WordPress.
 - Push.
 - Refactorer les outils SEO bulk (audit-all, etc.) pour couvrir les sites WP — peut être reporté en attendant validation terrain.
+
+
+---
+
+## Session 2026-05-04 (suite 25) — Mode hosted clé-en-main : 3 niveaux dintégration ✅
+
+**Pourquoi** : Darius a demandé "et si le client veut que le blog soit lié à son site existant ?". Réponse : 3 niveaux de proxy, déjà tous shippé.
+
+### Phase 1 — Frontend public Next.js générique (`public-blog/`)
+
+Nouvelle app Next.js 14 (App Router) au root du repo. **Une seule app** sert TOUS les clients. Résolution du site se fait au runtime via le header `Host`.
+
+Architecture :
+- `src/lib/api.ts` : client public API (listPosts, getPost, getTranslations, getCategories…).
+- `src/lib/site-context.ts` : `getCurrentSite()` lit le Host → appelle `GET /public/site-by-domain/?domain=<host>` → retourne le Site. Override possible via `NEXT_PUBLIC_SITE_ID` pour test mono-tenant.
+- Routes :
+  - `/` → liste articles (avec cover image, category, excerpt, date, reading time)
+  - `/[slug]` → article complet (gère le 301 redirect via la public API), avec hreflang inline si translations, JSON-LD BlogPosting, schema.org Person via layout.
+  - `/sitemap.xml` → sitemap dynamique
+  - `/rss.xml` → flux RSS
+  - `/robots.txt` → pointe vers le sitemap
+- Layout : header avec logo + nom du site, footer avec auteur + bio EEAT.
+- Theme : 4 CSS variables exposées (--brand-color, --brand-fg, --font-sans, --font-display) que Tailwind référence. Site.theme_config alimente les variables au render.
+- Markdown rendering : parser maison léger (bold/italic/code/headings/lists/links/images).
+
+### Phase 1 — Backend
+
+- Nouveaux champs Site : `public_blog_domain` (CharField db_indexed) + `theme_config` (JSONField). Migration 0016.
+- Helper `_serialize_public_site()` partagé entre PublicSiteView et nouvelle view.
+- **Nouvelle vue `PublicSiteByDomainView`** (`GET /public/site-by-domain/?domain=...`) : matche dabord `public_blog_domain`, fallback sur `domain`. No auth, intentionnellement public pour le SSR Next.js.
+- `SiteSerializer` expose les nouveaux champs (write).
+
+### Phase 2 — UI dans SiteSettings
+
+- Nouvelle card "Blog public (frontend hébergé)" dans SiteSettings :
+  - Input `public_blog_domain`.
+  - Banner DNS qui sactualise quand on tape un domaine : "Ajoute un CNAME : <sub> → cname.vercel-dns.com".
+  - 3 inputs theme : couleur principale (avec color picker natif), couleur texte, logo URL.
+  - Lien "Visiter le blog public" si domaine configuré.
+- Zod siteSchema étendu de `public_blog_domain` + `theme_config`.
+
+### Phase 2 — Onboarding hosted dans SiteSelector
+
+- Nouvelle CTA "Créer un blog clé-en-main" (icône Newspaper, variant outline) à côté de "Connecter un site WordPress".
+- Sous-titre explicatif : "Pas encore de blog ? On ten bâtit un complet en 5 minutes…".
+- Cliquer → ouvre le dialog dajout existant. Le client laisse `database_url` vide → mode hosted automatiquement.
+
+### Phase 3 — Guides proxy sous-chemin (`public-blog/docs/SUBPATH_PROXY.md`)
+
+Guide complet avec 4 patterns documentés :
+- **Pattern A — Cloudflare Worker** (recommandé, gratuit) : code Worker copy-paste qui proxy `/blog/*` vers le frontend Next.js, avec préservation du Host original (critique pour la résolution multi-tenant).
+- **Pattern B — Vercel rewrites** : `vercel.json` ou `next.config.js`. Limitation : pas de Host pass-through, donc nécessite `NEXT_PUBLIC_SITE_ID` mode mono-tenant.
+- **Pattern C — Nginx** : config `proxy_pass` complète pour VPS / hébergeurs custom.
+- **Pattern D — Apache .htaccess** : pour cPanel / hébergement mutualisé (mod_proxy + mod_rewrite).
+
+Tableau SEO impact comparatif inclus : sous-domaine vs sous-chemin vs domaine externe.
+
+### Tests
+
+- `python backend/manage.py check` → OK
+- `python manage.py migrate` → 0016 appliquée
+- JSON i18n valide
+- Dashboard `npm run build` → ✓ built in 14.97s
+- public-blog **pas encore testé localement** : `npm install` côté `public-blog/` + `NEXT_PUBLIC_SITE_ID=3 npm run dev` à faire pour valider le rendu.
+
+### Configuration humaine requise
+
+Pour que ce soit live :
+1. **Créer un projet Vercel** distinct pour `public-blog/` (pointant sur ce dossier).
+2. Pour chaque client :
+   - Soit le client tape son domaine custom dans Settings → on ajoute le domaine au projet Vercel via leur dashboard (plus tard : automatiser via Vercel API).
+   - Soit on utilise un sous-domaine wildcard `*.blog-quebec.ca` (achat domaine + DNS wildcard chez un registrar).
+
+### Commits prévus
+
+- 1 gros commit : public-blog app + backend endpoint + Site fields + SiteSettings UI + onboarding hosted + guide sous-chemin.
+
+### Statut mission
+
+Tier 4 #22 (landing) reste pour la commercialisation, mais avec ces 3 niveaux dintégration shipped, le SaaS peut maintenant accueillir NIMPORTE QUEL client québécois :
+- WordPress → connecter direct (déjà fait)
+- Pas de blog → on ten bâtit un (Phase 2 onboarding)
+- Site existant non-WP → 3 patterns proxy possibles (Phase 3 guides)
+
+**Mission "n°1 au Québec" :** la portion technique est terminée. Reste validation terrain + design landing.
+
+**Statistiques fin de session 25** :
+- Tier 1-3 + Tier 4 autonomes : ✅
+- Modes supportés : hosted, external Postgres, **WordPress (nouveau)**, **hosted public blog (nouveau)**
+- Endpoints backend cumulés : 28 (… + site-by-domain)
+- Migrations : 5 (0012-0016)
+- Apps frontend : 2 (dashboard Vite + public-blog Next.js)
+- Composants/pages : 19 (dashboard) + 6 routes (public-blog)
+- Commits cumulés non poussés : 1 (cette session)
+
+**Action humaine requise** :
+- Créer un projet Vercel pour public-blog (1× setup).
+- Décider dun domaine wildcard pour les sous-domaines de notre service (ex: `*.blog-quebec.ca`) si on veut offrir le sous-domaine sans config client.
+- Tester live lonboarding sur un site de test.

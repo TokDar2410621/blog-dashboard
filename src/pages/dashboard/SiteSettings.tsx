@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -85,6 +85,11 @@ export default function SiteSettings() {
   const [authorLinkedin, setAuthorLinkedin] = useState("");
   const [authorTwitter, setAuthorTwitter] = useState("");
   const [authorWebsite, setAuthorWebsite] = useState("");
+  // Public blog (Next.js frontend on our infra)
+  const [publicBlogDomain, setPublicBlogDomain] = useState("");
+  const [brandColor, setBrandColor] = useState("");
+  const [brandFg, setBrandFg] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -105,6 +110,11 @@ export default function SiteSettings() {
       setAuthorLinkedin(site.author_linkedin || "");
       setAuthorTwitter(site.author_twitter || "");
       setAuthorWebsite(site.author_website || "");
+      setPublicBlogDomain(site.public_blog_domain || "");
+      const tc = (site as { theme_config?: Record<string, string> }).theme_config || {};
+      setBrandColor(tc.brand_color || "");
+      setBrandFg(tc.brand_fg || "");
+      setLogoUrl(tc.logo_url || "");
     }
   }, [site]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -134,6 +144,12 @@ export default function SiteSettings() {
         author_linkedin: authorLinkedin,
         author_twitter: authorTwitter,
         author_website: authorWebsite,
+        public_blog_domain: publicBlogDomain.trim().toLowerCase(),
+        theme_config: {
+          ...(brandColor ? { brand_color: brandColor } : {}),
+          ...(brandFg ? { brand_fg: brandFg } : {}),
+          ...(logoUrl ? { logo_url: logoUrl } : {}),
+        },
       });
       toast.success(t("settings.saved"));
     } catch {
@@ -498,6 +514,116 @@ export default function SiteSettings() {
           <p className="text-xs text-muted-foreground">
             Ces 3 URLs alimentent <code>sameAs</code> dans le JSON-LD Person — Google les utilise pour vérifier ton identité.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Public Blog (hosted Next.js frontend) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Blog public (frontend hébergé)
+          </CardTitle>
+          <CardDescription>
+            Configure le frontend Next.js qu&apos;on héberge pour toi. Le visiteur lit tes articles via une URL dédiée — sous-domaine custom (<code>blog.tonsite.ca</code>) ou inclusion sous-chemin (<code>tonsite.ca/blog</code>).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Domaine du blog public</Label>
+            <Input
+              value={publicBlogDomain}
+              onChange={(e) => setPublicBlogDomain(e.target.value)}
+              placeholder="blog.restaurant.ca"
+              type="text"
+            />
+            <p className="text-xs text-muted-foreground">
+              Le hostname où le blog est servi. C&apos;est ce que le frontend Next.js lit dans le header <code>Host</code> pour t&apos;identifier.
+            </p>
+          </div>
+
+          {publicBlogDomain && (
+            <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <strong>Étape DNS — chez ton registrar :</strong>
+                  <p>
+                    Ajoute un <strong>CNAME</strong> :{" "}
+                    <code className="px-1 rounded bg-muted font-mono">
+                      {publicBlogDomain.split(".")[0] || "blog"}
+                    </code>{" "}
+                    →{" "}
+                    <code className="px-1 rounded bg-muted font-mono">
+                      cname.vercel-dns.com
+                    </code>
+                  </p>
+                  <p>
+                    Puis ajoute le domaine <code>{publicBlogDomain}</code> dans le projet Vercel <code>blog-dashboard-public</code> (ou demande à Darius de le faire).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Couleur principale</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={brandColor}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  placeholder="#2563eb"
+                  className="font-mono text-sm"
+                />
+                <input
+                  type="color"
+                  value={brandColor || "#2563eb"}
+                  onChange={(e) => setBrandColor(e.target.value)}
+                  className="h-9 w-12 rounded border cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Couleur du texte sur la couleur principale</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={brandFg}
+                  onChange={(e) => setBrandFg(e.target.value)}
+                  placeholder="#ffffff"
+                  className="font-mono text-sm"
+                />
+                <input
+                  type="color"
+                  value={brandFg || "#ffffff"}
+                  onChange={(e) => setBrandFg(e.target.value)}
+                  className="h-9 w-12 rounded border cursor-pointer"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Logo URL</Label>
+              <Input
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://..."
+                type="url"
+                className="text-sm"
+              />
+            </div>
+          </div>
+
+          {publicBlogDomain && (
+            <a
+              href={`https://${publicBlogDomain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              Visiter le blog public
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
         </CardContent>
       </Card>
 
