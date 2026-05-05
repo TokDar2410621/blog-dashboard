@@ -14,6 +14,7 @@ import ContentDecay from "./ContentDecay";
 import TopicClusters from "./TopicClusters";
 import LinkGraph from "./LinkGraph";
 import Redirects from "./Redirects";
+import BrokenLinks from "./BrokenLinks";
 
 export default function DashboardLayout() {
   return (
@@ -35,6 +36,7 @@ export default function DashboardLayout() {
                 <Route path="clusters" element={<TopicClusters />} />
                 <Route path="link-graph" element={<LinkGraph />} />
                 <Route path="redirects" element={<Redirects />} />
+                <Route path="broken-links" element={<BrokenLinks />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

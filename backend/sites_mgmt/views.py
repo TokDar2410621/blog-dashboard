@@ -3224,6 +3224,166 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class BrokenLinksView(APIView):
+    """Scan a site's published articles for outbound HTTP(S) links and report
+    those that are dead (4xx/5xx, timeout, connection error).
+
+    POST /sites/<site_id>/broken-links/?limit=100&language=fr
+
+    Each unique URL is checked once via HEAD (with GET fallback for servers
+    that reject HEAD), cached 24h. Returns the broken URLs grouped by URL,
+    each pointing back to the articles where it appears.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        import re as _re
+
+        site = get_site_for_user(request, site_id)
+        try:
+            limit = max(5, min(int(
+                request.data.get('limit') or request.query_params.get('limit') or 100
+            ), 200))
+        except (TypeError, ValueError):
+            limit = 100
+        language_filter = (
+            request.data.get('language') or request.query_params.get('language') or ''
+        ).strip().lower() or None
+
+        # Domain to know what's "internal" — we skip internal links here.
+        site_domain = (site.domain or '').lower().replace('https://', '').replace('http://', '').rstrip('/')
+
+        # Fetch published articles
+        if site.is_hosted:
+            qs = HostedPost.objects.filter(site=site, status='published')
+            if language_filter:
+                qs = qs.filter(language=language_filter)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title, 'content': p.content or ''}
+                for p in qs
+            ]
+        else:
+            alias = ensure_site_connection(site)
+            qs = BlogPost.objects.using(alias).filter(status='published')
+            if language_filter:
+                qs = qs.filter(language=language_filter)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title,
+                 'content': getattr(p, 'content', '') or ''}
+                for p in qs
+            ]
+
+        url_re = _re.compile(r'https?://[^\s\)<>"\']+', _re.IGNORECASE)
+        markdown_link_re = _re.compile(r'\[[^\]]*\]\((https?://[^)]+)\)')
+        html_href_re = _re.compile(
+            r'<a\b[^>]*\bhref=["\'](https?://[^"\']+)["\']', _re.IGNORECASE
+        )
+
+        # Map url -> list of (slug, title)
+        url_to_articles = {}
+        for art in articles:
+            content = art['content']
+            urls = set()
+            for m in markdown_link_re.finditer(content):
+                urls.add(m.group(1).rstrip('.,;:'))
+            for m in html_href_re.finditer(content):
+                urls.add(m.group(1).rstrip('.,;:'))
+            # Plain URLs in text (rare in markdown but covered)
+            for m in url_re.finditer(content):
+                urls.add(m.group(0).rstrip('.,;:'))
+
+            for url in urls:
+                # Skip internal links
+                if site_domain and site_domain in url.lower():
+                    continue
+                # Skip non-content links (mailto, tel, etc. — already filtered by regex but defense)
+                if not url.startswith(('http://', 'https://')):
+                    continue
+                url_to_articles.setdefault(url, []).append(
+                    {'slug': art['slug'], 'title': art['title']}
+                )
+
+        if not url_to_articles:
+            return Response({
+                'site_id': site.id,
+                'checked_count': 0,
+                'broken_count': 0,
+                'broken_links': [],
+                'note': 'Aucun lien externe HTTP(S) trouve dans les articles.',
+            })
+
+        # Check each unique URL (cached 24h)
+        broken = []
+        checked = 0
+        for url in list(url_to_articles.keys()):
+            cache_key = _seo_cache_key('broken-link:', url)
+            cached = cache.get(cache_key)
+            if cached is not None:
+                status_code, error = cached
+            else:
+                status_code, error = self._check_url(url)
+                cache.set(cache_key, (status_code, error), timeout=86400)  # 24h
+            checked += 1
+            is_broken = (
+                error is not None
+                or (status_code is not None and status_code >= 400)
+            )
+            if is_broken:
+                broken.append({
+                    'url': url,
+                    'status_code': status_code,
+                    'error': error or '',
+                    'articles': url_to_articles[url][:20],  # cap at 20 articles
+                    'article_count': len(url_to_articles[url]),
+                })
+
+        # Sort: errors first, then by status code descending (5xx before 4xx)
+        broken.sort(key=lambda b: (
+            -1 if b['error'] else -(b['status_code'] or 0),
+            -b['article_count'],
+        ))
+
+        return Response({
+            'site_id': site.id,
+            'checked_count': checked,
+            'broken_count': len(broken),
+            'broken_links': broken,
+        })
+
+    def _check_url(self, url):
+        """Probe a URL. Returns (status_code, error). status_code may be None
+        if the request failed before getting a response."""
+        try:
+            resp = http_requests.head(
+                url,
+                timeout=5,
+                allow_redirects=True,
+                headers={'User-Agent': 'Mozilla/5.0 BlogDashboard/1.0'},
+            )
+            # Some servers return 405/403 on HEAD but work on GET — try GET.
+            if resp.status_code in (403, 405, 501):
+                try:
+                    resp = http_requests.get(
+                        url,
+                        timeout=6,
+                        allow_redirects=True,
+                        stream=True,
+                        headers={'User-Agent': 'Mozilla/5.0 BlogDashboard/1.0'},
+                    )
+                    resp.close()
+                except Exception:
+                    pass  # fall through, keep HEAD result
+            return resp.status_code, None
+        except http_requests.Timeout:
+            return None, 'timeout'
+        except http_requests.ConnectionError:
+            return None, 'connection_error'
+        except Exception as e:
+            return None, str(e)[:100]
+
+
 def _count_syllables_en(word):
     """Heuristic English syllable count. Good enough for Flesch — not perfect."""
     word = word.lower().strip(".,!?;:'\"()[]{}—–-")

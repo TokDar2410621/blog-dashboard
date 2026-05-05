@@ -803,3 +803,72 @@ Plan Étape A pour #9 :
 - Tester les pages.
 - Décider du déploiement (12 commits non poussés, deux migrations safe : 0012 + 0013).
 
+---
+
+## Session 2026-05-04 (suite 14) — Broken link checker ✅ Tier 3 #9 DONE (end-to-end)
+
+**Fait** :
+- Backend `BrokenLinksView` ajouté (juste avant `_count_syllables_en`).
+  - Endpoint `POST /sites/<id>/broken-links/?limit=100&language=fr`.
+  - Itère articles publiés (max 200, default 100), filtre langue optionnel.
+  - Extraction des URLs externes via 3 regex : markdown `[text](url)`, HTML `<a href>`, plain `https?://...`.
+  - Skip les liens internes (matching site.domain) — déjà couverts par link-graph.
+  - Pour chaque URL unique : `requests.head(url, timeout=5, allow_redirects=True)` + GET fallback pour 403/405/501.
+  - Cache 24h par URL via `_seo_cache_key('broken-link:', url)` (les sites cassés ne se réparent pas vite).
+  - Considéré broken : status >= 400 OU error (timeout, connection_error, autre).
+  - Retourne `{checked_count, broken_count, broken_links: [{url, status_code, error, articles[], article_count}]}` triés par sévérité (errors d'abord, puis 5xx > 4xx).
+- Route `path('sites/<int:site_id>/broken-links/', BrokenLinksView.as_view(), name='site-broken-links')`.
+- Frontend `src/pages/dashboard/BrokenLinks.tsx` :
+  - Select langue (Toutes / FR / EN / ES) + bouton Scanner.
+  - 3 KPI cards : checked, broken (vert si 0, rouge sinon), healthy.
+  - Empty state si pas encore lancé / si rien cassé.
+  - Pour chaque lien cassé : carte avec status badge (rouge 5xx/error, ambre 4xx) + URL externe cliquable + liste des 5 premiers articles concernés (cliquables vers PostEditor) + "et X de plus" si dépasse 5.
+- Route `/dashboard/<siteId>/broken-links` + sidebar link "Liens cassés" (icône `Unlink2`).
+- 17 nouvelles clés `brokenLinks.*` + `sidebar.brokenLinks` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 13.98s
+- **Tests live à faire (humain)** : `/dashboard/<siteId>/broken-links`, cliquer Scanner. Pour TokamDarius (qui a probablement quelques articles avec des liens externes) → devrait détecter au moins 1-2 morts ou tout green. Cliquer sur un article concerné → arrive sur PostEditor pour réparer.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend + frontend + sidebar + i18n.
+
+**Prochain bloc concret** :
+
+Tier 3 a maintenant **5/9 fait** (#7, #8, #9, #10, #12). Items restants (priorité décroissante) :
+
+**Tier 3 #16 — Reddit/Quora question harvesting** (~2h, end-to-end, plus court) :
+
+1. Backend : Serper supporte un type de query `q="reddit.com {keyword}"` ou `q="quora.com {keyword}"` qui retourne des questions communautaires. Pas d'API officielle Reddit/Quora gratuite.
+2. Endpoint `POST /community-questions/` — input `{keyword, language}` → renvoie liste de questions Reddit + Quora trouvées via Serper.
+3. Cache 1h.
+4. Frontend : composant simple à intégrer dans `SEOAnalyzer.tsx` ou page dédiée. Suggestion : intégrer dans `PAAPanel` étendu (déjà au même endroit).
+
+**Ou Tier 3 #13 — Quebec lexicon (FR-CA + LocalBusiness schema)** (~4h, gros impact différenciation) :
+
+1. Helper Python avec dictionnaire FR-FR → FR-CA (ex: "shopping" → "magasinage", "fin de semaine" vs "week-end", etc.).
+2. Endpoint `POST /lexicon-check/` qui scanne le contenu et signale les termes non-québécois avec suggestions.
+3. Helper Schema.org LocalBusiness avec champs spécifiques au Québec (TPS/TVQ optionnel, NEQ).
+4. Frontend : carte dans audit + générateur de schema LocalBusiness dans SEO settings.
+
+**Ou Tier 3 #11 — Image SEO** (4h) — automatique WebP, srcset, descriptive filenames. Plus complexe, modifie le pipeline upload + génération.
+
+**Recommandation** : **#16 Reddit/Quora** — court (2h), end-to-end immédiat, complète bien la collecte de questions (PAA déjà fait, Reddit/Quora ajoute la richesse communautaire).
+
+**Statistiques fin de session 14** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 5/9 (#7, #8, #9, #10, #12)
+- Endpoints SEO ajoutés cumulés : 15
+- Composants frontend ajoutés cumulés : 11 (… + BrokenLinks)
+- Commits locaux non poussés : 13
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les pages.
+- Décider du déploiement (13 commits non poussés, 2 migrations safe : 0012 + 0013).
+

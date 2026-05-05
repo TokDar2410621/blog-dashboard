@@ -84,10 +84,31 @@
     "clusters": "Topic clusters",
     "linkGraph": "Internal links",
     "redirects": "301 redirects",
+    "brokenLinks": "Broken links",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "brokenLinks": {
+    "title": "Broken link checker",
+    "subtitle": "Scans external HTTP(S) links in your published articles and flags those that are dead (4xx/5xx, timeout, connection). Cached 24h per URL.",
+    "runTitle": "Scan links",
+    "language": "Language",
+    "allLangs": "All",
+    "scan": "Scan",
+    "scanning": "Scanning...",
+    "scanWait": "HEAD request per unique URL. 30 seconds to 2 minutes depending on link count.",
+    "intro": "Run a scan to detect dead external links in your articles.",
+    "checked": "Unique links checked",
+    "broken": "Broken",
+    "healthy": "OK",
+    "noneBroken": "No broken links detected. All external links are alive.",
+    "foundIn": "Found in {{count}} article",
+    "foundIn_plural": "Found in {{count}} articles",
+    "andMore": "and {{count}} more",
+    "error": "Scan error"
   },
 
   "redirects": {

@@ -84,10 +84,31 @@
     "clusters": "Topic clusters",
     "linkGraph": "Maillage interne",
     "redirects": "Redirections 301",
+    "brokenLinks": "Liens casses",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "brokenLinks": {
+    "title": "Detecteur de liens casses",
+    "subtitle": "Scanne les liens externes HTTP(S) de tes articles publies et signale ceux qui sont morts (4xx/5xx, timeout, connexion). Cache 24h par URL.",
+    "runTitle": "Scanner les liens",
+    "language": "Langue",
+    "allLangs": "Toutes",
+    "scan": "Scanner",
+    "scanning": "Scan en cours...",
+    "scanWait": "HEAD request sur chaque URL unique. Compte 30s a 2 min selon le nombre de liens.",
+    "intro": "Lance un scan pour detecter les liens externes morts dans tes articles.",
+    "checked": "Liens uniques verifies",
+    "broken": "Casses",
+    "healthy": "OK",
+    "noneBroken": "Aucun lien casse detecte. Tous tes liens externes sont vivants.",
+    "foundIn": "Trouve dans {{count}} article",
+    "foundIn_plural": "Trouve dans {{count}} articles",
+    "andMore": "et {{count}} de plus",
+    "error": "Erreur lors du scan"
   },
 
   "redirects": {
