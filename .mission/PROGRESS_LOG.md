@@ -1002,3 +1002,78 @@ Plan #15 :
 - Tester les pages.
 - Décider du déploiement.
 
+---
+
+## Session 2026-05-04 (suite 17) — Search trends FR-CA via pytrends ✅ Tier 3 #15 DONE
+
+**Fait** :
+- `requirements.txt` : ajout `pytrends>=4.9`. Installé localement (avec ses deps pandas + lxml + pytz).
+- Backend `SearchTrendsView` (juste avant `CommunityQuestionsView`) :
+  - Endpoint `POST /trends/`. Body : `{keyword, language, timeframe='today 12-m'}`.
+  - Geo mapping : FR → CA (Canada inclut Québec, pytrends ne supporte pas le sub-region direct), EN → US, ES → ES.
+  - `pytrends.TrendReq(hl=..., retries=2, backoff_factor=0.5)` puis `build_payload + interest_over_time + related_queries`.
+  - Retourne `{interest_over_time: [{date, value}], top_queries: [{query, value}], rising_queries: [{query, value}], geo, timeframe}`.
+  - Cache 24h (les trends bougent lentement).
+  - Gestion d'erreur explicite (Google rate-limit possible).
+- Route `path('trends/', SearchTrendsView.as_view(), name='search-trends')`.
+- Composant `src/components/SearchTrendsPanel.tsx` :
+  - Input mot-clé + select période (1m / 3m / 12m / 5y) + bouton Analyser.
+  - **Recharts AreaChart** pour interest_over_time (gradient primary, X temporel, Y 0-100 fixed scale).
+  - Grid 2-col : Top queries (étoile ambre) + Rising queries (flèche verte avec %).
+  - Footer geo + timeframe.
+  - États vides explicites (volume trop faible).
+- Intégration dans `AIGenerator.tsx` (sous `CommunityQuestionsPanel`).
+- 17 nouvelles clés `trends.*` en FR + EN.
+
+**Tests** :
+- pytrends installed (4.9.2 + pandas 2.3.3 + lxml 6.1.0)
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 12.66s
+- **Tests live à faire (humain)** : `/dashboard/<siteId>/generer`, panel "Tendances Google Trends", taper un mot-clé populaire (ex: "intelligence artificielle") + 12 mois → graphique area + listes top/rising. Si Google rate-limite, message d'erreur clair.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend (dep + view + route) + frontend (panel + mount) + i18n.
+
+**Prochain bloc concret** :
+
+Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
+
+- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage (modèle UploadedImage).
+- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+
+**Recommandation prochaine session** :
+
+**Option A — Tier 3 #11 Image SEO** (end-to-end). Plan :
+1. Backend : extension de `UploadImageView` pour, à l'upload, générer une version WebP via Pillow (image.save with format='WEBP', quality=80). Stocker en plus de l'original.
+2. Endpoint `POST /image-optimize/` qui prend une URL d'image + alt suggestion via Gemini, retourne `<picture>` HTML avec srcset et alt descriptif.
+3. Helper Gemini : "Donne un nom de fichier descriptif et un alt text en {language} pour cette image (basé sur le titre de l'article)".
+4. Frontend : composant qui prend une image, propose le rename + alt + bouton "Optimiser" → upload version WebP.
+
+**Option B — Pivoter vers Tier 4** (commercialisation). Reste :
+- #17 Weekly digest auto (4h)
+- #18 EEAT author profile (2h)
+- #20 Multi-domain comparison (4h)
+- #22 Landing page commerciale (6h)
+- #23 Onboarding flow (6h)
+
+**Option C — Push** des 16 commits non poussés pour valider live ce qui est fait avant de poursuivre. Important pour mesurer l'impact réel et tester les intégrations GSC.
+
+**Recommandation** : **Option C avant Option A**. Pousser les 16 commits, attendre 1 jour, observer ce qui marche live, puis revenir sur Image SEO. Évite que des bugs s'accumulent invisiblement.
+
+**Statistiques fin de session 17** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 8/9 (… + #15)
+- Endpoints SEO ajoutés cumulés : 19 (… + trends)
+- Composants frontend ajoutés cumulés : 14 (… + SearchTrendsPanel)
+- Commits locaux non poussés : 16
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- **Important** : pousser les 16 commits sur `main` pour valider live (`git push origin main`).
+- Tester les pages.
+- Décider de la suite : Tier 3 #11 Image SEO ou pivot Tier 4 commercialisation.
+

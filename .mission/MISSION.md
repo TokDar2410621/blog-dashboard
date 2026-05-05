@@ -57,7 +57,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Readability scores FR/EN
 - [x] Quebec lexicon (FR-CA, schema LocalBusiness)
 - [ ] Bing Webmaster integration
-- [ ] Search trends FR-CA
+- [x] Search trends FR-CA
 
 ### Tier 4 (finition / commercialisation)
 - [ ] Weekly digest auto

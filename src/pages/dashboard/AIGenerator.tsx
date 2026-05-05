@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ContentBriefPanel } from "@/components/ContentBrief";
 import { PAAPanel } from "@/components/PAAPanel";
 import { CommunityQuestionsPanel } from "@/components/CommunityQuestionsPanel";
+import { SearchTrendsPanel } from "@/components/SearchTrendsPanel";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -131,6 +132,12 @@ export default function AIGenerator() {
 
       {/* Reddit / Quora community questions */}
       <CommunityQuestionsPanel
+        language={language}
+        defaultKeyword={keywords.split(",")[0]?.trim() || topic}
+      />
+
+      {/* Google Trends — interest over time + related/rising queries */}
+      <SearchTrendsPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
       />

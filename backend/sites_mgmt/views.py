@@ -3224,6 +3224,115 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class SearchTrendsView(APIView):
+    """Google Trends data via pytrends — interest over time + related/rising
+    queries for a keyword. Geo-scoped to Quebec / Canada / France / US per
+    language. Cached 24h (trends move slowly).
+
+    POST /trends/ {keyword, language='fr', timeframe='today 12-m'}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+        timeframe = (request.data.get('timeframe') or 'today 12-m').strip()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': "Langue invalide (fr, en, es)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = _seo_cache_key('trends:', keyword, language, timeframe)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        # Geo + hl mapping. For FR sites, prefer Quebec (CA) but fall back to FR.
+        if language == 'en':
+            geo = 'US'
+            hl = 'en-US'
+        elif language == 'es':
+            geo = 'ES'
+            hl = 'es-ES'
+        else:
+            geo = 'CA'  # Canada — pytrends doesn't support sub-region directly for this query
+            hl = 'fr-CA'
+
+        try:
+            from pytrends.request import TrendReq
+        except ImportError:
+            return Response(
+                {'error': 'pytrends non installe sur le serveur'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            pytrends = TrendReq(hl=hl, tz=300, retries=2, backoff_factor=0.5)
+            pytrends.build_payload(
+                kw_list=[keyword], cat=0, timeframe=timeframe, geo=geo, gprop=''
+            )
+
+            # Interest over time (DataFrame)
+            iot = pytrends.interest_over_time()
+            interest_over_time = []
+            if not iot.empty and keyword in iot.columns:
+                for ts, value in iot[keyword].items():
+                    try:
+                        interest_over_time.append({
+                            'date': ts.strftime('%Y-%m-%d'),
+                            'value': int(value),
+                        })
+                    except Exception:
+                        continue
+
+            # Related queries: dict {keyword: {'top': df, 'rising': df}}
+            related = pytrends.related_queries() or {}
+            related_for_kw = related.get(keyword) or {}
+            top_df = related_for_kw.get('top')
+            rising_df = related_for_kw.get('rising')
+
+            top_queries = []
+            if top_df is not None and not top_df.empty:
+                for _, row in top_df.head(10).iterrows():
+                    top_queries.append({
+                        'query': str(row.get('query', '')),
+                        'value': int(row.get('value', 0)),
+                    })
+
+            rising_queries = []
+            if rising_df is not None and not rising_df.empty:
+                for _, row in rising_df.head(10).iterrows():
+                    rising_queries.append({
+                        'query': str(row.get('query', '')),
+                        'value': int(row.get('value', 0)),
+                    })
+        except Exception as e:
+            logger.warning('pytrends failed for %s: %s', keyword, e)
+            return Response(
+                {'error': f'Erreur Trends (probable rate-limit Google): {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        result = {
+            'keyword': keyword,
+            'language': language,
+            'geo': geo,
+            'timeframe': timeframe,
+            'interest_over_time': interest_over_time,
+            'top_queries': top_queries,
+            'rising_queries': rising_queries,
+        }
+        cache.set(cache_key, result, timeout=86400)  # 24h
+        return Response(result)
+
+
 class CommunityQuestionsView(APIView):
     """Harvest questions and discussions about a keyword from Reddit and Quora
     via Serper. Useful to find the real-world phrasing people use when they

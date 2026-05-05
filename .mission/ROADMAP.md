@@ -76,7 +76,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] **12. Readability scores FR/EN** (Flesch-Kincaid, ARI) — endpoint `/readability/`, helpers FR/EN avec syllable-counter heuristique, ReadabilityCard mounted in PostEditor SEO view, suggestions auto.
 - [x] **13. Quebec lexicon** — endpoint `/lexicon-check/` avec dictionnaire ~50 entrées FR-FR→FR-CA + helper `_generate_local_business_schema` adapté Québec (addressCountry CA, addressRegion QC, areaServed Québec). UI `LexiconCard` mounted in PostEditor, conditionné FR uniquement.
 - [ ] **14. Bing Webmaster integration** ⏱ 6h (action humaine pour API key)
-- [ ] **15. Search trends FR-CA** (Google Trends via pytrends) ⏱ 3h
+- [x] **15. Search trends FR-CA** — pytrends ajoute à requirements, endpoint `/trends/` avec interest_over_time + top + rising queries. UI SearchTrendsPanel avec recharts AreaChart, intégré dans AIGenerator.
 - [x] **16. Reddit/Quora question harvesting** — endpoint `/community-questions/` deux Serper queries `site:reddit.com` + `site:quora.com`, panel intégré dans AIGenerator.
 
 ## Tier 4 — finition / commercialisation

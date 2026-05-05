@@ -91,6 +91,27 @@
     "logout": "Deconnexion"
   },
 
+  "trends": {
+    "title": "Tendances Google Trends",
+    "subtitle": "Interet du mot-cle dans le temps + requetes connexes les plus populaires et celles qui montent. Geo-localise selon la langue (FR-CA, EN-US, ES-ES).",
+    "keyword": "Mot-cle",
+    "keywordPlaceholder": "Ex: travail hybride",
+    "timeframe": "Periode",
+    "tf1m": "1 mois",
+    "tf3m": "3 mois",
+    "tf12m": "12 mois",
+    "tf5y": "5 ans",
+    "run": "Analyser",
+    "interest": "Interet",
+    "topQueries": "Top requetes connexes",
+    "risingQueries": "Requetes qui montent",
+    "noData": "Pas de donnees Trends pour ce mot-cle (volume trop faible).",
+    "noTop": "Aucune requete connexe.",
+    "noRising": "Aucune requete en hausse.",
+    "geoLabel": "Geo: {{geo}} | Periode: {{tf}}",
+    "error": "Erreur Google Trends (probable rate-limit). Reessaye dans quelques minutes."
+  },
+
   "community": {
     "title": "Questions Reddit / Quora",
     "subtitle": "Decouvre comment les gens posent vraiment leurs questions sur ce sujet — source riche pour formuler tes H2 et FAQ avec les vrais mots de ton audience.",

@@ -91,6 +91,27 @@
     "logout": "Logout"
   },
 
+  "trends": {
+    "title": "Google Trends",
+    "subtitle": "Keyword interest over time + most popular related queries and rising ones. Geo-scoped by language (FR-CA, EN-US, ES-ES).",
+    "keyword": "Keyword",
+    "keywordPlaceholder": "e.g. hybrid work",
+    "timeframe": "Period",
+    "tf1m": "1 month",
+    "tf3m": "3 months",
+    "tf12m": "12 months",
+    "tf5y": "5 years",
+    "run": "Analyze",
+    "interest": "Interest",
+    "topQueries": "Top related queries",
+    "risingQueries": "Rising queries",
+    "noData": "No Trends data for this keyword (volume too low).",
+    "noTop": "No related queries.",
+    "noRising": "No rising queries.",
+    "geoLabel": "Geo: {{geo}} | Period: {{tf}}",
+    "error": "Google Trends error (likely rate-limit). Try again in a few minutes."
+  },
+
   "community": {
     "title": "Reddit / Quora questions",
     "subtitle": "Discover how people actually phrase their questions on this topic — rich source for crafting H2s and FAQs with your audience's real words.",
