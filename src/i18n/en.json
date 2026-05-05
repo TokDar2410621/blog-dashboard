@@ -80,10 +80,40 @@
     "generate": "Generate article",
     "bulkAudit": "Site-wide SEO audit",
     "positions": "Rank tracking",
+    "decay": "Content decay",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "decay": {
+    "title": "Content decay detector",
+    "subtitle": "Compares GSC impressions and clicks over the last 30 days vs the 30 days before to spot articles losing traction.",
+    "runTitle": "Run analysis",
+    "window": "Window",
+    "daysShort": "days",
+    "run": "Analyze",
+    "running": "Analyzing...",
+    "runWait": "Two Google Search Console queries (current + previous period). 5-15 seconds depending on article count.",
+    "decaying": "Decaying articles",
+    "healthy": "Healthy",
+    "new": "New articles",
+    "periodCompare": "Comparing: {{cur_start}} - {{cur_end}} vs {{prev_start}} - {{prev_end}}",
+    "noDecay": "No significant decay detected. Nice!",
+    "impressions": "Impressions",
+    "clicks": "Clicks",
+    "position": "Position",
+    "fix": "Fix",
+    "error": "Analysis error",
+    "gscNotConfigured": "GSC not configured for this site. Set the GSC property URL in settings.",
+    "gscReauthRequired": "GSC token expired. Reconnect to Google Search Console in settings.",
+    "goToSettings": "Go to settings",
+    "action": {
+      "redirect_or_remove": "Redirect/Remove",
+      "major_refresh": "Major refresh",
+      "minor_refresh": "Minor refresh"
+    }
   },
 
   "keywords": {

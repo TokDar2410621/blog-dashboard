@@ -45,7 +45,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 
 ### Tier 2 (feedback loop)
 - [x] Rank tracking (GSC + Serper history, alertes décay) — base + UI ; cron quotidien à brancher
-- [ ] Content decay detector
+- [x] Content decay detector
 - [ ] Topic Cluster Planner
 
 ### Tier 3 (qualité produit)

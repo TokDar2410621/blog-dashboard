@@ -449,3 +449,58 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Actions humaines en attente** : aucune nouvelle.
 
+---
+
+## Session 2026-05-04 (suite 9) — Content decay detector ✅ Tier 2 #6 DONE (end-to-end)
+
+**Fait** :
+- Backend `ContentDecayView` ajouté dans `views.py` (juste avant la section RANK TRACKING).
+  - Endpoint `GET /sites/<int:site_id>/content-decay/?days=30`.
+  - Validation : `days` clamped à [7, 90]. GSC requis (404/401/503 si absent avec codes `gsc_not_configured` / `gsc_reauth_required`).
+  - **2 requêtes GSC** : période courante (J-30 → J) + précédente (J-60 → J-31), `dimensions: ['page']`, `rowLimit: 1000`.
+  - Index par URL, calcul des deltas par page.
+  - **Règle de décay** : `imp_delta ≤ -30%` OU (avec clicks > 0 avant) `clicks_delta ≤ -40%`.
+  - **Suggested action** : `redirect_or_remove` si `imp_delta ≤ -80%`, `major_refresh` si `imp_delta ≤ -50%`, sinon `minor_refresh`.
+  - Retourne : `{decaying_count, healthy_count, new_pages_count, decaying[]}` triés par worst-first, max 50.
+- Route `path('sites/<int:site_id>/content-decay/', ContentDecayView.as_view(), name='site-content-decay')`.
+- Frontend `src/pages/dashboard/ContentDecay.tsx` :
+  - Select fenêtre (7/14/30/60/90 jours) + bouton Analyser.
+  - 3 KPI cards : decaying / healthy / new.
+  - Affichage période comparée.
+  - Pour chaque page en décay : carte avec impressions before→now (delta colored), clicks before→now, position before→now, badge action coloré (rouge redirect / ambre major refresh / bleu minor refresh) + bouton "Corriger" → PostEditor.
+  - États d'erreur GSC : 2 cards distinctes (not_configured et reauth_required) avec lien vers paramètres.
+  - Empty state si rien en décay.
+  - Skeleton loader.
+- Route `/dashboard/<siteId>/decay` + sidebar link "Détection de déclin" avec icône `TrendingDown`.
+- Clés i18n FR + EN sous `decay.*` (incl. sub-keys `decay.action.*`) + `sidebar.decay`.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 12.88s
+- **Test live à faire (humain)** : aller sur `/dashboard/<siteId>/decay`, vérifier que la page charge. Si GSC non configuré pour le site → message clair avec lien vers paramètres. Si configuré (TokamDarius probable) → cliquer "Analyser" → attendre 5-15s → voir la liste des articles en décay sur 30j vs 30j précédents.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. End-to-end (backend + frontend + route + sidebar + i18n) dans la même session.
+
+**Prochain bloc concret** :
+
+Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, multi-sessions). Étape A (~2h) :
+
+1. Lire `backend/sites_mgmt/views.py` autour des fonctions qui itèrent les articles (`SiteCannibalizationView` ou `LinkSuggestionsView` pour le pattern).
+2. Ajouter `class TopicClusterView(APIView)`. Endpoint `POST /sites/<id>/topic-clusters/`.
+3. Logique :
+   - Itérer les articles publiés du site.
+   - Pour chaque, extraire titre + first 500 chars de contenu.
+   - Envoyer à Gemini un prompt qui groupe par cluster thématique + identifie 1-3 "pillar candidates" par cluster + suggère des articles à écrire pour combler les trous.
+   - Retourner `{clusters: [{theme, pillar_candidate_slug, spokes: [{slug, title}], suggested_new_articles: [titre]}]}`.
+4. Frontend page `/dashboard/<id>/clusters` avec affichage en cartes par cluster (recharts treemap ou cards groupées simples). Prochaine session pour la viz graphe.
+5. i18n + build.
+
+**Alternative parallélisable** : Tier 3 items courts qui finissent vite (Readability scores 2h, EEAT author 2h, Auto-redirect 301 2h). Recommandation : **Topic Cluster** car gros impact différenciant (Ahrefs/Semrush l'ont, mais cher).
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : tester `/decay` (nécessite GSC configuré sur au moins un site).
+

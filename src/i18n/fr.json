@@ -80,10 +80,40 @@
     "generate": "Generer un article",
     "bulkAudit": "Audit global SEO",
     "positions": "Suivi des positions",
+    "decay": "Detection de declin",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "decay": {
+    "title": "Detection de declin de contenu",
+    "subtitle": "Compare les impressions et clics GSC sur les 30 derniers jours vs les 30 jours d'avant pour detecter les articles qui perdent en traction.",
+    "runTitle": "Lancer l'analyse",
+    "window": "Fenetre",
+    "daysShort": "jours",
+    "run": "Analyser",
+    "running": "Analyse...",
+    "runWait": "Deux requetes Google Search Console (periode courante + periode precedente). 5-15 secondes selon le nombre d'articles.",
+    "decaying": "Articles en declin",
+    "healthy": "Sains",
+    "new": "Nouveaux articles",
+    "periodCompare": "Comparaison : {{cur_start}} - {{cur_end}} vs {{prev_start}} - {{prev_end}}",
+    "noDecay": "Aucun declin significatif detecte. Bravo !",
+    "impressions": "Impressions",
+    "clicks": "Clics",
+    "position": "Position",
+    "fix": "Corriger",
+    "error": "Erreur lors de l'analyse",
+    "gscNotConfigured": "GSC n'est pas configure pour ce site. Configure l'URL de propriete GSC dans les parametres.",
+    "gscReauthRequired": "Token GSC expire. Reconnecte-toi a Google Search Console dans les parametres.",
+    "goToSettings": "Aller aux parametres",
+    "action": {
+      "redirect_or_remove": "Redirect/Suppr",
+      "major_refresh": "Refresh majeur",
+      "minor_refresh": "Refresh mineur"
+    }
   },
 
   "keywords": {

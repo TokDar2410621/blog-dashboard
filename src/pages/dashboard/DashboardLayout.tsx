@@ -10,6 +10,7 @@ import ImageGallery from "./ImageGallery";
 import SiteSettings from "./SiteSettings";
 import BulkAudit from "./BulkAudit";
 import KeywordTracker from "./KeywordTracker";
+import ContentDecay from "./ContentDecay";
 
 export default function DashboardLayout() {
   return (
@@ -27,6 +28,7 @@ export default function DashboardLayout() {
                 <Route path="generer" element={<AIGenerator />} />
                 <Route path="audit-global" element={<BulkAudit />} />
                 <Route path="positions" element={<KeywordTracker />} />
+                <Route path="decay" element={<ContentDecay />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

@@ -53,9 +53,11 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [ ] (Étape C) Cron `/schedule` ou cron Railway pour snapshot quotidien automatique.
 - [x] (Étape D) Graphe recharts d'évolution dans la row expansée — Y-axis inversé, reference lines top3/top10, plafond pour positions hors top 100.
 
-### 6. Content decay detector ⏱ 3h
-- [ ] Articles dont impressions/clics GSC chutent sur 30 jours glissants (utiliser `GSCQueriesView` data).
-- [ ] Suggestion auto : refresh, expansion, ou redirect.
+### 6. Content decay detector ✅ DONE
+- [x] Backend `GET /sites/<id>/content-decay/?days=N` — 2 GSC queries, deltas par page, règles de seuils (-30% imp, -40% clicks), suggested_action (redirect_or_remove / major_refresh / minor_refresh).
+- [x] Frontend page `ContentDecay.tsx` mountée sur `/decay` : 3 KPIs, liste cards avec deltas colorés, badge action, bouton Corriger → PostEditor.
+- [x] États d'erreur GSC explicites (not_configured, reauth_required) avec liens vers paramètres.
+- [x] Sidebar link + i18n FR/EN.
 
 ### 7. Topic Cluster Planner ⏱ 6-8h
 - [ ] Gemini analyse articles existants → propose pillars + spokes.

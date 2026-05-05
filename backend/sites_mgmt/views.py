@@ -3206,6 +3206,215 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class ContentDecayView(APIView):
+    """Detect articles whose GSC impressions / clicks dropped significantly
+    over the last `days` window compared to the previous one.
+
+    GET /sites/<site_id>/content-decay/?days=30
+
+    Requires GSC configured (gsc_property_url + gsc_refresh_token). Returns
+    a sorted list of decaying pages with their before/after numbers,
+    delta percentages, and a suggested action (refresh / expand / redirect).
+
+    Two GSC API calls (current period + previous period). No cache for now —
+    Darius can launch on demand; aggregating ~50 articles takes <15s.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        try:
+            days = max(7, min(int(request.query_params.get('days', 30)), 90))
+        except (TypeError, ValueError):
+            days = 30
+
+        if not site.gsc_property_url:
+            return Response(
+                {'error': 'GSC property URL not configured for this site.',
+                 'code': 'gsc_not_configured'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not site.gsc_refresh_token:
+            return Response(
+                {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        config = _gsc_client_config()
+        if not config:
+            return Response(
+                {'error': 'GSC OAuth client not configured on the server.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            from datetime import date as _date, timedelta
+            from google.oauth2.credentials import Credentials
+            from google.auth.exceptions import RefreshError
+            from googleapiclient.discovery import build
+            from googleapiclient.errors import HttpError
+        except ImportError:
+            return Response(
+                {'error': 'Google API libraries are not installed.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        end = _date.today()
+        cur_start = end - timedelta(days=days)
+        prev_end = cur_start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=days - 1)
+
+        try:
+            creds = Credentials(
+                token=None,
+                refresh_token=site.gsc_refresh_token,
+                token_uri=GSC_TOKEN_URI,
+                client_id=config['web']['client_id'],
+                client_secret=config['web']['client_secret'],
+                scopes=GSC_SCOPES,
+            )
+            service = build(
+                'searchconsole', 'v1',
+                credentials=creds,
+                cache_discovery=False,
+            )
+
+            def _query_period(start_d, end_d):
+                body = {
+                    'startDate': start_d.isoformat(),
+                    'endDate': end_d.isoformat(),
+                    'dimensions': ['page'],
+                    'rowLimit': 1000,
+                }
+                return (
+                    service.searchanalytics()
+                    .query(siteUrl=site.gsc_property_url, body=body)
+                    .execute()
+                )
+
+            cur_resp = _query_period(cur_start, end)
+            prev_resp = _query_period(prev_start, prev_end)
+        except RefreshError:
+            return Response(
+                {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        except HttpError as e:
+            status_code = getattr(getattr(e, 'resp', None), 'status', 500)
+            if status_code in (401, 403):
+                return Response(
+                    {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            return Response(
+                {'error': f'Erreur GSC: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur GSC: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Index responses by page URL
+        def _index(resp):
+            out = {}
+            for row in (resp or {}).get('rows', []) or []:
+                keys = row.get('keys') or []
+                if not keys:
+                    continue
+                url = keys[0]
+                out[url] = {
+                    'clicks': int(row.get('clicks') or 0),
+                    'impressions': int(row.get('impressions') or 0),
+                    'ctr': float(row.get('ctr') or 0),
+                    'position': float(row.get('position') or 0),
+                }
+            return out
+
+        cur_data = _index(cur_resp)
+        prev_data = _index(prev_resp)
+
+        # Resolve slug from URL by stripping the property URL prefix
+        property_prefix = site.gsc_property_url.rstrip('/') + '/'
+
+        def _slug_from_url(url):
+            if url.startswith(property_prefix):
+                tail = url[len(property_prefix):].rstrip('/')
+                return tail
+            return url
+
+        decaying = []
+        healthy = 0
+        new_pages = 0
+        all_urls = set(cur_data.keys()) | set(prev_data.keys())
+        for url in all_urls:
+            cur = cur_data.get(url, {'clicks': 0, 'impressions': 0})
+            prev = prev_data.get(url, {'clicks': 0, 'impressions': 0})
+
+            if prev['impressions'] == 0 and cur['impressions'] > 0:
+                new_pages += 1
+                continue
+            if prev['impressions'] == 0:
+                continue
+
+            imp_delta = (
+                (cur['impressions'] - prev['impressions']) / prev['impressions']
+            ) * 100
+            clk_delta_pct = None
+            if prev['clicks'] > 0:
+                clk_delta_pct = (
+                    (cur['clicks'] - prev['clicks']) / prev['clicks']
+                ) * 100
+
+            # Decay: impressions -30%+, OR clicks -40%+ when we had clicks before
+            is_decay = imp_delta <= -30 or (
+                clk_delta_pct is not None and clk_delta_pct <= -40
+            )
+
+            if not is_decay:
+                healthy += 1
+                continue
+
+            # Suggest action based on severity
+            if cur['impressions'] == 0 or imp_delta <= -80:
+                action = 'redirect_or_remove'
+            elif imp_delta <= -50 or (clk_delta_pct is not None and clk_delta_pct <= -60):
+                action = 'major_refresh'
+            else:
+                action = 'minor_refresh'
+
+            decaying.append({
+                'url': url,
+                'slug': _slug_from_url(url),
+                'impressions_now': cur['impressions'],
+                'impressions_before': prev['impressions'],
+                'clicks_now': cur['clicks'],
+                'clicks_before': prev['clicks'],
+                'impressions_delta_pct': round(imp_delta, 1),
+                'clicks_delta_pct': (
+                    round(clk_delta_pct, 1) if clk_delta_pct is not None else None
+                ),
+                'position_now': round(cur.get('position', 0), 1) if cur else None,
+                'position_before': round(prev.get('position', 0), 1) if prev else None,
+                'suggested_action': action,
+            })
+
+        # Sort by worst impressions delta first
+        decaying.sort(key=lambda d: d['impressions_delta_pct'])
+
+        return Response({
+            'site_id': site.id,
+            'days': days,
+            'period_current': {'start': cur_start.isoformat(), 'end': end.isoformat()},
+            'period_previous': {'start': prev_start.isoformat(), 'end': prev_end.isoformat()},
+            'decaying_count': len(decaying),
+            'healthy_count': healthy,
+            'new_pages_count': new_pages,
+            'decaying': decaying[:50],
+        })
+
+
 # ==========================================================================
 # RANK TRACKING — TrackedKeyword + SerpRank snapshots
 # ==========================================================================
