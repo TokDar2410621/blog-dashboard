@@ -81,10 +81,31 @@
     "bulkAudit": "Audit global SEO",
     "positions": "Suivi des positions",
     "decay": "Detection de declin",
+    "clusters": "Topic clusters",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "clusters": {
+    "title": "Topic clusters (pillars + spokes)",
+    "subtitle": "Gemini groupe tes articles publies par theme, identifie le pillar candidate de chaque cluster et propose les articles a ecrire pour combler les trous.",
+    "runTitle": "Lancer le clustering",
+    "language": "Langue",
+    "run": "Analyser",
+    "running": "Clustering...",
+    "runWait": "Gemini analyse jusqu'a 80 articles. Compte 10-30s selon la taille du blog.",
+    "intro": "Lance le clustering pour decouvrir les structures thematiques de ton site.",
+    "summary": "{{clusters}} clusters trouves sur {{articles}} articles analyses.",
+    "pillar": "Pillar candidate (a developper en page exhaustive)",
+    "spokes": "Spokes (sous-sujets)",
+    "suggestedGaps": "Articles a ecrire pour combler le cluster",
+    "generate": "Generer",
+    "unassignedTitle": "Articles non rattaches",
+    "unassignedHint": "Articles trop specifiques ou hors-sujet pour les clusters trouves.",
+    "unassignedCount": "{{count}} non rattaches",
+    "error": "Erreur lors du clustering"
   },
 
   "decay": {

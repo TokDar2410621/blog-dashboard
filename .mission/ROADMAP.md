@@ -59,10 +59,13 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] États d'erreur GSC explicites (not_configured, reauth_required) avec liens vers paramètres.
 - [x] Sidebar link + i18n FR/EN.
 
-### 7. Topic Cluster Planner ⏱ 6-8h
-- [ ] Gemini analyse articles existants → propose pillars + spokes.
-- [ ] Suggère liens internes pour densifier maillage.
-- [ ] Visu graphe (`react-flow` ou SVG simple).
+### 7. Topic Cluster Planner ✅ DONE (basic)
+- [x] Backend `POST /sites/<id>/topic-clusters/` — Gemini groupe en 3-8 clusters avec pillar + spokes + suggestions de gaps.
+- [x] Cache 1h, slugs validés contre la DB (flag `exists: false` si Gemini hallucine).
+- [x] Calcul des `unassigned[]`.
+- [x] Frontend page `TopicClusters.tsx` avec cartes par cluster, pillar mis en valeur, spokes en grid, suggestions avec bouton Générer.
+- [ ] (Futur, étape 2) Visualisation graphe `react-flow` au lieu des cartes simples.
+- [ ] (TODO mineur) `AIGenerator.tsx` doit lire `?title=...` query param pour que le bouton "Générer" depuis un cluster gap pré-remplisse le titre.
 
 ## Tier 3 — qualité produit (parallélisable)
 

@@ -81,10 +81,31 @@
     "bulkAudit": "Site-wide SEO audit",
     "positions": "Rank tracking",
     "decay": "Content decay",
+    "clusters": "Topic clusters",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "clusters": {
+    "title": "Topic clusters (pillars + spokes)",
+    "subtitle": "Gemini groups your published articles by theme, identifies each cluster's pillar candidate, and proposes new articles to fill content gaps.",
+    "runTitle": "Run clustering",
+    "language": "Language",
+    "run": "Analyze",
+    "running": "Clustering...",
+    "runWait": "Gemini analyzes up to 80 articles. Expect 10-30 seconds depending on blog size.",
+    "intro": "Run clustering to discover the thematic structure of your site.",
+    "summary": "{{clusters}} clusters found across {{articles}} articles.",
+    "pillar": "Pillar candidate (expand into a comprehensive page)",
+    "spokes": "Spokes (sub-topics)",
+    "suggestedGaps": "Articles to write to fill the cluster",
+    "generate": "Generate",
+    "unassignedTitle": "Unassigned articles",
+    "unassignedHint": "Articles too specific or off-topic for the clusters found.",
+    "unassignedCount": "{{count}} unassigned",
+    "error": "Clustering error"
   },
 
   "decay": {

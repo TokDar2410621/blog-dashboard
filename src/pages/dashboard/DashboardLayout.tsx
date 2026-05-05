@@ -11,6 +11,7 @@ import SiteSettings from "./SiteSettings";
 import BulkAudit from "./BulkAudit";
 import KeywordTracker from "./KeywordTracker";
 import ContentDecay from "./ContentDecay";
+import TopicClusters from "./TopicClusters";
 
 export default function DashboardLayout() {
   return (
@@ -29,6 +30,7 @@ export default function DashboardLayout() {
                 <Route path="audit-global" element={<BulkAudit />} />
                 <Route path="positions" element={<KeywordTracker />} />
                 <Route path="decay" element={<ContentDecay />} />
+                <Route path="clusters" element={<TopicClusters />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

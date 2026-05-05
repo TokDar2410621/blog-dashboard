@@ -504,3 +504,71 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 
 **Actions humaines en attente** : tester `/decay` (nécessite GSC configuré sur au moins un site).
 
+---
+
+## Session 2026-05-04 (suite 10) — Topic Cluster Planner ✅ Tier 3 #7 DONE (end-to-end)
+
+**Fait** :
+- Backend `TopicClusterView` (juste avant `ContentDecayView`) :
+  - Endpoint `POST /sites/<id>/topic-clusters/`. Body : `{language, limit}`.
+  - Itère articles publiés (max 80 par défaut), filtre par langue.
+  - Construit un corpus compact (slug + title + excerpt 200 chars + opening 300 chars) envoyé en un seul prompt à Gemini 2.5 flash.
+  - Demande à Gemini : 3-8 clusters avec `theme`, `summary`, `pillar_candidate_slug`, `spoke_slugs[]`, `suggested_new_articles[{title, rationale}]`. Slugs EXACTS (no inventés).
+  - Côté Python : enrichit chaque slug avec son titre depuis le lookup local, marque `exists: false` si Gemini hallucine un slug.
+  - Calcule `unassigned[]` : articles qui ne sont dans aucun cluster.
+  - Cache 1h via signature des slugs (cache_key inclus la langue + le nombre d'articles + signature triée).
+- Route `path('sites/<int:site_id>/topic-clusters/', TopicClusterView.as_view(), name='site-topic-clusters')`.
+- Frontend `src/pages/dashboard/TopicClusters.tsx` :
+  - Select langue + bouton "Analyser" (Gemini 10-30s).
+  - Header avec compteur clusters / articles / unassigned (en ambre si > 0).
+  - Pour chaque cluster : carte avec theme + summary + section **Pillar** mise en valeur (border-2 primary, étoile ambre) + grid 2-col **Spokes** (icône GitBranch) + section **Suggested Gaps** (border dashed, bouton "Générer" qui pré-remplit AIGenerator via `?title=...`).
+  - Bouton "Générer" sur chaque suggestion → navigate vers `/generer?title=<encoded>` pour pré-remplir le titre. (NB : il faut peut-être ajouter le support du query param `title` dans AIGenerator — TODO mineur, à voir prochaine session.)
+  - Section "Unassigned" en bas si présente.
+  - Empty state si pas encore lancé.
+- Route `/dashboard/<siteId>/clusters` + sidebar link "Topic clusters" avec icône `Network`.
+- Clés i18n FR + EN sous `clusters.*` + `sidebar.clusters`.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 14.33s
+- **Test live à faire (humain)** : `/dashboard/<siteId>/clusters`, choisir langue, Analyser. Pour TokamDarius (FR) qui a probablement 30+ articles, devrait sortir 4-6 clusters intéressants. Vérifier que les pillar/spokes sont sensés et que les articles suggérés sont pertinents.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend + frontend + route + sidebar + i18n dans la même session.
+
+**TODO mineur** : `AIGenerator.tsx` ne lit pas encore `?title=...` depuis l'URL pour préremplir. À ajouter pour que le bouton "Générer" depuis un cluster gap arrive avec le titre déjà en place. Ligne ~57 dans AIGenerator (le `useEffect` qui lit `tpl_id`) — il suffit d'ajouter la lecture de `searchParams.get('title')`. À faire prochaine session.
+
+**Prochain bloc concret** :
+
+**Tier 3 #8 — Internal link graph viz** (estimé 4h, end-to-end) :
+
+1. Backend `GET /sites/<id>/link-graph/` qui :
+   - Itère tous les articles publiés.
+   - Pour chaque, parse le markdown/HTML pour extraire les liens `[text](/blog/slug)` ou `<a href>`.
+   - Détermine si chaque lien pointe vers un autre article du site (matching slug).
+   - Retourne `{nodes: [{slug, title, in_degree, out_degree}], edges: [{from, to}]}`.
+   - Calcule aussi : `orphans[]` (articles sans incoming links), `hubs[]` (articles avec >5 incoming), `dead_ends[]` (articles sans outgoing).
+2. Frontend page `/dashboard/<id>/link-graph` :
+   - Visualisation avec `react-flow` (déjà candidat) ou simple cards groupées par catégorie : orphans, hubs, dead_ends, well-connected.
+   - MVP : 3 cards "Orphans", "Hubs", "Dead-ends" avec listes cliquables, sans graphe SVG. Le graphe react-flow vient en deuxième passe.
+3. i18n + routes + sidebar + build.
+
+**Alternative** : le TODO mineur `AIGenerator.tsx ?title=` (5 min) — peut être combiné en bonus dans la session de #8.
+
+**Statistiques fin de session 9 (cumulatif)** :
+- Tier 1 : ✅ 4/4 features
+- Tier 2 : ✅ 3/3 (rank tracking + decay; topic cluster est tier 3 mais déjà fait)
+- Tier 3 : 1/9 (topic cluster done)
+- Total endpoints SEO ajoutés cette journée : 9
+- Total composants frontend ajoutés : 7 (ContentBrief, PAAPanel, HreflangCard, BulkAudit, KeywordTracker, ContentDecay, TopicClusters)
+- Lignes ajoutées : ~3500
+- Commits locaux non poussés : 9
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les 7 nouvelles pages dashboard.
+- Décider du déploiement (push) — toutes les modifs sont safe (pas de breaking change), une migration unique (0012) safe à appliquer.
+

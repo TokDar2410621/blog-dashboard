@@ -3206,6 +3206,209 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class TopicClusterView(APIView):
+    """Group the site's published articles into thematic clusters via Gemini.
+    For each cluster: pick a pillar candidate, list spokes, suggest 2-3 new
+    article titles to fill content gaps.
+
+    POST /sites/<site_id>/topic-clusters/?language=fr&limit=80
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        import json
+
+        site = get_site_for_user(request, site_id)
+        language = (
+            request.data.get('language')
+            or request.query_params.get('language')
+            or site.default_language
+            or 'fr'
+        ).lower()
+        try:
+            limit = max(5, min(int(
+                request.data.get('limit') or request.query_params.get('limit') or 80
+            ), 150))
+        except (TypeError, ValueError):
+            limit = 80
+
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+        if not gemini_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Fetch published articles
+        if site.is_hosted:
+            qs = HostedPost.objects.filter(site=site, status='published')
+            if language:
+                qs = qs.filter(language=language)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title, 'excerpt': p.excerpt or '',
+                 'snippet': (p.content or '')[:600]}
+                for p in qs
+            ]
+        else:
+            alias = ensure_site_connection(site)
+            qs = BlogPost.objects.using(alias).filter(status='published')
+            if language:
+                qs = qs.filter(language=language)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title,
+                 'excerpt': getattr(p, 'excerpt', '') or '',
+                 'snippet': (getattr(p, 'content', '') or '')[:600]}
+                for p in qs
+            ]
+
+        if len(articles) < 3:
+            return Response({
+                'site_id': site.id,
+                'language': language,
+                'article_count': len(articles),
+                'clusters': [],
+                'message': 'Pas assez d\'articles pour clusterer (3 minimum).',
+            })
+
+        cache_signature = ','.join(sorted(a['slug'] for a in articles))
+        cache_key = _seo_cache_key(
+            'topic-clusters:', str(site.id), language, str(len(articles)), cache_signature[:200]
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        # Build the article corpus block for Gemini
+        corpus_lines = []
+        for i, a in enumerate(articles):
+            corpus_lines.append(
+                f"[{i+1}] slug={a['slug']} | title={a['title']}\n"
+                f"    excerpt: {a['excerpt'][:200]}\n"
+                f"    opening: {a['snippet'][:300]}"
+            )
+        corpus = '\n'.join(corpus_lines)
+
+        lang_label = {
+            'fr': 'French (Quebec)',
+            'en': 'English',
+            'es': 'Spanish',
+        }.get(language, 'French')
+
+        prompt = f"""You are an SEO content strategist. Analyze the {len(articles)}
+articles below from a single blog and group them into 3-8 THEMATIC CLUSTERS.
+
+For each cluster:
+- Pick a clear theme name in {lang_label}.
+- Identify ONE pillar_candidate_slug — the article that best summarizes the theme
+  and could be expanded into a comprehensive pillar page. Use the slug exactly
+  as written below.
+- List the spokes (other articles in the cluster) by their slugs.
+- Suggest 2-4 new article titles in {lang_label} to fill content gaps within the
+  cluster, each with a 1-sentence rationale.
+
+Articles:
+{corpus}
+
+Respond with JSON only, no markdown:
+{{
+  "clusters": [
+    {{
+      "theme": "<theme name in {lang_label}>",
+      "summary": "<1-2 sentences in {lang_label} explaining the cluster>",
+      "pillar_candidate_slug": "<slug>",
+      "spoke_slugs": ["<slug1>", "<slug2>", ...],
+      "suggested_new_articles": [
+        {{"title": "<title>", "rationale": "<1 sentence>"}},
+        ...
+      ]
+    }}
+  ]
+}}
+
+Use slugs EXACTLY as provided. Don't invent slugs. Every article should be
+assigned to one cluster (pillar OR spoke). Skip the article if it's truly off-topic."""
+
+        try:
+            from google import genai
+
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt],
+            )
+            text = (response.text or '').strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+            data = json.loads(text)
+        except Exception as e:
+            logger.warning('Gemini topic clustering failed: %s', e)
+            return Response(
+                {'error': f'Erreur clustering: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Build a lookup so we can enrich each slug with its title
+        title_by_slug = {a['slug']: a['title'] for a in articles}
+
+        def _enrich_slug(slug):
+            return {
+                'slug': slug,
+                'title': title_by_slug.get(slug, slug),
+                'exists': slug in title_by_slug,
+            }
+
+        clusters = []
+        for c in data.get('clusters') or []:
+            theme = (c.get('theme') or '').strip()
+            if not theme:
+                continue
+            pillar_slug = (c.get('pillar_candidate_slug') or '').strip()
+            spoke_slugs = [s for s in (c.get('spoke_slugs') or []) if s]
+            suggested = []
+            for sn in c.get('suggested_new_articles') or []:
+                if isinstance(sn, dict) and sn.get('title'):
+                    suggested.append({
+                        'title': sn['title'],
+                        'rationale': sn.get('rationale', ''),
+                    })
+            clusters.append({
+                'theme': theme,
+                'summary': (c.get('summary') or '').strip(),
+                'pillar': _enrich_slug(pillar_slug) if pillar_slug else None,
+                'spokes': [_enrich_slug(s) for s in spoke_slugs],
+                'suggested_new_articles': suggested,
+            })
+
+        # Find articles not assigned to any cluster
+        all_assigned = set()
+        for c in clusters:
+            if c['pillar']:
+                all_assigned.add(c['pillar']['slug'])
+            for sp in c['spokes']:
+                all_assigned.add(sp['slug'])
+        unassigned = [
+            {'slug': a['slug'], 'title': a['title']}
+            for a in articles if a['slug'] not in all_assigned
+        ]
+
+        result = {
+            'site_id': site.id,
+            'language': language,
+            'article_count': len(articles),
+            'clusters': clusters,
+            'unassigned': unassigned,
+        }
+        cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+        return Response(result)
+
+
 class ContentDecayView(APIView):
     """Detect articles whose GSC impressions / clicks dropped significantly
     over the last `days` window compared to the previous one.

@@ -26,6 +26,7 @@ import {
   Languages,
   TrendingUp,
   TrendingDown,
+  Network,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -44,6 +45,7 @@ export function DashboardSidebar() {
     { label: t("sidebar.bulkAudit"), icon: TrendingUp, href: `${base}/audit-global` },
     { label: t("sidebar.positions"), icon: TrendingUp, href: `${base}/positions` },
     { label: t("sidebar.decay"), icon: TrendingDown, href: `${base}/decay` },
+    { label: t("sidebar.clusters"), icon: Network, href: `${base}/clusters` },
     { label: t("sidebar.images"), icon: Image, href: `${base}/images` },
     { label: t("sidebar.settings"), icon: Settings, href: `${base}/parametres` },
   ];
