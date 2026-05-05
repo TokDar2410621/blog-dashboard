@@ -28,7 +28,7 @@ import markdown as md_lib
 
 from .models import (
     Site, UploadedImage, HostedPost, HostedCategory, HostedTag,
-    TrackedKeyword, SerpRank,
+    TrackedKeyword, SerpRank, Redirect,
 )
 from .db_utils import ensure_site_connection, test_site_connection
 from .blog_adapter import detect_blog_tables, setup_blog_views
@@ -330,11 +330,19 @@ class SitePostDetailView(APIView):
             if not post:
                 from django.http import Http404
                 raise Http404
+            old_slug = post.slug
+            old_lang = post.language
             for field in ['title', 'slug', 'excerpt', 'content', 'author',
                           'cover_image', 'reading_time', 'featured', 'status',
                           'scheduled_at', 'published_at', 'language', 'translation_group']:
                 if field in data:
                     setattr(post, field, data[field])
+            # Auto-create a 301 Redirect when the slug changes (hosted)
+            if 'slug' in data and data['slug'] and data['slug'] != old_slug:
+                Redirect.objects.update_or_create(
+                    site=site, from_slug=old_slug, language=old_lang,
+                    defaults={'to_slug': data['slug'], 'is_active': True},
+                )
             if 'category' in data:
                 cat_name = data['category']
                 if cat_name:
@@ -368,11 +376,20 @@ class SitePostDetailView(APIView):
             data = dict(data)
             data['content'] = _markdown_to_html(data['content'])
 
+        old_slug_ext = post.slug
+        old_lang_ext = getattr(post, 'language', 'fr') or 'fr'
         for field in ['title', 'slug', 'excerpt', 'content', 'author',
                       'cover_image', 'reading_time', 'featured', 'status',
                       'scheduled_at', 'published_at', 'language', 'translation_group']:
             if field in data:
                 setattr(post, field, data[field])
+        # Auto-create a 301 Redirect when the slug changes (external mode)
+        # The Redirect itself lives in the dashboard DB, indexed by site.
+        if 'slug' in data and data['slug'] and data['slug'] != old_slug_ext:
+            Redirect.objects.update_or_create(
+                site=site, from_slug=old_slug_ext, language=old_lang_ext,
+                defaults={'to_slug': data['slug'], 'is_active': True},
+            )
 
         if 'category' in data:
             cat_name = data['category']
@@ -3891,6 +3908,86 @@ class ContentDecayView(APIView):
 # RANK TRACKING — TrackedKeyword + SerpRank snapshots
 # ==========================================================================
 
+class RedirectsView(APIView):
+    """List or create 301 redirects for a site."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        items = list(
+            Redirect.objects.filter(site=site).order_by('-updated_at')[:500]
+        )
+        return Response({
+            'results': [
+                {
+                    'id': r.id,
+                    'from_slug': r.from_slug,
+                    'to_slug': r.to_slug,
+                    'language': r.language,
+                    'hit_count': r.hit_count,
+                    'is_active': r.is_active,
+                    'created_at': r.created_at.isoformat(),
+                    'updated_at': r.updated_at.isoformat(),
+                }
+                for r in items
+            ],
+        })
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        from_slug = (request.data.get('from_slug') or '').strip().strip('/')
+        to_slug = (request.data.get('to_slug') or '').strip().strip('/')
+        language = (request.data.get('language') or site.default_language or 'fr').lower()
+
+        if not from_slug or not to_slug:
+            return Response(
+                {'error': 'from_slug et to_slug requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if from_slug == to_slug:
+            return Response(
+                {'error': 'from_slug et to_slug doivent etre differents'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': 'Langue invalide (fr, en, es)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        r, created = Redirect.objects.update_or_create(
+            site=site, from_slug=from_slug, language=language,
+            defaults={'to_slug': to_slug, 'is_active': True},
+        )
+        return Response({
+            'id': r.id,
+            'from_slug': r.from_slug,
+            'to_slug': r.to_slug,
+            'language': r.language,
+            'hit_count': r.hit_count,
+            'is_active': r.is_active,
+            'created_at': r.created_at.isoformat(),
+            'updated_at': r.updated_at.isoformat(),
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class RedirectDetailView(APIView):
+    """Delete a redirect."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, site_id, pk):
+        site = get_site_for_user(request, site_id)
+        try:
+            r = Redirect.objects.get(site=site, id=pk)
+        except Redirect.DoesNotExist:
+            return Response(
+                {'error': 'Redirect introuvable'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        r.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 def _serialize_tracked_keyword(tk, latest=None):
     """Serialize a TrackedKeyword with its latest snapshot for list views."""
     base = {
@@ -4311,28 +4408,72 @@ class PublicPostsView(APIView):
 
 
 class PublicPostDetailView(APIView):
-    """GET /api/public/sites/<id>/posts/<slug>/ — single article."""
+    """GET /api/public/sites/<id>/posts/<slug>/ — single article.
+
+    If the slug doesn't exist as a current article, look up an active
+    Redirect entry (per-language) and return a 301-style payload pointing
+    to the canonical slug, so the frontend can issue a proper redirect.
+    """
     permission_classes = []
+
+    def _resolve_redirect(self, site, slug, language=None):
+        """Return the new slug if `slug` is a known redirect, else None."""
+        qs = Redirect.objects.filter(
+            site=site, from_slug=slug, is_active=True
+        )
+        if language:
+            r = qs.filter(language=language).first()
+            if r:
+                Redirect.objects.filter(pk=r.pk).update(hit_count=r.hit_count + 1)
+                return r.to_slug
+        # Fallback: any language match
+        r = qs.first()
+        if r:
+            Redirect.objects.filter(pk=r.pk).update(hit_count=r.hit_count + 1)
+            return r.to_slug
+        return None
 
     def get(self, request, site_id, slug):
         site = _public_get_site(site_id, request)
         if not site:
             return Response({'error': 'Invalid API key'}, status=status.HTTP_403_FORBIDDEN)
 
+        language = request.query_params.get('language')
+
         if site.is_hosted:
-            post = get_object_or_404(
-                HostedPost.objects.select_related('category').prefetch_related('tags'),
+            post = HostedPost.objects.select_related('category').prefetch_related('tags').filter(
                 site=site, slug=slug, status='published'
-            )
-            # Increment view count
+            ).first()
+            if post is None:
+                # Try redirect
+                target = self._resolve_redirect(site, slug, language)
+                if target:
+                    return Response(
+                        {'redirect_to': target, 'status': 301},
+                        status=status.HTTP_301_MOVED_PERMANENTLY,
+                        headers={'Location': f'/blog/{target}'},
+                    )
+                from django.http import Http404
+                raise Http404
             HostedPost.objects.filter(pk=post.pk).update(view_count=post.view_count + 1)
             return Response(_serialize_hosted_post(post))
 
         alias = ensure_site_connection(site)
-        post = get_object_or_404(
-            BlogPost.objects.using(alias).select_related('category').prefetch_related('tags'),
-            slug=slug, status='published'
+        post = (
+            BlogPost.objects.using(alias)
+            .select_related('category').prefetch_related('tags')
+            .filter(slug=slug, status='published').first()
         )
+        if post is None:
+            target = self._resolve_redirect(site, slug, language)
+            if target:
+                return Response(
+                    {'redirect_to': target, 'status': 301},
+                    status=status.HTTP_301_MOVED_PERMANENTLY,
+                    headers={'Location': f'/blog/{target}'},
+                )
+            from django.http import Http404
+            raise Http404
         BlogPost.objects.using(alias).filter(pk=post.pk).update(view_count=post.view_count + 1)
         serializer = BlogPostDetailSerializer(post)
         return Response(serializer.data)

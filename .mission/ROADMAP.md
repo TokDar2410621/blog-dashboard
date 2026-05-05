@@ -71,7 +71,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 - [x] **8. Internal link graph viz** ⏱ 4h — endpoint `/link-graph/` parse markdown + HTML pour edges, calcule orphans/hubs/dead_ends. UI 3-cols + top 10 connected.
 - [ ] **9. Broken link checker** (sortants + internes) ⏱ 3h
-- [ ] **10. Auto-redirect 301 sur slug change** ⏱ 2h (modèle Redirect + middleware)
+- [x] **10. Auto-redirect 301 sur slug change** — modèle `Redirect` + migration 0013 + auto-hook dans `SitePostDetailView.patch` + 301 dans `PublicPostDetailView` + CRUD admin + UI `/dashboard/<id>/redirects`.
 - [ ] **11. Image SEO** (WebP auto, srcset, descriptive filenames) ⏱ 4h
 - [x] **12. Readability scores FR/EN** (Flesch-Kincaid, ARI) — endpoint `/readability/`, helpers FR/EN avec syllable-counter heuristique, ReadabilityCard mounted in PostEditor SEO view, suggestions auto.
 - [ ] **13. Quebec lexicon** (FR-CA dictionnaire, schema LocalBusiness) ⏱ 4h

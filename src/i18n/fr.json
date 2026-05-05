@@ -83,10 +83,31 @@
     "decay": "Detection de declin",
     "clusters": "Topic clusters",
     "linkGraph": "Maillage interne",
+    "redirects": "Redirections 301",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "redirects": {
+    "title": "Redirections 301",
+    "subtitle": "Quand un slug change, l'ancien continue de pointer vers le nouveau pour preserver les backlinks et bookmarks. Cree automatiquement, modifiable manuellement.",
+    "addTitle": "Ajouter une redirection",
+    "fromSlug": "Ancien slug",
+    "fromSlugPlaceholder": "Ex: vieux-titre-article",
+    "toSlug": "Nouveau slug",
+    "toSlugPlaceholder": "Ex: nouveau-titre-article",
+    "language": "Langue",
+    "add": "Ajouter",
+    "added": "Redirection ajoutee",
+    "addError": "Erreur lors de l'ajout",
+    "deleted": "Redirection supprimee",
+    "deleteError": "Erreur lors de la suppression",
+    "confirmDelete": "Supprimer cette redirection ?",
+    "empty": "Aucune redirection. Une est creee automatiquement quand tu changes le slug d'un article.",
+    "autoHint": "Astuce : quand tu changes le slug d'un article via l'editeur, une redirection est creee automatiquement. Tu peux aussi en ajouter manuellement ici.",
+    "updated": "Mise a jour"
   },
 
   "readability": {

@@ -13,6 +13,7 @@ import KeywordTracker from "./KeywordTracker";
 import ContentDecay from "./ContentDecay";
 import TopicClusters from "./TopicClusters";
 import LinkGraph from "./LinkGraph";
+import Redirects from "./Redirects";
 
 export default function DashboardLayout() {
   return (
@@ -33,6 +34,7 @@ export default function DashboardLayout() {
                 <Route path="decay" element={<ContentDecay />} />
                 <Route path="clusters" element={<TopicClusters />} />
                 <Route path="link-graph" element={<LinkGraph />} />
+                <Route path="redirects" element={<Redirects />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

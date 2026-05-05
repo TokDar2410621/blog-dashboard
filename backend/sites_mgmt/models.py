@@ -231,6 +231,37 @@ class HostedPost(models.Model):
         return self.title
 
 
+class Redirect(models.Model):
+    """301 redirect from an old slug to a new one (per language).
+
+    Auto-created when an article's slug changes via the dashboard, so old
+    bookmarks / external backlinks keep working. Can also be created manually
+    via the dashboard UI.
+    """
+    LANGUAGE_CHOICES = Site.LANGUAGE_CHOICES
+
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='redirects'
+    )
+    from_slug = models.CharField(max_length=255)
+    to_slug = models.CharField(max_length=255)
+    language = models.CharField(max_length=2, choices=LANGUAGE_CHOICES, default='fr')
+    hit_count = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['site', 'from_slug', 'language']]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['site', 'from_slug', 'language']),
+        ]
+
+    def __str__(self):
+        return f"{self.from_slug} → {self.to_slug} ({self.language}, {self.site.name})"
+
+
 class TrackedKeyword(models.Model):
     """Keywords whose Google SERP position the user wants to track over time."""
     LANGUAGE_CHOICES = Site.LANGUAGE_CHOICES

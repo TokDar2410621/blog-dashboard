@@ -730,3 +730,76 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 - Tester les pages.
 - Décider du déploiement (11 commits non poussés).
 
+---
+
+## Session 2026-05-04 (suite 13) — Auto-redirect 301 ✅ Tier 3 #10 DONE (end-to-end)
+
+**Fait** :
+- **DB** : modèle `Redirect(site, from_slug, to_slug, language, hit_count, is_active, created_at, updated_at)` ajouté dans `models.py`. Unique sur (site, from_slug, language). Index sur (site, from_slug, language).
+- Migration `0013_redirect` créée et appliquée.
+- **Auto-hook** : `SitePostDetailView.patch` capture l'ancien slug avant les setattr ; si `data['slug']` est différent, crée/update un `Redirect(from=old, to=new)` via `update_or_create`. Implémenté pour les deux modes : hosted (HostedPost) et external (BlogPost via `using(alias)`).
+- **301 dans public API** : `PublicPostDetailView.get` modifié pour appeler `_resolve_redirect` quand le slug demandé n'existe pas en DB. Si une redirect active matche → incrémente `hit_count` et retourne HTTP 301 avec header `Location: /blog/<new_slug>` + body `{redirect_to, status: 301}` pour les frontends qui préfèrent une redirection client-side. Per-language priorisé, fallback any-language.
+- **CRUD endpoints** :
+  - `GET /sites/<id>/redirects/` — liste 500 max ordonnée par `-updated_at`.
+  - `POST /sites/<id>/redirects/` — création manuelle avec `update_or_create` (idempotent).
+  - `DELETE /sites/<id>/redirects/<pk>/`.
+- **Frontend** `src/pages/dashboard/Redirects.tsx` :
+  - Form d'ajout : from_slug + to_slug + langue (FR/EN/ES) + bouton.
+  - Hint explicatif de l'auto-création.
+  - Table : from → to, langue badge, hits count avec icône `MousePointerClick`, date updated, bouton supprimer.
+  - Empty state avec icône Move.
+- Route `/dashboard/<siteId>/redirects` + sidebar link "Redirections 301" (icône `Move`).
+- 17 nouvelles clés `redirects.*` + `sidebar.redirects` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- `python manage.py migrate` → migration `0013_redirect` appliquée
+- JSON i18n valide
+- `npm run build` → ✓ built in 17.52s
+- **Tests live à faire (humain)** :
+  1. Sur `/dashboard/<siteId>/articles/<slug>`, changer le slug d'un article publié, sauvegarder. Vérifier qu'une redirection apparaît automatiquement dans `/dashboard/<siteId>/redirects`.
+  2. Tester depuis le frontend public : visiter l'ancien slug → devrait recevoir un 301 vers le nouveau.
+  3. Ajouter une redirection manuelle (par exemple `vieille-promo` → `actuelle-promo`).
+  4. Vérifier que le `hit_count` s'incrémente quand on visite la from_slug.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Modèle + migration + auto-hook + endpoints + UI + sidebar + i18n dans la même session.
+
+**Prochain bloc concret** :
+
+Tier 3 a 4/9 fait (#7 #8 #10 #12). Items restants Tier 3 :
+
+- **#9 Broken link checker** (3h, end-to-end) — le plus impactant restant.
+- **#11 Image SEO** (4h) — WebP auto, srcset, descriptive filenames. Plus lourd.
+- **#13 Quebec lexicon** (4h) — FR-CA, schema LocalBusiness. Différenciation clé.
+- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+- **#15 Search trends FR-CA** (3h) — pytrends.
+- **#16 Reddit/Quora harvesting** (2h) — court.
+
+**Recommandation** : **#9 Broken link checker** — court, impact direct sur le SEO, end-to-end naturel.
+
+Plan Étape A pour #9 :
+1. Backend `POST /sites/<id>/broken-links/` qui :
+   - Itère articles publiés (max 100, configurable).
+   - Pour chaque, extrait tous les liens HTTP/HTTPS via regex (markdown + HTML).
+   - Pour chaque URL unique, fait un `requests.head(url, timeout=5)` (HEAD plus léger que GET) → status code.
+   - Considère broken : status >= 400 ou timeout/connection error.
+   - Cache 24h par URL (les liens cassés ne se réparent pas vite).
+2. Retourne `{checked_count, broken_count, broken_links: [{url, status, articles: [{slug, title}]}]}` (groupés par URL pour voir où chaque lien cassé apparaît).
+3. Frontend page `/dashboard/<id>/broken-links` : bouton Lancer, table url cassée + liste articles cliquables → PostEditor.
+4. Sidebar + i18n + build.
+
+**Statistiques fin de session 13** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 4/9 (#7 clusters, #8 link graph, #10 redirects, #12 readability)
+- Endpoints SEO ajoutés cumulés : 14
+- Composants frontend ajoutés cumulés : 10 (… + Redirects)
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les pages.
+- Décider du déploiement (12 commits non poussés, deux migrations safe : 0012 + 0013).
+

@@ -83,10 +83,31 @@
     "decay": "Content decay",
     "clusters": "Topic clusters",
     "linkGraph": "Internal links",
+    "redirects": "301 redirects",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "redirects": {
+    "title": "301 redirects",
+    "subtitle": "When a slug changes, the old one keeps pointing to the new one to preserve backlinks and bookmarks. Auto-created, editable manually.",
+    "addTitle": "Add a redirect",
+    "fromSlug": "From slug",
+    "fromSlugPlaceholder": "e.g. old-article-title",
+    "toSlug": "To slug",
+    "toSlugPlaceholder": "e.g. new-article-title",
+    "language": "Language",
+    "add": "Add",
+    "added": "Redirect added",
+    "addError": "Error adding redirect",
+    "deleted": "Redirect deleted",
+    "deleteError": "Delete error",
+    "confirmDelete": "Delete this redirect?",
+    "empty": "No redirects. One is auto-created when you change an article slug.",
+    "autoHint": "Tip: when you change an article's slug via the editor, a redirect is auto-created. You can also add some manually here.",
+    "updated": "Updated"
   },
 
   "readability": {

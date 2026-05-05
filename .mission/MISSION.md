@@ -51,7 +51,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 ### Tier 3 (qualité produit)
 - [x] Internal link graph viz
 - [ ] Broken link checker
-- [ ] Auto-redirect 301 sur slug change
+- [x] Auto-redirect 301 sur slug change
 - [ ] Image SEO (WebP, srcset)
 - [x] Readability scores FR/EN
 - [ ] Quebec lexicon (FR-CA, schema LocalBusiness)
