@@ -395,9 +395,57 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Application immédiate** : la roadmap restante est déjà naturellement front-aware (graphe recharts, Bing Webmaster, Quebec lexicon → tous touchent l'UI). Mais à partir de maintenant, Tier 3 #10 "Auto-redirect 301" qui semblait backend-only doit aussi avoir une UI minimale (page de listing des redirects + form d'ajout).
 
-**Prochain bloc concret** (inchangé) : étape D (graphe recharts dans KeywordTracker, ~2h) puis étape C (cron snapshot quotidien).
+**Prochain bloc concret** : voir entrée suivante (étape D faite dans la même session).
 
 **Blocages** : aucun.
+
+**Actions humaines en attente** : aucune nouvelle.
+
+---
+
+## Session 2026-05-04 (suite 8) — Étape D : graphe recharts dans KeywordTracker ✅
+
+**Fait** :
+- Composant interne `RankChart` ajouté à la fin de `src/pages/dashboard/KeywordTracker.tsx`.
+  - Utilise `recharts` (déjà dans `package.json` à `^3.7.0`).
+  - `LineChart` avec X-axis temporel (date du snapshot, formatée FR-CA) et Y-axis **inversé** (`reversed`) avec `domain` calculé dynamiquement (min/max ±2-5) — convention SEO : position 1 (la meilleure) en haut.
+  - Snapshots avec `position === null` (hors top 100) plottés à `101` comme plafond avec label "100+".
+  - Deux `ReferenceLine` horizontales pour les seuils top 3 (vert foncé) et top 10 (emerald), pointillés.
+  - Tooltip custom : date complète + titre du résultat (ou "Position").
+  - Légende sous le graphe.
+  - `connectNulls` pour ne pas couper la ligne si un snapshot manque.
+- Remplace l'ancienne liste texte mono-spaced dans la row expansée — l'alerte décay (warning/critical) reste affichée au-dessus du graphe.
+
+**Tests** :
+- `npm run build` → ✓ built in 17.05s. Bundle a grossi de +340KB (precache 1191 → 1531 KB) — coût attendu de recharts. Pas critique pour un dashboard interne.
+- **Test live à faire (humain)** : ajouter quelques mots-clés sur `/dashboard/<siteId>/positions`, lancer 3-4 snapshots, expand une row → vérifier que le graphe s'affiche avec axe Y inversé (position 1 en haut), que les hover tooltips fonctionnent, que les lignes de référence top 3 / top 10 sont visibles.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Le graphe est une amélioration UI directe — pas de backend orphelin.
+
+**Prochain bloc concret** :
+
+**Tier 2 #6 — Content decay detector** (estimé 3h) :
+
+1. Lire `backend/sites_mgmt/views.py` la classe `GSCQueriesView` (~ligne ?, à grep) pour comprendre comment elle interroge la Google Search Console et quelles données elle expose.
+2. Ajouter `class ContentDecayView(APIView)` dans `views.py`. Endpoint `GET /sites/<site_id>/content-decay/?days=30`.
+3. Logique :
+   - Pour chaque article publié du site, récupérer via GSC (réutiliser le helper existant) les **impressions + clics** sur les 30 derniers jours.
+   - Comparer avec les 30 jours d'avant (60-30 jours).
+   - Calculer le delta : si impressions chutent de >30% OU clics chutent de >40%, c'est un "decay alert".
+   - Retourner : `{decaying: [{slug, title, impressions_now, impressions_before, clicks_now, clicks_before, delta_pct, suggested_action}], healthy_count, no_data_count}`.
+   - `suggested_action` peut être un texte simple : "refresh content", "expand", "redirect" — basé sur des règles simples (si delta très fort → redirect, si delta modéré + score audit faible → refresh, etc.).
+4. Frontend : nouvelle page `src/pages/dashboard/ContentDecay.tsx` :
+   - Bouton "Analyser le décay" (peut prendre 30s-1min selon nombre d'articles + GSC API).
+   - Liste des articles en décay : titre, ancien vs nouveau (sparkline ou bar), delta %, suggested action, lien vers PostEditor.
+   - Skeleton loader.
+5. Route `/dashboard/<siteId>/decay` + sidebar link "Détection de déclin".
+6. i18n.
+7. `python manage.py check` + `npm run build`.
+8. **Si la logique GSC est complexe à implémenter sans tester live** : version MVP qui utilise SEULEMENT les view_count internes (de HostedPost.view_count ou BlogPost.view_count) en comparant les articles "récents" vs "anciens", sans GSC. Moins riche mais immédiatement testable. Puis brancher GSC en deuxième passe.
+
+**Blocages potentiels** : GSC OAuth doit être configuré pour le site. Pour TokamDarius, vérifier que `gsc_refresh_token` est setup. Si non setup, la version MVP avec view_count interne est la voie.
 
 **Actions humaines en attente** : aucune nouvelle.
 

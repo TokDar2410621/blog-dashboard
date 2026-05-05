@@ -33,6 +33,16 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ReferenceLine,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 type Latest = {
   position: number | null;
@@ -397,42 +407,7 @@ export default function KeywordTracker() {
                                       {t("keywords.noSnapshots")}
                                     </p>
                                   ) : (
-                                    <ul className="text-xs space-y-1 max-h-48 overflow-y-auto font-mono">
-                                      {history.data.snapshots.slice().reverse().map((s, i) => (
-                                        <li key={i} className="flex items-center gap-3">
-                                          <span className="text-muted-foreground w-32 shrink-0">
-                                            {new Date(s.recorded_at).toLocaleString("fr-CA", {
-                                              year: "2-digit",
-                                              month: "2-digit",
-                                              day: "2-digit",
-                                              hour: "2-digit",
-                                              minute: "2-digit",
-                                            })}
-                                          </span>
-                                          <span
-                                            className={`w-12 ${
-                                              s.position === null
-                                                ? "text-muted-foreground"
-                                                : s.position <= 10
-                                                ? "text-green-600 font-bold"
-                                                : ""
-                                            }`}
-                                          >
-                                            {s.position !== null ? `#${s.position}` : "—"}
-                                          </span>
-                                          {s.title && (
-                                            <span className="text-muted-foreground truncate flex-1">
-                                              {s.title}
-                                            </span>
-                                          )}
-                                          {s.is_target_match && (
-                                            <span className="text-[10px] px-1 py-0.5 rounded bg-green-500/10 text-green-700 dark:text-green-400">
-                                              ✓
-                                            </span>
-                                          )}
-                                        </li>
-                                      ))}
-                                    </ul>
+                                    <RankChart snapshots={history.data.snapshots} />
                                   )}
                                 </div>
                               </div>
@@ -448,6 +423,112 @@ export default function KeywordTracker() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+
+function RankChart({ snapshots }: { snapshots: Snapshot[] }) {
+  // Map: x = recorded date (ms), y = position (null → not in top 100, plotted at 101 as ceiling)
+  const NOT_IN_TOP = 101;
+  const data = snapshots.map((s) => ({
+    ts: new Date(s.recorded_at).getTime(),
+    position: s.position ?? NOT_IN_TOP,
+    rawPosition: s.position,
+    title: s.title,
+    isTargetMatch: s.is_target_match,
+  }));
+
+  const positions = data
+    .map((d) => d.rawPosition)
+    .filter((p): p is number => p !== null);
+  const minP = positions.length ? Math.max(1, Math.min(...positions) - 2) : 1;
+  const maxP = positions.length
+    ? Math.min(NOT_IN_TOP, Math.max(...positions) + 5)
+    : 50;
+
+  return (
+    <div className="w-full h-56 -ml-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+          data={data}
+          margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid stroke="currentColor" strokeOpacity={0.08} />
+          <XAxis
+            dataKey="ts"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            scale="time"
+            tickFormatter={(ts) =>
+              new Date(ts).toLocaleDateString("fr-CA", {
+                month: "short",
+                day: "2-digit",
+              })
+            }
+            tick={{ fontSize: 11 }}
+            stroke="currentColor"
+            strokeOpacity={0.5}
+          />
+          <YAxis
+            reversed
+            domain={[minP, maxP]}
+            tick={{ fontSize: 11 }}
+            stroke="currentColor"
+            strokeOpacity={0.5}
+            width={40}
+            tickFormatter={(v) => (v >= NOT_IN_TOP ? "100+" : `#${v}`)}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "hsl(var(--card))",
+              border: "1px solid hsl(var(--border))",
+              fontSize: 12,
+            }}
+            labelFormatter={(ts) =>
+              new Date(ts as number).toLocaleString("fr-CA")
+            }
+            formatter={(_value, _name, item) => {
+              const d = item.payload as (typeof data)[number];
+              return [
+                d.rawPosition === null ? "Hors top 100" : `#${d.rawPosition}`,
+                d.title || "Position",
+              ];
+            }}
+          />
+          {/* Reference lines for the top 3 / top 10 thresholds */}
+          <ReferenceLine
+            y={3}
+            stroke="hsl(142 76% 36%)"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+          />
+          <ReferenceLine
+            y={10}
+            stroke="hsl(142 60% 45%)"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+          />
+          <Line
+            type="monotone"
+            dataKey="position"
+            stroke="hsl(var(--primary))"
+            strokeWidth={2}
+            dot={{ r: 3, fill: "hsl(var(--primary))" }}
+            activeDot={{ r: 5 }}
+            connectNulls
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground mt-1 ml-10">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-px bg-green-600" /> Top 3
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-px bg-emerald-600" /> Top 10
+        </span>
+        <span>Y-axis : meilleur en haut (#1)</span>
+      </div>
     </div>
   );
 }

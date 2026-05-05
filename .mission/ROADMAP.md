@@ -51,7 +51,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] Endpoint `GET /sites/<id>/rank-history/?tracked_id=X&days=90` avec **decay alert** automatique (warning si chute >5 places vs médiane, critical si hors top 100).
 - [x] Frontend `KeywordTracker.tsx` : form d'ajout, table avec position colorée, snapshot button, expand row → historique 90j + decay alert.
 - [ ] (Étape C) Cron `/schedule` ou cron Railway pour snapshot quotidien automatique.
-- [ ] (Étape D) Graphe recharts d'évolution dans la row expansée (à la place / en plus de la liste texte).
+- [x] (Étape D) Graphe recharts d'évolution dans la row expansée — Y-axis inversé, reference lines top3/top10, plafond pour positions hors top 100.
 
 ### 6. Content decay detector ⏱ 3h
 - [ ] Articles dont impressions/clics GSC chutent sur 30 jours glissants (utiliser `GSCQueriesView` data).
