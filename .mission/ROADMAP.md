@@ -27,10 +27,12 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] Frontend `PAAPanel.tsx` : intégré dans `AIGenerator.tsx`, copy+insert schema.
 - [ ] (Futur) Wire-up dans `PostEditor.tsx` avec prop `onInsertSchema` pour insérer directement dans l'article édité.
 
-### 3. Bulk SEO audit ⏱ 3h
-- [ ] Backend `GET /sites/<id>/audit-all/` — itère articles publiés, appelle audit IA, agrège (top issues, score moyen, articles faibles).
-- [ ] Pour gros sites : tâche async via `threading.Thread` + endpoint de polling status (MVP simple).
-- [ ] Frontend : page `/dashboard/<siteId>/audit-global` avec dashboard agrégé + drill-down article.
+### 3. Bulk SEO audit ✅ DONE
+- [x] Backend `GET /sites/<id>/audit-all/?limit=N&language=L` — itère articles publiés, appelle `_run_seo_audit` (helper extrait, partagé avec SEOAuditView). Cache 1h par article via cache key existant.
+- [x] Agrégation : mean_score, distribution 4 buckets, top_weaknesses Counter, top_actions Counter, weakest_articles top 10.
+- [ ] (Futur, gros sites) async via `threading.Thread` + polling.
+- [x] Frontend page `BulkAudit.tsx` : KPIs, distribution bar visuelle, top issues, weakest articles cliquables.
+- [x] Route + sidebar link.
 
 ### 4. Hreflang validator ✅ DONE
 - [x] Endpoint dédié `POST /hreflang-check/` (mieux que dans audit pour ne pas polluer le cache audit).

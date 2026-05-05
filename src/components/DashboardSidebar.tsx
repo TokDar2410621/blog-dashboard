@@ -24,6 +24,7 @@ import {
   LogOut,
   Newspaper,
   Languages,
+  TrendingUp,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -39,6 +40,7 @@ export function DashboardSidebar() {
     { label: t("sidebar.dashboard"), icon: LayoutDashboard, href: base },
     { label: t("sidebar.articles"), icon: FileText, href: `${base}/articles` },
     { label: t("sidebar.generate"), icon: Sparkles, href: `${base}/generer` },
+    { label: t("sidebar.bulkAudit"), icon: TrendingUp, href: `${base}/audit-global` },
     { label: t("sidebar.images"), icon: Image, href: `${base}/images` },
     { label: t("sidebar.settings"), icon: Settings, href: `${base}/parametres` },
   ];

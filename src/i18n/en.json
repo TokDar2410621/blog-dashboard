@@ -78,10 +78,36 @@
     "dashboard": "Dashboard",
     "articles": "Articles",
     "generate": "Generate article",
+    "bulkAudit": "Site-wide SEO audit",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "bulkAudit": {
+    "title": "Site-wide SEO audit",
+    "subtitle": "Runs the AI audit on every published article and surfaces site-wide improvement patterns.",
+    "runTitle": "Run audit",
+    "limit": "Articles to audit",
+    "run": "Run",
+    "running": "Auditing...",
+    "runWait": "This can take 1-2 minutes depending on article count. Cached results speed up subsequent runs.",
+    "audited": "Articles audited",
+    "meanScore": "Mean score",
+    "healthy": "Healthy (≥70)",
+    "poor": "Poor (<50)",
+    "distribution": "Score distribution",
+    "excellent": "Excellent",
+    "good": "Good",
+    "average": "Average",
+    "cacheHits": "{{count}} results served from cache (free).",
+    "topWeaknesses": "Most frequent weaknesses",
+    "topActions": "Most recommended actions",
+    "noWeaknesses": "No weakness detected.",
+    "noActions": "No action recommended.",
+    "weakestArticles": "Weakest articles to fix first",
+    "error": "Audit error"
   },
 
   "overview": {

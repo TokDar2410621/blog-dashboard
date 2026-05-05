@@ -1143,45 +1143,32 @@ Reponds UNIQUEMENT avec un JSON: {{"tags": ["tag1", "tag2", ...]}}"""
             )
 
 
-class SEOAuditView(APIView):
-    """Full SEO audit via Gemini — returns score + strengths + weaknesses + actions."""
-    permission_classes = [IsAuthenticated]
+def _run_seo_audit(title, excerpt, content, keyword='', language='fr', api_key=None):
+    """Run the SEO audit prompt against Gemini and return the parsed result.
 
-    def post(self, request):
-        title = request.data.get('title', '')
-        excerpt = request.data.get('excerpt', '')
-        content = request.data.get('content', '')
-        keyword = request.data.get('keyword', '')
-        language = request.data.get('language', 'fr')
+    Shared between SEOAuditView (single-article) and BulkSEOAuditView. Caches
+    by content hash for 1h. Raises on hard failures (API key missing, JSON
+    parse error, network error).
+    """
+    import json
+    from google import genai
 
-        if not title or not content:
-            return Response(
-                {'error': 'Titre et contenu requis'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+    if not api_key:
         api_key = os.environ.get('GEMINI_API_KEY')
-        if not api_key:
-            return Response(
-                {'error': 'GEMINI_API_KEY non configuree'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+    if not api_key:
+        raise RuntimeError('GEMINI_API_KEY non configuree')
 
-        cache_key = _seo_cache_key('seo-audit:', title, excerpt, content[:5000], keyword, language)
-        cached = cache.get(cache_key)
-        if cached is not None:
-            resp = Response(cached)
-            resp['X-Cache'] = 'HIT'
-            return resp
+    cache_key = _seo_cache_key(
+        'seo-audit:', title, excerpt, content[:5000], keyword, language
+    )
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached, True  # (result, from_cache)
 
-        try:
-            from google import genai
-            import json
+    lang = 'French' if language == 'fr' else 'English'
+    kw_section = f'Primary keyword: {keyword}\n' if keyword else ''
 
-            lang = 'French' if language == 'fr' else 'English'
-            kw_section = f'Primary keyword: {keyword}\n' if keyword else ''
-
-            prompt = f"""You are a senior SEO expert. Audit this blog article holistically.
+    prompt = f"""You are a senior SEO expert. Audit this blog article holistically.
 Focus on REAL SEO signals, not checklists. Write feedback in {lang}.
 
 {kw_section}Title: {title}
@@ -1209,37 +1196,64 @@ Respond in JSON only (no markdown):
   "actions": ["<concrete action 1>", "<concrete action 2>", ...]
 }}"""
 
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[prompt],
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[prompt],
+    )
+    text = (response.text or '').strip()
+    if text.startswith('```'):
+        text = text.split('\n', 1)[1]
+        if text.endswith('```'):
+            text = text[:-3]
+        text = text.strip()
+    data = json.loads(text)
+    result = {
+        'score': int(data.get('score', 0)),
+        'verdict': data.get('verdict', ''),
+        'strengths': data.get('strengths', []),
+        'weaknesses': data.get('weaknesses', []),
+        'actions': data.get('actions', []),
+    }
+    cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+    return result, False
+
+
+class SEOAuditView(APIView):
+    """Full SEO audit via Gemini — returns score + strengths + weaknesses + actions."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        title = request.data.get('title', '')
+        excerpt = request.data.get('excerpt', '')
+        content = request.data.get('content', '')
+        keyword = request.data.get('keyword', '')
+        language = request.data.get('language', 'fr')
+
+        if not title or not content:
+            return Response(
+                {'error': 'Titre et contenu requis'},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-            text = response.text.strip()
-            if text.startswith('```'):
-                text = text.split('\n', 1)[1]
-                if text.endswith('```'):
-                    text = text[:-3]
-                text = text.strip()
-
-            data = json.loads(text)
-            result = {
-                'score': int(data.get('score', 0)),
-                'verdict': data.get('verdict', ''),
-                'strengths': data.get('strengths', []),
-                'weaknesses': data.get('weaknesses', []),
-                'actions': data.get('actions', []),
-            }
-            cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
-            resp = Response(result)
-            resp['X-Cache'] = 'MISS'
-            return resp
-
+        try:
+            result, from_cache = _run_seo_audit(
+                title, excerpt, content, keyword, language
+            )
+        except RuntimeError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         except Exception as e:
             return Response(
                 {'error': f'Erreur audit SEO: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        resp = Response(result)
+        resp['X-Cache'] = 'HIT' if from_cache else 'MISS'
+        return resp
 
 
 class SEOFixView(APIView):
@@ -2847,6 +2861,167 @@ class HreflangCheckView(APIView):
         }
         cache.set(cache_key, result, timeout=300)
         return Response(result)
+
+
+class BulkSEOAuditView(APIView):
+    """Run SEO audit on all published articles of a site, return aggregate stats.
+
+    Synchronous for MVP (capped at limit articles). Each per-article audit uses
+    the same cache as SEOAuditView, so re-runs are cheap once warm.
+
+    GET /sites/<site_id>/audit-all/?limit=50&language=fr
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        from collections import Counter
+
+        site = get_site_for_user(request, site_id)
+        try:
+            limit = max(1, min(int(request.query_params.get('limit', 50)), 100))
+        except (TypeError, ValueError):
+            limit = 50
+        language_filter = request.query_params.get('language')
+
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Fetch published articles
+        if site.is_hosted:
+            qs = HostedPost.objects.filter(site=site, status='published')
+            if language_filter:
+                qs = qs.filter(language=language_filter)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {
+                    'slug': p.slug,
+                    'title': p.title,
+                    'excerpt': p.excerpt or '',
+                    'content': p.content or '',
+                    'language': p.language or 'fr',
+                }
+                for p in qs
+            ]
+        else:
+            alias = ensure_site_connection(site)
+            qs = BlogPost.objects.using(alias).filter(status='published')
+            if language_filter:
+                qs = qs.filter(language=language_filter)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {
+                    'slug': p.slug,
+                    'title': p.title,
+                    'excerpt': getattr(p, 'excerpt', '') or '',
+                    'content': getattr(p, 'content', '') or '',
+                    'language': getattr(p, 'language', 'fr') or 'fr',
+                }
+                for p in qs
+            ]
+
+        if not articles:
+            return Response({
+                'site_id': site.id,
+                'audited_count': 0,
+                'failed_count': 0,
+                'mean_score': None,
+                'distribution': {'excellent': 0, 'good': 0, 'average': 0, 'poor': 0},
+                'top_weaknesses': [],
+                'top_actions': [],
+                'weakest_articles': [],
+                'audited_articles': [],
+            })
+
+        per_article = []
+        cache_hits = 0
+        for art in articles:
+            if not art['title'] or not art['content']:
+                continue
+            try:
+                result, from_cache = _run_seo_audit(
+                    art['title'], art['excerpt'], art['content'],
+                    keyword='', language=art['language'], api_key=api_key,
+                )
+                if from_cache:
+                    cache_hits += 1
+                per_article.append({
+                    'slug': art['slug'],
+                    'title': art['title'],
+                    'language': art['language'],
+                    'score': result['score'],
+                    'verdict': result['verdict'],
+                    'weaknesses': result['weaknesses'],
+                    'actions': result['actions'],
+                })
+            except Exception as e:
+                logger.warning('Bulk audit failed for %s: %s', art['slug'], e)
+                per_article.append({
+                    'slug': art['slug'],
+                    'title': art['title'],
+                    'language': art['language'],
+                    'score': None,
+                    'error': str(e),
+                })
+
+        scored = [a for a in per_article if a.get('score') is not None]
+        failed = len(per_article) - len(scored)
+        scores = [a['score'] for a in scored]
+
+        if scores:
+            mean_score = round(sum(scores) / len(scores), 1)
+        else:
+            mean_score = None
+
+        distribution = {
+            'excellent': sum(1 for s in scores if s >= 85),
+            'good': sum(1 for s in scores if 70 <= s < 85),
+            'average': sum(1 for s in scores if 50 <= s < 70),
+            'poor': sum(1 for s in scores if s < 50),
+        }
+
+        weakness_counter = Counter()
+        action_counter = Counter()
+        for a in scored:
+            for w in a.get('weaknesses', []):
+                if isinstance(w, str) and w.strip():
+                    # Normalize keep-first-words for grouping similar items
+                    weakness_counter[w.strip()[:80]] += 1
+            for ac in a.get('actions', []):
+                if isinstance(ac, str) and ac.strip():
+                    action_counter[ac.strip()[:80]] += 1
+
+        weakest = sorted(scored, key=lambda x: x['score'])[:10]
+
+        return Response({
+            'site_id': site.id,
+            'audited_count': len(scored),
+            'failed_count': failed,
+            'cache_hits': cache_hits,
+            'mean_score': mean_score,
+            'distribution': distribution,
+            'top_weaknesses': [
+                {'text': text, 'count': count}
+                for text, count in weakness_counter.most_common(10)
+            ],
+            'top_actions': [
+                {'text': text, 'count': count}
+                for text, count in action_counter.most_common(10)
+            ],
+            'weakest_articles': [
+                {
+                    'slug': a['slug'],
+                    'title': a['title'],
+                    'language': a.get('language'),
+                    'score': a['score'],
+                    'verdict': a.get('verdict', ''),
+                }
+                for a in weakest
+            ],
+        })
 
 
 class PAAView(APIView):

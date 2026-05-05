@@ -246,3 +246,70 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Actions humaines en attente** : aucune nouvelle.
 
+---
+
+## Session 2026-05-04 (suite 5) — Bulk SEO audit ✅ Tier 1 #3 DONE — TIER 1 COMPLETED 🎯
+
+**Fait** :
+- **Refactor** : extrait la logique d'audit Gemini dans une fonction helper `_run_seo_audit(title, excerpt, content, keyword, language, api_key)` partagée. Renvoie tuple `(result, from_cache)`. `SEOAuditView` simplifié pour l'utiliser.
+- Backend `BulkSEOAuditView` ajouté (juste avant `PAAView`) :
+  - Endpoint `GET /sites/<int:site_id>/audit-all/?limit=50&language=fr` (synchrone, MVP).
+  - Itère sur les articles publiés (HostedPost ou BlogPost via using).
+  - Filtre langue optionnel.
+  - Pour chaque article : appelle `_run_seo_audit` (cache 1h par article via le helper).
+  - Agrège : `mean_score`, `distribution` (excellent ≥85 / good 70-84 / average 50-69 / poor <50), `top_weaknesses` (Counter sur les 80 premiers chars), `top_actions`, `weakest_articles` (top 10 par score asc).
+  - Retourne `cache_hits` pour signaler les économies (utile car le cache rend les runs suivants quasi-instantanés).
+- Route `path('sites/<int:site_id>/audit-all/', BulkSEOAuditView.as_view(), name='site-audit-all')` ajoutée.
+- Frontend `src/pages/dashboard/BulkAudit.tsx` :
+  - Bouton "Lancer l'audit" + select limite (10/25/50/100).
+  - 4 KPI cards : audited count, mean score, healthy count, poor count.
+  - Distribution bar visuelle (4 segments colorés vert/emerald/amber/rouge avec %).
+  - Two-column : top weaknesses (×count) + top actions (×count).
+  - Liste des weakest articles avec score coloré + lien vers PostEditor.
+  - Skeleton pendant chargement.
+- Route React `<Route path="audit-global" element={<BulkAudit />} />` ajoutée dans `DashboardLayout.tsx`.
+- Lien sidebar "Audit global SEO" avec icône `TrendingUp` ajouté dans `DashboardSidebar.tsx`.
+- 21 nouvelles clés `bulkAudit.*` + `sidebar.bulkAudit` dans fr/en.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 10.16s
+- **Test live à faire (humain)** : aller sur `/dashboard/<siteId>/audit-global`, choisir limite=10 (premier run), cliquer Lancer. Premier run : 1-2 min (paie chaque article via Gemini). Re-lance : instantané (cache). Vérifier l'agrégat, les top weaknesses/actions, et que les weakest articles cliquent bien vers le PostEditor.
+
+**Branches/commits** : commit local à venir (pas de push).
+
+**🎯 Tier 1 de la roadmap COMPLET** :
+- [x] #1 Content Brief Generator
+- [x] #2 People Also Ask + FAQ schema
+- [x] #3 Bulk SEO audit
+- [x] #4 Hreflang validator
+
+**Prochain bloc concret** :
+
+**Tier 2 #5 — Rank tracking** (estimé 8-12h, multi-sessions). Planifier l'architecture en premier :
+
+**Étape A (1h, prochaine session)** : Concevoir le modèle DB `SerpRank`, écrire la migration.
+1. Modèle `SerpRank(site FK, keyword str, language str(2), position int, url str, source str, recorded_at datetime)`. Index sur (site, keyword, language, recorded_at).
+2. Modèle `TrackedKeyword(site FK, keyword str, language str(2), is_active bool, created_at)` pour stocker les mots-clés à suivre par site.
+3. `python manage.py makemigrations sites_mgmt`.
+4. Endpoint `POST /sites/<id>/keywords/track/` pour ajouter un mot-clé.
+5. Endpoint `GET /sites/<id>/keywords/` pour lister.
+6. Endpoint `DELETE /sites/<id>/keywords/<id>/` pour retirer.
+7. Frontend : nouvelle page `KeywordTracker.tsx` avec table, ajouter dans le sidebar.
+8. Tests : check + build.
+
+**Étape B (2h, session suivante)** : Cron + collecte rank.
+- Endpoint `POST /sites/<id>/rank-snapshot/` qui itère les TrackedKeyword actifs, query Serper SERP, stocke SerpRank.
+- Test manuel.
+
+**Étape C (3-4h)** : UI graphique d'évolution + alerte décay.
+
+**Alternative à Tier 2 #5** : si les 8-12h sont trop long en autonome, attaquer Tier 3 items courts (Readability scores 2h, EEAT author profile 2h, Auto-redirect 301 2h) qui sont indépendants.
+
+**Recommandation pour la prochaine session** : Tier 2 #5 étape A (1h) pour avancer le rank tracking sans bloquer sur tout.
+
+**Blocages** : aucun. Tier 1 fini, l'app a maintenant un parcours SEO complet : brief avant écriture → écriture assistée → audit après écriture (per article + bulk site-wide) → traduction → maillage international (hreflang) → suivi positions (Tier 2 prochain).
+
+**Actions humaines en attente** : aucune nouvelle.
+

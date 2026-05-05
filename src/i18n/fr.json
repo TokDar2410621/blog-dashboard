@@ -78,10 +78,36 @@
     "dashboard": "Tableau de bord",
     "articles": "Articles",
     "generate": "Generer un article",
+    "bulkAudit": "Audit global SEO",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "bulkAudit": {
+    "title": "Audit SEO global du site",
+    "subtitle": "Lance un audit IA sur tous les articles publies pour reperer les patterns d'amelioration.",
+    "runTitle": "Lancer l'audit",
+    "limit": "Articles a auditer",
+    "run": "Lancer",
+    "running": "Audit en cours...",
+    "runWait": "Cela peut prendre 1-2 minutes selon le nombre d'articles. Le cache acceleres les runs suivants.",
+    "audited": "Articles audites",
+    "meanScore": "Score moyen",
+    "healthy": "Sains (≥70)",
+    "poor": "Faibles (<50)",
+    "distribution": "Distribution des scores",
+    "excellent": "Excellent",
+    "good": "Bon",
+    "average": "Moyen",
+    "cacheHits": "{{count}} resultats lus depuis le cache (gratuit).",
+    "topWeaknesses": "Faiblesses les plus frequentes",
+    "topActions": "Actions les plus recommandees",
+    "noWeaknesses": "Aucune faiblesse detectee.",
+    "noActions": "Aucune action recommandee.",
+    "weakestArticles": "Articles les plus faibles a corriger en priorite",
+    "error": "Erreur lors de l'audit"
   },
 
   "overview": {

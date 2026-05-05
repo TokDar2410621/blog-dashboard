@@ -8,6 +8,7 @@ import PostEditor from "./PostEditor";
 import AIGenerator from "./AIGenerator";
 import ImageGallery from "./ImageGallery";
 import SiteSettings from "./SiteSettings";
+import BulkAudit from "./BulkAudit";
 
 export default function DashboardLayout() {
   return (
@@ -23,6 +24,7 @@ export default function DashboardLayout() {
                 <Route path="articles/nouveau" element={<PostEditor />} />
                 <Route path="articles/:slug" element={<PostEditor />} />
                 <Route path="generer" element={<AIGenerator />} />
+                <Route path="audit-global" element={<BulkAudit />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>
