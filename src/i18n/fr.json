@@ -143,6 +143,13 @@
     "updated": "Mise a jour"
   },
 
+  "lexicon": {
+    "title": "Lexique québécois (FR-CA)",
+    "subtitle": "Detecte les termes France (shopping, week-end, parking, email...) et propose les equivalents quebecois recommandes par l'OQLF.",
+    "allClear": "Aucun terme franco-francais detecte. Ton article respecte le lexique quebecois.",
+    "summary": "{{terms}} terme(s) a remplacer pour un public quebecois ({{total}} occurrence(s) au total)."
+  },
+
   "readability": {
     "title": "Lisibilite",
     "subtitle": "Score Flesch-Kincaid + ARI calcule sur ton contenu (rafraichi 800 ms apres ta derniere frappe).",

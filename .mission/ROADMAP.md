@@ -74,7 +74,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] **10. Auto-redirect 301 sur slug change** — modèle `Redirect` + migration 0013 + auto-hook dans `SitePostDetailView.patch` + 301 dans `PublicPostDetailView` + CRUD admin + UI `/dashboard/<id>/redirects`.
 - [ ] **11. Image SEO** (WebP auto, srcset, descriptive filenames) ⏱ 4h
 - [x] **12. Readability scores FR/EN** (Flesch-Kincaid, ARI) — endpoint `/readability/`, helpers FR/EN avec syllable-counter heuristique, ReadabilityCard mounted in PostEditor SEO view, suggestions auto.
-- [ ] **13. Quebec lexicon** (FR-CA dictionnaire, schema LocalBusiness) ⏱ 4h
+- [x] **13. Quebec lexicon** — endpoint `/lexicon-check/` avec dictionnaire ~50 entrées FR-FR→FR-CA + helper `_generate_local_business_schema` adapté Québec (addressCountry CA, addressRegion QC, areaServed Québec). UI `LexiconCard` mounted in PostEditor, conditionné FR uniquement.
 - [ ] **14. Bing Webmaster integration** ⏱ 6h (action humaine pour API key)
 - [ ] **15. Search trends FR-CA** (Google Trends via pytrends) ⏱ 3h
 - [x] **16. Reddit/Quora question harvesting** — endpoint `/community-questions/` deux Serper queries `site:reddit.com` + `site:quora.com`, panel intégré dans AIGenerator.

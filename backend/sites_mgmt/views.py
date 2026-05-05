@@ -3483,6 +3483,206 @@ class BrokenLinksView(APIView):
             return None, str(e)[:100]
 
 
+# Common French France → French Quebec lexicon. Each entry is
+# (word_or_phrase_to_flag, suggested_quebecois, optional_explanation).
+# Lowercased; matched as whole words (word-boundary regex).
+QUEBECOIS_LEXICON = [
+    # Lifestyle / commerce
+    ('shopping', 'magasinage', "Au Québec on dit magasiner."),
+    ('faire les magasins', 'magasiner', None),
+    ('week-end', 'fin de semaine', None),
+    ('weekend', 'fin de semaine', None),
+    ('parking', 'stationnement', None),
+    ('park-vehicule', 'stationnement', None),
+    ('email', 'courriel', None),
+    ('e-mail', 'courriel', None),
+    ('mail', 'courriel', "Au Québec mail = courrier postal, pas électronique."),
+    ('newsletter', 'infolettre', None),
+    ('spam', 'pourriel', None),
+    ('chat', 'clavardage', "Pour la conversation en ligne. Pour l'animal, chat est correct."),
+    ('podcast', 'baladodiffusion', None),
+    ('podcasts', 'baladodiffusions', None),
+    ('smartphone', 'téléphone intelligent', None),
+    ('smartphones', 'téléphones intelligents', None),
+    ('streaming', 'diffusion en continu', None),
+
+    # Education / work
+    ('lycée', 'cégep ou école secondaire', "Le système québécois utilise cégep + secondaire."),
+    ('lycéen', 'cégépien ou élève du secondaire', None),
+    ('lycéenne', 'cégépienne ou élève du secondaire', None),
+    ('bac', 'baccalauréat', "Le bac québécois = diplôme universitaire, pas le bac de France."),
+    ('CAP', 'DEP', "DEP = Diplôme d'études professionnelles."),
+    ('intérimaire', 'temporaire', None),
+    ('intérim', 'travail temporaire', None),
+    ('stagiaire', 'stagiaire', None),  # acceptable
+    ('emploi à plein temps', 'emploi à temps plein', None),
+    ('plein temps', 'temps plein', None),
+
+    # Money / numbers
+    ('TVA', 'TPS et TVQ', "Au Québec: TPS (5% fédéral) + TVQ (9.975% provincial)."),
+    ('SARL', 'inc. ou SENC', "Société québécoise: Inc. (équivalent SARL)."),
+    ('PME', 'PME', None),  # acceptable
+    ('CDI', 'emploi permanent', None),
+    ('CDD', 'contrat à durée déterminée', None),
+    ('SMIC', 'salaire minimum', None),
+    ('cagnotte', 'collecte de fonds', None),
+
+    # Food / hospitality
+    ('petit déjeuner', 'déjeuner', "Au Québec, déjeuner = matin, dîner = midi, souper = soir."),
+    ('petit-déjeuner', 'déjeuner', None),
+    ('déjeuner', 'dîner', None),  # When meaning the noon meal, in Quebec dîner = noon
+    ('dîner', 'souper', None),    # When meaning evening meal
+    ('boulot', 'travail', "Boulot = très familier France."),
+    ('chéri', 'mon chum / ma blonde', None),
+
+    # Cars / transport
+    ('voiture', 'auto / char', None),  # both used in QC
+    ('moto', 'moto', None),
+    ('tramway', 'tramway', None),
+    ('métro', 'métro', None),
+
+    # Tech / IT
+    ('mot de passe oublié', 'mot de passe oublié', None),
+    ('login', 'identifiant', None),
+    ('blogger', 'blogueur', None),
+    ('bloguer', 'bloguer', None),
+    ('e-commerce', 'commerce en ligne', None),
+    ('startup', 'jeune pousse', "Anglicisme accepté, mais 'jeune pousse' est l'équivalent OQLF."),
+
+    # Daily life
+    ('soldes', 'rabais', None),
+    ('soirée', 'veillée', None),
+    ('embouteillage', 'bouchon de circulation', None),
+    ('ticket', 'billet', None),
+    ('tickets', 'billets', None),
+]
+
+
+def _quebecois_check(text):
+    """Scan text for non-Quebecois terms and return matches with positions
+    (line/column) so the frontend can highlight inline if it wants."""
+    import re as _re
+
+    if not text:
+        return []
+
+    # Sort longer phrases first so multi-word matches win over single-word
+    sorted_lex = sorted(QUEBECOIS_LEXICON, key=lambda x: -len(x[0]))
+
+    matches = []
+    seen_terms = {}
+
+    for term, suggestion, explanation in sorted_lex:
+        # word-boundary regex, case-insensitive, hyphens treated as separators
+        pattern = _re.compile(r'\b' + _re.escape(term) + r'\b', _re.IGNORECASE)
+        positions = []
+        for m in pattern.finditer(text):
+            # Compute line + column
+            prefix = text[: m.start()]
+            line = prefix.count('\n') + 1
+            col = m.start() - (prefix.rfind('\n') + 1) if '\n' in prefix else m.start() + 1
+            positions.append({'line': line, 'col': col, 'matched_text': m.group(0)})
+        if positions:
+            key = term.lower()
+            if key in seen_terms:
+                continue
+            seen_terms[key] = True
+            matches.append({
+                'term': term,
+                'suggestion': suggestion,
+                'explanation': explanation or '',
+                'count': len(positions),
+                'positions': positions[:20],
+            })
+
+    return matches
+
+
+def _generate_local_business_schema(site, address=None, hours=None, phone=None,
+                                    price_range=None, area_served=None):
+    """Generate a Schema.org LocalBusiness JSON-LD adapted for Quebec.
+
+    Defaults: addressCountry=CA, addressRegion=QC. Pass address dict with
+    streetAddress/addressLocality/postalCode keys. hours is optional list of
+    OpeningHoursSpecification dicts.
+    """
+    schema = {
+        '@context': 'https://schema.org',
+        '@type': 'LocalBusiness',
+        'name': site.name,
+    }
+    if site.description:
+        schema['description'] = site.description
+    if site.domain:
+        url = site.domain
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        schema['url'] = url
+    if site.og_image_url:
+        schema['image'] = site.og_image_url
+    if phone:
+        schema['telephone'] = phone
+    if price_range:
+        schema['priceRange'] = price_range
+    if address:
+        schema['address'] = {
+            '@type': 'PostalAddress',
+            'addressCountry': 'CA',
+            'addressRegion': 'QC',
+            **{k: v for k, v in address.items() if v},
+        }
+    if hours:
+        schema['openingHoursSpecification'] = hours
+    schema['areaServed'] = area_served or {
+        '@type': 'AdministrativeArea',
+        'name': 'Québec',
+    }
+    return schema
+
+
+class LexiconCheckView(APIView):
+    """Detect non-Quebecois (FR-FR) terms in content and suggest Quebec
+    equivalents. Useful for sites targeting a Quebec audience.
+
+    POST /lexicon-check/ {content: str}
+    Returns: {matches: [{term, suggestion, explanation, count, positions}], total_matches}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        content = request.data.get('content', '') or ''
+        if not content.strip():
+            return Response({'matches': [], 'total_matches': 0})
+
+        matches = _quebecois_check(content)
+        total = sum(m['count'] for m in matches)
+        return Response({
+            'matches': matches,
+            'total_matches': total,
+            'unique_terms': len(matches),
+        })
+
+
+class LocalBusinessSchemaView(APIView):
+    """Generate a Schema.org LocalBusiness JSON-LD adapted for Quebec.
+
+    POST /sites/<id>/local-business-schema/ {address?, hours?, phone?, price_range?, area_served?}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        schema = _generate_local_business_schema(
+            site,
+            address=request.data.get('address'),
+            hours=request.data.get('hours'),
+            phone=request.data.get('phone'),
+            price_range=request.data.get('price_range'),
+            area_served=request.data.get('area_served'),
+        )
+        return Response({'schema': schema})
+
+
 def _count_syllables_en(word):
     """Heuristic English syllable count. Good enough for Flesch — not perfect."""
     word = word.lower().strip(".,!?;:'\"()[]{}—–-")

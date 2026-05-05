@@ -11,6 +11,7 @@ import { ImageInsertDialog } from "@/components/ImageInsertDialog";
 import { SEOPreview } from "@/components/SEOPreview";
 import { SEOAnalyzer } from "@/components/SEOAnalyzer";
 import { ReadabilityCard } from "@/components/ReadabilityCard";
+import { LexiconCard } from "@/components/LexiconCard";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -670,6 +671,7 @@ export default function PostEditor() {
           <div className="h-full overflow-y-auto pt-4">
             <div className="max-w-2xl space-y-6">
               <ReadabilityCard content={content} language={language} />
+              <LexiconCard content={content} language={language} />
               <SEOAnalyzer
                 title={title}
                 excerpt={excerpt}

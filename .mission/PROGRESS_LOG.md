@@ -932,3 +932,73 @@ Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
 
 **Actions humaines en attente** : tester + décider du déploiement.
 
+---
+
+## Session 2026-05-04 (suite 16) — Quebec lexicon (FR-CA) + LocalBusiness schema ✅ Tier 3 #13 DONE
+
+**Fait** :
+- Backend dans `views.py` (juste avant `_count_syllables_en`) :
+  - Constante `QUEBECOIS_LEXICON` : ~50 entrées `(term_FR-FR, suggestion_FR-CA, optional_explanation)` couvrant lifestyle/commerce (shopping→magasinage, week-end→fin de semaine, parking→stationnement, email→courriel...), education (lycée→cégep, bac→baccalauréat), money (TVA→TPS+TVQ, SARL→Inc.), food (petit déjeuner→déjeuner, déjeuner→dîner...), tech (login→identifiant, startup→jeune pousse...), daily life (soldes→rabais, ticket→billet...).
+  - `_quebecois_check(text)` : regex `\b...\b` case-insensitive par terme, calcule positions line/col, dédupliqué, max 20 positions par terme.
+  - `_generate_local_business_schema(site, address, hours, phone, price_range, area_served)` : génère `Schema.org/LocalBusiness` JSON-LD adapté Québec — `addressCountry: 'CA'`, `addressRegion: 'QC'`, `areaServed: 'Québec'` par défaut.
+  - `LexiconCheckView` (`POST /lexicon-check/`) : input `{content}`, retourne `{matches, total_matches, unique_terms}`.
+  - `LocalBusinessSchemaView` (`POST /sites/<id>/local-business-schema/`) : génère le schema avec les fields optionnels passés.
+- Routes ajoutées dans `urls.py`.
+- Test manuel Python : "Je vais faire mon shopping ce week-end. Le parking sera plein. Je dois envoyer un email avant." → 4 matches détectés avec suggestions correctes ✅.
+- Frontend `src/components/LexiconCard.tsx` :
+  - Debounce 1000ms.
+  - **Affiché uniquement si `language === 'fr'`** (le lexique n'a de sens qu'en FR).
+  - Si aucun match : message vert "Ton article respecte le lexique québécois".
+  - Sinon : liste des termes avec badge ×count, ancien terme barré, flèche vers la suggestion en vert, explication optionnelle.
+- Mounted dans `PostEditor.tsx` SEO view, juste après le `ReadabilityCard`.
+- 4 nouvelles clés `lexicon.*` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- Test manuel Python validé sur 4 termes
+- JSON i18n valide
+- `npm run build` → ✓ built in 10.78s
+- **Tests live à faire (humain)** : éditer un article FR dans `/dashboard/<siteId>/articles/<slug>`, switcher en vue SEO, voir la card "Lexique québécois (FR-CA)" sous Lisibilité. Mettre du texte avec "shopping" / "weekend" / "email" → matches détectés avec suggestions.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend (helper + 2 views + routes) + frontend (card + mount in PostEditor) + i18n.
+
+**Note différenciation** : c'est exactement le type de feature qui rend "n°1 au Québec" tangible — Ahrefs/Semrush/Surfer ne font absolument pas ça.
+
+**TODO mineur** : LocalBusinessSchemaView est exposé mais pas encore consommé par le frontend. À ajouter en option dans `SiteSettings.tsx` (form pour saisir address/hours/phone, generate schema, copier-coller). Reporté à une session future ou intégré au wrapper `SEOSchemaView` existant.
+
+**Prochain bloc concret** :
+
+Tier 3 a maintenant **7/9 fait** (#7, #8, #9, #10, #12, #13, #16). Items restants :
+
+- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe.
+- **#15 Search trends FR-CA** (3h) — pytrends.
+- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+
+**Recommandation** : **#15 Search trends FR-CA** (court, end-to-end, pas de clé requise). pytrends est gratuit, parfois rate-limited mais marche pour MVP.
+
+Plan #15 :
+1. `pip install pytrends` à ajouter à `requirements.txt`.
+2. Backend `POST /trends/` avec `{keyword, language='fr', timeframe='today 12-m'}` → retourne :
+   - Interest over time (12 mois).
+   - Top related queries.
+   - Top rising queries (ce qui monte).
+3. Cache 24h (les données trends bougent lentement).
+4. Frontend : panel dans AIGenerator (ou page dédiée) avec mini graphique recharts + listes related/rising.
+5. i18n + build.
+
+**Statistiques fin de session 16** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 7/9 (#7, #8, #9, #10, #12, #13, #16)
+- Endpoints SEO ajoutés cumulés : 18 (… + lexicon-check, local-business-schema)
+- Composants frontend ajoutés cumulés : 13 (… + LexiconCard)
+- Commits locaux non poussés : 15
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les pages.
+- Décider du déploiement.
+

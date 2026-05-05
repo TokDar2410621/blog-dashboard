@@ -143,6 +143,13 @@
     "updated": "Updated"
   },
 
+  "lexicon": {
+    "title": "Quebec French (FR-CA) lexicon",
+    "subtitle": "Spots France-French terms (shopping, week-end, parking, email...) and suggests OQLF-recommended Quebec equivalents.",
+    "allClear": "No France-French terms detected. Your article respects the Quebec lexicon.",
+    "summary": "{{terms}} term(s) to replace for a Quebec audience ({{total}} occurrence(s) total)."
+  },
+
   "readability": {
     "title": "Readability",
     "subtitle": "Flesch-Kincaid + ARI score computed on your content (refreshed 800 ms after the last keystroke).",
