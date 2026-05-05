@@ -3224,6 +3224,134 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class ImageSEOSuggestView(APIView):
+    """Use Gemini Vision to inspect an image and suggest SEO-friendly alt
+    text + descriptive filename slug. Article context (title, keyword,
+    language) is used to tailor the suggestion to the surrounding content.
+
+    POST /image-suggest/ {image_url, article_title?, keyword?, language='fr'}
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        import json
+
+        image_url = (request.data.get('image_url') or '').strip()
+        article_title = (request.data.get('article_title') or '').strip()
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not image_url:
+            return Response(
+                {'error': 'image_url requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not image_url.startswith(('http://', 'https://')):
+            return Response(
+                {'error': 'image_url doit etre une URL HTTP(S)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+        if not gemini_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        cache_key = _seo_cache_key(
+            'image-suggest:', image_url, article_title, keyword, language
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        # Fetch the image bytes
+        try:
+            resp = http_requests.get(
+                image_url,
+                timeout=10,
+                headers={'User-Agent': 'Mozilla/5.0 BlogDashboard/1.0'},
+            )
+            if not resp.ok or not resp.content:
+                return Response(
+                    {'error': 'Impossible de telecharger l\'image'},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            image_bytes = resp.content
+            mime_type = resp.headers.get('Content-Type', 'image/jpeg').split(';')[0].strip()
+            if not mime_type.startswith('image/'):
+                mime_type = 'image/jpeg'
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur telechargement image: {str(e)[:100]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        lang_label = {
+            'fr': 'French (Quebec)',
+            'en': 'English',
+            'es': 'Spanish',
+        }.get(language, 'French')
+
+        context_block = ''
+        if article_title:
+            context_block += f"Article title: {article_title}\n"
+        if keyword:
+            context_block += f"Target keyword: {keyword}\n"
+
+        prompt = f"""You are an SEO expert. Look at this image and suggest:
+1. A descriptive alt text (under 125 chars) in {lang_label}, accurate to the
+   image, and naturally including the target keyword if it fits without forcing.
+2. A short URL-friendly filename slug (3-6 words, lowercase, hyphens, in
+   {lang_label} stripped of accents) that describes the image content.
+3. A 1-sentence description of what's in the image.
+
+{context_block}
+Respond with JSON only (no markdown):
+{{
+  "alt_text": "...",
+  "filename_slug": "...",
+  "description": "..."
+}}"""
+
+        try:
+            from google import genai
+            from google.genai import types as genai_types
+
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    prompt,
+                ],
+            )
+            text = (response.text or '').strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1]
+                if text.endswith('```'):
+                    text = text[:-3]
+                text = text.strip()
+            data = json.loads(text)
+        except Exception as e:
+            logger.warning('Gemini image suggest failed: %s', e)
+            return Response(
+                {'error': f'Erreur Gemini: {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        result = {
+            'alt_text': (data.get('alt_text') or '').strip()[:200],
+            'filename_slug': slugify((data.get('filename_slug') or '').strip())[:80],
+            'description': (data.get('description') or '').strip(),
+        }
+        cache.set(cache_key, result, timeout=86400)  # 24h
+        return Response(result)
+
+
 class SearchTrendsView(APIView):
     """Google Trends data via pytrends — interest over time + related/rising
     queries for a keyword. Geo-scoped to Quebec / Canada / France / US per

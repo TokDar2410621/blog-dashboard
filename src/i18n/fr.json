@@ -557,7 +557,11 @@
     "fileTypes": "JPEG, PNG, GIF, WebP (max 10 Mo)",
     "altText": "Texte alternatif",
     "altPlaceholder": "Description de l'image...",
-    "insert": "Inserer dans l'article"
+    "insert": "Inserer dans l'article",
+    "aiSuggest": "IA",
+    "aiSuggestTooltip": "Generer un alt text SEO automatiquement avec Gemini Vision",
+    "aiSuggested": "Alt text genere par IA applique",
+    "aiError": "Erreur generation IA"
   },
 
   "status": {

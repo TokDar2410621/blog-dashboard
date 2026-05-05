@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { searchPexels, uploadInlineImage } from "@/lib/api-client";
+import { searchPexels, uploadInlineImage, authFetch } from "@/lib/api-client";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   Loader2,
   Check,
   ImageIcon,
+  Sparkles,
 } from "lucide-react";
 
 interface PexelsPhoto {
@@ -32,6 +34,11 @@ interface ImageInsertDialogProps {
   onOpenChange: (open: boolean) => void;
   onInsert: (markdown: string) => void;
   initialQuery?: string;
+  articleContext?: {
+    title?: string;
+    keyword?: string;
+    language?: string;
+  };
 }
 
 export function ImageInsertDialog({
@@ -39,6 +46,7 @@ export function ImageInsertDialog({
   onOpenChange,
   onInsert,
   initialQuery,
+  articleContext,
 }: ImageInsertDialogProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<"pexels" | "upload">("pexels");
@@ -48,8 +56,39 @@ export function ImageInsertDialog({
   const [uploading, setUploading] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState("");
   const [altText, setAltText] = useState("");
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [aiDescription, setAiDescription] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const didAutoSearch = useRef(false);
+
+  const handleAiSuggest = async () => {
+    if (!selectedUrl) return;
+    setAiSuggesting(true);
+    setAiDescription(null);
+    try {
+      const res = await authFetch("/image-suggest/", {
+        method: "POST",
+        body: JSON.stringify({
+          image_url: selectedUrl,
+          article_title: articleContext?.title || "",
+          keyword: articleContext?.keyword || "",
+          language: articleContext?.language || "fr",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || t("imageDialog.aiError"));
+      }
+      const data = await res.json();
+      if (data.alt_text) setAltText(data.alt_text);
+      if (data.description) setAiDescription(data.description);
+      toast.success(t("imageDialog.aiSuggested"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("imageDialog.aiError"));
+    } finally {
+      setAiSuggesting(false);
+    }
+  };
 
   useEffect(() => {
     if (open && initialQuery && !didAutoSearch.current) {
@@ -113,6 +152,7 @@ export function ImageInsertDialog({
   const handleClose = () => {
     setSelectedUrl("");
     setAltText("");
+    setAiDescription(null);
     setResults([]);
     setQuery("");
     onOpenChange(false);
@@ -261,13 +301,36 @@ export function ImageInsertDialog({
               />
               <div className="flex-1 space-y-2">
                 <div className="space-y-1">
-                  <Label className="text-xs">{t("imageDialog.altText")}</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-xs">{t("imageDialog.altText")}</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs"
+                      onClick={handleAiSuggest}
+                      disabled={aiSuggesting}
+                      title={t("imageDialog.aiSuggestTooltip")}
+                    >
+                      {aiSuggesting ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3 mr-1 text-primary" />
+                      )}
+                      {t("imageDialog.aiSuggest")}
+                    </Button>
+                  </div>
                   <Input
                     value={altText}
                     onChange={(e) => setAltText(e.target.value)}
                     placeholder={t("imageDialog.altPlaceholder")}
                     className="h-8 text-sm"
                   />
+                  {aiDescription && (
+                    <p className="text-[11px] text-muted-foreground italic">
+                      {aiDescription}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

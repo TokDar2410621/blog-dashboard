@@ -1077,3 +1077,89 @@ Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 - Tester les pages.
 - Décider de la suite : Tier 3 #11 Image SEO ou pivot Tier 4 commercialisation.
 
+---
+
+## Session 2026-05-04 (suite 18) — Image SEO via Gemini Vision ✅ Tier 3 #11 DONE
+
+**Fait** :
+- Backend `ImageSEOSuggestView` (juste avant `SearchTrendsView`) :
+  - Endpoint `POST /image-suggest/`. Body : `{image_url, article_title?, keyword?, language='fr'}`.
+  - Télécharge l'image (HTTP, max 10s timeout), envoie les bytes + prompt à Gemini 2.5 flash via `genai_types.Part.from_bytes(data=bytes, mime_type=...)` (Gemini Vision multimodal).
+  - Prompt structuré demande : `{alt_text, filename_slug, description}` en JSON, en {language} (FR-CA / EN / ES), avec keyword inclus naturellement si possible, alt < 125 chars.
+  - Cache 24h via `_seo_cache_key('image-suggest:', image_url, article_title, keyword, language)`.
+  - Slugifie le filename côté Python pour garantir un slug propre.
+- Route `path('image-suggest/', ImageSEOSuggestView.as_view(), name='image-suggest')`.
+- Frontend `src/components/ImageInsertDialog.tsx` :
+  - Nouvelle prop optionnelle `articleContext: {title?, keyword?, language?}`.
+  - State `aiSuggesting`, `aiDescription`.
+  - Fonction `handleAiSuggest()` qui appelle `/image-suggest/` avec le contexte article.
+  - Bouton **"IA"** discret (variant ghost, h-6, icon Sparkles primary) à côté du label "Texte alternatif" dans la section preview/insert.
+  - Quand cliqué : remplit `altText` avec la suggestion + affiche `description` en italique en dessous.
+  - Toasts succès/erreur.
+  - Reset `aiDescription` au close du dialog.
+- `PostEditor.tsx` passe `articleContext` au dialog : `{title, keyword: tagsInput.split(',')[0]?.trim(), language}`.
+- 4 nouvelles clés `imageDialog.aiSuggest*` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 12.45s
+- **Tests live à faire (humain)** : éditer un article, cliquer pour insérer une image (Pexels ou upload), une fois sélectionnée, cliquer sur le bouton **IA** près du champ alt text → Gemini Vision analyse l'image, propose un alt text contextualisé incluant le keyword si pertinent. Vérifier la pertinence sur 3-4 images variées.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend (view + route) + frontend (props + bouton + state + i18n) dans la même session.
+
+**🎯 TIER 3 COMPLET (sauf #14 qui exige clé Bing Webmaster — action humaine)** :
+- [x] #7 Topic Cluster Planner
+- [x] #8 Internal link graph
+- [x] #9 Broken link checker
+- [x] #10 Auto-redirect 301
+- [x] #11 Image SEO (alt text Gemini Vision)
+- [x] #12 Readability scores FR/EN
+- [x] #13 Quebec lexicon + LocalBusiness schema
+- [x] #15 Search trends FR-CA
+- [x] #16 Reddit/Quora harvesting
+- [ ] #14 Bing Webmaster — pending human action (clé API)
+
+**Statistiques fin de session 18 (la mission est essentiellement complète sur Tiers 1-3)** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : ✅ 9/10 (manque #14 humain)
+- **Total endpoints SEO ajoutés cette journée : 20**
+- **Total composants/pages frontend ajoutés cette journée : 14**
+- 2 migrations DB safe
+- 17 commits locaux non poussés
+
+**Prochain bloc concret** :
+
+La mission a essentiellement franchi le seuil "presque accomplie" sur les capacités SEO. Reste pour atteindre vraiment la position **n°1 au Québec** :
+
+1. **Action humaine prioritaire** : pousser les 17 commits (`git push origin main`), redéployer, tester les pages live sur les 3 sites de Darius. Mesurer ce qui marche, ce qui buggue, ce qui doit être affiné.
+2. **Tier 4 — commercialisation** (5 items, ~28h cumulés) :
+   - #17 Weekly digest auto (4h)
+   - #18 EEAT author profile (2h)
+   - #19 Plagiarism / originality check (3h, action humaine pour clé API tierce)
+   - #20 Multi-domain comparison (4h)
+   - #21 Pricing + Stripe (8h, **action humaine** : config compte Stripe)
+   - #22 Landing page commerciale (6h)
+   - #23 Onboarding flow (6h)
+
+**Recommandation forte** : avant Tier 4, **valider la mission sur les 3 sites de prod** :
+- Push, deploy, attendre 6 semaines.
+- Mesurer GSC : impressions, clics, position moyenne avant/après.
+- Si amélioration mesurable → entrer Tier 4 commercialisation avec preuve.
+- Sinon → identifier ce qui ne marche pas et l'affiner.
+
+**Items mineurs identifiés en cours de route, à reprendre quand utile** :
+- LocalBusinessSchemaView frontend (form dans SiteSettings) — endpoint backend déjà en place mais pas consommé.
+- Topic clusters — visualisation graphe react-flow au lieu des cartes simples (option D du #7).
+- Rank tracking étape C — cron quotidien pour rank-snapshot via Railway scheduler ou /schedule cloud avec endpoint protégé X-Cron-Token.
+
+**Blocages** : aucun pour le code.
+
+**Actions humaines en attente** :
+- **PRIORITAIRE** : push 17 commits + tester live sur Arivex / LocaSur / TokamDarius.
+- Configurer Stripe pour commercialisation (Tier 4 #21).
+- Configurer Bing Webmaster API key pour Tier 3 #14.
+

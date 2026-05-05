@@ -1117,6 +1117,11 @@ export default function PostEditor() {
         }}
         onInsert={handleImageInsert}
         initialQuery={imageDialogQuery}
+        articleContext={{
+          title,
+          keyword: tagsInput.split(",")[0]?.trim() || "",
+          language,
+        }}
       />
 
       {/* AI Article Generation Dialog */}

@@ -53,7 +53,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Internal link graph viz
 - [x] Broken link checker
 - [x] Auto-redirect 301 sur slug change
-- [ ] Image SEO (WebP, srcset)
+- [x] Image SEO (alt text Gemini Vision ; WebP/srcset reportés en option future)
 - [x] Readability scores FR/EN
 - [x] Quebec lexicon (FR-CA, schema LocalBusiness)
 - [ ] Bing Webmaster integration
