@@ -119,7 +119,7 @@ export function DashboardSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link to="/">
+              <Link to="/sites">
                 <ArrowLeft className="h-4 w-4" />
                 <span>{t("sidebar.switchSite")}</span>
               </Link>

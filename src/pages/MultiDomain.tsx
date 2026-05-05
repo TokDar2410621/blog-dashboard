@@ -79,7 +79,7 @@ export default function MultiDomain() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/sites")}
             title={t("multiDomain.back")}
           >
             <ArrowLeft className="h-5 w-5" />

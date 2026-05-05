@@ -22,7 +22,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   if (!isLoading && user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/sites" replace />;
   }
 
   if (isLoading && getToken()) {
@@ -41,7 +41,7 @@ export default function Login() {
       setTokens(tokens.access);
       await checkAuth();
       toast.success(t("login.success"));
-      navigate("/");
+      navigate("/sites");
     } catch (e) {
       toast.error(getApiErrorMessage(e, t));
     } finally {

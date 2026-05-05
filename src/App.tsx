@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import "@/i18n";
 
 const Login = lazy(() => import("./pages/Login"));
+const Landing = lazy(() => import("./pages/Landing"));
 const SiteSelector = lazy(() => import("./pages/SiteSelector"));
 const MultiDomain = lazy(() => import("./pages/MultiDomain"));
 const DashboardLayout = lazy(
@@ -40,8 +41,9 @@ function App() {
             <Suspense fallback={<Loader />}>
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/" element={<Landing />} />
                 <Route
-                  path="/"
+                  path="/sites"
                   element={
                     <AuthGuard>
                       <SiteSelector />
