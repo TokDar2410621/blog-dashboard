@@ -25,7 +25,10 @@ from django.http import HttpResponse
 
 import markdown as md_lib
 
-from .models import Site, UploadedImage, HostedPost, HostedCategory, HostedTag
+from .models import (
+    Site, UploadedImage, HostedPost, HostedCategory, HostedTag,
+    TrackedKeyword, SerpRank,
+)
 from .db_utils import ensure_site_connection, test_site_connection
 from .blog_adapter import detect_blog_tables, setup_blog_views
 
@@ -3201,6 +3204,285 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         }
         cache.set(cache_key, result, SEO_CACHE_TTL)
         return Response(result)
+
+
+# ==========================================================================
+# RANK TRACKING — TrackedKeyword + SerpRank snapshots
+# ==========================================================================
+
+def _serialize_tracked_keyword(tk, latest=None):
+    """Serialize a TrackedKeyword with its latest snapshot for list views."""
+    base = {
+        'id': tk.id,
+        'keyword': tk.keyword,
+        'language': tk.language,
+        'target_url': tk.target_url,
+        'is_active': tk.is_active,
+        'created_at': tk.created_at.isoformat(),
+    }
+    if latest:
+        base['latest'] = {
+            'position': latest.position,
+            'url': latest.url,
+            'title': latest.title,
+            'is_target_match': latest.is_target_match,
+            'recorded_at': latest.recorded_at.isoformat(),
+        }
+    else:
+        base['latest'] = None
+    return base
+
+
+class TrackedKeywordsView(APIView):
+    """List or create tracked keywords for a site."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        keywords = list(
+            TrackedKeyword.objects.filter(site=site).order_by('-created_at')
+        )
+        # Fetch latest snapshot per keyword in a single query
+        latest_map = {}
+        if keywords:
+            ids = [k.id for k in keywords]
+            for snap in (
+                SerpRank.objects.filter(tracked_id__in=ids)
+                .order_by('tracked_id', '-recorded_at')
+            ):
+                if snap.tracked_id not in latest_map:
+                    latest_map[snap.tracked_id] = snap
+        return Response({
+            'results': [
+                _serialize_tracked_keyword(k, latest_map.get(k.id))
+                for k in keywords
+            ],
+        })
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or site.default_language or 'fr').lower()
+        target_url = (request.data.get('target_url') or '').strip()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': 'Langue invalide (fr, en, es)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tk, created = TrackedKeyword.objects.get_or_create(
+            site=site, keyword=keyword, language=language,
+            defaults={'target_url': target_url, 'is_active': True},
+        )
+        if not created:
+            # Reactivate / update target if existed
+            tk.is_active = True
+            if target_url:
+                tk.target_url = target_url
+            tk.save()
+        return Response(
+            _serialize_tracked_keyword(tk),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class TrackedKeywordDetailView(APIView):
+    """Delete a tracked keyword."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, site_id, pk):
+        site = get_site_for_user(request, site_id)
+        try:
+            tk = TrackedKeyword.objects.get(site=site, id=pk)
+        except TrackedKeyword.DoesNotExist:
+            return Response(
+                {'error': 'Mot-cle introuvable'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        tk.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RankSnapshotView(APIView):
+    """Crawl Google SERP via Serper for all active tracked keywords of a site,
+    record one SerpRank snapshot per keyword. Designed to be called from a
+    cron / scheduled agent (daily). Returns counts.
+
+    Body: {keyword_ids?: [int]} — optional filter to only crawl specific
+    keywords (default: all active for the site).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        keyword_ids = request.data.get('keyword_ids') or []
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        qs = TrackedKeyword.objects.filter(site=site, is_active=True)
+        if keyword_ids:
+            qs = qs.filter(id__in=keyword_ids)
+
+        snapshots_created = 0
+        not_found_count = 0
+        site_domain = (site.domain or '').lower().replace('https://', '').replace('http://', '').rstrip('/')
+
+        for tk in qs:
+            hl, gl = ('en', 'us') if tk.language == 'en' else (
+                ('es', 'es') if tk.language == 'es' else ('fr', 'ca')
+            )
+            try:
+                resp = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={
+                        'X-API-KEY': api_key,
+                        'Content-Type': 'application/json',
+                    },
+                    json={'q': tk.keyword, 'num': 100, 'hl': hl, 'gl': gl},
+                    timeout=15,
+                )
+            except Exception as e:
+                logger.warning('Serper rank snapshot failed for %s: %s', tk.keyword, e)
+                continue
+
+            if resp.status_code != 200:
+                logger.warning('Serper rank snapshot status %s for %s', resp.status_code, tk.keyword)
+                continue
+
+            organic = (resp.json() or {}).get('organic') or []
+
+            # Find first occurrence of target_url OR site_domain
+            target_url_norm = (tk.target_url or '').lower().rstrip('/')
+            best_hit = None
+            for idx, item in enumerate(organic, start=1):
+                url = (item.get('link') or '').lower()
+                if not url:
+                    continue
+                if target_url_norm and url.rstrip('/') == target_url_norm:
+                    best_hit = (idx, item, True)
+                    break
+                if site_domain and site_domain in url:
+                    best_hit = best_hit or (idx, item, False)
+
+            if best_hit:
+                pos, item, is_target = best_hit
+                SerpRank.objects.create(
+                    tracked=tk,
+                    position=pos,
+                    url=item.get('link') or '',
+                    title=item.get('title') or '',
+                    is_target_match=is_target,
+                    source='serper',
+                )
+                snapshots_created += 1
+            else:
+                # Not in top 100
+                SerpRank.objects.create(
+                    tracked=tk,
+                    position=None,
+                    url='',
+                    title='',
+                    is_target_match=False,
+                    source='serper',
+                )
+                not_found_count += 1
+
+        return Response({
+            'site_id': site.id,
+            'snapshots_created': snapshots_created,
+            'not_found_count': not_found_count,
+            'total_processed': snapshots_created + not_found_count,
+        })
+
+
+class RankHistoryView(APIView):
+    """Return snapshot history for a tracked keyword.
+
+    GET /sites/<site_id>/rank-history/?tracked_id=<id>&days=90
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        tracked_id = request.query_params.get('tracked_id')
+        try:
+            days = max(1, min(int(request.query_params.get('days', 90)), 365))
+        except (TypeError, ValueError):
+            days = 90
+
+        if not tracked_id:
+            return Response(
+                {'error': 'tracked_id requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            tk = TrackedKeyword.objects.get(site=site, id=tracked_id)
+        except TrackedKeyword.DoesNotExist:
+            return Response(
+                {'error': 'Mot-cle introuvable'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        from datetime import timedelta
+        from django.utils import timezone
+
+        cutoff = timezone.now() - timedelta(days=days)
+        snaps = list(
+            SerpRank.objects.filter(tracked=tk, recorded_at__gte=cutoff)
+            .order_by('recorded_at')
+        )
+
+        # Decay detection: compare latest snapshot to median of previous ones
+        decay_alert = None
+        if len(snaps) >= 3:
+            latest = snaps[-1]
+            previous = snaps[:-1]
+            # only consider snapshots that had a position
+            ranked = [s.position for s in previous if s.position is not None]
+            if ranked:
+                from statistics import median
+                med = median(ranked)
+                if latest.position is None and ranked:
+                    decay_alert = {
+                        'severity': 'critical',
+                        'message': 'Article tombe hors top 100',
+                        'previous_median': int(med),
+                    }
+                elif latest.position is not None and latest.position - med >= 5:
+                    decay_alert = {
+                        'severity': 'warning',
+                        'message': f'Position chute de {int(latest.position - med)} places vs mediane',
+                        'previous_median': int(med),
+                        'current': latest.position,
+                    }
+
+        return Response({
+            'tracked': _serialize_tracked_keyword(tk),
+            'days': days,
+            'snapshots': [
+                {
+                    'position': s.position,
+                    'url': s.url,
+                    'title': s.title,
+                    'is_target_match': s.is_target_match,
+                    'recorded_at': s.recorded_at.isoformat(),
+                }
+                for s in snaps
+            ],
+            'decay_alert': decay_alert,
+        })
 
 
 # ==========================================================================

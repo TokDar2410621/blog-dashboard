@@ -41,6 +41,7 @@ export function DashboardSidebar() {
     { label: t("sidebar.articles"), icon: FileText, href: `${base}/articles` },
     { label: t("sidebar.generate"), icon: Sparkles, href: `${base}/generer` },
     { label: t("sidebar.bulkAudit"), icon: TrendingUp, href: `${base}/audit-global` },
+    { label: t("sidebar.positions"), icon: TrendingUp, href: `${base}/positions` },
     { label: t("sidebar.images"), icon: Image, href: `${base}/images` },
     { label: t("sidebar.settings"), icon: Settings, href: `${base}/parametres` },
   ];

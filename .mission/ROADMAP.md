@@ -43,14 +43,15 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 ## Tier 2 — feedback loop (après Tier 1)
 
-### 5. Rank tracking ⏱ 8-12h
-- [ ] DB : nouveau modèle `SerpRank(site, keyword, language, position, date, url)`.
-- [ ] Migration.
-- [ ] Endpoint `POST /sites/<id>/keywords/track/` (ajouter mot-clé suivi).
-- [ ] Cron via `/schedule` quotidien : interroger GSC + Serper pour chaque mot-clé suivi, stocker position.
-- [ ] Endpoint `GET /sites/<id>/rank-history/?keyword=X`.
-- [ ] Alertes : décay = chute >5 places ou hors top 20.
-- [ ] Frontend : graphique recharts évolution + table des décays.
+### 5. Rank tracking ⏱ 8-12h — 90% DONE
+- [x] DB : modèles `TrackedKeyword(site, keyword, language, target_url, is_active)` + `SerpRank(tracked, position, url, title, is_target_match, source, recorded_at)`.
+- [x] Migration `0012_trackedkeyword_serprank_and_more`.
+- [x] Endpoint `POST /sites/<id>/keywords/` (ajouter mot-clé suivi). DELETE `/keywords/<pk>/`. GET liste.
+- [x] Endpoint `POST /sites/<id>/rank-snapshot/` — itère tracked actifs, query Serper top 100, cherche target_url ou site.domain, stocke SerpRank.
+- [x] Endpoint `GET /sites/<id>/rank-history/?tracked_id=X&days=90` avec **decay alert** automatique (warning si chute >5 places vs médiane, critical si hors top 100).
+- [x] Frontend `KeywordTracker.tsx` : form d'ajout, table avec position colorée, snapshot button, expand row → historique 90j + decay alert.
+- [ ] (Étape C) Cron `/schedule` ou cron Railway pour snapshot quotidien automatique.
+- [ ] (Étape D) Graphe recharts d'évolution dans la row expansée (à la place / en plus de la liste texte).
 
 ### 6. Content decay detector ⏱ 3h
 - [ ] Articles dont impressions/clics GSC chutent sur 30 jours glissants (utiliser `GSCQueriesView` data).

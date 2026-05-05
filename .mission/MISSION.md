@@ -44,7 +44,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Hreflang validator
 
 ### Tier 2 (feedback loop)
-- [ ] Rank tracking (GSC + Serper history, alertes décay)
+- [x] Rank tracking (GSC + Serper history, alertes décay) — base + UI ; cron quotidien à brancher
 - [ ] Content decay detector
 - [ ] Topic Cluster Planner
 

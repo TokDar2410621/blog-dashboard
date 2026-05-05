@@ -229,3 +229,59 @@ class HostedPost(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class TrackedKeyword(models.Model):
+    """Keywords whose Google SERP position the user wants to track over time."""
+    LANGUAGE_CHOICES = Site.LANGUAGE_CHOICES
+
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='tracked_keywords'
+    )
+    keyword = models.CharField(max_length=255)
+    language = models.CharField(max_length=2, choices=LANGUAGE_CHOICES, default='fr')
+    target_url = models.URLField(
+        max_length=500, blank=True, default='',
+        help_text="Optional. The article URL we expect to rank — used to highlight if the page actually ranks."
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['site', 'keyword', 'language']]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['site', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.keyword} ({self.language}) — {self.site.name}"
+
+
+class SerpRank(models.Model):
+    """One snapshot of a tracked keyword's SERP position at a point in time."""
+    tracked = models.ForeignKey(
+        TrackedKeyword, on_delete=models.CASCADE, related_name='snapshots'
+    )
+    position = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Position 1-100, NULL if not in top 100"
+    )
+    url = models.URLField(max_length=500, blank=True, default='')
+    title = models.CharField(max_length=500, blank=True, default='')
+    is_target_match = models.BooleanField(
+        default=False,
+        help_text="True if the ranking URL matches the tracked target_url"
+    )
+    source = models.CharField(max_length=20, default='serper')
+    recorded_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-recorded_at']
+        indexes = [
+            models.Index(fields=['tracked', '-recorded_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.tracked.keyword} #{self.position} ({self.recorded_at.date()})"
