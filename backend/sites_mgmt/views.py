@@ -3206,6 +3206,150 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class LinkGraphView(APIView):
+    """Build the internal-link graph of a site's published articles.
+
+    Parses each article's content (markdown + raw HTML) for links pointing to
+    another article on the same site (via slug match). Returns nodes with
+    in/out-degree and a sorted list of orphans, hubs, and dead-ends.
+
+    GET /sites/<site_id>/link-graph/?language=fr&limit=200
+    """
+    permission_classes = [IsAuthenticated]
+
+    LINK_RE = None  # compiled lazily
+
+    def get(self, request, site_id):
+        import re
+
+        site = get_site_for_user(request, site_id)
+        language = (request.query_params.get('language') or '').strip().lower() or None
+        try:
+            limit = max(5, min(int(request.query_params.get('limit', 200)), 500))
+        except (TypeError, ValueError):
+            limit = 200
+
+        # Fetch published articles
+        if site.is_hosted:
+            qs = HostedPost.objects.filter(site=site, status='published')
+            if language:
+                qs = qs.filter(language=language)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title, 'content': p.content or ''}
+                for p in qs
+            ]
+        else:
+            alias = ensure_site_connection(site)
+            qs = BlogPost.objects.using(alias).filter(status='published')
+            if language:
+                qs = qs.filter(language=language)
+            qs = qs.order_by('-published_at')[:limit]
+            articles = [
+                {'slug': p.slug, 'title': p.title,
+                 'content': getattr(p, 'content', '') or ''}
+                for p in qs
+            ]
+
+        slug_set = {a['slug'] for a in articles}
+        title_by_slug = {a['slug']: a['title'] for a in articles}
+
+        # Patterns: [text](/blog/slug) or [text](/blog/slug/) or <a href="/blog/slug">
+        # Also match relative slugs and absolute URLs containing the site domain.
+        domain = (site.domain or '').lower().replace('https://', '').replace('http://', '').rstrip('/')
+        md_link_re = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
+        html_link_re = re.compile(r'<a\b[^>]*\bhref=["\']([^"\']+)["\']', re.IGNORECASE)
+
+        edges = []  # list of (from_slug, to_slug)
+        edges_set = set()  # dedupe (from, to) pairs
+
+        def _extract_target_slug(href):
+            href = (href or '').strip()
+            if not href:
+                return None
+            # Strip absolute URL prefix if it points to this site
+            if href.startswith('http'):
+                lower = href.lower()
+                if domain and domain in lower:
+                    # strip protocol + domain
+                    idx = lower.find(domain) + len(domain)
+                    href = href[idx:]
+                else:
+                    return None  # external link
+            # Now href should be like /blog/slug or /slug or /post/slug
+            href = href.lstrip('/').rstrip('/')
+            # Strip query/fragment
+            href = href.split('?')[0].split('#')[0]
+            # Strip common prefixes: blog/, post/, posts/, articles/
+            for prefix in ('blog/', 'post/', 'posts/', 'articles/'):
+                if href.startswith(prefix):
+                    href = href[len(prefix):]
+                    break
+            return href if href in slug_set else None
+
+        for art in articles:
+            content = art['content']
+            for m in md_link_re.finditer(content):
+                target = _extract_target_slug(m.group(1))
+                if target and target != art['slug']:
+                    pair = (art['slug'], target)
+                    if pair not in edges_set:
+                        edges_set.add(pair)
+                        edges.append({'from': pair[0], 'to': pair[1]})
+            for m in html_link_re.finditer(content):
+                target = _extract_target_slug(m.group(1))
+                if target and target != art['slug']:
+                    pair = (art['slug'], target)
+                    if pair not in edges_set:
+                        edges_set.add(pair)
+                        edges.append({'from': pair[0], 'to': pair[1]})
+
+        # Compute degrees
+        in_degree = {a['slug']: 0 for a in articles}
+        out_degree = {a['slug']: 0 for a in articles}
+        for e in edges:
+            out_degree[e['from']] = out_degree.get(e['from'], 0) + 1
+            in_degree[e['to']] = in_degree.get(e['to'], 0) + 1
+
+        nodes = [
+            {
+                'slug': a['slug'],
+                'title': a['title'],
+                'in_degree': in_degree.get(a['slug'], 0),
+                'out_degree': out_degree.get(a['slug'], 0),
+            }
+            for a in articles
+        ]
+
+        orphans = sorted(
+            [n for n in nodes if n['in_degree'] == 0],
+            key=lambda n: (n['out_degree'], n['title'].lower()),
+        )
+        hubs = sorted(
+            [n for n in nodes if n['in_degree'] >= 5],
+            key=lambda n: -n['in_degree'],
+        )
+        dead_ends = sorted(
+            [n for n in nodes if n['out_degree'] == 0],
+            key=lambda n: (n['in_degree'], n['title'].lower()),
+        )
+
+        return Response({
+            'site_id': site.id,
+            'language': language,
+            'article_count': len(articles),
+            'edge_count': len(edges),
+            'nodes': nodes,
+            'edges': edges,
+            'orphans': orphans,
+            'orphans_count': len(orphans),
+            'hubs': hubs,
+            'hubs_count': len(hubs),
+            'dead_ends': dead_ends,
+            'dead_ends_count': len(dead_ends),
+        })
+
+
 class TopicClusterView(APIView):
     """Group the site's published articles into thematic clusters via Gemini.
     For each cluster: pick a pillar candidate, list spokes, suggest 2-3 new

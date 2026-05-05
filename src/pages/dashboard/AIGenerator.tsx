@@ -53,17 +53,24 @@ export default function AIGenerator() {
   const [keywords, setKeywords] = useState("");
   const [dryRun, setDryRun] = useState(false);
 
-  // Template pre-fill from query params
+  // Template + title pre-fill from query params
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const tplId = searchParams.get("tpl_id");
-    if (!tplId) return;
-    const tpl = aiTemplates.find((t) => t.id === tplId);
-    if (tpl) {
-      setArticleType(tpl.params.type);
-      setLength(tpl.params.length);
-      setSearchMethod(tpl.params.search);
+    if (tplId) {
+      const tpl = aiTemplates.find((t) => t.id === tplId);
+      if (tpl) {
+        setArticleType(tpl.params.type);
+        setLength(tpl.params.length);
+        setSearchMethod(tpl.params.search);
+      }
     }
+    const presetTitle = searchParams.get("title");
+    if (presetTitle) setTitle(presetTitle);
+    const presetTopic = searchParams.get("topic");
+    if (presetTopic) setTopic(presetTopic);
+    const presetKeywords = searchParams.get("keywords");
+    if (presetKeywords) setKeywords(presetKeywords);
   }, [searchParams]);
   /* eslint-enable react-hooks/set-state-in-effect */
 

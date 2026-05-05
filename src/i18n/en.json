@@ -82,10 +82,35 @@
     "positions": "Rank tracking",
     "decay": "Content decay",
     "clusters": "Topic clusters",
+    "linkGraph": "Internal links",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "linkGraph": {
+    "title": "Internal link graph",
+    "subtitle": "Identifies orphans (no incoming link), hubs (5+ incoming) and dead-ends (no outgoing) to optimize your link juice.",
+    "allLangs": "All",
+    "articles": "Articles",
+    "links": "Internal links",
+    "orphans": "Orphans",
+    "hubs": "Hubs",
+    "orphansTitle": "Orphans",
+    "orphansHint": "No incoming link. Link to them from other articles.",
+    "hubsTitle": "Hubs",
+    "hubsHint": "5+ incoming links. Strong articles, prioritize their SEO.",
+    "deadEndsTitle": "Dead-ends",
+    "deadEndsHint": "No outgoing link. Add internal links.",
+    "noOrphans": "No orphans.",
+    "noHubs": "No hubs yet.",
+    "noDeadEnds": "No dead-ends.",
+    "topConnected": "Top 10 most connected articles",
+    "in": "Incoming",
+    "out": "Outgoing",
+    "empty": "No published articles to analyze.",
+    "error": "Failed to load the graph."
   },
 
   "clusters": {

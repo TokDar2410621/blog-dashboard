@@ -572,3 +572,76 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 - Tester les 7 nouvelles pages dashboard.
 - Décider du déploiement (push) — toutes les modifs sont safe (pas de breaking change), une migration unique (0012) safe à appliquer.
 
+---
+
+## Session 2026-05-04 (suite 11) — Fix AIGenerator query params + Tier 3 #8 Internal link graph ✅
+
+**Fait** :
+
+**Fix AIGenerator query params** :
+- Ligne 56 de `src/pages/dashboard/AIGenerator.tsx` : le `useEffect` lisait seulement `tpl_id`. Étendu pour lire aussi `title`, `topic`, `keywords`. Permet aux pages cluster + decay (et toute future feature) de pré-remplir le formulaire de génération.
+
+**Tier 3 #8 — Internal link graph (end-to-end)** :
+- Backend `LinkGraphView` ajouté (juste avant `TopicClusterView`).
+  - Endpoint `GET /sites/<id>/link-graph/?language=fr&limit=200`.
+  - Itère articles publiés (max 200 par défaut, 500 cap), parse leur contenu pour extraire les liens internes via deux regex :
+    - Markdown : `\[[^\]]*\]\(([^)]+)\)`
+    - HTML : `<a\b[^>]*\bhref=["']([^"']+)["']`
+  - Pour chaque href, normalise (strip protocol+domain si site, strip prefix `blog/`/`post/`/`articles/`, strip query/fragment) et matche contre `slug_set`.
+  - Construit edges `[{from, to}]` (dédupliqué), calcule `in_degree` et `out_degree` par node.
+  - Retourne `nodes[]`, `edges[]`, `orphans[]` (in_degree=0), `hubs[]` (in_degree>=5), `dead_ends[]` (out_degree=0) avec leurs counts.
+- Route `path('sites/<int:site_id>/link-graph/', LinkGraphView.as_view(), name='site-link-graph')`.
+- Frontend `src/pages/dashboard/LinkGraph.tsx` :
+  - Header avec select langue (Toutes / FR / EN / ES).
+  - 4 KPI cards : articles, edges, orphans (ambre), hubs (vert).
+  - Grid 3 colonnes : **Orphans**, **Hubs**, **Dead-ends** — chacun avec liste cliquable max 30 entries, indicateurs de degré, hint explicatif.
+  - Section "Top 10 articles les mieux connectés" en bas (somme in+out_degree).
+  - Empty state si pas d'articles.
+- Route `/dashboard/<siteId>/link-graph` + sidebar link "Maillage interne" (icône `Link2`).
+- 23 nouvelles clés `linkGraph.*` + `sidebar.linkGraph` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 14.68s
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. End-to-end backend + frontend + route + sidebar + i18n.
+
+**Prochain bloc concret** :
+
+Tier 3 a 2 features done sur 9 (#7 clusters + #8 link graph). Items rapides Tier 3 restants :
+
+**Tier 3 #12 — Readability scores FR/EN** (~2h, end-to-end) :
+
+1. Backend : ajouter helper `_compute_readability(text, lang)` qui calcule Flesch-Kincaid (FR + EN — formule légèrement différente) et ARI. Pas d'API externe.
+2. Brancher dans `_run_seo_audit` ou créer endpoint dédié `POST /readability/` avec `{content, language}` → retourne `{flesch, ari, level, suggestions}`.
+3. Frontend : ajouter une card dans `SEOAnalyzer.tsx` qui montre le score + interprétation (très facile / facile / moyen / difficile / très difficile) avec barre de progression colorée.
+4. i18n + build.
+
+Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mini UI) :
+
+1. DB : modèle `Redirect(site, from_slug, to_slug, language, hit_count, created_at)`.
+2. Migration.
+3. Hook dans `SitePostDetailView.patch` : si `slug` change, créer une `Redirect` automatique.
+4. Endpoint public à brancher dans `PublicPostDetailView` : si slug demandé n'existe pas, vérifier les redirects et retourner 301.
+5. Frontend : page `/dashboard/<id>/redirects` avec liste + form d'ajout manuel + suppression.
+6. i18n.
+
+**Recommandation** : faire **#12 Readability** (plus court, plus visible immédiatement, ne nécessite pas de migration). Puis #10 Redirects.
+
+**Statistiques fin de session 11** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3 (rank tracking + decay + (clusters réutilisé))
+- Tier 3 : 2/9 (#7 clusters, #8 link graph)
+- Total endpoints SEO ajoutés : 11
+- Total composants frontend ajoutés : 8 (ContentBrief, PAAPanel, HreflangCard, BulkAudit, KeywordTracker, ContentDecay, TopicClusters, LinkGraph)
+- Lignes commits cumulées : ~4500
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- Tester les pages dashboard nouvellement créées.
+- Décider du déploiement (10 commits non poussés sont safe).
+

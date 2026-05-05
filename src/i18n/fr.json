@@ -82,10 +82,35 @@
     "positions": "Suivi des positions",
     "decay": "Detection de declin",
     "clusters": "Topic clusters",
+    "linkGraph": "Maillage interne",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "linkGraph": {
+    "title": "Graphe de maillage interne",
+    "subtitle": "Identifie les articles orphelins (sans lien entrant), les hubs (>=5 liens entrants) et les dead-ends (sans lien sortant) pour optimiser ton link juice.",
+    "allLangs": "Toutes",
+    "articles": "Articles",
+    "links": "Liens internes",
+    "orphans": "Orphelins",
+    "hubs": "Hubs",
+    "orphansTitle": "Orphelins",
+    "orphansHint": "Aucun lien entrant. A relier depuis d'autres articles.",
+    "hubsTitle": "Hubs",
+    "hubsHint": "5+ liens entrants. Articles forts, prioriser leur SEO.",
+    "deadEndsTitle": "Dead-ends",
+    "deadEndsHint": "Aucun lien sortant. Ajouter des liens internes.",
+    "noOrphans": "Aucun orphelin.",
+    "noHubs": "Aucun hub pour l'instant.",
+    "noDeadEnds": "Aucun dead-end.",
+    "topConnected": "Top 10 articles les mieux connectes",
+    "in": "Liens entrants",
+    "out": "Liens sortants",
+    "empty": "Aucun article publie a analyser.",
+    "error": "Impossible de charger le graphe."
   },
 
   "clusters": {

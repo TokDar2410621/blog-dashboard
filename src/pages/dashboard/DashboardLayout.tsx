@@ -12,6 +12,7 @@ import BulkAudit from "./BulkAudit";
 import KeywordTracker from "./KeywordTracker";
 import ContentDecay from "./ContentDecay";
 import TopicClusters from "./TopicClusters";
+import LinkGraph from "./LinkGraph";
 
 export default function DashboardLayout() {
   return (
@@ -31,6 +32,7 @@ export default function DashboardLayout() {
                 <Route path="positions" element={<KeywordTracker />} />
                 <Route path="decay" element={<ContentDecay />} />
                 <Route path="clusters" element={<TopicClusters />} />
+                <Route path="link-graph" element={<LinkGraph />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

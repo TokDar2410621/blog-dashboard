@@ -49,7 +49,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Topic Cluster Planner (cards-based MVP ; graphe react-flow en option future)
 
 ### Tier 3 (qualité produit)
-- [ ] Internal link graph viz
+- [x] Internal link graph viz
 - [ ] Broken link checker
 - [ ] Auto-redirect 301 sur slug change
 - [ ] Image SEO (WebP, srcset)

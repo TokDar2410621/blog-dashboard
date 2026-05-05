@@ -69,7 +69,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 ## Tier 3 — qualité produit (parallélisable)
 
-- [ ] **8. Internal link graph viz** ⏱ 4h
+- [x] **8. Internal link graph viz** ⏱ 4h — endpoint `/link-graph/` parse markdown + HTML pour edges, calcule orphans/hubs/dead_ends. UI 3-cols + top 10 connected.
 - [ ] **9. Broken link checker** (sortants + internes) ⏱ 3h
 - [ ] **10. Auto-redirect 301 sur slug change** ⏱ 2h (modèle Redirect + middleware)
 - [ ] **11. Image SEO** (WebP auto, srcset, descriptive filenames) ⏱ 4h
