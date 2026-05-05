@@ -15,6 +15,7 @@ import TopicClusters from "./TopicClusters";
 import LinkGraph from "./LinkGraph";
 import Redirects from "./Redirects";
 import BrokenLinks from "./BrokenLinks";
+import WeeklyDigest from "./WeeklyDigest";
 
 export default function DashboardLayout() {
   return (
@@ -37,6 +38,7 @@ export default function DashboardLayout() {
                 <Route path="link-graph" element={<LinkGraph />} />
                 <Route path="redirects" element={<Redirects />} />
                 <Route path="broken-links" element={<BrokenLinks />} />
+                <Route path="digest" element={<WeeklyDigest />} />
                 <Route path="images" element={<ImageGallery />} />
                 <Route path="parametres" element={<SiteSettings />} />
               </Routes>

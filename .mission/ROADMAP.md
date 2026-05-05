@@ -81,7 +81,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 ## Tier 4 — finition / commercialisation
 
-- [ ] **17. Weekly digest auto** (rapport email/PDF par site) ⏱ 4h
+- [x] **17. Weekly digest** (rapport téléchargeable, sans SMTP) — endpoint `/sites/<id>/weekly-digest/` agrège articles publiés cette semaine, top vues, mouvements de positions (top + worst), redirections récentes. Page imprimable `/dashboard/<id>/digest` avec window.print() pour PDF.
 - [x] **18. EEAT author profile** — 7 champs ajoutés à Site (role, bio, credentials, image, linkedin, twitter, website), migration 0014, helper `_generate_person_schema`, endpoint `/sites/<id>/person-schema/`, PublicSiteView enrichi avec `author` + `person_schema`. UI complète dans SiteSettings.
 - [ ] **19. Plagiarism / originality check** ⏱ 3h (action humaine pour clé API tierce)
 - [x] **20. Multi-domain comparison** — endpoint `/multi-domain-stats/` agrège tous les sites de l'owner, page `/compare` avec table cross-site + KPI cards + couverture GSC/EEAT. Lien depuis SiteSelector.

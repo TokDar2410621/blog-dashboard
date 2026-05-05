@@ -30,6 +30,7 @@ import {
   Link2,
   Move,
   Unlink2,
+  Calendar,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -52,6 +53,7 @@ export function DashboardSidebar() {
     { label: t("sidebar.linkGraph"), icon: Link2, href: `${base}/link-graph` },
     { label: t("sidebar.redirects"), icon: Move, href: `${base}/redirects` },
     { label: t("sidebar.brokenLinks"), icon: Unlink2, href: `${base}/broken-links` },
+    { label: t("sidebar.digest"), icon: Calendar, href: `${base}/digest` },
     { label: t("sidebar.images"), icon: Image, href: `${base}/images` },
     { label: t("sidebar.settings"), icon: Settings, href: `${base}/parametres` },
   ];

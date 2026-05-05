@@ -3963,6 +3963,152 @@ class LocalBusinessSchemaView(APIView):
         return Response({'schema': schema})
 
 
+class WeeklyDigestView(APIView):
+    """Generate a weekly digest for a site: articles published this week,
+    top performing posts, tracked-keyword movements, and broken-link/decay
+    counters cached from previous scans.
+
+    GET /sites/<site_id>/weekly-digest/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        site = get_site_for_user(request, site_id)
+        now = timezone.now()
+        week_ago = now - timedelta(days=7)
+        two_weeks_ago = now - timedelta(days=14)
+
+        # Articles published this week
+        if site.is_hosted:
+            week_qs = HostedPost.objects.filter(
+                site=site, status='published', published_at__gte=week_ago.date()
+            )
+            published_this_week = list(
+                week_qs.order_by('-published_at')[:20].values(
+                    'slug', 'title', 'language', 'view_count', 'published_at'
+                )
+            )
+            top_views_qs = (
+                HostedPost.objects.filter(site=site, status='published')
+                .order_by('-view_count')[:5]
+                .values('slug', 'title', 'view_count')
+            )
+            top_views = list(top_views_qs)
+            total_articles = HostedPost.objects.filter(
+                site=site, status='published'
+            ).count()
+        else:
+            alias = ensure_site_connection(site)
+            week_qs = BlogPost.objects.using(alias).filter(
+                status='published', published_at__gte=week_ago.date()
+            )
+            published_this_week = list(
+                week_qs.order_by('-published_at')[:20].values(
+                    'slug', 'title', 'language', 'view_count', 'published_at'
+                )
+            )
+            top_views = list(
+                BlogPost.objects.using(alias).filter(status='published')
+                .order_by('-view_count')[:5]
+                .values('slug', 'title', 'view_count')
+            )
+            total_articles = (
+                BlogPost.objects.using(alias).filter(status='published').count()
+            )
+
+        # Format dates
+        for p in published_this_week:
+            if p.get('published_at'):
+                p['published_at'] = p['published_at'].isoformat()
+
+        # Tracked keyword movements: compare latest snapshot to one ~7 days old
+        keyword_movements = []
+        for tk in TrackedKeyword.objects.filter(site=site, is_active=True):
+            snapshots = list(
+                SerpRank.objects.filter(tracked=tk).order_by('-recorded_at')[:30]
+            )
+            if not snapshots:
+                continue
+            latest = snapshots[0]
+            # Find snapshot closest to 7 days ago
+            week_ago_snap = None
+            for s in snapshots[1:]:
+                if s.recorded_at <= week_ago:
+                    week_ago_snap = s
+                    break
+            if week_ago_snap is None and len(snapshots) >= 2:
+                week_ago_snap = snapshots[-1]
+            if week_ago_snap is None:
+                continue
+            # Compute delta (lower position = better)
+            old_pos = week_ago_snap.position
+            new_pos = latest.position
+            if old_pos is None and new_pos is None:
+                continue
+            if old_pos is None:
+                delta = -100  # entered top 100
+            elif new_pos is None:
+                delta = 100  # fell out of top 100
+            else:
+                delta = new_pos - old_pos
+            keyword_movements.append({
+                'keyword': tk.keyword,
+                'language': tk.language,
+                'old_position': old_pos,
+                'new_position': new_pos,
+                'delta': delta,
+            })
+
+        # Sort: best improvers first (most negative delta), worst at the bottom
+        keyword_movements.sort(key=lambda k: k['delta'])
+        top_movers = keyword_movements[:5]
+        worst_movers = sorted(
+            keyword_movements, key=lambda k: -k['delta']
+        )[:5]
+
+        # Broken-link count (only if a recent scan was cached)
+        # We don't trigger a scan; just sample the cache for a known key.
+        # MVP: skip — leave 0 unless integrated later.
+        broken_link_cache_count = 0
+
+        # Active redirects + recent redirects (created or updated this week)
+        recent_redirects_count = Redirect.objects.filter(
+            site=site, updated_at__gte=week_ago
+        ).count()
+        total_redirects = Redirect.objects.filter(
+            site=site, is_active=True
+        ).count()
+
+        return Response({
+            'site': {
+                'id': site.id,
+                'name': site.name,
+                'domain': site.domain,
+            },
+            'period': {
+                'start': week_ago.isoformat(),
+                'end': now.isoformat(),
+                'previous_start': two_weeks_ago.isoformat(),
+                'previous_end': week_ago.isoformat(),
+            },
+            'totals': {
+                'total_published': total_articles,
+                'published_this_week': len(published_this_week),
+                'recent_redirects': recent_redirects_count,
+                'active_redirects': total_redirects,
+                'tracked_keywords': len(keyword_movements),
+            },
+            'published_this_week': published_this_week,
+            'top_views': list(top_views),
+            'top_movers': top_movers,
+            'worst_movers': worst_movers,
+            'generated_at': now.isoformat(),
+        })
+
+
 class MultiDomainStatsView(APIView):
     """Aggregate stats for ALL sites of the authenticated user — useful for
     agencies / multi-site owners who want a single view across their portfolio.

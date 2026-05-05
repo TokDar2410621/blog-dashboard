@@ -85,10 +85,31 @@
     "linkGraph": "Maillage interne",
     "redirects": "Redirections 301",
     "brokenLinks": "Liens casses",
+    "digest": "Rapport hebdo",
     "images": "Images",
     "settings": "Parametres",
     "switchSite": "Changer de site",
     "logout": "Deconnexion"
+  },
+
+  "digest": {
+    "title": "Rapport hebdomadaire",
+    "subtitle": "Resume des 7 derniers jours : articles publies, top vues, mouvements de positions, redirections recentes. Imprimable en PDF.",
+    "report": "Rapport",
+    "period": "Periode",
+    "print": "Imprimer / PDF",
+    "publishedThisWeek": "Publies cette semaine",
+    "totalPublished": "Total publie",
+    "trackedKeywords": "Mots-cles suivis",
+    "recentRedirects": "Redirections cette semaine",
+    "publishedListTitle": "Articles publies cette semaine",
+    "nothingPublished": "Aucun article publie cette semaine.",
+    "topViews": "Top 5 articles vus (tout temps)",
+    "noViews": "Aucune donnee de vues.",
+    "topMovers": "Top mouvements de positions (en hausse)",
+    "worstMovers": "Mouvements en baisse (a surveiller)",
+    "noMovement": "Pas assez de snapshots pour mesurer un mouvement.",
+    "generatedAt": "Genere le"
   },
 
   "multiDomain": {

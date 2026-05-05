@@ -85,10 +85,31 @@
     "linkGraph": "Internal links",
     "redirects": "301 redirects",
     "brokenLinks": "Broken links",
+    "digest": "Weekly report",
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
     "logout": "Logout"
+  },
+
+  "digest": {
+    "title": "Weekly report",
+    "subtitle": "7-day summary: published articles, top views, ranking moves, recent redirects. Printable as PDF.",
+    "report": "Report",
+    "period": "Period",
+    "print": "Print / PDF",
+    "publishedThisWeek": "Published this week",
+    "totalPublished": "Total published",
+    "trackedKeywords": "Tracked keywords",
+    "recentRedirects": "Redirects this week",
+    "publishedListTitle": "Articles published this week",
+    "nothingPublished": "No articles published this week.",
+    "topViews": "Top 5 articles by views (all time)",
+    "noViews": "No view data.",
+    "topMovers": "Top ranking improvements",
+    "worstMovers": "Ranking declines (watch list)",
+    "noMovement": "Not enough snapshots to measure movement.",
+    "generatedAt": "Generated on"
   },
 
   "multiDomain": {
