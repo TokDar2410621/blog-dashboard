@@ -268,10 +268,16 @@ class ArticleGenerator:
 
     def generate(self, search_method='serper', topic=None, title=None,
                  article_type='news', length='medium', keywords=None, dry_run=False,
-                 language='fr'):
+                 language='fr', brief=None):
         """
         Generate an article and optionally save it to the site's database.
         Returns dict with 'output' (text log) and 'post_count'.
+
+        `brief` (optional dict) is the structured Content Brief produced by
+        ContentBriefView. When provided, it is injected into the Claude prompt
+        as a STRATEGIC BRIEF section (search intent, target word count, outline,
+        FAQ, entities, schemas, EEAT signals) so the article aligns with the
+        pre-writing analysis.
         """
         self.article_length = length
         self.forced_title = title
@@ -279,6 +285,7 @@ class ArticleGenerator:
         self.custom_topic = topic
         self.language = language if language in ('fr', 'en', 'es') else 'fr'
         self.seo_keywords = [k.strip() for k in keywords.split(',')] if keywords else []
+        self.brief = brief if isinstance(brief, dict) else None
 
         config = LENGTH_CONFIG[length]
 
@@ -702,6 +709,57 @@ Inclus ces mots-cles naturellement: {', '.join(self.seo_keywords)}
 - Au moins 1 fois dans un titre H2
 - 2-3 fois dans le corps du texte"""
 
+        # Strategic content brief (from /content-brief/ if user generated one)
+        brief_context = ""
+        brief = getattr(self, 'brief', None) or {}
+        if brief:
+            outline_lines = []
+            for h in brief.get('outline', [])[:15]:
+                level = h.get('level', 2)
+                text = (h.get('text') or '').strip()
+                if text:
+                    prefix = '##' if level == 2 else '###'
+                    outline_lines.append(f"  {prefix} {text}")
+            outline_block = '\n'.join(outline_lines) if outline_lines else '(aucun outline propose)'
+
+            faq_lines = []
+            for f in brief.get('faq', [])[:8]:
+                q = (f.get('question') or '').strip()
+                a = (f.get('answer_hint') or '').strip()
+                if q:
+                    faq_lines.append(f"  - Q: {q}\n    A (hint): {a}")
+            faq_block = '\n'.join(faq_lines) if faq_lines else '(aucune FAQ)'
+
+            entities = brief.get('entities') or []
+            entities_block = ', '.join(str(e) for e in entities[:15]) if entities else '(aucune)'
+
+            eeat = brief.get('eeat_signals') or []
+            eeat_block = '\n'.join(f"  - {s}" for s in eeat[:8]) if eeat else '(aucun)'
+
+            schemas = brief.get('schemas_suggested') or []
+            schemas_block = ', '.join(str(s) for s in schemas[:8]) if schemas else '(aucun)'
+
+            brief_context = f"""
+**BRIEF STRATEGIQUE (a respecter, surtout l'outline et les entites):**
+
+Intention de recherche: {brief.get('search_intent', 'informational')}
+Longueur cible recommandee: {brief.get('word_count_target') or 'non specifiee'} mots
+
+Plan suggere (suis cette structure pour matcher les top SERP):
+{outline_block}
+
+Entites/concepts a mentionner naturellement (pour la profondeur thematique):
+{entities_block}
+
+FAQ a inclure en fin d'article (peut etre transformee en schema FAQPage):
+{faq_block}
+
+Signaux E-E-A-T a integrer (citations, dates, references):
+{eeat_block}
+
+Schemas Schema.org pertinents pour cet article: {schemas_block}
+"""
+
         # Get existing articles for internal linking
         existing_articles = self._get_existing_articles()
         internal_links = self._get_internal_linking_instructions(existing_articles)
@@ -771,6 +829,8 @@ NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le fra
 {TYPE_INSTRUCTIONS.get(self.article_type, TYPE_INSTRUCTIONS['guide'])}
 
 {seo_keywords_context}
+
+{brief_context}
 
 **RECHERCHES (pour contexte):**
 {search_results}

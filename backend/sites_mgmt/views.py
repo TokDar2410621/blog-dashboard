@@ -734,6 +734,11 @@ class GenerateArticleView(APIView):
         keywords = request.data.get('keywords', None) or None
         dry_run = request.data.get('dry_run', False)
         language = request.data.get('language', 'fr')
+        # Optional Content Brief from /content-brief/ — passed through to the
+        # generator which injects it into the Claude prompt.
+        brief = request.data.get('brief')
+        if not isinstance(brief, dict):
+            brief = None
         if language not in ('fr', 'en', 'es'):
             language = 'fr'
         # Enforce per-site allowed languages
@@ -773,6 +778,7 @@ class GenerateArticleView(APIView):
                 keywords=keywords,
                 dry_run=dry_run,
                 language=language,
+                brief=brief,
             )
 
             trigger_vercel_deploy(site)

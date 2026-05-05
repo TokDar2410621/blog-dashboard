@@ -478,7 +478,10 @@
     "generateAnother": "Generer un autre",
     "previewSuccess": "Apercu genere!",
     "publishSuccess": "Article genere et publie!",
-    "error": "Erreur lors de la generation"
+    "error": "Erreur lors de la generation",
+    "briefActive": "Brief actif",
+    "briefActiveHint": "Claude utilisera l'outline ({{sections}} sections), {{faq}} FAQ et les entites recommandees.",
+    "briefRemove": "Retirer"
   },
 
   "hreflang": {

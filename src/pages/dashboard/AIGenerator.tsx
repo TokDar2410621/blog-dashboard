@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { ContentBriefPanel } from "@/components/ContentBrief";
+import { ContentBriefPanel, type ContentBrief } from "@/components/ContentBrief";
 import { PAAPanel } from "@/components/PAAPanel";
 import { CommunityQuestionsPanel } from "@/components/CommunityQuestionsPanel";
 import { SearchTrendsPanel } from "@/components/SearchTrendsPanel";
@@ -54,6 +54,7 @@ export default function AIGenerator() {
   const [language, setLanguage] = useState<string>("fr");
   const [keywords, setKeywords] = useState("");
   const [dryRun, setDryRun] = useState(false);
+  const [activeBrief, setActiveBrief] = useState<ContentBrief | null>(null);
 
   // Template + title pre-fill from query params
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -92,6 +93,7 @@ export default function AIGenerator() {
     if (topic) params.topic = topic;
     if (title) params.title = title;
     if (keywords) params.keywords = keywords;
+    if (activeBrief) params.brief = activeBrief;
 
     try {
       const data = await generateArticle.mutateAsync(params);
@@ -117,10 +119,11 @@ export default function AIGenerator() {
       <ContentBriefPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
-        onApply={({ topic: t2, title: ti2, keywords: kw2 }) => {
+        onApply={({ topic: t2, title: ti2, keywords: kw2, brief }) => {
           if (t2) setTopic(t2);
           if (ti2) setTitle(ti2);
           if (kw2) setKeywords(kw2);
+          setActiveBrief(brief);
         }}
       />
 
@@ -244,6 +247,28 @@ export default function AIGenerator() {
               <Switch checked={dryRun} onCheckedChange={setDryRun} />
               <Label>{t("ai.dryRun")}</Label>
             </div>
+
+            {activeBrief && (
+              <div className="flex items-center justify-between gap-2 p-3 rounded border border-primary/30 bg-primary/5">
+                <div className="flex items-center gap-2 text-xs">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span>
+                    <strong>{t("ai.briefActive")}</strong> —{" "}
+                    {t("ai.briefActiveHint", {
+                      sections: activeBrief.outline?.length || 0,
+                      faq: activeBrief.faq?.length || 0,
+                    })}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveBrief(null)}
+                  className="text-xs text-muted-foreground hover:text-destructive"
+                >
+                  {t("ai.briefRemove")}
+                </button>
+              </div>
+            )}
 
             <Button
               className="w-full"

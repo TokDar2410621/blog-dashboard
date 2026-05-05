@@ -1375,3 +1375,67 @@ Tier 4 restant nécessite des actions humaines :
 - Onboarding (#23) : décider du flow d'inscription (auto-création de site ? sélecteur de blog existant ?).
 - Bing Webmaster (#14) : clé API si toujours pertinent.
 
+---
+
+## Session 2026-05-04 (suite 22) — Polish : Content Brief consommé par Claude ✅
+
+**Fait** (closure d'une boucle non-fermée du progress log) :
+- `ArticleGenerator.generate()` accepte maintenant un argument `brief: dict` optionnel et le stocke en `self.brief`.
+- Dans `generate_article_content()`, si `self.brief` est présent, construit un bloc `**BRIEF STRATEGIQUE**` injecté dans le prompt Claude :
+  - Intention de recherche
+  - Longueur cible recommandée
+  - Outline (H2/H3 formattés en markdown)
+  - Entités à mentionner (max 15)
+  - FAQ (Q + A hint, max 8) à inclure en fin d'article (pour transformation en FAQPage schema)
+  - Signaux E-E-A-T (max 8)
+  - Schemas Schema.org pertinents
+- Le bloc s'insère après le `seo_keywords_context` et avant `**RECHERCHES (pour contexte):**` — Claude voit donc d'abord le brief stratégique, puis les recherches web brutes.
+- `GenerateArticleView` accepte `brief` dans `request.data` (validé en dict, ignoré sinon) et le passe au générateur.
+- Frontend `AIGenerator.tsx` :
+  - Nouveau state `activeBrief: ContentBrief | null`.
+  - Le callback `onApply` du `ContentBriefPanel` capture maintenant le brief complet (en plus de pré-remplir topic/title/keywords).
+  - Le param `brief` est passé à `generateArticle.mutateAsync(...)` quand le brief est actif.
+  - Nouveau **badge "Brief actif"** affiché juste au-dessus du bouton Générer : montre nombre de sections + nombre de FAQ, avec bouton "Retirer" pour le retirer si l'utilisateur a changé d'avis.
+- Type `ContentBrief` re-exporté depuis `ContentBrief.tsx` (déjà exporté en fait).
+- 3 nouvelles clés `ai.briefActive*` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 18.56s
+- **Tests live à faire (humain)** :
+  1. Aller sur `/dashboard/<siteId>/generer`.
+  2. Générer un brief sur un mot-clé (ex: "automatisation pme québec").
+  3. Cliquer "Utiliser ce brief" → vérifier que topic + title + keywords sont remplis ET que le badge "Brief actif" apparaît au-dessus du bouton Générer.
+  4. Cliquer Générer → l'article devrait suivre l'outline du brief, mentionner les entités suggérées, et inclure une section FAQ proche de celle du brief.
+
+**Branches/commits** : commit local à venir.
+
+**Pourquoi cette boucle compte** : avant ce commit, le Content Brief ne servait qu'à pré-remplir des champs. Claude API ne le voyait pas. Maintenant le brief structure réellement la sortie de l'IA — alignement complet "audit avant écriture → écriture guidée" qui était la promesse du Tier 1 #1.
+
+**Note règle d'or** : ✅ respectée. Backend (generator + view) + frontend (state + mutation + UI badge) + i18n.
+
+**Prochain bloc concret** :
+
+Polish/audit restant :
+- **TODO mineur** : LocalBusinessSchemaView frontend — endpoint backend en place mais pas de form UI pour le configurer dans SiteSettings. Petit (1h end-to-end).
+- **TODO mineur** : `GenerateInlineView` (édition inline) ne consomme PAS le brief — pour l'instant seul `GenerateArticleView` (article complet) le voit. À faire si pertinent.
+- **Bundle code-splitting** : warning Vite chunk 597KB DashboardLayout. Ajouter `manualChunks` dans `vite.config.ts` pour split recharts + autres lourds.
+- **Cron rank-snapshot** quotidien (Tier 2 #5 étape C reportée).
+
+**Recommandation** : Le bloc le plus impactant restant en autonomie est le **LocalBusinessSchemaView frontend**. Petit, ferme une autre boucle non-fermée.
+
+**Statistiques fin de session 22** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : ✅ 9/10
+- Tier 4 : 3/7 autonomes done
+- Polish : 1 boucle clé fermée (brief → Claude)
+- Endpoints SEO : 24 (inchangé, mais GenerateArticleView étendu)
+- Composants/pages frontend : 16 (inchangé)
+- Commits locaux non poussés : **22**
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : push, test live, Stripe, Bing, plagiarism API, décisions landing/onboarding.
+

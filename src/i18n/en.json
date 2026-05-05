@@ -478,7 +478,10 @@
     "generateAnother": "Generate another",
     "previewSuccess": "Preview generated!",
     "publishSuccess": "Article generated and published!",
-    "error": "Error during generation"
+    "error": "Error during generation",
+    "briefActive": "Brief active",
+    "briefActiveHint": "Claude will use the outline ({{sections}} sections), {{faq}} FAQ entries, and the recommended entities.",
+    "briefRemove": "Remove"
   },
 
   "hreflang": {
