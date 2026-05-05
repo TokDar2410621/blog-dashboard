@@ -3835,6 +3835,49 @@ def _quebecois_check(text):
     return matches
 
 
+def _generate_person_schema(site):
+    """Generate a Schema.org Person JSON-LD for the site's default author,
+    using the EEAT fields configured on the Site. Returns None if there's no
+    meaningful data (no name + no bio).
+    """
+    name = site.default_author or 'Admin'
+    if not site.author_bio and not site.author_role and name == 'Admin':
+        return None
+
+    schema = {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        'name': name,
+    }
+    if site.author_role:
+        schema['jobTitle'] = site.author_role
+    if site.author_bio:
+        schema['description'] = site.author_bio
+    if site.author_image_url:
+        schema['image'] = site.author_image_url
+    if site.author_credentials:
+        schema['hasCredential'] = site.author_credentials
+    same_as = [
+        u for u in (
+            site.author_linkedin,
+            site.author_twitter,
+            site.author_website,
+        ) if u
+    ]
+    if same_as:
+        schema['sameAs'] = same_as
+    if site.domain:
+        url = site.domain
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        schema['worksFor'] = {
+            '@type': 'Organization',
+            'name': site.name,
+            'url': url,
+        }
+    return schema
+
+
 def _generate_local_business_schema(site, address=None, hours=None, phone=None,
                                     price_range=None, area_served=None):
     """Generate a Schema.org LocalBusiness JSON-LD adapted for Quebec.
@@ -3917,6 +3960,19 @@ class LocalBusinessSchemaView(APIView):
             price_range=request.data.get('price_range'),
             area_served=request.data.get('area_served'),
         )
+        return Response({'schema': schema})
+
+
+class PersonSchemaView(APIView):
+    """Return the Schema.org Person JSON-LD built from the site's EEAT fields.
+
+    GET /sites/<id>/person-schema/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        schema = _generate_person_schema(site)
         return Response({'schema': schema})
 
 
@@ -5016,7 +5072,7 @@ def _dedupe_by_translation_group(posts, preferred_language=None, default_languag
 
 
 class PublicSiteView(APIView):
-    """GET /api/public/sites/<id>/ — basic site info."""
+    """GET /api/public/sites/<id>/ — basic site info + EEAT author profile."""
     permission_classes = []
 
     def get(self, request, site_id):
@@ -5027,6 +5083,21 @@ class PublicSiteView(APIView):
             'id': site.id,
             'name': site.name,
             'domain': site.domain,
+            'description': site.description,
+            'og_image_url': site.og_image_url,
+            'default_language': site.default_language,
+            'available_languages': site.effective_languages,
+            'author': {
+                'name': site.default_author or 'Admin',
+                'role': site.author_role,
+                'bio': site.author_bio,
+                'credentials': site.author_credentials,
+                'image_url': site.author_image_url,
+                'linkedin': site.author_linkedin,
+                'twitter': site.author_twitter,
+                'website': site.author_website,
+            },
+            'person_schema': _generate_person_schema(site),
         })
 
 

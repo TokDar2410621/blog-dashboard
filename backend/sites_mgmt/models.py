@@ -52,6 +52,40 @@ class Site(models.Model):
         verbose_name="Auteur par défaut",
         help_text="Nom d'auteur attribué aux articles générés (utilisé aussi pour Schema.org). Vide = 'Admin'."
     )
+    # ── EEAT — author profile (Schema.org Person) ─────────────────────
+    author_role = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name="Rôle / titre de l'auteur",
+        help_text="Ex: Fondateur, Consultant SEO, Avocat fiscaliste"
+    )
+    author_bio = models.TextField(
+        blank=True, default='',
+        verbose_name="Bio de l'auteur",
+        help_text="2-4 phrases qui établissent l'expertise (E-E-A-T : experience, expertise, authority, trust)"
+    )
+    author_credentials = models.TextField(
+        blank=True, default='',
+        verbose_name="Crédentials / qualifications",
+        help_text="Diplômes, certifications, expérience pertinente. Visible publiquement et utilisé en JSON-LD."
+    )
+    author_image_url = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="Photo de l'auteur",
+        help_text="URL d'une photo professionnelle (JSON-LD Person.image)"
+    )
+    author_linkedin = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="LinkedIn",
+    )
+    author_twitter = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="Twitter / X",
+    )
+    author_website = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="Site personnel",
+    )
+
     default_language = models.CharField(
         max_length=2, choices=LANGUAGE_CHOICES, default='fr',
         verbose_name="Langue par défaut",

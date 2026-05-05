@@ -1163,3 +1163,76 @@ La mission a essentiellement franchi le seuil "presque accomplie" sur les capaci
 - Configurer Stripe pour commercialisation (Tier 4 #21).
 - Configurer Bing Webmaster API key pour Tier 3 #14.
 
+---
+
+## Session 2026-05-04 (suite 19) — Tier 4 #18 EEAT author profile ✅ (end-to-end)
+
+**Fait** :
+- DB : `Site` étendu de 7 nouveaux champs EEAT :
+  - `author_role` (CharField 200) — titre/rôle
+  - `author_bio` (TextField) — bio 2-4 phrases
+  - `author_credentials` (TextField) — diplômes/certifications
+  - `author_image_url` (URLField) — photo
+  - `author_linkedin`, `author_twitter`, `author_website` (URLField each) — sameAs
+- Migration `0014_site_author_bio_site_author_credentials_and_more` créée et appliquée.
+- `SiteSerializer` : 7 nouveaux fields exposés.
+- Helper backend `_generate_person_schema(site)` : génère JSON-LD Schema.org/Person avec `name`, `jobTitle`, `description`, `image`, `hasCredential`, `sameAs[]` (LinkedIn + Twitter + Website filtré), `worksFor` (Organization du site). Retourne `None` si pas de bio + pas de role + nom = 'Admin' (rien d'utile).
+- `PersonSchemaView` (`GET /sites/<id>/person-schema/`) : preview du JSON-LD pour le dashboard.
+- **`PublicSiteView` enrichi** : retourne maintenant `description`, `og_image_url`, `default_language`, `available_languages`, `author: {name, role, bio, credentials, image_url, linkedin, twitter, website}`, et `person_schema` (JSON-LD prêt à coller dans une balise `<script type="application/ld+json">` côté frontend public).
+- Routes : `/sites/<id>/person-schema/` ajoutée.
+- **Frontend `src/pages/dashboard/SiteSettings.tsx`** :
+  - Nouvelle card "Profil auteur (E-E-A-T)" entre Branding et Knowledge Base.
+  - Inputs : rôle, photo (avec preview thumb 40×40 rond), bio (textarea 3 rows + compteur), credentials (textarea 2 rows), 3 URLs sociales (LinkedIn / Twitter / Site personnel) avec icônes.
+  - Hints qui expliquent l'usage SEO de chaque champ.
+- `src/lib/schemas.ts` : Zod `siteSchema` étendu de 7 fields optionnels pour valider la réponse.
+
+**Tests** :
+- `python manage.py makemigrations` + `migrate` → migration 0014 appliquée.
+- `python backend/manage.py check` → OK.
+- `npm run build` → ✓ built in 17.47s.
+- **Tests live à faire (humain)** :
+  1. Aller sur `/dashboard/<siteId>/parametres`, voir la nouvelle card "Profil auteur (E-E-A-T)", remplir, sauvegarder.
+  2. Vérifier `GET /api/public/sites/<id>/` retourne maintenant `author` et `person_schema`.
+  3. Côté frontend public (Arivex, etc.), exposer `person_schema` dans une `<script type="application/ld+json">` sur la page article — ça va aider Google à classer l'auteur.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Modèle + migration + serializer + helper + view + endpoint + UI + Zod schema dans la même session.
+
+**Prochain bloc concret** :
+
+Tier 4 (commercialisation) — items restants :
+- **#17 Weekly digest auto** (4h) — rapport email/PDF par site. Nécessite SMTP config (probablement déjà en place sur Railway, à vérifier).
+- **#19 Plagiarism check** (3h) — clé API tierce (Originality.ai ou Copyleaks) requise. Action humaine.
+- **#20 Multi-domain comparison** (4h) — compare KPIs entre sites du même owner. End-to-end pur.
+- **#21 Pricing + Stripe** (8h) — action humaine (compte Stripe).
+- **#22 Landing page** (6h) — décision design/copy. Mieux co-construit avec Darius.
+- **#23 Onboarding flow** (6h) — décision UX. Co-construit.
+
+**Recommandation** : **#20 Multi-domain comparison** — fully autonomous (pas de clé API tierce, pas de décision produit), différencie le SaaS pour les clients qui ont plusieurs sites (cas typique d'agences Québec).
+
+Plan #20 :
+1. Backend `GET /multi-domain-stats/` (auth) qui itère tous les `Site` du `owner`, agrège pour chacun les stats publiées (count articles, view_count total, articles en décay si GSC, articles incomplets hreflang, broken links count si scanné, score audit moyen si caché). Retourne tableau cross-site.
+2. Frontend page `/dashboard/multi-domain` (hors du site context, niveau dashboard global ?) ou intégré dans le site selector existant.
+3. Sidebar ou header link.
+4. i18n + build.
+
+**Statistiques fin de session 19** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : ✅ 9/10 (manque #14 humain)
+- Tier 4 : 1/7 (#18 EEAT)
+- Endpoints SEO ajoutés cumulés cette journée : 22
+- Composants/pages frontend : 14
+- Migrations DB : 3 (0012, 0013, 0014)
+- Commits locaux non poussés : 19
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** :
+- **PRIORITAIRE** : push 19 commits + tester live.
+- Stripe (Tier 4 #21).
+- Bing Webmaster (Tier 3 #14).
+- Plagiarism API (Tier 4 #19).
+- Décisions design/copy pour landing + onboarding (Tier 4 #22, #23).
+

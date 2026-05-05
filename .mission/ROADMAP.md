@@ -82,7 +82,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 ## Tier 4 — finition / commercialisation
 
 - [ ] **17. Weekly digest auto** (rapport email/PDF par site) ⏱ 4h
-- [ ] **18. EEAT author profile** ⏱ 2h
+- [x] **18. EEAT author profile** — 7 champs ajoutés à Site (role, bio, credentials, image, linkedin, twitter, website), migration 0014, helper `_generate_person_schema`, endpoint `/sites/<id>/person-schema/`, PublicSiteView enrichi avec `author` + `person_schema`. UI complète dans SiteSettings.
 - [ ] **19. Plagiarism / originality check** ⏱ 3h (action humaine pour clé API tierce)
 - [ ] **20. Multi-domain comparison** ⏱ 4h
 - [ ] **21. Pricing + Stripe** ⏱ 8h (**action humaine** : config compte Stripe)

@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -29,6 +29,14 @@ export default function SiteSettings() {
   const [ogImageUrl, setOgImageUrl] = useState("");
   const [defaultAuthor, setDefaultAuthor] = useState("");
   const [defaultLanguage, setDefaultLanguage] = useState<string>("fr");
+  // EEAT author profile
+  const [authorRole, setAuthorRole] = useState("");
+  const [authorBio, setAuthorBio] = useState("");
+  const [authorCredentials, setAuthorCredentials] = useState("");
+  const [authorImageUrl, setAuthorImageUrl] = useState("");
+  const [authorLinkedin, setAuthorLinkedin] = useState("");
+  const [authorTwitter, setAuthorTwitter] = useState("");
+  const [authorWebsite, setAuthorWebsite] = useState("");
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -42,6 +50,13 @@ export default function SiteSettings() {
       setOgImageUrl(site.og_image_url || "");
       setDefaultAuthor(site.default_author || "");
       setDefaultLanguage(site.default_language || "fr");
+      setAuthorRole(site.author_role || "");
+      setAuthorBio(site.author_bio || "");
+      setAuthorCredentials(site.author_credentials || "");
+      setAuthorImageUrl(site.author_image_url || "");
+      setAuthorLinkedin(site.author_linkedin || "");
+      setAuthorTwitter(site.author_twitter || "");
+      setAuthorWebsite(site.author_website || "");
     }
   }, [site]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -64,6 +79,13 @@ export default function SiteSettings() {
         og_image_url: ogImageUrl,
         default_author: defaultAuthor,
         default_language: defaultLanguage,
+        author_role: authorRole,
+        author_bio: authorBio,
+        author_credentials: authorCredentials,
+        author_image_url: authorImageUrl,
+        author_linkedin: authorLinkedin,
+        author_twitter: authorTwitter,
+        author_website: authorWebsite,
       });
       toast.success(t("settings.saved"));
     } catch {
@@ -302,6 +324,132 @@ export default function SiteSettings() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* EEAT — Author profile (Schema.org Person) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            Profil auteur (E-E-A-T)
+          </CardTitle>
+          <CardDescription>
+            Renseigne ces champs pour booster les signaux Experience, Expertise, Authority, Trust de Google. Utilisé en JSON-LD <code className="text-xs">Person</code> sur les articles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm">Rôle / titre</Label>
+              <Input
+                value={authorRole}
+                onChange={(e) => setAuthorRole(e.target.value)}
+                placeholder="Ex: Fondateur, Consultant SEO, Avocat fiscaliste"
+              />
+              <p className="text-xs text-muted-foreground">
+                JSON-LD <code>jobTitle</code>. Aide Google à classer ton expertise.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5" />
+                Photo (URL)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={authorImageUrl}
+                  onChange={(e) => setAuthorImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  type="url"
+                  className="flex-1"
+                />
+                {authorImageUrl && (
+                  <img
+                    src={authorImageUrl}
+                    alt="Author preview"
+                    className="h-10 w-10 rounded-full object-cover border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Bio (2-4 phrases)</Label>
+            <Textarea
+              value={authorBio}
+              onChange={(e) => setAuthorBio(e.target.value)}
+              placeholder="Ex: Fondateur de Blog Dashboard, j'aide les PME québécoises à atteindre la première page de Google. 10 ans d'expérience SEO."
+              rows={3}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground">
+              {authorBio.length} caractères — vise une bio concise qui établit ton expérience pratique.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Credentials / qualifications</Label>
+            <Textarea
+              value={authorCredentials}
+              onChange={(e) => setAuthorCredentials(e.target.value)}
+              placeholder="Ex: MBA HEC Montréal, certifié Google Analytics, ancien consultant chez Shopify..."
+              rows={2}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground">
+              JSON-LD <code>hasCredential</code>. Diplômes, certifications, expériences pertinentes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Linkedin className="h-3.5 w-3.5" />
+                LinkedIn
+              </Label>
+              <Input
+                value={authorLinkedin}
+                onChange={(e) => setAuthorLinkedin(e.target.value)}
+                placeholder="https://linkedin.com/in/..."
+                type="url"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Twitter className="h-3.5 w-3.5" />
+                Twitter / X
+              </Label>
+              <Input
+                value={authorTwitter}
+                onChange={(e) => setAuthorTwitter(e.target.value)}
+                placeholder="https://x.com/..."
+                type="url"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5" />
+                Site personnel
+              </Label>
+              <Input
+                value={authorWebsite}
+                onChange={(e) => setAuthorWebsite(e.target.value)}
+                placeholder="https://..."
+                type="url"
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Ces 3 URLs alimentent <code>sameAs</code> dans le JSON-LD Person — Google les utilise pour vérifier ton identité.
+          </p>
         </CardContent>
       </Card>
 
