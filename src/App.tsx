@@ -9,6 +9,7 @@ import "@/i18n";
 
 const Login = lazy(() => import("./pages/Login"));
 const SiteSelector = lazy(() => import("./pages/SiteSelector"));
+const MultiDomain = lazy(() => import("./pages/MultiDomain"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -44,6 +45,14 @@ function App() {
                   element={
                     <AuthGuard>
                       <SiteSelector />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/compare"
+                  element={
+                    <AuthGuard>
+                      <MultiDomain />
                     </AuthGuard>
                   }
                 />

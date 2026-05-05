@@ -91,6 +91,27 @@
     "logout": "Logout"
   },
 
+  "multiDomain": {
+    "title": "Multi-site comparison",
+    "subtitle": "Overview of all your sites in one page. Spot which ones need attention.",
+    "back": "Back to sites",
+    "activeSites": "Active sites of {{total}}",
+    "totalPublished": "Published articles",
+    "totalViews": "Total views",
+    "trackedKeywords": "Tracked keywords",
+    "perSite": "Per site",
+    "site": "Site",
+    "articles": "Articles",
+    "views": "Views",
+    "languages": "Languages",
+    "gsc": "GSC",
+    "eeat": "EEAT",
+    "gscCoverage": "Google Search Console coverage",
+    "gscHint": "Connect missing sites to monitor their Google performance.",
+    "eeatCoverage": "EEAT author profile coverage",
+    "eeatHint": "Fill in the author profile on each site to boost E-E-A-T signals."
+  },
+
   "trends": {
     "title": "Google Trends",
     "subtitle": "Keyword interest over time + most popular related queries and rising ones. Geo-scoped by language (FR-CA, EN-US, ES-ES).",

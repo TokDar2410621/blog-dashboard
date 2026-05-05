@@ -84,7 +84,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [ ] **17. Weekly digest auto** (rapport email/PDF par site) ⏱ 4h
 - [x] **18. EEAT author profile** — 7 champs ajoutés à Site (role, bio, credentials, image, linkedin, twitter, website), migration 0014, helper `_generate_person_schema`, endpoint `/sites/<id>/person-schema/`, PublicSiteView enrichi avec `author` + `person_schema`. UI complète dans SiteSettings.
 - [ ] **19. Plagiarism / originality check** ⏱ 3h (action humaine pour clé API tierce)
-- [ ] **20. Multi-domain comparison** ⏱ 4h
+- [x] **20. Multi-domain comparison** — endpoint `/multi-domain-stats/` agrège tous les sites de l'owner, page `/compare` avec table cross-site + KPI cards + couverture GSC/EEAT. Lien depuis SiteSelector.
 - [ ] **21. Pricing + Stripe** ⏱ 8h (**action humaine** : config compte Stripe)
 - [ ] **22. Landing page commerciale** ⏱ 6h
 - [ ] **23. Onboarding flow** (connexion blog en <10 min) ⏱ 6h

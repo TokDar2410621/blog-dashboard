@@ -1236,3 +1236,64 @@ Plan #20 :
 - Plagiarism API (Tier 4 #19).
 - Décisions design/copy pour landing + onboarding (Tier 4 #22, #23).
 
+---
+
+## Session 2026-05-04 (suite 20) — Tier 4 #20 Multi-domain comparison ✅ (end-to-end)
+
+**Fait** :
+- Backend `MultiDomainStatsView` (avant `PersonSchemaView`) :
+  - Endpoint `GET /multi-domain-stats/`. Auth requise.
+  - Itère tous les `Site` du `request.user`.
+  - Pour chaque site (hosted ou external) : compte total/published/drafts, somme view_count, last_published_at, language_breakdown (Counter), tracked_keywords actifs, redirects actifs, gsc_configured (bool), has_eeat_profile (bool).
+  - Gère les erreurs par site (DB external indisponible) avec fallback `{error}` plutôt que de tout faire planter.
+  - Agrégat `totals: {sites_count, active_sites, total_articles, total_views, total_tracked_keywords, sites_with_gsc, sites_with_eeat}`.
+- Route `path('multi-domain-stats/', MultiDomainStatsView.as_view(), name='multi-domain-stats')`.
+- Frontend nouvelle page `src/pages/MultiDomain.tsx` (top-level, hors site context) :
+  - 4 KPI cards : sites actifs / total articles / total vues / mots-clés suivis.
+  - Table par site avec : nom (lien vers `/dashboard/<id>`), domaine, articles publiés (+drafts en grisé), vues, language badges, GSC ✓/✗, EEAT badge, mots-clés suivis, redirects, bouton lien externe.
+  - 2 cards de couverture en bas : GSC coverage + EEAT coverage avec barre de progression.
+  - États inactive en opacité 50%.
+- Route `/compare` ajoutée dans `App.tsx` (lazy-loaded, AuthGuard).
+- Lien "Comparer mes sites" (icône BarChart3) ajouté dans `SiteSelector.tsx` à côté du Logout.
+- 19 nouvelles clés `multiDomain.*` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 15.68s
+- **Tests live à faire (humain)** : aller sur `/`, cliquer "Comparer mes sites" → vue agrégée des 3 sites. Vérifier que les chiffres correspondent à la réalité.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend (view + route) + frontend (page + route App + lien SiteSelector) + i18n.
+
+**Prochain bloc concret** :
+
+Tier 4 restant :
+- **#17 Weekly digest** (4h) — rapport email/PDF par site. Risque SMTP non configuré côté Railway. Fallback : générer un PDF/HTML téléchargeable depuis le dashboard, sans envoi email automatique.
+- **#19 Plagiarism check** — clé API tierce (action humaine).
+- **#21 Pricing + Stripe** — action humaine.
+- **#22 Landing page** — décision design/copy.
+- **#23 Onboarding flow** — décision UX.
+
+**Recommandation** : **#17 Weekly digest** version "rapport téléchargeable" (sans dépendance SMTP), le plus impactant restant qui peut être fait en autonomie.
+
+Plan #17 :
+1. Backend `GET /sites/<id>/weekly-digest/` → JSON avec : période 7 jours, articles publiés cette semaine, articles avec le plus de vues cette semaine vs précédente, top mots-clés tracked positions delta, score audit moyen évolution, broken links count, decay alerts count.
+2. Frontend page `/dashboard/<id>/digest` ou intégration dans Overview avec option "Générer rapport" → bouton qui télécharge un PDF (via `react-pdf` côté client, simple) ou HTML imprimable.
+3. Cache 1h.
+
+**Statistiques fin de session 20** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : ✅ 9/10
+- Tier 4 : 2/7 (#18 EEAT, #20 multi-domain)
+- Endpoints SEO ajoutés cumulés : 23
+- Composants/pages frontend ajoutés cumulés : 15
+- Migrations : 3
+- Commits locaux non poussés : 20
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : push, test live, Stripe, Bing, plagiarism API, décisions landing/onboarding.
+

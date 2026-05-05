@@ -91,6 +91,27 @@
     "logout": "Deconnexion"
   },
 
+  "multiDomain": {
+    "title": "Comparaison multi-sites",
+    "subtitle": "Vue d'ensemble de tous tes sites en une page. Identifie quels sites ont besoin d'attention.",
+    "back": "Retour aux sites",
+    "activeSites": "Sites actifs sur {{total}}",
+    "totalPublished": "Articles publies",
+    "totalViews": "Vues totales",
+    "trackedKeywords": "Mots-cles suivis",
+    "perSite": "Par site",
+    "site": "Site",
+    "articles": "Articles",
+    "views": "Vues",
+    "languages": "Langues",
+    "gsc": "GSC",
+    "eeat": "EEAT",
+    "gscCoverage": "Couverture Google Search Console",
+    "gscHint": "Connecte tes sites manquants pour suivre leurs performances Google.",
+    "eeatCoverage": "Couverture profil auteur EEAT",
+    "eeatHint": "Remplis les champs Profil auteur sur chaque site pour booster les signaux E-E-A-T."
+  },
+
   "trends": {
     "title": "Tendances Google Trends",
     "subtitle": "Interet du mot-cle dans le temps + requetes connexes les plus populaires et celles qui montent. Geo-localise selon la langue (FR-CA, EN-US, ES-ES).",

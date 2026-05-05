@@ -36,6 +36,7 @@ import {
   LogOut,
   CheckCircle,
   Database,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -225,7 +226,12 @@ export default function SiteSelector() {
           </DialogContent>
         </Dialog>
 
-        <div className="text-center">
+        <div className="text-center flex items-center justify-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            {t("sites.compare", "Comparer mes sites")}
+          </Button>
+          <span className="text-muted-foreground">·</span>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             {t("sites.logout")}

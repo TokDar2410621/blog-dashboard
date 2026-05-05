@@ -3963,6 +3963,112 @@ class LocalBusinessSchemaView(APIView):
         return Response({'schema': schema})
 
 
+class MultiDomainStatsView(APIView):
+    """Aggregate stats for ALL sites of the authenticated user — useful for
+    agencies / multi-site owners who want a single view across their portfolio.
+
+    GET /multi-domain-stats/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from collections import Counter
+
+        sites = list(Site.objects.filter(owner=request.user).order_by('name'))
+        results = []
+
+        for site in sites:
+            try:
+                if site.is_hosted:
+                    qs = HostedPost.objects.filter(site=site)
+                    total = qs.count()
+                    published_qs = qs.filter(status='published')
+                    published = published_qs.count()
+                    drafts = qs.filter(status='draft').count()
+                    total_views = sum(
+                        published_qs.values_list('view_count', flat=True)
+                    ) or 0
+                    last_pub = (
+                        published_qs.order_by('-published_at')
+                        .values_list('published_at', flat=True)
+                        .first()
+                    )
+                    lang_counter = Counter(
+                        published_qs.values_list('language', flat=True)
+                    )
+                else:
+                    alias = ensure_site_connection(site)
+                    qs = BlogPost.objects.using(alias)
+                    total = qs.count()
+                    published_qs = qs.filter(status='published')
+                    published = published_qs.count()
+                    drafts = qs.filter(status='draft').count()
+                    total_views = sum(
+                        published_qs.values_list('view_count', flat=True)
+                    ) or 0
+                    last_pub = (
+                        published_qs.order_by('-published_at')
+                        .values_list('published_at', flat=True)
+                        .first()
+                    )
+                    lang_counter = Counter(
+                        published_qs.values_list('language', flat=True)
+                    )
+
+                tracked_keywords = TrackedKeyword.objects.filter(
+                    site=site, is_active=True
+                ).count()
+                redirects_count = Redirect.objects.filter(
+                    site=site, is_active=True
+                ).count()
+
+                results.append({
+                    'id': site.id,
+                    'name': site.name,
+                    'domain': site.domain,
+                    'is_hosted': site.is_hosted,
+                    'is_active': site.is_active,
+                    'default_language': site.default_language,
+                    'available_languages': site.effective_languages,
+                    'total_articles': total,
+                    'published_articles': published,
+                    'drafts': drafts,
+                    'total_views': int(total_views),
+                    'last_published_at': last_pub.isoformat() if last_pub else None,
+                    'language_breakdown': dict(lang_counter),
+                    'tracked_keywords': tracked_keywords,
+                    'redirects_count': redirects_count,
+                    'gsc_configured': bool(
+                        site.gsc_property_url and site.gsc_refresh_token
+                    ),
+                    'has_eeat_profile': bool(site.author_bio or site.author_role),
+                })
+            except Exception as e:
+                logger.warning('multi-domain stats failed for site %s: %s', site.id, e)
+                results.append({
+                    'id': site.id,
+                    'name': site.name,
+                    'domain': site.domain,
+                    'error': str(e)[:100],
+                })
+
+        # Aggregate totals
+        totals = {
+            'sites_count': len(results),
+            'active_sites': sum(1 for r in results if r.get('is_active')),
+            'total_articles': sum(r.get('published_articles', 0) for r in results),
+            'total_views': sum(r.get('total_views', 0) for r in results),
+            'total_tracked_keywords': sum(r.get('tracked_keywords', 0) for r in results),
+            'sites_with_gsc': sum(1 for r in results if r.get('gsc_configured')),
+            'sites_with_eeat': sum(1 for r in results if r.get('has_eeat_profile')),
+        }
+
+        return Response({
+            'sites': results,
+            'totals': totals,
+        })
+
+
 class PersonSchemaView(APIView):
     """Return the Schema.org Person JSON-LD built from the site's EEAT fields.
 
