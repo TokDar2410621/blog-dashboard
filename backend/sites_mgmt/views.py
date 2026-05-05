@@ -2528,6 +2528,185 @@ class CompetitorAnalysisView(APIView):
         })
 
 
+class ContentBriefView(APIView):
+    """Generate a full SEO content brief for a keyword.
+
+    Combines Serper SERP (top 10 + PAA) with Gemini synthesis to produce:
+    search intent, recommended titles, outline, word count target, FAQ,
+    entities, suggested schemas, and E-E-A-T signals.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        import json
+
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = _seo_cache_key('content_brief', keyword, language)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp['X-Cache'] = 'HIT'
+            return resp
+
+        serper_key = os.environ.get('SERPER_API_KEY')
+        gemini_key = os.environ.get('GEMINI_API_KEY')
+
+        if not serper_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        if not gemini_key:
+            return Response(
+                {'error': 'GEMINI_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if language == 'en':
+            hl, gl = 'en', 'ca'
+            lang_label = 'English (Canadian)'
+        else:
+            hl, gl = 'fr', 'ca'
+            lang_label = 'French (Quebec)'
+
+        # Step A — Serper: top 10 organic + PAA
+        try:
+            serper_resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={
+                    'X-API-KEY': serper_key,
+                    'Content-Type': 'application/json',
+                },
+                json={'q': keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                timeout=12,
+            )
+        except http_requests.Timeout:
+            return Response(
+                {'error': 'Delai Serper depasse'},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Serper: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if serper_resp.status_code != 200:
+            return Response(
+                {'error': f'Erreur Serper: {serper_resp.status_code}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        serper_data = serper_resp.json() or {}
+        organic = (serper_data.get('organic') or [])[:10]
+        paa_raw = serper_data.get('peopleAlsoAsk') or []
+
+        competitors_summary = []
+        for item in organic:
+            competitors_summary.append({
+                'title': item.get('title') or '',
+                'url': item.get('link') or '',
+                'snippet': item.get('snippet') or '',
+            })
+
+        paa_questions = [
+            (item.get('question') or '').strip()
+            for item in paa_raw
+            if (item.get('question') or '').strip()
+        ]
+
+        # Step B — Gemini: synthesize brief
+        competitors_text = '\n'.join(
+            f"{i+1}. {c['title']} — {c['snippet']}"
+            for i, c in enumerate(competitors_summary)
+        )
+        paa_text = '\n'.join(f'- {q}' for q in paa_questions) if paa_questions else '(none)'
+
+        prompt = f"""You are an expert SEO content strategist specialized in the Quebec/Canadian market.
+Analyze the following data for the keyword "{keyword}" (language: {lang_label}) and produce a
+detailed content brief in JSON format.
+
+TOP 10 SERP RESULTS:
+{competitors_text}
+
+PEOPLE ALSO ASK:
+{paa_text}
+
+Return ONLY valid JSON (no markdown, no code blocks, no explanation) with this exact structure:
+{{
+  "search_intent": "informational|commercial|transactional|navigational",
+  "intent_explanation": "<1 sentence why>",
+  "recommended_titles": ["<title variant 1>", "<title variant 2>", "<title variant 3>"],
+  "outline": [
+    {{"level": 2, "text": "<H2 heading>"}},
+    {{"level": 3, "text": "<H3 heading (optional, under previous H2)"}},
+    ...
+  ],
+  "word_count_target": <integer, median of top competitors or educated estimate>,
+  "faq": [
+    {{"q": "<question>", "a": "<concise answer 1-2 sentences>"}},
+    ...
+  ],
+  "entities": ["<LSI keyword / entity to mention>", ...],
+  "schemas_suggested": ["Article", "FAQ", ...],
+  "eeat_signals": ["<E-E-A-T signal to include, e.g. cite expert source, add author bio, show date updated>", ...]
+}}
+
+Guidelines:
+- Titles must be in {lang_label}, compelling, include the keyword naturally.
+- Outline: 5-8 H2s, add H3s where logical. In {lang_label}.
+- FAQ: 4-6 questions, sourced from PAA when available, in {lang_label}.
+- Entities: 8-12 semantic entities/LSI keywords relevant to the topic and Quebec market.
+- Schemas: pick from Article, FAQ, HowTo, LocalBusiness, BreadcrumbList, VideoObject.
+- E-E-A-T: concrete signals a blog post should include (author credentials, sources, freshness indicators)."""
+
+        try:
+            from google import genai
+
+            client = genai.Client(api_key=gemini_key)
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt],
+            )
+            text = (response.text or '').strip()
+            if text.startswith('```'):
+                lines = text.split('\n')
+                text = '\n'.join(lines[1:])
+                if text.strip().endswith('```'):
+                    text = text.strip()[:-3].strip()
+
+            brief = json.loads(text)
+        except json.JSONDecodeError as e:
+            return Response(
+                {'error': f'Gemini a retourne un JSON invalide: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Gemini: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        result = {
+            'keyword': keyword,
+            'language': language,
+            'competitors': competitors_summary,
+            'brief': brief,
+        }
+        cache.set(cache_key, result, 3600)
+        return Response(result)
+
+
 # ==========================================================================
 # PUBLIC API — consumed by site frontends (no auth, optional API key check)
 # ==========================================================================
