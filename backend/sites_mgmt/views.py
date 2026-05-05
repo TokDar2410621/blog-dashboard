@@ -190,6 +190,18 @@ class SitePostsView(APIView):
         page = int(request.query_params.get('page', 1))
         page_size = 20
 
+        # WordPress mode: delegate to the REST adapter.
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(site)
+                return Response(client.list_posts(
+                    status=status_filter or None, search=search,
+                    page=page, per_page=page_size,
+                ))
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
         if site.is_hosted:
             posts = HostedPost.objects.filter(site=site).select_related('category').prefetch_related('tags').order_by('-created_at')
             if search:
@@ -233,6 +245,24 @@ class SitePostsView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
+
+        # WordPress mode: bypass the BlogPost serializer (which validates
+        # against the canonical schema) and forward to the REST adapter.
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            data_in = request.data
+            try:
+                client = WordPressClient(site)
+                created = client.create_post(
+                    title=data_in.get('title', ''),
+                    content=data_in.get('content', ''),
+                    excerpt=data_in.get('excerpt', '') or '',
+                    slug=data_in.get('slug', '') or slugify(data_in.get('title', '') or 'article'),
+                    status=data_in.get('status', 'draft'),
+                )
+                return Response(created, status=status.HTTP_201_CREATED)
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         serializer = BlogPostWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -294,6 +324,18 @@ class SitePostDetailView(APIView):
         site = get_site_for_user(request, site_id)
         language = request.query_params.get('language')
 
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(site)
+                post = client.get_post(slug)
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                from django.http import Http404
+                raise Http404
+            return Response(post)
+
         if site.is_hosted:
             qs = HostedPost.objects.filter(site=site, slug=slug) \
                 .select_related('category').prefetch_related('tags')
@@ -321,6 +363,35 @@ class SitePostDetailView(APIView):
         site = get_site_for_user(request, site_id)
         data = request.data
         language = request.query_params.get('language')
+
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(site)
+                # Look up the post first (we need its WP id to PATCH).
+                existing = client.get_post(slug)
+                if not existing:
+                    from django.http import Http404
+                    raise Http404
+                updated = client.update_post(
+                    existing['wp_id'],
+                    title=data.get('title', existing['title']),
+                    content=data.get('content', existing['content']),
+                    excerpt=data.get('excerpt', existing['excerpt']),
+                    slug=data.get('slug', existing['slug']) or existing['slug'],
+                    status=data.get('status', existing['status']),
+                )
+                # Track redirect if slug changed
+                old_slug = existing['slug']
+                new_slug = updated['slug']
+                if new_slug and old_slug != new_slug:
+                    Redirect.objects.update_or_create(
+                        site=site, from_slug=old_slug, language=existing.get('language', 'fr'),
+                        defaults={'to_slug': new_slug, 'is_active': True},
+                    )
+                return Response(updated)
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
             hosted_qs = HostedPost.objects.filter(site=site, slug=slug)
@@ -420,6 +491,20 @@ class SitePostDetailView(APIView):
         site = get_site_for_user(request, site_id)
         language = request.query_params.get('language')
         from django.http import Http404
+
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(site)
+                existing = client.get_post(slug)
+                if not existing:
+                    raise Http404
+                ok = client.delete_post(existing['wp_id'], force=False)
+                if not ok:
+                    return Response({'error': 'WP delete failed'}, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
             qs = HostedPost.objects.filter(site=site, slug=slug)
@@ -611,6 +696,12 @@ class SiteCategoriesView(APIView):
 
     def get(self, request, site_id):
         site = get_site_for_user(request, site_id)
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                return Response(WordPressClient(site).list_categories())
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         if site.is_hosted:
             categories = HostedCategory.objects.filter(site=site)
             return Response([
@@ -629,6 +720,12 @@ class SiteTagsView(APIView):
 
     def get(self, request, site_id):
         site = get_site_for_user(request, site_id)
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                return Response(WordPressClient(site).list_tags())
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         if site.is_hosted:
             tags = HostedTag.objects.filter(site=site)
             return Response([{'id': t.id, 'name': t.name} for t in tags])
@@ -723,7 +820,11 @@ class GenerateArticleView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        alias = ensure_site_connection(site)
+        # WordPress mode: don't try to open an external Postgres connection.
+        if site.is_wordpress:
+            alias = None
+        else:
+            alias = ensure_site_connection(site)
 
         # Extract parameters from request
         search_method = request.data.get('search', 'serper')
@@ -768,7 +869,11 @@ class GenerateArticleView(APIView):
         try:
             from .article_generator import ArticleGenerator
 
-            generator = ArticleGenerator(alias, knowledge_base=site.knowledge_base or '')
+            generator = ArticleGenerator(
+                alias,
+                knowledge_base=site.knowledge_base or '',
+                wp_site=site if site.is_wordpress else None,
+            )
             result = generator.generate(
                 search_method=search_method,
                 topic=topic,
@@ -808,7 +913,10 @@ class GenerateInlineView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        alias = ensure_site_connection(site)
+        if site.is_wordpress:
+            alias = None
+        else:
+            alias = ensure_site_connection(site)
 
         topic = request.data.get('topic') or None
         title = request.data.get('title') or None
@@ -850,7 +958,8 @@ class GenerateInlineView(APIView):
 
             generator = ArticleGenerator(
                 alias,
-                knowledge_base=(site.knowledge_base or '') + url_context
+                knowledge_base=(site.knowledge_base or '') + url_context,
+                wp_site=site if site.is_wordpress else None,
             )
             # Use dry_run to prevent saving
             result = generator.generate(
@@ -3971,6 +4080,117 @@ class LocalBusinessSchemaView(APIView):
             area_served=request.data.get('area_served'),
         )
         return Response({'schema': schema})
+
+
+class WordPressDiscoverView(APIView):
+    """Probe a URL to confirm it's a WordPress site with REST API enabled.
+
+    POST /wp/discover/ {url}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        url = (request.data.get('url') or '').strip()
+        if not url:
+            return Response(
+                {'error': 'url requise'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from .wordpress_adapter import WordPressClient
+        result = WordPressClient.discover(url)
+        if not result.get('valid_wp'):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class WordPressConnectView(APIView):
+    """Authenticate with a WordPress site using Application Password and
+    create / update a Site row for it.
+
+    POST /wp/connect/ {url, username, app_password, name?}
+    On success returns the Site dict — frontend can then redirect to the
+    dashboard for that site.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        url = (request.data.get('url') or '').strip()
+        username = (request.data.get('username') or '').strip()
+        app_password = (request.data.get('app_password') or '').strip()
+        explicit_name = (request.data.get('name') or '').strip()
+
+        if not url or not username or not app_password:
+            return Response(
+                {'error': 'url, username et app_password requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Normalize URL
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        url = url.rstrip('/')
+
+        from .wordpress_adapter import WordPressClient, WordPressError
+
+        # First, discovery to confirm it's WP and grab the name
+        discovery = WordPressClient.discover(url)
+        if not discovery.get('valid_wp'):
+            return Response(
+                {'error': discovery.get('error') or 'Site WordPress non détecté.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        url = discovery.get('normalized_url') or url
+        wp_name = explicit_name or discovery.get('name') or 'Site WordPress'
+
+        # Test auth before saving
+        try:
+            site = Site.objects.filter(owner=request.user, wp_url=url).first()
+            if not site:
+                site = Site(
+                    owner=request.user,
+                    name=wp_name,
+                    domain=url.replace('https://', '').replace('http://', '').rstrip('/'),
+                    wp_url=url,
+                    description=discovery.get('description', '') or '',
+                )
+            # Always (re)set credentials and save before testing — WPClient reads them from the model.
+            site.wp_url = url
+            site.wp_username = username
+            site.wp_app_password = app_password
+            site.save()
+
+            client = WordPressClient(site)
+            user_info = client.test_auth()
+        except WordPressError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.exception('WP connect failed')
+            return Response(
+                {'error': f'Erreur inattendue : {str(e)[:120]}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({
+            'site': {
+                'id': site.id,
+                'name': site.name,
+                'domain': site.domain,
+                'wp_url': site.wp_url,
+                'is_wordpress': True,
+            },
+            'wp_user': {
+                'username': user_info.get('slug') or user_info.get('name') or username,
+                'name': user_info.get('name') or username,
+                'roles': user_info.get('roles') or [],
+            },
+            'discovery': {
+                'site_name': discovery.get('name'),
+                'post_count': discovery.get('post_count'),
+            },
+        }, status=status.HTTP_201_CREATED)
 
 
 class WeeklyDigestView(APIView):

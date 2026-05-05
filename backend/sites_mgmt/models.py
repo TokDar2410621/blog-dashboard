@@ -108,6 +108,22 @@ class Site(models.Model):
         verbose_name="Config tables blog",
         help_text="Mapping des tables/colonnes si le site n'utilise pas les tables blog_* standard"
     )
+    # ── WordPress integration (mode "WP") ─────────────────────────────
+    wp_url = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="WordPress — URL du site",
+        help_text="Ex: https://monsite.ca (sans /wp-admin). Si renseigné, le site est en mode WordPress."
+    )
+    wp_username = models.CharField(
+        max_length=100, blank=True, default='',
+        verbose_name="WordPress — username",
+        help_text="Le nom d'utilisateur WordPress qui possède l'Application Password."
+    )
+    wp_app_password = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name="WordPress — Application Password",
+        help_text="Application Password généré dans WP → Profil → Application Passwords."
+    )
 
     # ── Intégrations externes ─────────────────────────────────────────
     vercel_deploy_hook = models.URLField(
@@ -158,9 +174,14 @@ class Site(models.Model):
         ]
 
     @property
+    def is_wordpress(self):
+        """Site connected via WordPress REST API + Application Password."""
+        return bool(self.wp_url and self.wp_app_password)
+
+    @property
     def is_hosted(self):
-        """Site without database_url uses the dashboard's hosted storage."""
-        return not self.database_url
+        """Site without external storage (no DB URL, no WP) uses the dashboard's hosted storage."""
+        return not self.database_url and not self.is_wordpress
 
     @property
     def author_for_articles(self):

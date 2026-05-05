@@ -148,9 +148,13 @@ REGLES: Inclure TOUS les sites web trouves, liens cliquables [Nom](URL), ne pas 
 class ArticleGenerator:
     """Generates articles for a specific site using dynamic DB connections."""
 
-    def __init__(self, alias, knowledge_base=''):
+    def __init__(self, alias, knowledge_base='', wp_site=None):
+        """alias: Django DB alias for external Postgres mode (None for WP/hosted).
+        wp_site: Site model instance when the site is in WordPress mode.
+        """
         self.alias = alias
         self.knowledge_base = knowledge_base
+        self.wp_site = wp_site  # if set → save via WP REST API instead of BlogPost
         self.serper_images = []
         self.logs = []
 
@@ -317,10 +321,14 @@ class ArticleGenerator:
         # 2.5 Cannibalization guard: refuse to generate a near-duplicate of
         # an existing article (unless the user forced the title explicitly).
         if not self.forced_title:
-            existing_titles = list(
-                BlogPost.objects.using(self.alias)
-                .values_list('title', flat=True)[:60]
-            )
+            if self.wp_site is not None:
+                # Fetch existing titles from WP REST API
+                existing_titles = [a['title'] for a in self._get_existing_articles()][:60]
+            else:
+                existing_titles = list(
+                    BlogPost.objects.using(self.alias)
+                    .values_list('title', flat=True)[:60]
+                )
             match = self._is_too_similar(topic_analysis['title'], existing_titles, threshold=0.55)
             if match:
                 matched_title, sim = match
@@ -1010,9 +1018,12 @@ NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le fra
         if not matches:
             return content, []
 
-        existing_slugs = set(
-            BlogPost.objects.using(self.alias).values_list('slug', flat=True)
-        )
+        if self.wp_site is not None:
+            existing_slugs = {a['slug'] for a in self._get_existing_articles()}
+        else:
+            existing_slugs = set(
+                BlogPost.objects.using(self.alias).values_list('slug', flat=True)
+            )
 
         broken_links = []
         for link_text, slug in matches:
@@ -1125,6 +1136,25 @@ Reponds UNIQUEMENT avec la meta description.'''
     # === INTERNAL LINKING HELPERS ===
 
     def _get_existing_articles(self):
+        # WordPress mode: fetch via REST API (capped at 50 to keep prompt size sane).
+        if self.wp_site is not None:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(self.wp_site)
+                page = client.list_posts(status='published', per_page=50)
+                return [
+                    {
+                        'title': p.get('title') or '',
+                        'slug': p.get('slug') or '',
+                        'url': f"/{p.get('slug') or ''}",
+                        'excerpt': (p.get('excerpt') or '')[:100],
+                        'category': '',
+                    }
+                    for p in page.get('results', [])
+                ]
+            except WordPressError:
+                return []
+
         articles = (
             BlogPost.objects.using(self.alias)
             .all()
@@ -1164,6 +1194,37 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
     # === SAVE ===
 
     def save_article(self, title, slug, excerpt, content, category_name, tags, reading_time, cover_image):
+        # WordPress mode: push to WP REST API instead of saving locally.
+        if self.wp_site is not None:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                client = WordPressClient(self.wp_site)
+                # Convert markdown content to HTML for WP (WP renders raw HTML; markdown isn't natively supported).
+                from markdown import markdown as md_to_html
+                content_html = md_to_html(
+                    content, extensions=['extra', 'tables', 'fenced_code']
+                )
+                created = client.create_post(
+                    title=title,
+                    content=content_html,
+                    excerpt=excerpt,
+                    slug=slug,
+                    status='publish',
+                )
+                self.log(f'[OK] Article publie sur WordPress (id={created.get("wp_id")})')
+                # Return a duck-typed object with .slug/.title attributes (used by callers).
+
+                class _WpPostShim:
+                    pass
+                shim = _WpPostShim()
+                shim.slug = created.get('slug') or slug
+                shim.title = created.get('title') or title
+                shim.id = created.get('wp_id')
+                return shim
+            except WordPressError as e:
+                self.log(f'[ERROR] WP save failed: {e}')
+                raise
+
         # Check for duplicate slug
         if BlogPost.objects.using(self.alias).filter(slug=slug).exists():
             slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
@@ -1213,6 +1274,11 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
         return content + section
 
     def _get_related_articles(self, category_name, tags, exclude_slug, limit=3):
+        # WordPress mode: skip the "A lire aussi" auto-section since we'd need
+        # category/tag matching via WP REST and that's overkill for MVP.
+        if self.wp_site is not None:
+            return []
+
         related = []
 
         try:
