@@ -199,6 +199,22 @@
     "error": "Erreur lors de la generation"
   },
 
+  "paa": {
+    "title": "People Also Ask + FAQ schema",
+    "subtitle": "Recupere les questions Google PAA pour ton mot-cle, genere des reponses courtes, et produit un schema FAQPage pret a coller.",
+    "keyword": "Mot-cle",
+    "keywordPlaceholder": "Ex: tva auto-entrepreneur quebec",
+    "keywordRequired": "Le mot-cle est requis",
+    "fetch": "Recuperer",
+    "noQuestions": "Aucune question PAA trouvee pour ce mot-cle.",
+    "faqSchema": "Schema FAQPage (JSON-LD)",
+    "copySchema": "Copier",
+    "insertSchema": "Inserer dans l'article",
+    "schemaCopied": "Schema copie dans le presse-papiers",
+    "schemaInserted": "Schema insere",
+    "error": "Erreur lors de la recuperation"
+  },
+
   "brief": {
     "title": "Brief de contenu",
     "subtitle": "Genere un plan strategique avant d'ecrire — intent, titres, plan, FAQ, entites, schemas, signaux EEAT.",

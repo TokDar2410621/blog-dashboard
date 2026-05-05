@@ -23,6 +23,7 @@ import {
 import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { ContentBriefPanel } from "@/components/ContentBrief";
+import { PAAPanel } from "@/components/PAAPanel";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -112,6 +113,12 @@ export default function AIGenerator() {
           if (ti2) setTitle(ti2);
           if (kw2) setKeywords(kw2);
         }}
+      />
+
+      {/* PAA harvester — questions + FAQ schema */}
+      <PAAPanel
+        language={language}
+        defaultKeyword={keywords.split(",")[0]?.trim() || topic}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

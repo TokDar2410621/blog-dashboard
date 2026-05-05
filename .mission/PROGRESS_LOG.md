@@ -120,7 +120,9 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 **Branches/commits** : commit local à venir (pas de push).
 
-**Prochain bloc concret** :
+**Prochain bloc concret** : (voir entrée suivante — PAA fait dans la même session)
+
+(Roadmap suivante après PAA :)
 
 **Tier 1 #2 — People Also Ask harvester + auto-FAQ schema** (estimé 2h) :
 
@@ -141,3 +143,52 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 **Blocages** : aucun.
 
 **Actions humaines en attente** : aucune (la PR éventuellement ouverte par le run cloud déclenché plus tôt peut être ignorée/fermée — la feature est faite en local).
+
+---
+
+## Session 2026-05-04 (suite 3) — PAA harvester + FAQ schema ✅ Tier 1 #2 DONE
+
+**Fait** :
+- Backend `PAAView` ajouté dans `views.py` (juste après `ContentBriefView`).
+  - Input : `{keyword, language, generate_answers?: bool=true}`.
+  - Étape 1 : Serper SERP top 10 → extrait `peopleAlsoAsk` (jusqu'à 10 questions, avec snippet).
+  - Étape 2 (si `generate_answers`) : Gemini génère une réponse courte (1-2 phrases) par question, dans la langue cible. Fallback sur le snippet Serper si Gemini échoue.
+  - Étape 3 : construit un **schema JSON-LD `FAQPage`** prêt à coller, avec `mainEntity` array de `Question`/`acceptedAnswer`.
+  - Cache 1h via `_seo_cache_key('paa:', keyword, language, gen_answers_flag)`.
+- Route `path('paa/', PAAView.as_view(), name='paa')` ajoutée dans `urls.py`.
+- Composant `src/components/PAAPanel.tsx` :
+  - Input mot-clé + bouton "Récupérer".
+  - Liste questions/réponses en `<details>` expandables.
+  - Section "Schema FAQPage (JSON-LD)" avec preview du JSON, bouton **Copier** (presse-papiers, format `<script type="application/ld+json">…</script>`) et bouton **Insérer dans l'article** (via prop `onInsertSchema`, optionnelle).
+- Intégration dans `AIGenerator.tsx` (sous le `ContentBriefPanel`).
+- 14 nouvelles clés `paa.*` dans `fr.json` + `en.json`.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 13.25s
+- **Test live à faire (humain)** : `/dashboard/<siteId>/generer`, dans le panneau "People Also Ask + FAQ schema", taper un mot-clé qui produit du PAA (ex: "tva auto-entrepreneur quebec"), vérifier que les questions arrivent, que les réponses Gemini sont pertinentes en FR-CA, et que le bouton Copier place bien le `<script type="application/ld+json">` dans le presse-papiers.
+
+**Branches/commits** : commit local à venir (pas de push).
+
+**Prochain bloc concret** :
+
+**Tier 1 #4 — Hreflang validator** (estimé 1h, gain rapide) :
+
+1. Ouvrir `backend/sites_mgmt/views.py`, trouver `class SEOAuditView` (~ligne 1163).
+2. Dans la méthode `post`, après l'audit Gemini, ajouter une vérification hreflang :
+   - Si `request.data.get('translation_group')` est passé : query toutes les translations du même group.
+   - Pour chaque translation, vérifier si le contenu HTML/markdown contient `<link rel="alternate" hreflang="<lang>" href="...">`.
+   - Retourner dans la réponse un champ `hreflang_check: { has_alternates: bool, missing: [lang], extras: [{lang, href}] }`.
+3. Frontend `src/components/SEOAnalyzer.tsx` : trouver l'affichage du résultat audit, ajouter une section "Hreflang" qui montre le statut (vert si correct, rouge si translations existent mais pas annoncées).
+4. i18n `audit.hreflang.*`.
+5. `python manage.py check` + `npm run build`.
+
+Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur tous les articles publiés d'un site, agrège les problèmes, dashboard agrégé. Choisir entre #4 (rapide, pertinent multi-langue) et #3 (gros impact).
+
+**Recommandation pour la prochaine session** : faire #4 d'abord (1h, finit Tier 1) puis #3.
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : aucune nouvelle.
+

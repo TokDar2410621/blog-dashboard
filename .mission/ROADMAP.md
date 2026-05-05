@@ -21,10 +21,11 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [x] i18n FR + EN.
 - **Pourquoi prio 1** : transforme "audit après écriture" → "guide avant écriture". Différenciation forte vs Ahrefs/Semrush en FR-CA.
 
-### 2. People Also Ask + auto-FAQ schema ⏱ 2h
-- [ ] Backend `POST /paa/` — Serper SERP avec `peopleAlsoAsk` → liste questions.
-- [ ] Gemini formate en FAQ schema JSON-LD.
-- [ ] Frontend : section dans `SEOAnalyzer.tsx`, bouton "Insérer FAQ schema" dans l'éditeur.
+### 2. People Also Ask + auto-FAQ schema ✅ DONE
+- [x] Backend `POST /paa/` — Serper SERP avec `peopleAlsoAsk` → liste questions, Gemini génère réponses courtes.
+- [x] Construit JSON-LD FAQPage `mainEntity` avec Question + acceptedAnswer.
+- [x] Frontend `PAAPanel.tsx` : intégré dans `AIGenerator.tsx`, copy+insert schema.
+- [ ] (Futur) Wire-up dans `PostEditor.tsx` avec prop `onInsertSchema` pour insérer directement dans l'article édité.
 
 ### 3. Bulk SEO audit ⏱ 3h
 - [ ] Backend `GET /sites/<id>/audit-all/` — itère articles publiés, appelle audit IA, agrège (top issues, score moyen, articles faibles).

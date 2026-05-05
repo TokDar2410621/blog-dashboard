@@ -2718,6 +2718,185 @@ Respond with JSON only (no markdown code fences):
         return Response(result)
 
 
+class PAAView(APIView):
+    """Harvest People Also Ask questions from Google SERP, optionally generate
+    short answers via Gemini, and return both the raw list and a ready-to-paste
+    FAQPage JSON-LD schema.
+
+    Input: {keyword, language: 'fr'|'en'|'es', generate_answers?: bool}
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        import json
+
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+        generate_answers = bool(request.data.get('generate_answers', True))
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle cible est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': "Langue invalide (fr, en, es)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serper_key = os.environ.get('SERPER_API_KEY')
+        if not serper_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        cache_key = _seo_cache_key(
+            'paa:', keyword, language, '1' if generate_answers else '0'
+        )
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        hl, gl = ('en', 'us') if language == 'en' else (
+            ('es', 'es') if language == 'es' else ('fr', 'ca')
+        )
+
+        # 1) Serper — peopleAlsoAsk
+        try:
+            resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={
+                    'X-API-KEY': serper_key,
+                    'Content-Type': 'application/json',
+                },
+                json={'q': keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                timeout=10,
+            )
+        except http_requests.Timeout:
+            return Response(
+                {'error': 'Delai de requete Serper depasse'},
+                status=status.HTTP_504_GATEWAY_TIMEOUT,
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erreur Serper: {str(e)}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if resp.status_code != 200:
+            return Response(
+                {'error': f'Erreur Serper: {resp.status_code}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        data = resp.json() or {}
+        raw_paa = data.get('peopleAlsoAsk') or []
+        questions = []
+        for item in raw_paa[:10]:
+            q = (item or {}).get('question')
+            snippet = (item or {}).get('snippet') or ''
+            if q:
+                questions.append({
+                    'question': q.strip(),
+                    'snippet': snippet.strip(),
+                    'answer': '',
+                })
+
+        if not questions:
+            result = {
+                'keyword': keyword,
+                'language': language,
+                'questions': [],
+                'faq_schema': None,
+            }
+            cache.set(cache_key, result, SEO_CACHE_TTL)
+            return Response(result)
+
+        # 2) Gemini — short answers (best-effort; if it fails, fall back to snippet)
+        if generate_answers:
+            gemini_key = os.environ.get('GEMINI_API_KEY')
+            if gemini_key:
+                try:
+                    from google import genai
+
+                    lang_label = {
+                        'fr': 'French (Quebec)',
+                        'en': 'English',
+                        'es': 'Spanish',
+                    }[language]
+                    qlist = '\n'.join(
+                        f"{i+1}. {q['question']}" for i, q in enumerate(questions)
+                    )
+                    prompt = f"""You are a helpful expert. Below are {len(questions)} questions
+that people search on Google around the keyword "{keyword}". Answer each in 1-2
+factual, concise sentences in {lang_label}. Stay on-topic. No preamble, no marketing.
+
+Questions:
+{qlist}
+
+Respond with JSON only:
+{{"answers": ["answer 1", "answer 2", ...]}}
+The answers array MUST have exactly {len(questions)} entries, in the same order."""
+
+                    client = genai.Client(api_key=gemini_key)
+                    g_resp = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=[prompt],
+                    )
+                    text = (g_resp.text or '').strip()
+                    if text.startswith('```'):
+                        text = text.split('\n', 1)[1]
+                        if text.endswith('```'):
+                            text = text[:-3]
+                        text = text.strip()
+                    parsed = json.loads(text)
+                    answers = parsed.get('answers') or []
+                    for i, ans in enumerate(answers[:len(questions)]):
+                        if isinstance(ans, str) and ans.strip():
+                            questions[i]['answer'] = ans.strip()
+                except Exception as e:
+                    logger.warning('Gemini PAA answers failed: %s', e)
+
+            # Fallback: use Serper snippet when no Gemini answer
+            for q in questions:
+                if not q['answer'] and q['snippet']:
+                    q['answer'] = q['snippet']
+
+        # 3) Build FAQPage JSON-LD schema (only includes questions with answers)
+        answered = [q for q in questions if q['answer']]
+        if answered:
+            faq_schema = {
+                '@context': 'https://schema.org',
+                '@type': 'FAQPage',
+                'mainEntity': [
+                    {
+                        '@type': 'Question',
+                        'name': q['question'],
+                        'acceptedAnswer': {
+                            '@type': 'Answer',
+                            'text': q['answer'],
+                        },
+                    }
+                    for q in answered
+                ],
+            }
+        else:
+            faq_schema = None
+
+        result = {
+            'keyword': keyword,
+            'language': language,
+            'questions': questions,
+            'faq_schema': faq_schema,
+        }
+        cache.set(cache_key, result, SEO_CACHE_TTL)
+        return Response(result)
+
+
 # ==========================================================================
 # PUBLIC API — consumed by site frontends (no auth, optional API key check)
 # ==========================================================================

@@ -199,6 +199,22 @@
     "error": "Error during generation"
   },
 
+  "paa": {
+    "title": "People Also Ask + FAQ schema",
+    "subtitle": "Fetches Google PAA questions for your keyword, generates short answers, and produces a paste-ready FAQPage schema.",
+    "keyword": "Keyword",
+    "keywordPlaceholder": "e.g. self-employed tax quebec",
+    "keywordRequired": "Keyword is required",
+    "fetch": "Fetch",
+    "noQuestions": "No PAA questions found for this keyword.",
+    "faqSchema": "FAQPage schema (JSON-LD)",
+    "copySchema": "Copy",
+    "insertSchema": "Insert into article",
+    "schemaCopied": "Schema copied to clipboard",
+    "schemaInserted": "Schema inserted",
+    "error": "Error fetching"
+  },
+
   "brief": {
     "title": "Content Brief",
     "subtitle": "Generate a strategic plan before writing — intent, titles, outline, FAQ, entities, schemas, EEAT signals.",

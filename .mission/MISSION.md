@@ -39,7 +39,7 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 
 ### Tier 1 (différenciation immédiate)
 - [x] Content Brief Generator (intent + competitors + outline + FAQ + entités)
-- [ ] People Also Ask harvester + auto-FAQ schema
+- [x] People Also Ask harvester + auto-FAQ schema
 - [ ] Bulk SEO audit
 - [ ] Hreflang validator
 
