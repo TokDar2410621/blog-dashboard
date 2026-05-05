@@ -3224,6 +3224,105 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
         return Response(result)
 
 
+class CommunityQuestionsView(APIView):
+    """Harvest questions and discussions about a keyword from Reddit and Quora
+    via Serper. Useful to find the real-world phrasing people use when they
+    have a problem in your topic area — strong source of long-tail headings
+    and FAQ content.
+
+    POST /community-questions/ {keyword, language: 'fr'|'en'|'es'}
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request):
+        keyword = (request.data.get('keyword') or '').strip()
+        language = (request.data.get('language') or 'fr').strip().lower()
+
+        if not keyword:
+            return Response(
+                {'error': 'Le mot-cle est requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': "Langue invalide (fr, en, es)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        cache_key = _seo_cache_key('community-questions:', keyword, language)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        hl, gl = ('en', 'us') if language == 'en' else (
+            ('es', 'es') if language == 'es' else ('fr', 'ca')
+        )
+
+        def _query(domain):
+            try:
+                resp = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={
+                        'X-API-KEY': api_key,
+                        'Content-Type': 'application/json',
+                    },
+                    json={
+                        'q': f'site:{domain} {keyword}',
+                        'num': 10,
+                        'hl': hl,
+                        'gl': gl,
+                    },
+                    timeout=10,
+                )
+                if resp.status_code != 200:
+                    return []
+                return (resp.json() or {}).get('organic') or []
+            except Exception as e:
+                logger.warning('Serper community query failed (%s): %s', domain, e)
+                return []
+
+        reddit = _query('reddit.com')
+        quora = _query('quora.com')
+
+        def _format(items, source):
+            out = []
+            for item in items[:10]:
+                title = (item.get('title') or '').strip()
+                snippet = (item.get('snippet') or '').strip()
+                url = item.get('link') or ''
+                # Strip site name suffix from titles like "X : a question - r/foo - Reddit"
+                cleaned_title = title.rsplit(' - ', 1)[0] if ' - ' in title else title
+                if title:
+                    out.append({
+                        'title': cleaned_title,
+                        'snippet': snippet,
+                        'url': url,
+                        'source': source,
+                    })
+            return out
+
+        results = _format(reddit, 'reddit') + _format(quora, 'quora')
+
+        result = {
+            'keyword': keyword,
+            'language': language,
+            'reddit_count': len(reddit),
+            'quora_count': len(quora),
+            'questions': results,
+        }
+        cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
+        return Response(result)
+
+
 class BrokenLinksView(APIView):
     """Scan a site's published articles for outbound HTTP(S) links and report
     those that are dead (4xx/5xx, timeout, connection error).

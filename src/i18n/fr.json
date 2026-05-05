@@ -91,6 +91,18 @@
     "logout": "Deconnexion"
   },
 
+  "community": {
+    "title": "Questions Reddit / Quora",
+    "subtitle": "Decouvre comment les gens posent vraiment leurs questions sur ce sujet — source riche pour formuler tes H2 et FAQ avec les vrais mots de ton audience.",
+    "keyword": "Mot-cle",
+    "keywordPlaceholder": "Ex: comment retenir les developpeurs",
+    "keywordRequired": "Le mot-cle est requis",
+    "fetch": "Trouver",
+    "found": "{{reddit}} resultats Reddit + {{quora}} resultats Quora.",
+    "noQuestions": "Aucun resultat trouve dans les forums.",
+    "error": "Erreur lors de la recuperation"
+  },
+
   "brokenLinks": {
     "title": "Detecteur de liens casses",
     "subtitle": "Scanne les liens externes HTTP(S) de tes articles publies et signale ceux qui sont morts (4xx/5xx, timeout, connexion). Cache 24h par URL.",

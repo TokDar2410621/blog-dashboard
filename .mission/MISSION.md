@@ -48,7 +48,8 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Content decay detector
 - [x] Topic Cluster Planner (cards-based MVP ; graphe react-flow en option future)
 
-### Tier 3 (qualité produit)
+### Tier 3 (qualité produit) — 6/9 done
+- [x] Reddit/Quora question harvesting (Serper site: queries)
 - [x] Internal link graph viz
 - [x] Broken link checker
 - [x] Auto-redirect 301 sur slug change

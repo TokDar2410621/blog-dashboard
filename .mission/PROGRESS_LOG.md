@@ -872,3 +872,63 @@ Tier 3 a maintenant **5/9 fait** (#7, #8, #9, #10, #12). Items restants (priorit
 - Tester les pages.
 - Décider du déploiement (13 commits non poussés, 2 migrations safe : 0012 + 0013).
 
+---
+
+## Session 2026-05-04 (suite 15) — Reddit/Quora harvester ✅ Tier 3 #16 DONE (end-to-end)
+
+**Fait** :
+- Backend `CommunityQuestionsView` ajouté (juste avant `BrokenLinksView`).
+  - Endpoint `POST /community-questions/`. Body : `{keyword, language}`.
+  - Deux requêtes Serper avec `q="site:reddit.com {keyword}"` puis `q="site:quora.com {keyword}"`, hl/gl localisés (FR-CA, EN-US, ES-ES).
+  - Parse `organic[]` de chaque réponse, formate en `{title, snippet, url, source}`.
+  - Cache 1h via `_seo_cache_key('community-questions:', keyword, language)`.
+  - Retourne `{keyword, language, reddit_count, quora_count, questions: [...]}`.
+- Route `path('community-questions/', CommunityQuestionsView.as_view(), name='community-questions')`.
+- Composant `src/components/CommunityQuestionsPanel.tsx` :
+  - Input mot-clé + bouton "Trouver".
+  - Liste de questions avec badge coloré orange (Reddit) / rouge (Quora), titre cliquable vers le post original (target=_blank), snippet sur 2 lignes (line-clamp-2).
+  - Compteur reddit + quora + état vide si rien trouvé.
+- Intégration dans `AIGenerator.tsx` (sous `PAAPanel`, complète la suite "Brief + PAA + Community").
+- 9 nouvelles clés `community.*` en FR + EN.
+
+**Tests** :
+- `python backend/manage.py check` → OK
+- JSON i18n valide
+- `npm run build` → ✓ built in 10.24s
+- **Test live à faire (humain)** : `/dashboard/<siteId>/generer`, dans le panneau "Questions Reddit / Quora", taper "automatisation pme québec" → devrait trouver des threads Reddit (r/quebec, r/entrepreneur) et des questions Quora.
+
+**Branches/commits** : commit local à venir.
+
+**Note règle d'or** : ✅ respectée. Backend + frontend + i18n.
+
+**Prochain bloc concret** :
+
+Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
+
+- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage.
+- **#13 Quebec lexicon (FR-CA + LocalBusiness schema)** (4h) — gros impact différenciation.
+- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+- **#15 Search trends FR-CA** (3h) — pytrends, fonctionne sans clé, parfois rate-limited.
+
+**Recommandation** : **#13 Quebec lexicon** — différenciation cœur de la mission "n°1 au Québec". Plan :
+
+1. Helper Python `_quebecois_check(text)` avec dictionnaire `FRENCH_TO_QUEBECOIS = {"shopping": "magasinage", "week-end": "fin de semaine", "parking": "stationnement", "email": "courriel", ...}` (~30-50 entries pour démarrer).
+2. Endpoint `POST /lexicon-check/` → input `{content, language}` → retourne `{matches: [{term, suggestion, count, positions: [{line, col}]}]}`.
+3. Helper `_localbusiness_schema(site, address?, hours?)` qui génère un JSON-LD LocalBusiness adapté Québec (pas de TPS/TVQ requis, mais `areaServed: Quebec`, `priceRange`, `address.addressRegion: "QC"`, `addressCountry: "CA"`).
+4. Frontend :
+   - Card dans `SEOAnalyzer.tsx` ou nouveau composant `LexiconCard.tsx` mounted dans PostEditor SEO view (à côté de Readability).
+   - Section dans SiteSettings : "Schema LocalBusiness Québec" avec form (rue, ville, code postal, téléphone, areaServed, priceRange) + preview JSON.
+5. i18n + build.
+
+**Statistiques fin de session 15** :
+- Tier 1 : ✅ 4/4
+- Tier 2 : ✅ 3/3
+- Tier 3 : 6/9 (#7, #8, #9, #10, #12, #16)
+- Endpoints SEO ajoutés cumulés : 16
+- Composants frontend ajoutés cumulés : 12 (… + CommunityQuestionsPanel)
+- Commits locaux non poussés : 14
+
+**Blocages** : aucun.
+
+**Actions humaines en attente** : tester + décider du déploiement.
+

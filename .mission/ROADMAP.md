@@ -77,7 +77,7 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 - [ ] **13. Quebec lexicon** (FR-CA dictionnaire, schema LocalBusiness) ⏱ 4h
 - [ ] **14. Bing Webmaster integration** ⏱ 6h (action humaine pour API key)
 - [ ] **15. Search trends FR-CA** (Google Trends via pytrends) ⏱ 3h
-- [ ] **16. Reddit/Quora question harvesting** ⏱ 2h
+- [x] **16. Reddit/Quora question harvesting** — endpoint `/community-questions/` deux Serper queries `site:reddit.com` + `site:quora.com`, panel intégré dans AIGenerator.
 
 ## Tier 4 — finition / commercialisation
 

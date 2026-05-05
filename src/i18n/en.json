@@ -91,6 +91,18 @@
     "logout": "Logout"
   },
 
+  "community": {
+    "title": "Reddit / Quora questions",
+    "subtitle": "Discover how people actually phrase their questions on this topic — rich source for crafting H2s and FAQs with your audience's real words.",
+    "keyword": "Keyword",
+    "keywordPlaceholder": "e.g. how to retain developers",
+    "keywordRequired": "Keyword is required",
+    "fetch": "Find",
+    "found": "{{reddit}} Reddit results + {{quora}} Quora results.",
+    "noQuestions": "No forum results found.",
+    "error": "Fetch error"
+  },
+
   "brokenLinks": {
     "title": "Broken link checker",
     "subtitle": "Scans external HTTP(S) links in your published articles and flags those that are dead (4xx/5xx, timeout, connection). Cached 24h per URL.",

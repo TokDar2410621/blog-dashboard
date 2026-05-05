@@ -24,6 +24,7 @@ import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { ContentBriefPanel } from "@/components/ContentBrief";
 import { PAAPanel } from "@/components/PAAPanel";
+import { CommunityQuestionsPanel } from "@/components/CommunityQuestionsPanel";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -124,6 +125,12 @@ export default function AIGenerator() {
 
       {/* PAA harvester — questions + FAQ schema */}
       <PAAPanel
+        language={language}
+        defaultKeyword={keywords.split(",")[0]?.trim() || topic}
+      />
+
+      {/* Reddit / Quora community questions */}
+      <CommunityQuestionsPanel
         language={language}
         defaultKeyword={keywords.split(",")[0]?.trim() || topic}
       />
