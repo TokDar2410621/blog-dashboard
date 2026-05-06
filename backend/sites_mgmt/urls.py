@@ -23,6 +23,11 @@ from .views import (
     PublicTranslationsView, PublicCategoriesView,
     GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
 )
+from .api_v1 import (
+    V1MeView, V1SitesView, V1ArticlesView, V1GenerateView,
+    V1AuditView, V1BriefView, V1KeywordsView, V1RankSnapshotView,
+    V1DigestView, TokenManagementView, TokenRevokeView,
+)
 
 router = DefaultRouter()
 router.register(r'sites', SiteViewSet, basename='site')
@@ -96,5 +101,18 @@ urlpatterns = [
     path('public/sites/<int:site_id>/posts/<slug:slug>/', PublicPostDetailView.as_view(), name='public-post-detail'),
     path('public/sites/<int:site_id>/posts/<slug:slug>/translations/', PublicTranslationsView.as_view(), name='public-translations'),
     path('public/sites/<int:site_id>/categories/', PublicCategoriesView.as_view(), name='public-categories'),
+    # Public developer API v1 (Bearer ApiToken auth)
+    path('v1/me/', V1MeView.as_view(), name='v1-me'),
+    path('v1/sites/', V1SitesView.as_view(), name='v1-sites'),
+    path('v1/sites/<int:site_id>/articles/', V1ArticlesView.as_view(), name='v1-articles'),
+    path('v1/sites/<int:site_id>/generate/', V1GenerateView.as_view(), name='v1-generate'),
+    path('v1/audit/', V1AuditView.as_view(), name='v1-audit'),
+    path('v1/brief/', V1BriefView.as_view(), name='v1-brief'),
+    path('v1/sites/<int:site_id>/keywords/', V1KeywordsView.as_view(), name='v1-keywords'),
+    path('v1/sites/<int:site_id>/keywords/snapshot/', V1RankSnapshotView.as_view(), name='v1-rank-snapshot'),
+    path('v1/sites/<int:site_id>/digest/weekly/', V1DigestView.as_view(), name='v1-digest'),
+    # Account-level token management (JWT auth)
+    path('account/api-tokens/', TokenManagementView.as_view(), name='api-tokens'),
+    path('account/api-tokens/<int:pk>/', TokenRevokeView.as_view(), name='api-token-revoke'),
     path('', include(router.urls)),
 ]

@@ -12,6 +12,8 @@ const Landing = lazy(() => import("./pages/Landing"));
 const SiteSelector = lazy(() => import("./pages/SiteSelector"));
 const MultiDomain = lazy(() => import("./pages/MultiDomain"));
 const Billing = lazy(() => import("./pages/Billing"));
+const ApiKeys = lazy(() => import("./pages/ApiKeys"));
+const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -67,6 +69,15 @@ function App() {
                     </AuthGuard>
                   }
                 />
+                <Route
+                  path="/account/api-keys"
+                  element={
+                    <AuthGuard>
+                      <ApiKeys />
+                    </AuthGuard>
+                  }
+                />
+                <Route path="/api-docs" element={<ApiDocs />} />
                 <Route
                   path="/dashboard/:siteId/*"
                   element={

@@ -404,6 +404,7 @@ export default function Landing() {
                   "Audit bulk + topic clusters",
                   "Lexique FR-CA + EEAT + LocalBusiness",
                   "Rapport hebdomadaire PDF",
+                  "API REST (60 req/h)",
                   "Support email <24h",
                 ]}
                 cta="Commencer Pro"
@@ -420,6 +421,7 @@ export default function Landing() {
                   "Tout du plan Pro",
                   "Comparaison multi-domaines",
                   "Suivi 200 mots-clés",
+                  "API REST (600 req/h)",
                   "White-label optionnel",
                   "Onboarding personnalisé",
                   "Support prioritaire <4h",

@@ -297,6 +297,42 @@ class HostedPost(models.Model):
         return self.title
 
 
+class ApiToken(models.Model):
+    """Long-lived API token for the developer-facing /api/v1/ endpoints.
+
+    The plain-text token is shown ONCE at creation and never stored — only
+    its SHA256 hash. Format: `btb_<43-char url-safe random>`.
+    Multiple tokens per user (different scopes / contexts).
+    """
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='api_tokens'
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Friendly label set by the user. E.g. 'n8n production', 'Zapier'."
+    )
+    # Stored = SHA256(plain_token).hexdigest(). Plain is never persisted.
+    key_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    # First 8 chars of the plain token, kept for UI identification (not enough to reconstruct).
+    key_prefix = models.CharField(max_length=12, blank=True, default='')
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'revoked_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username}:{self.name} ({self.key_prefix}...)"
+
+    @property
+    def is_active(self):
+        return self.revoked_at is None
+
+
 class Subscription(models.Model):
     """One subscription per user. Tracks the active plan + Stripe IDs.
     Default plan = 'free' (auto-created when missing).
