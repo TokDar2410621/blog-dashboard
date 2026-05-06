@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Key, Code2, Zap, ShieldCheck } from "lucide-react";
+import Terminal3D from "@/components/Terminal3D";
 
 const BASE = "https://api.blog-dashboard.ca/api/v1";
 
@@ -121,6 +122,19 @@ export default function ApiDocs() {
             <Key className="h-4 w-4 mr-2" />
             Mes clés API
           </Button>
+        </div>
+
+        {/* Animated terminal hero */}
+        <div className="rounded-2xl border border-border/50 bg-zinc-950 overflow-hidden">
+          <div
+            className="relative"
+            style={{
+              background:
+                "radial-gradient(50% 80% at 50% 0%, rgba(16,185,129,0.10), transparent 70%)",
+            }}
+          >
+            <Terminal3D />
+          </div>
         </div>
 
         {/* Quickstart */}

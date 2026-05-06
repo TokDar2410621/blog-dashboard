@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import ProductMockup3D from "@/components/ProductMockup3D";
+import WorkflowIA3D from "@/components/WorkflowIA3D";
 import {
   Sparkles,
   Languages,
@@ -210,6 +211,28 @@ export default function Landing() {
           </Reveal>
           <Reveal delay={150}>
             <ProductMockup3D />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Workflow IA - 4-step animated flow */}
+      <section className="relative z-10 border-t border-white/5 py-24 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6">
+          <Reveal className="text-center mb-14">
+            <p className="text-xs font-mono uppercase tracking-wider text-emerald-400/80 mb-4">
+              Le flow complet
+            </p>
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+              Du sujet à
+              <br />
+              <span className="text-emerald-400">la première position Google.</span>
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Tu donnes le sujet, l'IA rédige, l'audit corrige, on publie sur ton domaine. 90 secondes en moyenne.
+            </p>
+          </Reveal>
+          <Reveal delay={150}>
+            <WorkflowIA3D />
           </Reveal>
         </div>
       </section>
