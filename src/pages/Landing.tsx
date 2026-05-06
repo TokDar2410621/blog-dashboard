@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import ProductMockup3D from "@/components/ProductMockup3D";
 import {
   Sparkles,
   Languages,
@@ -191,7 +192,29 @@ export default function Landing() {
         </Reveal>
       </section>
 
-      {/* "Trusted by" marquee — subtle visual touch */}
+      {/* Product mockup section - 3D perspective showing the dashboard */}
+      <section className="relative z-10 border-t border-white/5 py-24 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6">
+          <Reveal className="text-center mb-14">
+            <p className="text-xs font-mono uppercase tracking-wider text-emerald-400/80 mb-4">
+              L'app en 3 secondes
+            </p>
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+              Tout ton SEO,
+              <br />
+              <span className="text-emerald-400">une seule interface.</span>
+            </h2>
+            <p className="text-zinc-400 max-w-xl mx-auto">
+              Liste d'articles, audit SEO automatique, génération IA, suivi des positions Google. Tout dans le dashboard, en français-québécois.
+            </p>
+          </Reveal>
+          <Reveal delay={150}>
+            <ProductMockup3D />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* "Trusted by" marquee - subtle visual touch */}
       <section className="relative z-10 border-t border-white/5 py-10 overflow-hidden">
         <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-600 mb-6">
           Construit avec
