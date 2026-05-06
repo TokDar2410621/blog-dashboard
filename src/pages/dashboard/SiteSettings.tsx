@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useMutation } from "@tanstack/react-query";
 import { useSite, useUpdateSite } from "@/hooks/useDashboard";
 import { authFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -90,6 +91,44 @@ export default function SiteSettings() {
   const [brandColor, setBrandColor] = useState("");
   const [brandFg, setBrandFg] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [scannedMeta, setScannedMeta] = useState<{
+    site_name?: string;
+    brand_color?: string;
+    font_sans?: string;
+    logo_url?: string;
+  } | null>(null);
+
+  const scanBranding = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch("/branding/scan/", {
+        method: "POST",
+        body: JSON.stringify({ url: domain }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Scan échoué.");
+      }
+      return data as {
+        success: true;
+        theme_config: { brand_color: string; brand_fg: string; logo_url: string; font_sans: string; font_display: string };
+        meta: { site_name: string; description: string };
+      };
+    },
+    onSuccess: (data) => {
+      const tc = data.theme_config;
+      setBrandColor(tc.brand_color || "");
+      setBrandFg(tc.brand_fg || "");
+      if (tc.logo_url) setLogoUrl(tc.logo_url);
+      setScannedMeta({
+        site_name: data.meta.site_name,
+        brand_color: tc.brand_color,
+        font_sans: tc.font_sans,
+        logo_url: tc.logo_url,
+      });
+      toast.success("Branding détecté — n'oublie pas d'enregistrer.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -565,6 +604,49 @@ export default function SiteSettings() {
               </div>
             </div>
           )}
+
+          {/* Auto-scan branding from the site's domain */}
+          <div className="rounded border border-border/50 bg-muted/30 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm">
+                <div className="font-medium">Détecter automatiquement le branding</div>
+                <div className="text-xs text-muted-foreground">
+                  Scanne {domain || "ton domaine"} et remplit couleur, logo et fonts.
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!domain.trim() || scanBranding.isPending}
+                onClick={() => scanBranding.mutate()}
+              >
+                {scanBranding.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Scanner
+              </Button>
+            </div>
+            {scannedMeta && (
+              <div className="text-xs text-muted-foreground border-t border-border/50 pt-2 flex items-center gap-3">
+                {scannedMeta.logo_url && (
+                  <img
+                    src={scannedMeta.logo_url}
+                    alt="logo détecté"
+                    className="h-6 w-6 rounded border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                )}
+                <span>
+                  {scannedMeta.site_name || "?"} · couleur {scannedMeta.brand_color}
+                  {scannedMeta.font_sans ? ` · ${scannedMeta.font_sans}` : ""}
+                </span>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">

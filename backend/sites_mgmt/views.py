@@ -4,7 +4,7 @@ import uuid
 import base64
 import hashlib
 import logging
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -6813,6 +6813,55 @@ class ShopifyConnectView(APIView):
             },
             'blogs': discovery.get('blogs') or [],
         }, status=status.HTTP_201_CREATED)
+
+
+# ============================================================================
+# Branding extractor — scan a domain and return colors/logo/fonts
+# ============================================================================
+
+class BrandingScanView(APIView):
+    """Scan a public URL and infer theme_config (colors, logo, fonts).
+
+    POST /branding/scan/ {url, save_to_site_id?}
+    If save_to_site_id is provided, the result is saved to that site's theme_config.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        url = (request.data.get('url') or '').strip()
+        save_to = request.data.get('save_to_site_id')
+        if not url:
+            return Response(
+                {'error': 'url requise'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .branding_scanner import scan
+        result = scan(url)
+        if not result.get('success'):
+            return Response(
+                {'error': result.get('error') or 'Scan échoué.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if save_to:
+            try:
+                site = Site.objects.get(id=int(save_to), owner=request.user)
+                site.theme_config = result['theme_config']
+                # Also update domain if not already set, since we just confirmed it.
+                if not site.domain:
+                    parsed = urlparse(result['normalized_url'])
+                    if parsed.netloc:
+                        site.domain = parsed.netloc
+                site.save(update_fields=['theme_config', 'domain', 'updated_at'])
+                result['saved_to_site_id'] = site.id
+            except (Site.DoesNotExist, ValueError, TypeError):
+                return Response(
+                    {'error': 'Site introuvable ou non autorisé.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        return Response(result)
 
 
 # ============================================================================
