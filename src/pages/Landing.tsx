@@ -207,14 +207,16 @@ export default function Landing() {
           </Reveal>
           <Reveal delay={150} className="relative">
             <ProductMockup3D />
-            {/* Activity feed floating bottom-left, balances the AI generator side panel on the right */}
+            {/* Activity feed floating in the empty left gutter, balances the AI
+                generator side panel that overhangs the right. Scaled down and
+                pushed far left so it sits BESIDE the mockup, not over it. */}
             <div
               className="hidden lg:block absolute z-30"
               style={{
-                bottom: 60,
-                left: -20,
-                width: 340,
-                transform: "scale(0.92)",
+                bottom: 50,
+                left: -180,
+                width: 320,
+                transform: "scale(0.78)",
                 transformOrigin: "bottom left",
               }}
             >
