@@ -187,10 +187,6 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Linear-style activity feed mockup */}
-        <Reveal delay={150} className="mt-20 max-w-3xl mx-auto">
-          <ActivityFeed />
-        </Reveal>
       </section>
 
       {/* Product mockup section - 3D perspective showing the dashboard */}
@@ -209,8 +205,21 @@ export default function Landing() {
               Liste d'articles, audit SEO automatique, génération IA, suivi des positions Google. Tout dans le dashboard, en français-québécois.
             </p>
           </Reveal>
-          <Reveal delay={150}>
+          <Reveal delay={150} className="relative">
             <ProductMockup3D />
+            {/* Activity feed floating bottom-left, balances the AI generator side panel on the right */}
+            <div
+              className="hidden lg:block absolute z-30"
+              style={{
+                bottom: 60,
+                left: -20,
+                width: 340,
+                transform: "scale(0.92)",
+                transformOrigin: "bottom left",
+              }}
+            >
+              <ActivityFeed />
+            </div>
           </Reveal>
         </div>
       </section>
