@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BrandingPreview } from "@/components/BrandingPreview";
+import { useConfetti } from "@/hooks/useConfetti";
 
 type DiscoverResult = {
   valid_wp: boolean;
@@ -47,6 +48,7 @@ type Props = {
 export function WordPressConnectDialog({ open, onOpenChange }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const fireConfetti = useConfetti();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [url, setUrl] = useState("");
   const [discovery, setDiscovery] = useState<DiscoverResult | null>(null);
@@ -108,6 +110,7 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
     },
     onSuccess: (d) => {
       toast.success(t("wpConnect.connected"));
+      fireConfetti();
       handleClose(false);
       navigate(`/dashboard/${d.site.id}`);
     },

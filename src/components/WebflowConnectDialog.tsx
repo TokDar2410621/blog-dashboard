@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { BrandingPreview } from "@/components/BrandingPreview";
+import { useConfetti } from "@/hooks/useConfetti";
 
 type WebflowSite = {
   id: string;
@@ -60,6 +61,7 @@ type Props = {
 
 export function WebflowConnectDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
+  const fireConfetti = useConfetti();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [token, setToken] = useState("");
   const [sites, setSites] = useState<WebflowSite[]>([]);
@@ -142,6 +144,7 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
     },
     onSuccess: (data) => {
       toast.success(`Site Webflow connecté : ${data.webflow_site.displayName}`);
+      fireConfetti();
       handleClose(false);
       navigate(`/dashboard/${data.site.id}/`);
     },

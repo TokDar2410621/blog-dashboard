@@ -47,6 +47,7 @@ import {
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
 import { WebflowConnectDialog } from "@/components/WebflowConnectDialog";
+import { useConfetti } from "@/hooks/useConfetti";
 import { toast } from "sonner";
 
 export default function SiteSelector() {
@@ -54,6 +55,7 @@ export default function SiteSelector() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const qc = useQueryClient();
+  const fireConfetti = useConfetti();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wpDialogOpen, setWpDialogOpen] = useState(false);
@@ -122,6 +124,8 @@ export default function SiteSelector() {
         domain: domain.trim(),
       });
       qc.invalidateQueries({ queryKey: ["sites"] });
+      // Celebrate first-ever site creation
+      if (sites.length === 0) fireConfetti();
       setOpen(false);
       setName("");
       setDatabaseUrl("");

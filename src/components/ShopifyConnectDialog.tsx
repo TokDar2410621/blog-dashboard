@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { ShoppingBag, Loader2, ArrowRight, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { BrandingPreview } from "@/components/BrandingPreview";
+import { useConfetti } from "@/hooks/useConfetti";
 
 type ShopifyBlog = { id: string; title: string; handle: string };
 
@@ -45,6 +46,7 @@ type Props = {
 
 export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
   const navigate = useNavigate();
+  const fireConfetti = useConfetti();
   const [step, setStep] = useState<1 | 2>(1);
   const [domain, setDomain] = useState("");
   const [token, setToken] = useState("");
@@ -103,6 +105,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
     },
     onSuccess: (data) => {
       toast.success(`Boutique connectée : ${data.shop.name}`);
+      fireConfetti();
       handleClose(false);
       navigate(`/dashboard/${data.site.id}/`);
     },
