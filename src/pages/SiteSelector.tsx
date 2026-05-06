@@ -48,6 +48,7 @@ import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
 import { WebflowConnectDialog } from "@/components/WebflowConnectDialog";
 import { useConfetti } from "@/hooks/useConfetti";
+import ProductMockup3D from "@/components/ProductMockup3D";
 import { toast } from "sonner";
 
 export default function SiteSelector() {
@@ -198,14 +199,49 @@ export default function SiteSelector() {
             ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Globe className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                {t("sites.empty")}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="relative rounded-2xl overflow-hidden border border-border/50 bg-zinc-950">
+            {/* Emerald glow background */}
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(80% 60% at 50% 30%, rgba(16,185,129,0.15), transparent 70%)",
+              }}
+            />
+
+            {/* Grayed-out mockup preview, scaled down */}
+            <div
+              className="relative grayscale opacity-50 pointer-events-none"
+              style={{
+                transform: "scale(0.7)",
+                transformOrigin: "50% 30%",
+                marginBottom: "-180px",
+              }}
+            >
+              <ProductMockup3D />
+            </div>
+
+            {/* Overlay CTA */}
+            <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
+              <div className="relative max-w-md text-center px-6 py-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-4">
+                  <Sparkles className="h-3 w-3" />
+                  Ton dashboard t'attend
+                </div>
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+                  Connecte ton premier site pour le débloquer
+                </h2>
+                <p className="text-sm text-zinc-400 mt-2">
+                  Articles SEO, audit IA, suivi Google. Tout devient actif dès la première connexion.
+                </p>
+                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Choisis une option ci-dessous
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* CMS quick-connect - primary path for non-technical users */}

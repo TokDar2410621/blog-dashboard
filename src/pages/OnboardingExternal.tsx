@@ -16,8 +16,18 @@ import {
   Globe,
 } from "lucide-react";
 import { toast } from "sonner";
+import BrowserBlogPreview3D from "@/components/BrowserBlogPreview3D";
 
-type Site = { id: number; name: string; domain: string };
+type Site = {
+  id: number;
+  name: string;
+  domain: string;
+  theme_config?: {
+    brand_color?: string;
+    brand_fg?: string;
+    logo_url?: string;
+  } | null;
+};
 type Framework =
   | "next-app"
   | "next-pages"
@@ -423,10 +433,42 @@ export default function OnboardingExternal() {
             </h1>
             <p className="text-muted-foreground">
               Tu as déjà un site React ou Next.js. On te génère le code à coller
-              pour afficher tes articles sur ton domaine — SEO 100 % bonifié.
+              pour afficher tes articles sur ton domaine - SEO 100 % bonifié.
             </p>
           </div>
         </div>
+
+        {/* Preview - "voilà ton blog avec ton branding" */}
+        {selectedSite && (
+          <div className="rounded-2xl border border-border/50 bg-zinc-950 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm font-medium text-white">
+                  Voilà à quoi ton blog ressemblera
+                </span>
+              </div>
+              <span className="text-xs text-zinc-500 font-mono">
+                {selectedSite.domain || "ton-domaine.com"}/blog/...
+              </span>
+            </div>
+            <div
+              className="relative"
+              style={{
+                background:
+                  "radial-gradient(50% 80% at 50% 0%, rgba(16,185,129,0.08), transparent 70%)",
+              }}
+            >
+              <BrowserBlogPreview3D
+                domain={selectedSite.domain || "ton-domaine.com"}
+                brandColor={selectedSite.theme_config?.brand_color || undefined}
+                brandFg={selectedSite.theme_config?.brand_fg || undefined}
+                logoUrl={selectedSite.theme_config?.logo_url || undefined}
+                siteName={selectedSite.name}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Step 1: Pick a site */}
         <Card>

@@ -402,6 +402,7 @@ export default function Landing() {
                 price="0$"
                 period="pour toujours"
                 hint="Sans carte"
+                sites={1}
                 features={[
                   "1 site",
                   "5 articles / mois",
@@ -419,6 +420,7 @@ export default function Landing() {
                 period="/mois"
                 highlight
                 hint="Le plus populaire"
+                sites={3}
                 features={[
                   "3 sites (WP, hébergé, externe)",
                   "Articles illimités",
@@ -439,6 +441,7 @@ export default function Landing() {
                 price="199$"
                 period="/mois"
                 hint="Pour gérer 10 clients"
+                sites={10}
                 features={[
                   "10 sites",
                   "Tout du plan Pro",
@@ -1099,6 +1102,78 @@ function LexiconLiveMockup() {
 
 // --- Pricing ---------------------------------------------------------------
 
+function PlanSlots({
+  filled,
+  total,
+  highlight,
+}: {
+  filled: number;
+  total: number;
+  highlight?: boolean;
+}) {
+  // Render up to 5 mini "site cards" + "+N" indicator if total > 5.
+  const visible = Math.min(filled, 5);
+  const overflow = filled > 5 ? filled - 5 : 0;
+  const ghosts = Math.max(0, Math.min(total, 5) - visible);
+  const cards: { active: boolean; rot: number }[] = [];
+  for (let i = 0; i < visible; i++) {
+    cards.push({ active: true, rot: -6 + i * 3 });
+  }
+  for (let i = 0; i < ghosts; i++) {
+    cards.push({ active: false, rot: -6 + (visible + i) * 3 });
+  }
+
+  return (
+    <div className="flex items-end justify-center gap-1 mb-4 h-12 select-none" aria-hidden>
+      {cards.map((c, i) => (
+        <div
+          key={i}
+          style={{
+            transform: `rotate(${c.rot}deg) translateY(${Math.abs(c.rot) * 0.4}px)`,
+            transition: "transform 0.4s",
+          }}
+          className={`w-6 h-9 rounded-[3px] border ${
+            c.active
+              ? highlight
+                ? "bg-emerald-500/20 border-emerald-400/60"
+                : "bg-zinc-700/60 border-zinc-600"
+              : "bg-zinc-900/60 border-white/5"
+          } flex flex-col p-[2px] gap-[1px]`}
+        >
+          <div
+            className={`h-[2px] w-full rounded-full ${
+              c.active
+                ? highlight
+                  ? "bg-emerald-400"
+                  : "bg-zinc-500"
+                : "bg-white/10"
+            }`}
+          />
+          <div
+            className={`h-[1px] w-3/4 rounded-full ${
+              c.active ? (highlight ? "bg-emerald-400/60" : "bg-zinc-600") : "bg-white/5"
+            }`}
+          />
+          <div
+            className={`h-[1px] w-1/2 rounded-full ${
+              c.active ? (highlight ? "bg-emerald-400/60" : "bg-zinc-600") : "bg-white/5"
+            }`}
+          />
+        </div>
+      ))}
+      {overflow > 0 && (
+        <div
+          className={`ml-1 text-[10px] font-mono font-bold ${
+            highlight ? "text-emerald-400" : "text-zinc-500"
+          }`}
+        >
+          +{overflow}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PriceCard({
   name,
   price,
@@ -1107,6 +1182,7 @@ function PriceCard({
   features,
   cta,
   highlight,
+  sites,
 }: {
   name: string;
   price: string;
@@ -1115,6 +1191,7 @@ function PriceCard({
   features: string[];
   cta: string;
   highlight?: boolean;
+  sites?: number;
 }) {
   return (
     <div
@@ -1133,6 +1210,9 @@ function PriceCard({
         <div className="absolute top-6 right-6 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
           {hint}
         </div>
+      )}
+      {typeof sites === "number" && (
+        <PlanSlots filled={sites} total={10} highlight={highlight} />
       )}
       <h3 className="font-semibold text-lg">{name}</h3>
       <div className="mt-4">
