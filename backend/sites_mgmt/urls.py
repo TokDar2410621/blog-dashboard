@@ -19,6 +19,7 @@ from .views import (
     ShopifyDiscoverView, ShopifyConnectView,
     WebflowDiscoverView, WebflowCollectionsView, WebflowConnectView,
     BrandingScanView,
+    SiteSitemapView, SiteRSSView,
     BillingMeView, BillingCheckoutView, BillingPortalView, BillingWebhookView,
     PlagiarismCheckView,
     PageSpeedView, LinkSuggestionsView, BacklinksView, SEOSchemaView,
@@ -71,6 +72,9 @@ urlpatterns = [
     path('webflow/collections/', WebflowCollectionsView.as_view(), name='webflow-collections'),
     path('webflow/connect/', WebflowConnectView.as_view(), name='webflow-connect'),
     path('branding/scan/', BrandingScanView.as_view(), name='branding-scan'),
+    # Public XML feeds (no auth — must be reachable by Googlebot)
+    path('sites/<int:site_id>/sitemap.xml', SiteSitemapView.as_view(), name='site-sitemap-xml'),
+    path('sites/<int:site_id>/rss.xml', SiteRSSView.as_view(), name='site-rss-xml'),
     path('billing/me/', BillingMeView.as_view(), name='billing-me'),
     path('billing/checkout/', BillingCheckoutView.as_view(), name='billing-checkout'),
     path('billing/portal/', BillingPortalView.as_view(), name='billing-portal'),

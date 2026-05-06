@@ -6826,6 +6826,236 @@ class ShopifyConnectView(APIView):
 
 
 # ============================================================================
+# Public sitemap.xml + rss.xml per site
+# ============================================================================
+
+def _public_article_url(site, article):
+    """Return the canonical public URL for an article on the user's site.
+    Best-effort across all modes. Returns '' if we genuinely can't compute it.
+    """
+    domain = (site.domain or '').strip().rstrip('/')
+    if not domain.startswith('http'):
+        domain = f'https://{domain}'
+
+    # WordPress already gives us the canonical link
+    if site.is_wordpress and article.get('wp_link'):
+        return article['wp_link']
+    # Shopify: /blogs/{blog_handle}/{slug}
+    if site.is_shopify:
+        slug = article.get('slug', '')
+        # We don't store the blog handle on Site; default to 'news' (Shopify default).
+        return f"{domain}/blogs/news/{slug}".rstrip('/')
+    # Webflow: needs a collection-specific path; site.domain is best-effort
+    if site.is_webflow:
+        slug = article.get('slug', '')
+        return f"{domain}/blog/{slug}".rstrip('/')
+    # Hosted (our public-blog Next.js)
+    if site.public_blog_domain:
+        slug = article.get('slug', '')
+        lang = article.get('language', 'fr')
+        # Hosted blog renders as / for FR or /<lang>/ for non-FR
+        prefix = '' if lang == 'fr' else f'/{lang}'
+        return f"https://{site.public_blog_domain}{prefix}/{slug}".rstrip('/')
+    # External / hosted-fallback: assume /blog/<slug>
+    slug = article.get('slug', '')
+    return f"{domain}/blog/{slug}".rstrip('/')
+
+
+def _collect_published_articles(site, limit=2000):
+    """Return a flat list of published article dicts {slug, title, excerpt,
+    published_at, updated_at, language} for the given site, regardless of mode."""
+    out = []
+    if site.is_wordpress:
+        try:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            page = WordPressClient(site).list_posts(status='published', per_page=min(100, limit))
+            for p in page.get('results', []):
+                out.append({
+                    'slug': p.get('slug', ''),
+                    'title': p.get('title', ''),
+                    'excerpt': p.get('excerpt', ''),
+                    'published_at': p.get('published_at') or p.get('created_at'),
+                    'updated_at': p.get('updated_at') or p.get('published_at'),
+                    'language': p.get('language', 'fr'),
+                    'wp_link': p.get('wp_link', ''),
+                    'cover_image': p.get('cover_image', ''),
+                })
+        except Exception:
+            pass
+        return out
+    if site.is_shopify:
+        try:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            page = ShopifyClient(site).list_posts(status='published', per_page=min(250, limit))
+            for p in page.get('results', []):
+                out.append({
+                    'slug': p.get('slug', ''),
+                    'title': p.get('title', ''),
+                    'excerpt': p.get('excerpt', ''),
+                    'published_at': p.get('published_at') or p.get('created_at'),
+                    'updated_at': p.get('updated_at') or p.get('published_at'),
+                    'language': p.get('language', 'fr'),
+                    'cover_image': p.get('cover_image', ''),
+                })
+        except Exception:
+            pass
+        return out
+    if site.is_webflow:
+        try:
+            from .webflow_adapter import WebflowClient, WebflowError
+            page = WebflowClient(site).list_posts(status='published', per_page=min(100, limit))
+            for p in page.get('results', []):
+                out.append({
+                    'slug': p.get('slug', ''),
+                    'title': p.get('title', ''),
+                    'excerpt': p.get('excerpt', ''),
+                    'published_at': p.get('published_at') or p.get('created_at'),
+                    'updated_at': p.get('updated_at') or p.get('published_at'),
+                    'language': p.get('language', 'fr'),
+                    'cover_image': p.get('cover_image', ''),
+                })
+        except Exception:
+            pass
+        return out
+    if site.is_hosted:
+        from .models import HostedPost
+        qs = HostedPost.objects.filter(site=site, status='published').order_by('-published_at')[:limit]
+        for p in qs:
+            out.append({
+                'slug': p.slug,
+                'title': p.title,
+                'excerpt': p.excerpt or '',
+                'published_at': p.published_at.isoformat() if p.published_at else '',
+                'updated_at': p.updated_at.isoformat() if p.updated_at else '',
+                'language': p.language or 'fr',
+                'cover_image': p.cover_image or '',
+            })
+        return out
+    # External Postgres
+    try:
+        alias = ensure_site_connection(site)
+        qs = (
+            BlogPost.objects.using(alias)
+            .filter(status='published')
+            .order_by('-published_at')[:limit]
+        )
+        for p in qs:
+            out.append({
+                'slug': p.slug,
+                'title': p.title,
+                'excerpt': getattr(p, 'excerpt', '') or '',
+                'published_at': p.published_at.isoformat() if p.published_at else '',
+                'updated_at': p.updated_at.isoformat() if p.updated_at else '',
+                'language': getattr(p, 'language', 'fr'),
+                'cover_image': getattr(p, 'cover_image', '') or '',
+            })
+    except Exception:
+        pass
+    return out
+
+
+def _xml_escape(s):
+    return (
+        (s or '')
+        .replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+        .replace('"', '&quot;')
+        .replace("'", '&apos;')
+    )
+
+
+class SiteSitemapView(APIView):
+    """Public sitemap.xml for a site. No auth — must be reachable by Googlebot.
+    GET /sites/<int:site_id>/sitemap.xml
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, site_id):
+        from django.http import HttpResponse, Http404
+        try:
+            site = Site.objects.get(id=int(site_id), is_active=True)
+        except (Site.DoesNotExist, ValueError, TypeError):
+            raise Http404
+        articles = _collect_published_articles(site, limit=10000)
+
+        urls_xml = []
+        for a in articles:
+            loc = _public_article_url(site, a)
+            if not loc:
+                continue
+            lastmod = (a.get('updated_at') or a.get('published_at') or '')[:10]
+            urls_xml.append(
+                f'  <url><loc>{_xml_escape(loc)}</loc>'
+                + (f'<lastmod>{_xml_escape(lastmod)}</lastmod>' if lastmod else '')
+                + '<changefreq>weekly</changefreq><priority>0.7</priority></url>'
+            )
+
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + '\n'.join(urls_xml)
+            + '\n</urlset>'
+        )
+        resp = HttpResponse(body, content_type='application/xml; charset=utf-8')
+        resp['Cache-Control'] = 'public, max-age=3600, s-maxage=3600'
+        return resp
+
+
+class SiteRSSView(APIView):
+    """Public RSS feed for a site. GET /sites/<int:site_id>/rss.xml"""
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request, site_id):
+        from django.http import HttpResponse, Http404
+        try:
+            site = Site.objects.get(id=int(site_id), is_active=True)
+        except (Site.DoesNotExist, ValueError, TypeError):
+            raise Http404
+
+        articles = _collect_published_articles(site, limit=50)
+        domain = (site.domain or '').strip().rstrip('/')
+        if not domain.startswith('http'):
+            domain = f'https://{domain}'
+        feed_title = _xml_escape(site.name or 'Blog')
+        feed_desc = _xml_escape(site.description or '')
+
+        items_xml = []
+        for a in articles:
+            link = _public_article_url(site, a)
+            if not link:
+                continue
+            pub = a.get('published_at') or ''
+            items_xml.append(
+                '<item>'
+                f'<title>{_xml_escape(a.get("title", ""))}</title>'
+                f'<link>{_xml_escape(link)}</link>'
+                f'<guid>{_xml_escape(link)}</guid>'
+                + (f'<pubDate>{_xml_escape(pub)}</pubDate>' if pub else '')
+                + f'<description>{_xml_escape(a.get("excerpt", ""))}</description>'
+                + '</item>'
+            )
+
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+            '<channel>\n'
+            f'  <title>{feed_title}</title>\n'
+            f'  <link>{_xml_escape(domain)}</link>\n'
+            f'  <description>{feed_desc}</description>\n'
+            '  <language>fr-CA</language>\n'
+            f'  <atom:link href="{_xml_escape(domain)}/rss.xml" rel="self" type="application/rss+xml"/>\n'
+            + '\n'.join('  ' + x for x in items_xml)
+            + '\n</channel>\n</rss>'
+        )
+        resp = HttpResponse(body, content_type='application/rss+xml; charset=utf-8')
+        resp['Cache-Control'] = 'public, max-age=3600, s-maxage=3600'
+        return resp
+
+
+# ============================================================================
 # Branding extractor — scan a domain and return colors/logo/fonts
 # ============================================================================
 
