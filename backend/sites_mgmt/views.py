@@ -202,6 +202,18 @@ class SitePostsView(APIView):
             except WordPressError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
+        # Shopify mode: delegate to the Admin API adapter.
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(site)
+                return Response(client.list_posts(
+                    status=status_filter or None, search=search,
+                    page=page, per_page=page_size,
+                ))
+            except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
         if site.is_hosted:
             posts = HostedPost.objects.filter(site=site).select_related('category').prefetch_related('tags').order_by('-created_at')
             if search:
@@ -262,6 +274,26 @@ class SitePostsView(APIView):
                 )
                 return Response(created, status=status.HTTP_201_CREATED)
             except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        # Shopify mode: forward to the Admin API adapter.
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            data_in = request.data
+            try:
+                client = ShopifyClient(site)
+                created = client.create_post(
+                    title=data_in.get('title', ''),
+                    content=data_in.get('content', ''),
+                    excerpt=data_in.get('excerpt', '') or '',
+                    slug=data_in.get('slug', '') or slugify(data_in.get('title', '') or 'article'),
+                    status=data_in.get('status', 'draft'),
+                    author=site.author_for_articles,
+                    tags=data_in.get('tags_input') or data_in.get('tags') or [],
+                    featured_image_url=data_in.get('cover_image', '') or '',
+                )
+                return Response(created, status=status.HTTP_201_CREATED)
+            except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         serializer = BlogPostWriteSerializer(data=request.data)
@@ -336,6 +368,18 @@ class SitePostDetailView(APIView):
                 raise Http404
             return Response(post)
 
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(site)
+                post = client.get_post(slug)
+            except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                from django.http import Http404
+                raise Http404
+            return Response(post)
+
         if site.is_hosted:
             qs = HostedPost.objects.filter(site=site, slug=slug) \
                 .select_related('category').prefetch_related('tags')
@@ -391,6 +435,35 @@ class SitePostDetailView(APIView):
                     )
                 return Response(updated)
             except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(site)
+                existing = client.get_post(slug)
+                if not existing:
+                    from django.http import Http404
+                    raise Http404
+                updated = client.update_post(
+                    existing['shopify_id'],
+                    title=data.get('title', existing['title']),
+                    content=data.get('content', existing['content']),
+                    excerpt=data.get('excerpt', existing['excerpt']),
+                    slug=data.get('slug', existing['slug']) or existing['slug'],
+                    status=data.get('status', existing['status']),
+                    tags=data.get('tags_input') or data.get('tags') or existing.get('tags', []),
+                    featured_image_url=data.get('cover_image', '') or existing.get('cover_image', '') or '',
+                )
+                old_slug = existing['slug']
+                new_slug = updated['slug']
+                if new_slug and old_slug != new_slug:
+                    Redirect.objects.update_or_create(
+                        site=site, from_slug=old_slug, language=existing.get('language', 'fr'),
+                        defaults={'to_slug': new_slug, 'is_active': True},
+                    )
+                return Response(updated)
+            except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
@@ -504,6 +577,20 @@ class SitePostDetailView(APIView):
                     return Response({'error': 'WP delete failed'}, status=status.HTTP_502_BAD_GATEWAY)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(site)
+                existing = client.get_post(slug)
+                if not existing:
+                    raise Http404
+                ok = client.delete_post(existing['shopify_id'])
+                if not ok:
+                    return Response({'error': 'Shopify delete failed'}, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
@@ -702,6 +789,9 @@ class SiteCategoriesView(APIView):
                 return Response(WordPressClient(site).list_categories())
             except WordPressError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        if site.is_shopify:
+            # Shopify articles don't have categories.
+            return Response([])
         if site.is_hosted:
             categories = HostedCategory.objects.filter(site=site)
             return Response([
@@ -725,6 +815,12 @@ class SiteTagsView(APIView):
             try:
                 return Response(WordPressClient(site).list_tags())
             except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                return Response(ShopifyClient(site).list_tags())
+            except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         if site.is_hosted:
             tags = HostedTag.objects.filter(site=site)
@@ -820,8 +916,8 @@ class GenerateArticleView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        # WordPress mode: don't try to open an external Postgres connection.
-        if site.is_wordpress:
+        # CMS modes (WordPress, Shopify) don't open an external Postgres connection.
+        if site.is_wordpress or site.is_shopify:
             alias = None
         else:
             alias = ensure_site_connection(site)
@@ -873,6 +969,7 @@ class GenerateArticleView(APIView):
                 alias,
                 knowledge_base=site.knowledge_base or '',
                 wp_site=site if site.is_wordpress else None,
+                shopify_site=site if site.is_shopify else None,
             )
             result = generator.generate(
                 search_method=search_method,
@@ -913,7 +1010,7 @@ class GenerateInlineView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        if site.is_wordpress:
+        if site.is_wordpress or site.is_shopify:
             alias = None
         else:
             alias = ensure_site_connection(site)
@@ -960,6 +1057,7 @@ class GenerateInlineView(APIView):
                 alias,
                 knowledge_base=(site.knowledge_base or '') + url_context,
                 wp_site=site if site.is_wordpress else None,
+                shopify_site=site if site.is_shopify else None,
             )
             # Use dry_run to prevent saving
             result = generator.generate(
@@ -6492,3 +6590,136 @@ class GSCQueriesView(APIView):
             })
         queries.sort(key=lambda r: r['clicks'], reverse=True)
         return Response({'page_url': page_url, 'days': days, 'queries': queries})
+
+
+# ============================================================================
+# Shopify connection endpoints
+# ============================================================================
+
+class ShopifyDiscoverView(APIView):
+    """Probe a Shopify domain + token to confirm credentials work and list blogs.
+
+    POST /shopify/discover/ {domain, token}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        domain = (request.data.get('domain') or '').strip()
+        token = (request.data.get('token') or '').strip()
+        if not domain or not token:
+            return Response(
+                {'error': 'domain et token requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from .shopify_adapter import ShopifyClient
+        result = ShopifyClient.discover(domain, token)
+        if not result.get('valid'):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class ShopifyConnectView(APIView):
+    """Authenticate with a Shopify store and create/update a Site row for it.
+
+    POST /shopify/connect/ {domain, token, blog_id?, name?}
+    On success returns the Site dict — frontend can then redirect to the dashboard.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        domain = (request.data.get('domain') or '').strip()
+        token = (request.data.get('token') or '').strip()
+        blog_id = (request.data.get('blog_id') or '').strip()
+        explicit_name = (request.data.get('name') or '').strip()
+
+        if not domain or not token:
+            return Response(
+                {'error': 'domain et token requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .shopify_adapter import ShopifyClient, ShopifyError
+
+        # Discovery validates the token and returns the list of blogs.
+        discovery = ShopifyClient.discover(domain, token)
+        if not discovery.get('valid'):
+            return Response(
+                {'error': discovery.get('error') or 'Boutique Shopify non détectée.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        normalized_domain = discovery['normalized_domain']
+        # If user didn't pick a blog_id, default to the primary one.
+        if not blog_id:
+            blog_id = discovery.get('primary_blog_id') or ''
+        if not blog_id:
+            return Response(
+                {'error': "Cette boutique n'a aucun blog. Crée-en un dans Shopify Admin → Online Store → Blog posts."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        # Validate that the blog_id is one of the discovered blogs.
+        valid_blog_ids = {b['id'] for b in discovery.get('blogs') or []}
+        if str(blog_id) not in valid_blog_ids:
+            return Response(
+                {'error': "Le blog_id sélectionné n'existe pas dans cette boutique."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        site_name = (
+            explicit_name
+            or discovery.get('shop_name')
+            or normalized_domain.replace('.myshopify.com', '')
+            or 'Boutique Shopify'
+        )
+
+        try:
+            site = Site.objects.filter(
+                owner=request.user, shopify_domain=normalized_domain
+            ).first()
+            if not site:
+                custom_domain = (discovery.get('custom_domain') or '').strip()
+                site = Site(
+                    owner=request.user,
+                    name=site_name,
+                    domain=custom_domain or normalized_domain,
+                    description=f"Boutique Shopify : {site_name}",
+                )
+            site.shopify_domain = normalized_domain
+            site.shopify_access_token = token
+            site.shopify_blog_id = str(blog_id)
+            # Refresh the visible domain to the custom one if Shopify reports it.
+            custom_domain = (discovery.get('custom_domain') or '').strip()
+            if custom_domain:
+                site.domain = custom_domain
+            site.save()
+
+            # Confirm the credentials still work post-save.
+            ShopifyClient(site).test_auth()
+        except ShopifyError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception('Shopify connect failed')
+            return Response(
+                {'error': f'Erreur inattendue : {str(e)[:120]}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({
+            'site': {
+                'id': site.id,
+                'name': site.name,
+                'domain': site.domain,
+                'shopify_domain': site.shopify_domain,
+                'shopify_blog_id': site.shopify_blog_id,
+                'is_shopify': True,
+            },
+            'shop': {
+                'name': discovery.get('shop_name'),
+                'email': discovery.get('shop_email'),
+                'currency': discovery.get('shop_currency'),
+                'primary_locale': discovery.get('shop_primary_locale'),
+                'custom_domain': discovery.get('custom_domain'),
+            },
+            'blogs': discovery.get('blogs') or [],
+        }, status=status.HTTP_201_CREATED)
+

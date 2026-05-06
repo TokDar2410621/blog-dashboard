@@ -136,6 +136,23 @@ class Site(models.Model):
         help_text="Application Password généré dans WP → Profil → Application Passwords."
     )
 
+    # ── Shopify integration (mode "Shopify") ──────────────────────────
+    shopify_domain = models.CharField(
+        max_length=255, blank=True, default='', db_index=True,
+        verbose_name="Shopify — myshopify.com",
+        help_text="Ex: monstore.myshopify.com (le domaine technique, pas le custom domain). Si renseigné, le site est en mode Shopify."
+    )
+    shopify_access_token = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name="Shopify — Admin API access token",
+        help_text="Token de la custom app Shopify (Admin → Apps → Develop apps → Create app → Admin API access token). Scope requis: write_content."
+    )
+    shopify_blog_id = models.CharField(
+        max_length=50, blank=True, default='',
+        verbose_name="Shopify — Blog ID",
+        help_text="ID du blog Shopify où publier (un store peut avoir plusieurs blogs). Auto-détecté à la connexion."
+    )
+
     # ── Intégrations externes ─────────────────────────────────────────
     vercel_deploy_hook = models.URLField(
         max_length=500, blank=True, default='',
@@ -190,9 +207,14 @@ class Site(models.Model):
         return bool(self.wp_url and self.wp_app_password)
 
     @property
+    def is_shopify(self):
+        """Site connected via Shopify Admin API (custom app token)."""
+        return bool(self.shopify_domain and self.shopify_access_token)
+
+    @property
     def is_hosted(self):
-        """Site without external storage (no DB URL, no WP) uses the dashboard's hosted storage."""
-        return not self.database_url and not self.is_wordpress
+        """Site without external storage (no DB URL, no WP, no Shopify) uses the dashboard's hosted storage."""
+        return not self.database_url and not self.is_wordpress and not self.is_shopify
 
     @property
     def author_for_articles(self):

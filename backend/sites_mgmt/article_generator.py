@@ -148,13 +148,15 @@ REGLES: Inclure TOUS les sites web trouves, liens cliquables [Nom](URL), ne pas 
 class ArticleGenerator:
     """Generates articles for a specific site using dynamic DB connections."""
 
-    def __init__(self, alias, knowledge_base='', wp_site=None):
-        """alias: Django DB alias for external Postgres mode (None for WP/hosted).
+    def __init__(self, alias, knowledge_base='', wp_site=None, shopify_site=None):
+        """alias: Django DB alias for external Postgres mode (None for WP/hosted/Shopify).
         wp_site: Site model instance when the site is in WordPress mode.
+        shopify_site: Site model instance when the site is in Shopify mode.
         """
         self.alias = alias
         self.knowledge_base = knowledge_base
         self.wp_site = wp_site  # if set → save via WP REST API instead of BlogPost
+        self.shopify_site = shopify_site  # if set → save via Shopify Admin API
         self.serper_images = []
         self.logs = []
 
@@ -321,8 +323,8 @@ class ArticleGenerator:
         # 2.5 Cannibalization guard: refuse to generate a near-duplicate of
         # an existing article (unless the user forced the title explicitly).
         if not self.forced_title:
-            if self.wp_site is not None:
-                # Fetch existing titles from WP REST API
+            if self.wp_site is not None or self.shopify_site is not None:
+                # Fetch existing titles via the CMS adapter
                 existing_titles = [a['title'] for a in self._get_existing_articles()][:60]
             else:
                 existing_titles = list(
@@ -1018,7 +1020,7 @@ NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le fra
         if not matches:
             return content, []
 
-        if self.wp_site is not None:
+        if self.wp_site is not None or self.shopify_site is not None:
             existing_slugs = {a['slug'] for a in self._get_existing_articles()}
         else:
             existing_slugs = set(
@@ -1155,6 +1157,25 @@ Reponds UNIQUEMENT avec la meta description.'''
             except WordPressError:
                 return []
 
+        # Shopify mode: fetch via Admin API (capped at 50).
+        if self.shopify_site is not None:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(self.shopify_site)
+                page = client.list_posts(status='published', per_page=50)
+                return [
+                    {
+                        'title': p.get('title') or '',
+                        'slug': p.get('slug') or '',
+                        'url': f"/blogs/{client.blog_id or 'news'}/{p.get('slug') or ''}",
+                        'excerpt': (p.get('excerpt') or '')[:100],
+                        'category': '',
+                    }
+                    for p in page.get('results', [])
+                ]
+            except ShopifyError:
+                return []
+
         articles = (
             BlogPost.objects.using(self.alias)
             .all()
@@ -1225,6 +1246,38 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
                 self.log(f'[ERROR] WP save failed: {e}')
                 raise
 
+        # Shopify mode: push to Admin API.
+        if self.shopify_site is not None:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                client = ShopifyClient(self.shopify_site)
+                from markdown import markdown as md_to_html
+                content_html = md_to_html(
+                    content, extensions=['extra', 'tables', 'fenced_code']
+                )
+                created = client.create_post(
+                    title=title,
+                    content=content_html,
+                    excerpt=excerpt,
+                    slug=slug,
+                    status='published',
+                    author=self.shopify_site.author_for_articles,
+                    tags=tags,
+                    featured_image_url=cover_image or '',
+                )
+                self.log(f'[OK] Article publie sur Shopify (id={created.get("shopify_id")})')
+
+                class _ShopifyPostShim:
+                    pass
+                shim = _ShopifyPostShim()
+                shim.slug = created.get('slug') or slug
+                shim.title = created.get('title') or title
+                shim.id = created.get('shopify_id')
+                return shim
+            except ShopifyError as e:
+                self.log(f'[ERROR] Shopify save failed: {e}')
+                raise
+
         # Check for duplicate slug
         if BlogPost.objects.using(self.alias).filter(slug=slug).exists():
             slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
@@ -1274,9 +1327,9 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
         return content + section
 
     def _get_related_articles(self, category_name, tags, exclude_slug, limit=3):
-        # WordPress mode: skip the "A lire aussi" auto-section since we'd need
-        # category/tag matching via WP REST and that's overkill for MVP.
-        if self.wp_site is not None:
+        # CMS modes (WP, Shopify): skip the "A lire aussi" auto-section since we'd
+        # need category/tag matching via remote APIs and that's overkill for MVP.
+        if self.wp_site is not None or self.shopify_site is not None:
             return []
 
         related = []

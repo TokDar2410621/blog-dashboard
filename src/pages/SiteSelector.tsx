@@ -40,8 +40,10 @@ import {
   Sparkles,
   CreditCard,
   Key,
+  ShoppingBag,
 } from "lucide-react";
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
+import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
 import { toast } from "sonner";
 
 export default function SiteSelector() {
@@ -52,6 +54,7 @@ export default function SiteSelector() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [wpDialogOpen, setWpDialogOpen] = useState(false);
+  const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [databaseUrl, setDatabaseUrl] = useState("");
@@ -197,8 +200,8 @@ export default function SiteSelector() {
           </Card>
         )}
 
-        {/* WordPress quick-connect - primary path for non-technical users */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* CMS quick-connect - primary path for non-technical users */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Button
             className="w-full"
             size="lg"
@@ -206,7 +209,16 @@ export default function SiteSelector() {
             onClick={() => setWpDialogOpen(true)}
           >
             <Sparkles className="h-5 w-5 mr-2" />
-            {t("sites.connectWordpress", "Connecter un site WordPress")}
+            {t("sites.connectWordpress", "Connecter WordPress")}
+          </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            variant="default"
+            onClick={() => setShopifyDialogOpen(true)}
+          >
+            <ShoppingBag className="h-5 w-5 mr-2" />
+            Connecter Shopify
           </Button>
           <Button
             className="w-full"
@@ -215,7 +227,7 @@ export default function SiteSelector() {
             onClick={() => setOpen(true)}
           >
             <Newspaper className="h-5 w-5 mr-2" />
-            {t("sites.hostedBlog", "Créer un blog clé-en-main")}
+            {t("sites.hostedBlog", "Blog clé-en-main")}
           </Button>
         </div>
 
@@ -258,6 +270,7 @@ export default function SiteSelector() {
         </Dialog>
 
         <WordPressConnectDialog open={wpDialogOpen} onOpenChange={setWpDialogOpen} />
+        <ShopifyConnectDialog open={shopifyDialogOpen} onOpenChange={setShopifyDialogOpen} />
 
         <div className="text-center flex items-center justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>
