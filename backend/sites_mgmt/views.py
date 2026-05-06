@@ -4658,6 +4658,9 @@ class WordPressConnectView(APIView):
         username = (request.data.get('username') or '').strip()
         app_password = (request.data.get('app_password') or '').strip()
         explicit_name = (request.data.get('name') or '').strip()
+        theme_config = request.data.get('theme_config')
+        if not isinstance(theme_config, dict):
+            theme_config = None
 
         if not url or not username or not app_password:
             return Response(
@@ -4697,6 +4700,8 @@ class WordPressConnectView(APIView):
             site.wp_url = url
             site.wp_username = username
             site.wp_app_password = app_password
+            if theme_config:
+                site.theme_config = theme_config
             site.save()
 
             client = WordPressClient(site)
@@ -6722,6 +6727,9 @@ class ShopifyConnectView(APIView):
         token = (request.data.get('token') or '').strip()
         blog_id = (request.data.get('blog_id') or '').strip()
         explicit_name = (request.data.get('name') or '').strip()
+        theme_config = request.data.get('theme_config')
+        if not isinstance(theme_config, dict):
+            theme_config = None
 
         if not domain or not token:
             return Response(
@@ -6782,6 +6790,8 @@ class ShopifyConnectView(APIView):
             custom_domain = (discovery.get('custom_domain') or '').strip()
             if custom_domain:
                 site.domain = custom_domain
+            if theme_config:
+                site.theme_config = theme_config
             site.save()
 
             # Confirm the credentials still work post-save.
@@ -6949,6 +6959,9 @@ class WebflowConnectView(APIView):
         collection_id = (request.data.get('collection_id') or '').strip()
         field_map = request.data.get('field_map')
         explicit_name = (request.data.get('name') or '').strip()
+        theme_config = request.data.get('theme_config')
+        if not isinstance(theme_config, dict):
+            theme_config = None
 
         if not token or not wf_site_id or not collection_id:
             return Response(
@@ -7036,6 +7049,8 @@ class WebflowConnectView(APIView):
             site.webflow_field_map = field_map
             if primary_domain:
                 site.domain = primary_domain
+            if theme_config:
+                site.theme_config = theme_config
             site.save()
 
             # Final auth check via the constructed client.

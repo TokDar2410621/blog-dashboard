@@ -21,6 +21,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BrandingPreview } from "@/components/BrandingPreview";
 
 type WebflowSite = {
   id: string;
@@ -65,6 +66,7 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
   const [chosenSite, setChosenSite] = useState<WebflowSite | null>(null);
   const [collections, setCollections] = useState<WebflowCollection[]>([]);
   const [chosenCollectionId, setChosenCollectionId] = useState<string>("");
+  const [themeConfig, setThemeConfig] = useState<Record<string, string> | null>(null);
 
   const reset = () => {
     setStep(1);
@@ -73,6 +75,7 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
     setChosenSite(null);
     setCollections([]);
     setChosenCollectionId("");
+    setThemeConfig(null);
   };
 
   const handleClose = (o: boolean) => {
@@ -130,6 +133,7 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
           collection_id: chosenCollectionId,
           field_map: collection?.field_map || undefined,
           name: chosenSite!.displayName,
+          theme_config: themeConfig || undefined,
         }),
       });
       const data = await res.json();
@@ -267,6 +271,14 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
                 {chosenSite.customDomains[0] || `${chosenSite.shortName}.webflow.io`}
               </div>
             </div>
+
+            <BrandingPreview
+              domain={
+                chosenSite.customDomains[0] ||
+                `${chosenSite.shortName}.webflow.io`
+              }
+              onAppliedChange={(tc) => setThemeConfig(tc)}
+            />
 
             <div className="space-y-2">
               <Label>

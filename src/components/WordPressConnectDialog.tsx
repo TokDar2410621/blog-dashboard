@@ -22,6 +22,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { BrandingPreview } from "@/components/BrandingPreview";
 
 type DiscoverResult = {
   valid_wp: boolean;
@@ -52,12 +53,15 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
   const [username, setUsername] = useState("");
   const [appPassword, setAppPassword] = useState("");
 
+  const [themeConfig, setThemeConfig] = useState<Record<string, string> | null>(null);
+
   const reset = () => {
     setStep(1);
     setUrl("");
     setDiscovery(null);
     setUsername("");
     setAppPassword("");
+    setThemeConfig(null);
   };
 
   const handleClose = (o: boolean) => {
@@ -89,7 +93,12 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
     mutationFn: async () => {
       const res = await authFetch("/wp/connect/", {
         method: "POST",
-        body: JSON.stringify({ url, username, app_password: appPassword }),
+        body: JSON.stringify({
+          url,
+          username,
+          app_password: appPassword,
+          theme_config: themeConfig || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -184,6 +193,11 @@ export function WordPressConnectDialog({ open, onOpenChange }: Props) {
                 </div>
               </div>
             </div>
+
+            <BrandingPreview
+              domain={discovery.normalized_url || url}
+              onAppliedChange={(tc) => setThemeConfig(tc)}
+            />
 
             <div className="space-y-2">
               <h4 className="text-sm font-semibold">{t("wpConnect.step2Title")}</h4>

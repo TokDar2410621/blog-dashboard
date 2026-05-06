@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShoppingBag, Loader2, ArrowRight, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { BrandingPreview } from "@/components/BrandingPreview";
 
 type ShopifyBlog = { id: string; title: string; handle: string };
 
@@ -49,6 +50,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
   const [token, setToken] = useState("");
   const [discovery, setDiscovery] = useState<DiscoverResult | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string>("");
+  const [themeConfig, setThemeConfig] = useState<Record<string, string> | null>(null);
 
   const reset = () => {
     setStep(1);
@@ -56,6 +58,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
     setToken("");
     setDiscovery(null);
     setSelectedBlogId("");
+    setThemeConfig(null);
   };
 
   const handleClose = (o: boolean) => {
@@ -87,7 +90,12 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
     mutationFn: async (): Promise<ConnectResult> => {
       const res = await authFetch("/shopify/connect/", {
         method: "POST",
-        body: JSON.stringify({ domain, token, blog_id: selectedBlogId }),
+        body: JSON.stringify({
+          domain,
+          token,
+          blog_id: selectedBlogId,
+          theme_config: themeConfig || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur de connexion Shopify.");
@@ -213,6 +221,16 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
                 )}
               </div>
             </div>
+
+            <BrandingPreview
+              domain={
+                discovery.custom_domain ||
+                discovery.myshopify_domain ||
+                discovery.normalized_domain ||
+                domain
+              }
+              onAppliedChange={(tc) => setThemeConfig(tc)}
+            />
 
             <div className="space-y-2">
               <Label>
