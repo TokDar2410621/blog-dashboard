@@ -230,6 +230,16 @@ class V1ArticlesView(BaseV1View):
             except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                page = WebflowClient(site).list_posts(
+                    status=status_filter, language=language, per_page=limit
+                )
+                return Response(page)
+            except WebflowError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
         if site.is_hosted:
             qs = HostedPost.objects.filter(site=site)
         else:
@@ -283,13 +293,14 @@ class V1GenerateView(BaseV1View):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        alias = None if (site.is_wordpress or site.is_shopify) else ensure_site_connection(site)
+        alias = None if (site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
         try:
             generator = ArticleGenerator(
                 alias,
                 knowledge_base=site.knowledge_base or '',
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
+                webflow_site=site if site.is_webflow else None,
             )
             result = generator.generate(
                 search_method='serper',

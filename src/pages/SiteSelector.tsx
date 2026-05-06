@@ -41,9 +41,11 @@ import {
   CreditCard,
   Key,
   ShoppingBag,
+  Layers,
 } from "lucide-react";
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
+import { WebflowConnectDialog } from "@/components/WebflowConnectDialog";
 import { toast } from "sonner";
 
 export default function SiteSelector() {
@@ -55,6 +57,7 @@ export default function SiteSelector() {
   const [loading, setLoading] = useState(false);
   const [wpDialogOpen, setWpDialogOpen] = useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
+  const [webflowDialogOpen, setWebflowDialogOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [databaseUrl, setDatabaseUrl] = useState("");
@@ -201,7 +204,7 @@ export default function SiteSelector() {
         )}
 
         {/* CMS quick-connect - primary path for non-technical users */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Button
             className="w-full"
             size="lg"
@@ -209,7 +212,7 @@ export default function SiteSelector() {
             onClick={() => setWpDialogOpen(true)}
           >
             <Sparkles className="h-5 w-5 mr-2" />
-            {t("sites.connectWordpress", "Connecter WordPress")}
+            WordPress
           </Button>
           <Button
             className="w-full"
@@ -218,7 +221,16 @@ export default function SiteSelector() {
             onClick={() => setShopifyDialogOpen(true)}
           >
             <ShoppingBag className="h-5 w-5 mr-2" />
-            Connecter Shopify
+            Shopify
+          </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            variant="default"
+            onClick={() => setWebflowDialogOpen(true)}
+          >
+            <Layers className="h-5 w-5 mr-2" />
+            Webflow
           </Button>
           <Button
             className="w-full"
@@ -271,6 +283,7 @@ export default function SiteSelector() {
 
         <WordPressConnectDialog open={wpDialogOpen} onOpenChange={setWpDialogOpen} />
         <ShopifyConnectDialog open={shopifyDialogOpen} onOpenChange={setShopifyDialogOpen} />
+        <WebflowConnectDialog open={webflowDialogOpen} onOpenChange={setWebflowDialogOpen} />
 
         <div className="text-center flex items-center justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>

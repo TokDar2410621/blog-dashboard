@@ -214,6 +214,18 @@ class SitePostsView(APIView):
             except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
+        # Webflow mode: delegate to the CMS API adapter.
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                client = WebflowClient(site)
+                return Response(client.list_posts(
+                    status=status_filter or None, search=search,
+                    page=page, per_page=page_size,
+                ))
+            except WebflowError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
         if site.is_hosted:
             posts = HostedPost.objects.filter(site=site).select_related('category').prefetch_related('tags').order_by('-created_at')
             if search:
@@ -296,6 +308,24 @@ class SitePostsView(APIView):
             except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
+        # Webflow mode: forward to the CMS API adapter.
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            data_in = request.data
+            try:
+                client = WebflowClient(site)
+                created = client.create_post(
+                    title=data_in.get('title', ''),
+                    content=data_in.get('content', ''),
+                    excerpt=data_in.get('excerpt', '') or '',
+                    slug=data_in.get('slug', '') or slugify(data_in.get('title', '') or 'article'),
+                    status=data_in.get('status', 'draft'),
+                    featured_image_url=data_in.get('cover_image', '') or '',
+                )
+                return Response(created, status=status.HTTP_201_CREATED)
+            except WebflowError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
         serializer = BlogPostWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -374,6 +404,18 @@ class SitePostDetailView(APIView):
                 client = ShopifyClient(site)
                 post = client.get_post(slug)
             except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                from django.http import Http404
+                raise Http404
+            return Response(post)
+
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                client = WebflowClient(site)
+                post = client.get_post(slug)
+            except WebflowError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
             if not post:
                 from django.http import Http404
@@ -464,6 +506,34 @@ class SitePostDetailView(APIView):
                     )
                 return Response(updated)
             except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                client = WebflowClient(site)
+                existing = client.get_post(slug)
+                if not existing:
+                    from django.http import Http404
+                    raise Http404
+                updated = client.update_post(
+                    existing['webflow_id'],
+                    title=data.get('title', existing['title']),
+                    content=data.get('content', existing['content']),
+                    excerpt=data.get('excerpt', existing['excerpt']),
+                    slug=data.get('slug', existing['slug']) or existing['slug'],
+                    status=data.get('status', existing['status']),
+                    featured_image_url=data.get('cover_image', '') or existing.get('cover_image', '') or '',
+                )
+                old_slug = existing['slug']
+                new_slug = updated['slug']
+                if new_slug and old_slug != new_slug:
+                    Redirect.objects.update_or_create(
+                        site=site, from_slug=old_slug, language=existing.get('language', 'fr'),
+                        defaults={'to_slug': new_slug, 'is_active': True},
+                    )
+                return Response(updated)
+            except WebflowError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
@@ -591,6 +661,20 @@ class SitePostDetailView(APIView):
                     return Response({'error': 'Shopify delete failed'}, status=status.HTTP_502_BAD_GATEWAY)
                 return Response(status=status.HTTP_204_NO_CONTENT)
             except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                client = WebflowClient(site)
+                existing = client.get_post(slug)
+                if not existing:
+                    raise Http404
+                ok = client.delete_post(existing['webflow_id'])
+                if not ok:
+                    return Response({'error': 'Webflow delete failed'}, status=status.HTTP_502_BAD_GATEWAY)
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except WebflowError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         if site.is_hosted:
@@ -792,6 +876,9 @@ class SiteCategoriesView(APIView):
         if site.is_shopify:
             # Shopify articles don't have categories.
             return Response([])
+        if site.is_webflow:
+            # Webflow collections vary; we don't expose categories.
+            return Response([])
         if site.is_hosted:
             categories = HostedCategory.objects.filter(site=site)
             return Response([
@@ -822,6 +909,8 @@ class SiteTagsView(APIView):
                 return Response(ShopifyClient(site).list_tags())
             except ShopifyError as e:
                 return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+        if site.is_webflow:
+            return Response([])
         if site.is_hosted:
             tags = HostedTag.objects.filter(site=site)
             return Response([{'id': t.id, 'name': t.name} for t in tags])
@@ -916,8 +1005,8 @@ class GenerateArticleView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        # CMS modes (WordPress, Shopify) don't open an external Postgres connection.
-        if site.is_wordpress or site.is_shopify:
+        # CMS modes (WordPress, Shopify, Webflow) don't open an external Postgres connection.
+        if site.is_wordpress or site.is_shopify or site.is_webflow:
             alias = None
         else:
             alias = ensure_site_connection(site)
@@ -970,6 +1059,7 @@ class GenerateArticleView(APIView):
                 knowledge_base=site.knowledge_base or '',
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
+                webflow_site=site if site.is_webflow else None,
             )
             result = generator.generate(
                 search_method=search_method,
@@ -1010,7 +1100,7 @@ class GenerateInlineView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
-        if site.is_wordpress or site.is_shopify:
+        if site.is_wordpress or site.is_shopify or site.is_webflow:
             alias = None
         else:
             alias = ensure_site_connection(site)
@@ -1058,6 +1148,7 @@ class GenerateInlineView(APIView):
                 knowledge_base=(site.knowledge_base or '') + url_context,
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
+                webflow_site=site if site.is_webflow else None,
             )
             # Use dry_run to prevent saving
             result = generator.generate(
@@ -6721,5 +6812,208 @@ class ShopifyConnectView(APIView):
                 'custom_domain': discovery.get('custom_domain'),
             },
             'blogs': discovery.get('blogs') or [],
+        }, status=status.HTTP_201_CREATED)
+
+
+# ============================================================================
+# Webflow connection endpoints
+# ============================================================================
+
+class WebflowDiscoverView(APIView):
+    """Validate a Webflow API token by listing sites the user has access to.
+    POST /webflow/discover/ {token}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = (request.data.get('token') or '').strip()
+        if not token:
+            return Response(
+                {'error': 'token requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from .webflow_adapter import WebflowClient
+        result = WebflowClient.discover(token)
+        if not result.get('valid'):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class WebflowCollectionsView(APIView):
+    """List CMS collections for a chosen Webflow site.
+    POST /webflow/collections/ {token, site_id}
+    Returns the list with auto-detected field maps so the frontend can preview.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = (request.data.get('token') or '').strip()
+        site_id = (request.data.get('site_id') or '').strip()
+        if not token or not site_id:
+            return Response(
+                {'error': 'token et site_id requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from .webflow_adapter import WebflowClient, WebflowError, detect_field_map
+        try:
+            collections = WebflowClient.list_collections(token, site_id)
+        except WebflowError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enrich each collection with its field map (best-effort).
+        enriched = []
+        for c in collections:
+            entry = {
+                'id': c.get('id'),
+                'displayName': c.get('displayName'),
+                'singularName': c.get('singularName'),
+                'slug': c.get('slug'),
+            }
+            try:
+                schema = WebflowClient.get_collection_schema(token, c.get('id'))
+                entry['field_map'] = detect_field_map(schema)
+                entry['fields'] = [
+                    {'slug': f.get('slug'), 'displayName': f.get('displayName'), 'type': f.get('type'), 'required': f.get('isRequired')}
+                    for f in (schema.get('fields') or [])
+                ]
+                # Flag whether the auto-mapping found a body field — this is the
+                # main signal that "this collection looks like a blog".
+                entry['looks_like_blog'] = bool(entry['field_map'].get('body'))
+            except WebflowError:
+                entry['field_map'] = None
+                entry['fields'] = []
+                entry['looks_like_blog'] = False
+            enriched.append(entry)
+
+        return Response({'collections': enriched})
+
+
+class WebflowConnectView(APIView):
+    """Connect a Webflow CMS collection as a Site for blog publishing.
+    POST /webflow/connect/ {token, site_id, collection_id, field_map?, name?}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        token = (request.data.get('token') or '').strip()
+        wf_site_id = (request.data.get('site_id') or '').strip()
+        collection_id = (request.data.get('collection_id') or '').strip()
+        field_map = request.data.get('field_map')
+        explicit_name = (request.data.get('name') or '').strip()
+
+        if not token or not wf_site_id or not collection_id:
+            return Response(
+                {'error': 'token, site_id et collection_id requis'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from .webflow_adapter import (
+            WebflowClient, WebflowError, detect_field_map, DEFAULT_FIELD_MAP,
+        )
+
+        # Confirm token works and gather site metadata.
+        discovery = WebflowClient.discover(token)
+        if not discovery.get('valid'):
+            return Response(
+                {'error': discovery.get('error') or 'Token Webflow invalide.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        wf_site = next(
+            (s for s in (discovery.get('sites') or []) if s.get('id') == wf_site_id),
+            None,
+        )
+        if not wf_site:
+            return Response(
+                {'error': "Le site_id ne correspond à aucun site accessible avec ce token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate the collection exists for this site.
+        try:
+            collections = WebflowClient.list_collections(token, wf_site_id)
+        except WebflowError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        if not any(c.get('id') == collection_id for c in collections):
+            return Response(
+                {'error': "La collection_id ne correspond à aucune collection de ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Auto-detect field map if not provided.
+        if not isinstance(field_map, dict) or not field_map:
+            try:
+                schema = WebflowClient.get_collection_schema(token, collection_id)
+                field_map = detect_field_map(schema)
+            except WebflowError:
+                field_map = dict(DEFAULT_FIELD_MAP)
+
+        # Confirm the mapping has at least a body field, otherwise the AI's
+        # generated content wouldn't go anywhere visible.
+        if not field_map.get('body'):
+            return Response(
+                {
+                    'error': "Cette collection n'a pas de champ de type RichText pour le corps de l'article. Crée un champ Rich Text dans Webflow ou choisis une autre collection.",
+                    'field_map': field_map,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        site_name = (
+            explicit_name
+            or wf_site.get('displayName')
+            or wf_site.get('shortName')
+            or 'Site Webflow'
+        )
+        primary_domain = ''
+        if wf_site.get('customDomains'):
+            primary_domain = wf_site['customDomains'][0]
+        elif wf_site.get('shortName'):
+            primary_domain = f"{wf_site['shortName']}.webflow.io"
+
+        try:
+            site = Site.objects.filter(
+                owner=request.user, webflow_site_id=wf_site_id, webflow_collection_id=collection_id
+            ).first()
+            if not site:
+                site = Site(
+                    owner=request.user,
+                    name=site_name,
+                    domain=primary_domain or site_name,
+                    description=f"Site Webflow : {site_name}",
+                )
+            site.webflow_token = token
+            site.webflow_site_id = wf_site_id
+            site.webflow_collection_id = collection_id
+            site.webflow_field_map = field_map
+            if primary_domain:
+                site.domain = primary_domain
+            site.save()
+
+            # Final auth check via the constructed client.
+            WebflowClient(site).test_auth()
+        except WebflowError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception('Webflow connect failed')
+            return Response(
+                {'error': f'Erreur inattendue : {str(e)[:120]}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({
+            'site': {
+                'id': site.id,
+                'name': site.name,
+                'domain': site.domain,
+                'webflow_site_id': site.webflow_site_id,
+                'webflow_collection_id': site.webflow_collection_id,
+                'is_webflow': True,
+            },
+            'webflow_site': {
+                'displayName': wf_site.get('displayName'),
+                'shortName': wf_site.get('shortName'),
+                'customDomains': wf_site.get('customDomains') or [],
+            },
+            'field_map': field_map,
         }, status=status.HTTP_201_CREATED)
 

@@ -153,6 +153,28 @@ class Site(models.Model):
         help_text="ID du blog Shopify où publier (un store peut avoir plusieurs blogs). Auto-détecté à la connexion."
     )
 
+    # ── Webflow integration (mode "Webflow") ──────────────────────────
+    webflow_token = models.CharField(
+        max_length=300, blank=True, default='',
+        verbose_name="Webflow — API token",
+        help_text="Site Token (Project Settings → Apps & Integrations → API access). Si renseigné avec un site_id et collection_id, le site est en mode Webflow."
+    )
+    webflow_site_id = models.CharField(
+        max_length=64, blank=True, default='',
+        verbose_name="Webflow — Site ID",
+        help_text="Identifiant du Webflow site (auto-rempli à la connexion)."
+    )
+    webflow_collection_id = models.CharField(
+        max_length=64, blank=True, default='',
+        verbose_name="Webflow — Collection ID",
+        help_text="ID de la collection CMS où publier les articles (auto-rempli à la connexion)."
+    )
+    webflow_field_map = models.JSONField(
+        blank=True, null=True, default=None,
+        verbose_name="Webflow — Mapping de champs",
+        help_text="Mapping de nos champs vers les slugs Webflow. Format: {title, slug, body, summary, image, status}. Auto-détecté à la connexion."
+    )
+
     # ── Intégrations externes ─────────────────────────────────────────
     vercel_deploy_hook = models.URLField(
         max_length=500, blank=True, default='',
@@ -212,9 +234,19 @@ class Site(models.Model):
         return bool(self.shopify_domain and self.shopify_access_token)
 
     @property
+    def is_webflow(self):
+        """Site connected via Webflow CMS API (site token + collection)."""
+        return bool(self.webflow_token and self.webflow_site_id and self.webflow_collection_id)
+
+    @property
     def is_hosted(self):
-        """Site without external storage (no DB URL, no WP, no Shopify) uses the dashboard's hosted storage."""
-        return not self.database_url and not self.is_wordpress and not self.is_shopify
+        """Site without external storage (no DB URL, no CMS) uses the dashboard's hosted storage."""
+        return (
+            not self.database_url
+            and not self.is_wordpress
+            and not self.is_shopify
+            and not self.is_webflow
+        )
 
     @property
     def author_for_articles(self):
