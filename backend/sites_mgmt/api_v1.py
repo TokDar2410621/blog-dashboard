@@ -268,6 +268,74 @@ class V1ArticlesView(BaseV1View):
         })
 
 
+class V1ArticleDetailView(BaseV1View):
+    """GET /api/v1/sites/<id>/articles/<slug>/ — single article with full content."""
+    def get(self, request, site_id, slug):
+        site = self.get_user_site(request, site_id)
+
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            try:
+                post = WordPressClient(site).get_post(slug)
+            except WordPressError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                return Response({'error': 'Article introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(post)
+
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            try:
+                post = ShopifyClient(site).get_post(slug)
+            except ShopifyError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                return Response({'error': 'Article introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(post)
+
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            try:
+                post = WebflowClient(site).get_post(slug)
+            except WebflowError as e:
+                return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            if not post:
+                return Response({'error': 'Article introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response(post)
+
+        # Hosted / external Postgres
+        if site.is_hosted:
+            from .models import HostedPost
+            try:
+                p = HostedPost.objects.get(site=site, slug=slug)
+            except HostedPost.DoesNotExist:
+                return Response({'error': 'Article introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'slug': p.slug, 'title': p.title, 'excerpt': p.excerpt,
+                'content': p.content, 'cover_image': p.cover_image,
+                'language': p.language, 'status': p.status,
+                'published_at': p.published_at.isoformat() if p.published_at else None,
+                'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+            })
+
+        from .db_utils import ensure_site_connection
+        alias = ensure_site_connection(site)
+        try:
+            p = BlogPost.objects.using(alias).get(slug=slug)
+        except BlogPost.DoesNotExist:
+            return Response({'error': 'Article introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({
+            'slug': p.slug, 'title': p.title,
+            'excerpt': getattr(p, 'excerpt', ''),
+            'content': getattr(p, 'content', ''),
+            'cover_image': getattr(p, 'cover_image', ''),
+            'language': getattr(p, 'language', 'fr'),
+            'status': p.status,
+            'published_at': p.published_at.isoformat() if p.published_at else None,
+            'updated_at': p.updated_at.isoformat() if p.updated_at else None,
+        })
+
+
 class V1GenerateView(BaseV1View):
     """POST /api/v1/sites/<id>/generate/ {topic, title?, type?, length?, language?, keywords?, brief?}"""
     def post(self, request, site_id):

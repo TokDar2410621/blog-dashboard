@@ -42,6 +42,7 @@ import {
   Key,
   ShoppingBag,
   Layers,
+  Code,
 } from "lucide-react";
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
@@ -299,6 +300,11 @@ export default function SiteSelector() {
           <Button variant="ghost" size="sm" onClick={() => navigate("/account/api-keys")}>
             <Key className="h-4 w-4 mr-2" />
             API
+          </Button>
+          <span className="text-muted-foreground">·</span>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/onboarding/external")}>
+            <Code className="h-4 w-4 mr-2" />
+            Mode externe (React/Next.js)
           </Button>
           <span className="text-muted-foreground">·</span>
           <Button variant="ghost" size="sm" onClick={handleLogout}>

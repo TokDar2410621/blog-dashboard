@@ -28,7 +28,7 @@ from .views import (
     GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
 )
 from .api_v1 import (
-    V1MeView, V1SitesView, V1ArticlesView, V1GenerateView,
+    V1MeView, V1SitesView, V1ArticlesView, V1ArticleDetailView, V1GenerateView,
     V1AuditView, V1BriefView, V1KeywordsView, V1RankSnapshotView,
     V1DigestView, TokenManagementView, TokenRevokeView,
 )
@@ -118,6 +118,7 @@ urlpatterns = [
     path('v1/me/', V1MeView.as_view(), name='v1-me'),
     path('v1/sites/', V1SitesView.as_view(), name='v1-sites'),
     path('v1/sites/<int:site_id>/articles/', V1ArticlesView.as_view(), name='v1-articles'),
+    path('v1/sites/<int:site_id>/articles/<slug:slug>/', V1ArticleDetailView.as_view(), name='v1-article-detail'),
     path('v1/sites/<int:site_id>/generate/', V1GenerateView.as_view(), name='v1-generate'),
     path('v1/audit/', V1AuditView.as_view(), name='v1-audit'),
     path('v1/brief/', V1BriefView.as_view(), name='v1-brief'),
