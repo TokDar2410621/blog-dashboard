@@ -78,6 +78,18 @@ class SiteViewSet(viewsets.ModelViewSet):
             return SiteListSerializer
         return SiteSerializer
 
+    def create(self, request, *args, **kwargs):
+        # Enforce sites_max from the user's plan before creating a new site.
+        from .quota import check_site_quota
+        try:
+            check_site_quota(request.user)
+        except DRFPermissionDenied as e:
+            return Response(
+                {'error': str(e), 'quota_exceeded': True, 'limit_type': 'sites'},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+        return super().create(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def test(self, request, pk=None):
         site = self.get_object()
@@ -4432,6 +4444,15 @@ PLAN_PRICE_ENV = {
     'agency': 'STRIPE_PRICE_AGENCY',
 }
 
+# Legacy price-id env vars for plans with grandfathered subscribers.
+# When the webhook receives a subscription event referencing one of these
+# legacy prices, it still maps the user to the right plan tier (so old Pro
+# subscribers at $79 stay 'pro' instead of being downgraded to 'free').
+PLAN_PRICE_ENV_LEGACY = {
+    'pro':    ['STRIPE_PRICE_PRO_LEGACY'],
+    'agency': ['STRIPE_PRICE_AGENCY_LEGACY'],
+}
+
 
 def _get_or_create_subscription(user):
     sub, _ = Subscription.objects.get_or_create(user=user)
@@ -4617,14 +4638,22 @@ class BillingWebhookView(APIView):
                 stripe_status = data.get('status', 'active')
                 sub_obj.status = stripe_status
                 sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
-                # Determine plan from price id
+                # Determine plan from price id - check current then legacy envs
                 items = data.get('items', {}).get('data', [])
                 if items:
                     price_id = items[0].get('price', {}).get('id', '')
+                    matched = False
                     for plan_key, env_key in PLAN_PRICE_ENV.items():
                         if os.environ.get(env_key) == price_id:
                             sub_obj.plan = plan_key
+                            matched = True
                             break
+                    if not matched:
+                        for plan_key, env_keys in PLAN_PRICE_ENV_LEGACY.items():
+                            if any(os.environ.get(k) == price_id for k in env_keys):
+                                sub_obj.plan = plan_key
+                                matched = True
+                                break
                 # Period end
                 period_end = data.get('current_period_end')
                 if period_end:
@@ -4712,6 +4741,15 @@ class WordPressConnectView(APIView):
         try:
             site = Site.objects.filter(owner=request.user, wp_url=url).first()
             if not site:
+                # New connection - enforce sites_max
+                from .quota import check_site_quota
+                try:
+                    check_site_quota(request.user)
+                except DRFPermissionDenied as e:
+                    return Response(
+                        {'error': str(e), 'quota_exceeded': True, 'limit_type': 'sites'},
+                        status=status.HTTP_402_PAYMENT_REQUIRED,
+                    )
                 site = Site(
                     owner=request.user,
                     name=wp_name,
@@ -5856,6 +5894,22 @@ class TrackedKeywordsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Enforce keywords_max from the user's plan, but only when adding NEW.
+        # If the keyword already exists (even inactive), reactivating it doesn't
+        # consume an extra slot beyond what the user already has counted.
+        existing = TrackedKeyword.objects.filter(
+            site=site, keyword=keyword, language=language
+        ).first()
+        if existing is None or not existing.is_active:
+            from .quota import check_keyword_quota
+            try:
+                check_keyword_quota(request.user)
+            except DRFPermissionDenied as e:
+                return Response(
+                    {'error': str(e), 'quota_exceeded': True, 'limit_type': 'keywords'},
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
         tk, created = TrackedKeyword.objects.get_or_create(
             site=site, keyword=keyword, language=language,
             defaults={'target_url': target_url, 'is_active': True},
@@ -6799,6 +6853,15 @@ class ShopifyConnectView(APIView):
                 owner=request.user, shopify_domain=normalized_domain
             ).first()
             if not site:
+                # New connection - enforce sites_max
+                from .quota import check_site_quota
+                try:
+                    check_site_quota(request.user)
+                except DRFPermissionDenied as e:
+                    return Response(
+                        {'error': str(e), 'quota_exceeded': True, 'limit_type': 'sites'},
+                        status=status.HTTP_402_PAYMENT_REQUIRED,
+                    )
                 custom_domain = (discovery.get('custom_domain') or '').strip()
                 site = Site(
                     owner=request.user,
@@ -7290,6 +7353,15 @@ class WebflowConnectView(APIView):
                 owner=request.user, webflow_site_id=wf_site_id, webflow_collection_id=collection_id
             ).first()
             if not site:
+                # New connection - enforce sites_max
+                from .quota import check_site_quota
+                try:
+                    check_site_quota(request.user)
+                except DRFPermissionDenied as e:
+                    return Response(
+                        {'error': str(e), 'quota_exceeded': True, 'limit_type': 'sites'},
+                        status=status.HTTP_402_PAYMENT_REQUIRED,
+                    )
                 site = Site(
                     owner=request.user,
                     name=site_name,

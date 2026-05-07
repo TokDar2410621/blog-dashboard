@@ -65,3 +65,65 @@ def increment_article_quota(user) -> int:
     MonthlyArticleQuota.objects.filter(pk=row.pk).update(count=F('count') + 1)
     row.refresh_from_db(fields=['count'])
     return row.count
+
+
+# --------------------------------------------------------------------------
+# Sites quota (per user)
+# --------------------------------------------------------------------------
+
+def get_sites_used(user) -> int:
+    """Count of active sites currently owned by `user`."""
+    from .models import Site
+    return Site.objects.filter(owner=user, is_active=True).count()
+
+
+def get_sites_limit(user) -> int | None:
+    """Plan's sites_max. None = unlimited."""
+    sub, _ = Subscription.objects.get_or_create(user=user)
+    return (sub.get_limits() or {}).get('sites_max')
+
+
+def check_site_quota(user) -> tuple[int, int | None]:
+    """Raise PermissionDenied if user is at or over the sites limit.
+    Use BEFORE creating a new site row. Skip for re-connects/updates.
+    Returns (used, limit) on success.
+    """
+    limit = get_sites_limit(user)
+    used = get_sites_used(user)
+    if limit is not None and used >= limit:
+        raise PermissionDenied(
+            f"Limite de sites atteinte ({used}/{limit}). Mets ton plan à niveau "
+            f"sur /billing pour ajouter un site supplémentaire."
+        )
+    return (used, limit)
+
+
+# --------------------------------------------------------------------------
+# Keywords quota (per user, summed across sites)
+# --------------------------------------------------------------------------
+
+def get_keywords_used(user) -> int:
+    """Count of active tracked keywords across all of user's sites."""
+    from .models import TrackedKeyword
+    return TrackedKeyword.objects.filter(
+        site__owner=user, site__is_active=True, is_active=True
+    ).count()
+
+
+def get_keywords_limit(user) -> int | None:
+    sub, _ = Subscription.objects.get_or_create(user=user)
+    return (sub.get_limits() or {}).get('keywords_max')
+
+
+def check_keyword_quota(user) -> tuple[int, int | None]:
+    """Raise PermissionDenied if user is at or over the keyword limit.
+    Use BEFORE adding a new tracked keyword. Returns (used, limit) on success.
+    """
+    limit = get_keywords_limit(user)
+    used = get_keywords_used(user)
+    if limit is not None and used >= limit:
+        raise PermissionDenied(
+            f"Limite de mots-clés atteinte ({used}/{limit}). Mets ton plan à "
+            f"niveau sur /billing ou retire un mot-clé pour en suivre un autre."
+        )
+    return (used, limit)
