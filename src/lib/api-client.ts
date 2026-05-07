@@ -32,11 +32,20 @@ export class ApiError extends Error {
   status: number;
   /** Machine-readable code for i18n (see `errors.*` in locale files) */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** Raw response body when JSON-parseable. Use this to read flags the backend
+   * sets alongside `error`, e.g. `quota_exceeded`, `limit_type`. */
+  body?: Record<string, unknown>;
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    body?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -261,7 +270,12 @@ export async function generateArticle(
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new ApiError(err.error || "Generation failed", res.status);
+    throw new ApiError(
+      err.error || "Generation failed",
+      res.status,
+      undefined,
+      err,
+    );
   }
   const data = await res.json();
   return generateArticleResponseSchema.parse(data);

@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/api-client";
 import {
   LayoutDashboard,
   FileText,
@@ -31,6 +33,7 @@ import {
   Move,
   Unlink2,
   Calendar,
+  Coins,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -110,6 +113,7 @@ export function DashboardSidebar() {
 
       <SidebarFooter>
         <SidebarSeparator />
+        <QuotaIndicator />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton onClick={toggleLang}>
@@ -134,5 +138,80 @@ export function DashboardSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function QuotaIndicator() {
+  const navigate = useNavigate();
+  type SubInfo = {
+    plan: "free" | "solo" | "pro" | "agency";
+    limits: { articles_per_month: number | null };
+    usage?: { articles_this_month: number };
+    credits?: { balance: number };
+  };
+  const { data } = useQuery<SubInfo>({
+    queryKey: ["billing-me"],
+    queryFn: async () => {
+      const res = await authFetch("/billing/me/");
+      if (!res.ok) throw new Error("billing fetch failed");
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+  if (!data) return null;
+  const limit = data.limits.articles_per_month;
+  const used = data.usage?.articles_this_month ?? 0;
+  const credits = data.credits?.balance ?? 0;
+  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
+  const exhausted = limit !== null && used >= limit && credits === 0;
+  const danger = exhausted;
+  const warning = limit !== null && pct >= 80 && !exhausted;
+
+  return (
+    <button
+      onClick={() => navigate("/billing")}
+      className="mx-2 mb-2 rounded-lg border border-border/50 hover:border-border bg-muted/30 p-2.5 text-left transition-colors group"
+      title="Voir mon plan et mes crédits"
+    >
+      <div className="flex items-center justify-between text-[11px] mb-1.5">
+        <span className="text-muted-foreground uppercase tracking-wider font-mono">
+          {data.plan}
+        </span>
+        <span
+          className={`tabular-nums font-mono font-semibold ${
+            danger
+              ? "text-destructive"
+              : warning
+                ? "text-amber-500"
+                : "text-foreground"
+          }`}
+        >
+          {limit === null ? `${used} ce mois` : `${used} / ${limit}`}
+        </span>
+      </div>
+      {limit !== null && (
+        <div className="h-1 rounded-full bg-muted overflow-hidden mb-1.5">
+          <div
+            className={`h-full transition-all ${
+              danger
+                ? "bg-destructive"
+                : warning
+                  ? "bg-amber-500"
+                  : "bg-primary"
+            }`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Coins className="h-3 w-3" />
+        <span className="tabular-nums">
+          {credits} crédit{credits !== 1 ? "s" : ""}
+        </span>
+        <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-primary">
+          gérer →
+        </span>
+      </div>
+    </button>
   );
 }

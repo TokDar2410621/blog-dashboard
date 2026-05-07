@@ -20,12 +20,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { Sparkles, Loader2, Pencil, RefreshCw, AlertTriangle, Coins } from "lucide-react";
 import { toast } from "sonner";
 import { ContentBriefPanel, type ContentBrief } from "@/components/ContentBrief";
 import { PAAPanel } from "@/components/PAAPanel";
 import { CommunityQuestionsPanel } from "@/components/CommunityQuestionsPanel";
 import { SearchTrendsPanel } from "@/components/SearchTrendsPanel";
+import { QuotaBanner } from "@/components/QuotaBanner";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { authFetch, ApiError } from "@/lib/api-client";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -82,7 +85,51 @@ export default function AIGenerator() {
     post_count: number;
   } | null>(null);
 
+  // Pre-flight: read user's plan + quota usage + credits to gate the button
+  type SubInfo = {
+    plan: string;
+    limits: { articles_per_month: number | null };
+    usage?: { articles_this_month: number };
+    credits?: { balance: number };
+  };
+  const { data: subInfo } = useQuery<SubInfo>({
+    queryKey: ["billing-me"],
+    queryFn: async () => {
+      const res = await authFetch("/billing/me/");
+      if (!res.ok) throw new Error("billing fetch failed");
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+  const articleLimit = subInfo?.limits.articles_per_month ?? null;
+  const articleUsed = subInfo?.usage?.articles_this_month ?? 0;
+  const credits = subInfo?.credits?.balance ?? 0;
+  const quotaExhausted =
+    articleLimit !== null && articleUsed >= articleLimit && credits === 0;
+  // dry_run skips quota consumption, so don't gate it
+  const cannotGenerate = !dryRun && quotaExhausted;
+
+  // Inline error state when generation hits 402 quota_exceeded
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+
+  const buyCredits = useMutation({
+    mutationFn: async (pack: "small" | "medium" | "large") => {
+      const res = await authFetch("/billing/credits/buy/", {
+        method: "POST",
+        body: JSON.stringify({ pack }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Erreur achat");
+      return data.url as string;
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const handleGenerate = async () => {
+    setQuotaError(null);
     const params: Record<string, unknown> = {
       search: searchMethod,
       type: articleType,
@@ -101,8 +148,20 @@ export default function AIGenerator() {
       toast.success(
         dryRun ? t("ai.previewSuccess") : t("ai.publishSuccess")
       );
-    } catch {
-      toast.error(t("ai.error"));
+    } catch (err) {
+      // 402 with quota_exceeded → render an inline upgrade card instead of a
+      // generic toast. The full backend French message lives on err.message.
+      if (
+        err instanceof ApiError &&
+        err.status === 402 &&
+        err.body?.quota_exceeded
+      ) {
+        setQuotaError(err.message);
+        return;
+      }
+      // Other errors keep their existing UX
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || t("ai.error"));
     }
   };
 
@@ -114,6 +173,8 @@ export default function AIGenerator() {
           {t("ai.subtitle")}
         </p>
       </div>
+
+      <QuotaBanner />
 
       {/* Content Brief - pre-writing brief (optional, fills the form when applied) */}
       <ContentBriefPanel
@@ -274,12 +335,22 @@ export default function AIGenerator() {
               className="w-full"
               size="lg"
               onClick={handleGenerate}
-              disabled={generateArticle.isPending}
+              disabled={generateArticle.isPending || cannotGenerate}
+              title={
+                cannotGenerate
+                  ? "Quota mensuel épuisé. Achète des crédits pour continuer."
+                  : undefined
+              }
             >
               {generateArticle.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   {t("ai.generating")}
+                </>
+              ) : cannotGenerate ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Quota épuisé · Achète des crédits
                 </>
               ) : (
                 <>
@@ -288,6 +359,50 @@ export default function AIGenerator() {
                 </>
               )}
             </Button>
+
+            {/* Inline error block when generation hits 402 quota_exceeded */}
+            {quotaError && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/[0.04] p-4 mt-3 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <div className="font-semibold mb-0.5">
+                      Génération bloquée
+                    </div>
+                    <div className="text-muted-foreground">{quotaError}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 pl-8">
+                  <Button
+                    size="sm"
+                    onClick={() => buyCredits.mutate("small")}
+                    disabled={buyCredits.isPending}
+                  >
+                    {buyCredits.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Coins className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    +10 crédits · 25$
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => buyCredits.mutate("medium")}
+                    disabled={buyCredits.isPending}
+                  >
+                    +50 crédits · 99$
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => navigate("/billing")}
+                  >
+                    Voir les plans
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
