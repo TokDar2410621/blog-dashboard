@@ -1,0 +1,62 @@
+{
+  "free_fresh": {
+    "plan": "free",
+    "status": "active",
+    "is_paid": false,
+    "current_period_end": null,
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 1, "articles_per_month": 1, "keywords_max": 0 },
+    "usage": { "articles_this_month": 0, "month_key": "2026-05" },
+    "credits": { "balance": 0 }
+  },
+  "free_exhausted": {
+    "plan": "free",
+    "status": "active",
+    "is_paid": false,
+    "current_period_end": null,
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 1, "articles_per_month": 1, "keywords_max": 0 },
+    "usage": { "articles_this_month": 1, "month_key": "2026-05" },
+    "credits": { "balance": 0 }
+  },
+  "free_with_credits": {
+    "plan": "free",
+    "status": "active",
+    "is_paid": false,
+    "current_period_end": null,
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 1, "articles_per_month": 1, "keywords_max": 0 },
+    "usage": { "articles_this_month": 1, "month_key": "2026-05" },
+    "credits": { "balance": 5 }
+  },
+  "solo_warning": {
+    "plan": "solo",
+    "status": "active",
+    "is_paid": true,
+    "current_period_end": "2026-06-06T12:00:00Z",
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 1, "articles_per_month": 8, "keywords_max": 10 },
+    "usage": { "articles_this_month": 7, "month_key": "2026-05" },
+    "credits": { "balance": 0 }
+  },
+  "pro_healthy": {
+    "plan": "pro",
+    "status": "active",
+    "is_paid": true,
+    "current_period_end": "2026-06-06T12:00:00Z",
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 2, "articles_per_month": 60, "keywords_max": 30 },
+    "usage": { "articles_this_month": 20, "month_key": "2026-05" },
+    "credits": { "balance": 0 }
+  },
+  "pro_exhausted_with_credits": {
+    "plan": "pro",
+    "status": "active",
+    "is_paid": true,
+    "current_period_end": "2026-06-06T12:00:00Z",
+    "cancel_at_period_end": false,
+    "limits": { "sites_max": 2, "articles_per_month": 60, "keywords_max": 30 },
+    "usage": { "articles_this_month": 60, "month_key": "2026-05" },
+    "credits": { "balance": 12 }
+  }
+}

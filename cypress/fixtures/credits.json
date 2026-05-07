@@ -1,0 +1,25 @@
+{
+  "empty": {
+    "balance": 0,
+    "transactions": [],
+    "packs": [
+      { "key": "small",  "credits": 10,  "price_cad": 25,  "label": "Petit boost" },
+      { "key": "medium", "credits": 50,  "price_cad": 99,  "label": "Boost moyen" },
+      { "key": "large",  "credits": 200, "price_cad": 299, "label": "Gros volume" }
+    ]
+  },
+  "with_history": {
+    "balance": 12,
+    "transactions": [
+      { "amount": -1, "kind": "spend",    "description": "Article généré (top-up)", "created_at": "2026-05-06T10:30:00Z" },
+      { "amount": -1, "kind": "spend",    "description": "Article généré (top-up)", "created_at": "2026-05-05T08:15:00Z" },
+      { "amount": -1, "kind": "spend",    "description": "Article généré (top-up)", "created_at": "2026-05-03T14:42:00Z" },
+      { "amount": 15, "kind": "purchase", "description": "Pack small: +15 crédits", "created_at": "2026-05-02T11:00:00Z" }
+    ],
+    "packs": [
+      { "key": "small",  "credits": 10,  "price_cad": 25,  "label": "Petit boost" },
+      { "key": "medium", "credits": 50,  "price_cad": 99,  "label": "Boost moyen" },
+      { "key": "large",  "credits": 200, "price_cad": 299, "label": "Gros volume" }
+    ]
+  }
+}
