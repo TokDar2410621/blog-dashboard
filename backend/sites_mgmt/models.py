@@ -393,6 +393,7 @@ class Subscription(models.Model):
     """
     PLAN_CHOICES = [
         ('free', 'Essai (gratuit)'),
+        ('solo', 'Solo'),
         ('pro', 'Pro'),
         ('agency', 'Agence'),
     ]
@@ -422,15 +423,16 @@ class Subscription(models.Model):
 
     @property
     def is_paid(self):
-        return self.plan in ('pro', 'agency') and self.status in ('active', 'trialing')
+        return self.plan in ('solo', 'pro', 'agency') and self.status in ('active', 'trialing')
 
     def get_limits(self):
         """Return dict of plan limits: {sites_max, articles_per_month, keywords_max}."""
         return {
-            'free': {'sites_max': 1, 'articles_per_month': 5, 'keywords_max': 5},
-            'pro': {'sites_max': 3, 'articles_per_month': None, 'keywords_max': 50},
-            'agency': {'sites_max': 10, 'articles_per_month': None, 'keywords_max': 200},
-        }.get(self.plan, {'sites_max': 1, 'articles_per_month': 5, 'keywords_max': 5})
+            'free':   {'sites_max': 1, 'articles_per_month': 1,   'keywords_max': 0},
+            'solo':   {'sites_max': 1, 'articles_per_month': 8,   'keywords_max': 10},
+            'pro':    {'sites_max': 2, 'articles_per_month': 60,  'keywords_max': 30},
+            'agency': {'sites_max': 5, 'articles_per_month': 200, 'keywords_max': 100},
+        }.get(self.plan, {'sites_max': 1, 'articles_per_month': 1, 'keywords_max': 0})
 
 
 class Redirect(models.Model):

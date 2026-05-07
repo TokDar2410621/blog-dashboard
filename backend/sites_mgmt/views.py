@@ -4411,6 +4411,7 @@ class LocalBusinessSchemaView(APIView):
 
 # Plan slug → env var of the Stripe Price ID. Configured by the operator.
 PLAN_PRICE_ENV = {
+    'solo': 'STRIPE_PRICE_SOLO',
     'pro': 'STRIPE_PRICE_PRO',
     'agency': 'STRIPE_PRICE_AGENCY',
 }

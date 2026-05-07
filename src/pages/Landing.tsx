@@ -429,7 +429,7 @@ export default function Landing() {
               Simple. Honnête. Pas un piège SaaS.
             </h2>
           </Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
             <Reveal delay={0}>
               <PriceCard
                 name="Essai"
@@ -439,64 +439,109 @@ export default function Landing() {
                 sites={1}
                 features={[
                   "1 site",
-                  "5 articles / mois",
+                  "1 article / mois",
                   "Audit IA basique",
-                  "Brief de contenu",
-                  "Suivi 5 mots-clés",
+                  "Pas de suivi mots-clés",
+                  "Support communauté",
                 ]}
                 cta="Commencer"
               />
             </Reveal>
-            <Reveal delay={120}>
+            <Reveal delay={100}>
+              <PriceCard
+                name="Solo"
+                price="29.99$"
+                period="/mois"
+                hint="Pour les solos"
+                sites={1}
+                features={[
+                  "1 site",
+                  "8 articles / mois",
+                  "Audit IA + brief de contenu",
+                  "Suivi 10 mots-clés + GSC",
+                  "Lexique FR-CA",
+                  "Rapport mensuel PDF",
+                  "Support email <72h",
+                ]}
+                cta="Commencer Solo"
+              />
+            </Reveal>
+            <Reveal delay={200}>
               <PriceCard
                 name="Pro"
-                price="79$"
+                price="89.99$"
                 period="/mois"
                 highlight
                 hint="Le plus populaire"
-                sites={3}
+                sites={2}
                 features={[
-                  "3 sites (WP, hébergé, externe)",
-                  "Articles illimités",
+                  "2 sites (WP, hébergé, externe)",
+                  "60 articles / mois",
                   "24 outils SEO",
-                  "Suivi 50 mots-clés + GSC + alertes",
+                  "Suivi 30 mots-clés + GSC + alertes",
                   "Audit bulk + topic clusters",
                   "Lexique FR-CA + EEAT + LocalBusiness",
                   "Rapport hebdomadaire PDF",
-                  "API REST (60 req/h)",
-                  "Support email <24h",
+                  "API REST (30 req/h)",
+                  "Support email <48h",
                 ]}
                 cta="Commencer Pro"
               />
             </Reveal>
-            <Reveal delay={240}>
+            <Reveal delay={300}>
               <PriceCard
                 name="Agence"
-                price="199$"
+                price="199.99$"
                 period="/mois"
-                hint="Pour gérer 10 clients"
-                sites={10}
+                hint="Pour gérer 5 clients"
+                sites={5}
                 features={[
-                  "10 sites",
+                  "5 sites",
+                  "200 articles / mois",
                   "Tout du plan Pro",
                   "Comparaison multi-domaines",
-                  "Suivi 200 mots-clés",
-                  "API REST (600 req/h)",
+                  "Suivi 100 mots-clés",
+                  "API REST (200 req/h)",
                   "White-label optionnel",
                   "Onboarding personnalisé",
-                  "Support prioritaire <4h",
+                  "Support prioritaire <8h",
                 ]}
                 cta="Choisir Agence"
               />
             </Reveal>
           </div>
-          <p className="text-center text-sm text-zinc-500 mt-12">
-            Plus de 10 sites ou intégration custom ?{" "}
-            <a href="mailto:tokamdarius@gmail.com" className="text-emerald-400 hover:underline">
-              On en jase
-            </a>
-            .
-          </p>
+
+          {/* Enterprise contact CTA */}
+          <Reveal delay={400} className="max-w-6xl mx-auto mt-8">
+            <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.06] to-transparent p-6 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="h-4 w-4 text-emerald-400" />
+                  <span className="text-xs font-mono uppercase tracking-wider text-emerald-400">
+                    Enterprise
+                  </span>
+                </div>
+                <h3 className="text-lg font-semibold">
+                  Plus de 5 sites, volume custom ou intégrations sur mesure ?
+                </h3>
+                <p className="text-sm text-zinc-400 mt-1">
+                  SLA, comptable dédié, white-label complet, intégrations custom (CRM, n8n self-hosted, API privée). Contrat annuel.
+                </p>
+              </div>
+              <a
+                href="mailto:tokamdarius@gmail.com?subject=Plan%20Enterprise%20-%20demande%20sur%20mesure"
+                className="shrink-0"
+              >
+                <Button
+                  variant="outline"
+                  className="bg-white/5 hover:bg-white/10 text-zinc-100 border-white/10"
+                >
+                  On en jase
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </a>
+            </div>
+          </Reveal>
         </div>
       </section>
 

@@ -97,9 +97,10 @@ class ApiTokenAuthentication(authentication.BaseAuthentication):
 # --------------------------------------------------------------------------
 
 PLAN_API_LIMITS = {
-    'free': {'rate': 0, 'per_hour': 0},     # blocked
-    'pro': {'rate': 60, 'per_hour': 60},
-    'agency': {'rate': 600, 'per_hour': 600},
+    'free':   {'rate': 0,   'per_hour': 0},    # blocked
+    'solo':   {'rate': 0,   'per_hour': 0},    # blocked - API is Pro+ only
+    'pro':    {'rate': 30,  'per_hour': 30},
+    'agency': {'rate': 200, 'per_hour': 200},
 }
 
 
@@ -149,7 +150,7 @@ class BaseV1View(APIView):
         if not request.user or not request.user.is_authenticated:
             raise exceptions.AuthenticationFailed('Bearer token requis.')
         sub = _get_subscription(request.user)
-        if sub.plan == 'free':
+        if sub.plan in ('free', 'solo'):
             raise exceptions.PermissionDenied(
                 'Accès API réservé aux plans Pro et Agence. Mets à niveau sur /billing.'
             )

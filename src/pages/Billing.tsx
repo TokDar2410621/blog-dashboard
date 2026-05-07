@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 
 type Subscription = {
-  plan: "free" | "pro" | "agency";
+  plan: "free" | "solo" | "pro" | "agency";
   status: string;
   is_paid: boolean;
   current_period_end: string | null;
@@ -36,44 +36,60 @@ const PLANS = [
     period: "pour toujours",
     features: [
       "1 site",
-      "5 articles générés/mois",
+      "1 article généré/mois",
       "Audit IA basique",
-      "Brief de contenu",
-      "Suivi 5 mots-clés",
+      "Pas de suivi de mots-clés",
+      "Support communauté",
+    ],
+  },
+  {
+    key: "solo" as const,
+    name: "Solo",
+    price: "29.99$",
+    period: "/mois",
+    features: [
+      "1 site",
+      "8 articles générés/mois",
+      "Audit IA + brief de contenu",
+      "Suivi 10 mots-clés + GSC",
+      "Lexique FR-CA",
+      "Rapport mensuel PDF",
+      "Support email <72h",
     ],
   },
   {
     key: "pro" as const,
     name: "Pro",
-    price: "79$",
+    price: "89.99$",
     period: "/mois",
     highlighted: true,
     features: [
-      "3 sites",
-      "Articles illimités",
-      "Tous les outils SEO",
-      "Suivi 50 mots-clés + GSC + alertes",
+      "2 sites",
+      "60 articles générés/mois",
+      "24 outils SEO",
+      "Suivi 30 mots-clés + GSC + alertes",
       "Audit bulk + topic clusters",
       "Lexique FR-CA + EEAT",
       "Rapport hebdomadaire PDF",
-      "API REST (60 req/h)",
-      "Support email <24h",
+      "API REST (30 req/h)",
+      "Support email <48h",
     ],
   },
   {
     key: "agency" as const,
     name: "Agence",
-    price: "199$",
+    price: "199.99$",
     period: "/mois",
     features: [
-      "10 sites",
+      "5 sites",
+      "200 articles générés/mois",
       "Tout du plan Pro",
       "Comparaison multi-domaines",
-      "Suivi 200 mots-clés",
-      "API REST (600 req/h)",
+      "Suivi 100 mots-clés",
+      "API REST (200 req/h)",
       "White-label optionnel",
       "Onboarding personnalisé",
-      "Support prioritaire <4h",
+      "Support prioritaire <8h",
     ],
   },
 ];
@@ -105,7 +121,7 @@ export default function Billing() {
   }, [searchParams, qc]);
 
   const checkout = useMutation({
-    mutationFn: async (plan: "pro" | "agency") => {
+    mutationFn: async (plan: "solo" | "pro" | "agency") => {
       setBusyPlan(plan);
       const res = await authFetch("/billing/checkout/", {
         method: "POST",
@@ -233,7 +249,7 @@ export default function Billing() {
         ) : null}
 
         {/* Plans */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {PLANS.map((plan) => {
             const isCurrent = sub?.plan === plan.key;
             const canSubscribe = plan.key !== "free";
@@ -306,6 +322,27 @@ export default function Billing() {
             );
           })}
         </div>
+
+        {/* Enterprise contact CTA */}
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardContent className="py-5 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+            <div>
+              <div className="font-semibold flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-500" />
+                Plus de 5 sites ou besoin sur mesure ?
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">
+                Volume custom, intégrations, SLA, comptable dédié. On en jase.
+              </div>
+            </div>
+            <a
+              href="mailto:tokamdarius@gmail.com?subject=Plan%20Enterprise%20-%20demande%20sur%20mesure"
+              className="shrink-0"
+            >
+              <Button variant="outline">Nous contacter</Button>
+            </a>
+          </CardContent>
+        </Card>
 
         {/* Stripe note */}
         <Card>
