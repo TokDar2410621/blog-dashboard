@@ -15,7 +15,9 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
-from .models import MonthlyArticleQuota, Subscription
+from .models import (
+    CreditBalance, CreditTransaction, MonthlyArticleQuota, Subscription,
+)
 
 
 def current_month_key() -> str:
@@ -39,17 +41,41 @@ def get_articles_limit(user) -> int | None:
 
 
 def check_article_quota(user) -> tuple[int, int | None]:
-    """Raise `PermissionDenied` if `user` has exhausted their monthly quota.
-    Returns `(used, limit)` on success. `limit=None` means unlimited.
+    """Raise `PermissionDenied` if `user` has neither monthly quota left NOR
+    purchased credits available. Returns `(used, limit)` on success.
+    `limit=None` = unlimited (always passes).
     """
     limit = get_articles_limit(user)
     used = get_articles_used(user)
-    if limit is not None and used >= limit:
-        raise PermissionDenied(
-            f"Quota mensuel atteint ({used}/{limit}). Mets ton plan à niveau "
-            f"sur /billing pour continuer à générer ce mois-ci."
-        )
-    return (used, limit)
+    if limit is None or used < limit:
+        return (used, limit)
+    # Monthly quota exhausted - fall back to top-up credits
+    if get_credit_balance(user) > 0:
+        return (used, limit)
+    raise PermissionDenied(
+        f"Quota mensuel atteint ({used}/{limit}) et aucun crédit disponible. "
+        f"Achète des crédits sur /billing ou attends le début du mois prochain."
+    )
+
+
+def consume_article(user) -> str:
+    """Consume one article generation. Decrements the monthly quota first
+    (free if under plan limit), falls back to top-up credits otherwise.
+    Returns 'quota' or 'credit' so the caller can surface which bucket was hit.
+    Should only run AFTER `check_article_quota` succeeded - if both buckets
+    are empty here it raises (defense in depth).
+    """
+    limit = get_articles_limit(user)
+    used = get_articles_used(user)
+    if limit is None or used < limit:
+        increment_article_quota(user)
+        return 'quota'
+    if consume_credit(user, 1, description='Article généré (top-up)'):
+        return 'credit'
+    raise PermissionDenied(
+        "Aucun crédit ni quota disponible (race condition?). "
+        "Réessaie ou contacte le support."
+    )
 
 
 def increment_article_quota(user) -> int:
@@ -127,3 +153,74 @@ def check_keyword_quota(user) -> tuple[int, int | None]:
             f"niveau sur /billing ou retire un mot-clé pour en suivre un autre."
         )
     return (used, limit)
+
+
+# --------------------------------------------------------------------------
+# Top-up credits (purchased one-time, never expire)
+# --------------------------------------------------------------------------
+
+def get_credit_balance(user) -> int:
+    """Current balance of purchased credits."""
+    bal, _ = CreditBalance.objects.get_or_create(user=user)
+    return bal.balance
+
+
+def add_credits(
+    user,
+    amount: int,
+    *,
+    kind: str = 'purchase',
+    stripe_session_id: str = '',
+    description: str = '',
+) -> int:
+    """Atomically credit `amount` to the user's balance and log the txn.
+    Returns the new balance. Idempotent on `stripe_session_id` for purchases:
+    if a txn with the same session_id already exists, this is a no-op (Stripe
+    sometimes redelivers webhooks).
+    """
+    if amount <= 0:
+        raise ValueError("amount must be positive (use consume_credit to spend)")
+    if kind == 'purchase' and stripe_session_id:
+        if CreditTransaction.objects.filter(
+            stripe_session_id=stripe_session_id, kind='purchase'
+        ).exists():
+            return get_credit_balance(user)
+    bal, _ = CreditBalance.objects.get_or_create(user=user)
+    CreditBalance.objects.filter(pk=bal.pk).update(balance=F('balance') + amount)
+    CreditTransaction.objects.create(
+        user=user,
+        amount=amount,
+        kind=kind,
+        stripe_session_id=stripe_session_id,
+        description=description,
+    )
+    bal.refresh_from_db(fields=['balance'])
+    return bal.balance
+
+
+def consume_credit(user, amount: int = 1, *, description: str = '') -> bool:
+    """Atomically debit `amount` from balance. Returns True on success, False
+    if balance is insufficient (no rows updated). Logs a 'spend' txn on success.
+    """
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+    affected = CreditBalance.objects.filter(
+        user=user, balance__gte=amount
+    ).update(balance=F('balance') - amount)
+    if not affected:
+        return False
+    CreditTransaction.objects.create(
+        user=user,
+        amount=-amount,
+        kind='spend',
+        description=description or 'Consommation',
+    )
+    return True
+
+
+# Pack metadata - kept here so views and the Stripe webhook share one source.
+CREDIT_PACKS = {
+    'small':  {'credits': 10,  'price_cents': 2500,  'env': 'STRIPE_PRICE_CREDITS_SMALL',  'label': 'Petit boost'},
+    'medium': {'credits': 50,  'price_cents': 9900,  'env': 'STRIPE_PRICE_CREDITS_MEDIUM', 'label': 'Boost moyen'},
+    'large':  {'credits': 200, 'price_cents': 29900, 'env': 'STRIPE_PRICE_CREDITS_LARGE',  'label': 'Gros volume'},
+}

@@ -12,6 +12,9 @@ import {
   CreditCard,
   Loader2,
   AlertCircle,
+  Coins,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +33,29 @@ type Subscription = {
     articles_this_month: number;
     month_key: string;
   };
+  credits?: {
+    balance: number;
+  };
+};
+
+type CreditPack = {
+  key: "small" | "medium" | "large";
+  credits: number;
+  price_cad: number;
+  label: string;
+};
+
+type CreditTransaction = {
+  amount: number;
+  kind: "purchase" | "spend" | "refund" | "gift";
+  description: string;
+  created_at: string;
+};
+
+type CreditsResponse = {
+  balance: number;
+  transactions: CreditTransaction[];
+  packs: CreditPack[];
 };
 
 const PLANS = [
@@ -122,7 +148,47 @@ export default function Billing() {
     } else if (status === "cancel") {
       toast("Paiement annulé.");
     }
+    const credits = searchParams.get("credits");
+    if (credits === "success") {
+      toast.success("Crédits ajoutés à ton compte. Merci !");
+      qc.invalidateQueries({ queryKey: ["billing-me"] });
+      qc.invalidateQueries({ queryKey: ["billing-credits"] });
+    } else if (credits === "cancel") {
+      toast("Achat de crédits annulé.");
+    }
   }, [searchParams, qc]);
+
+  const { data: credits } = useQuery<CreditsResponse>({
+    queryKey: ["billing-credits"],
+    queryFn: async () => {
+      const res = await authFetch("/billing/credits/");
+      if (!res.ok) throw new Error("credits fetch failed");
+      return res.json();
+    },
+  });
+
+  const [busyPack, setBusyPack] = useState<string | null>(null);
+  const buyCredits = useMutation({
+    mutationFn: async (pack: CreditPack["key"]) => {
+      setBusyPack(pack);
+      const res = await authFetch("/billing/credits/buy/", {
+        method: "POST",
+        body: JSON.stringify({ pack }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Erreur achat");
+      }
+      return data.url as string;
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+      setBusyPack(null);
+    },
+  });
 
   const checkout = useMutation({
     mutationFn: async (plan: "solo" | "pro" | "agency") => {
@@ -283,6 +349,135 @@ export default function Billing() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Credits balance + buy packs */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Coins className="h-5 w-5 text-primary" />
+              Crédits achetés
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-baseline gap-3">
+              <div className="text-4xl font-bold tabular-nums">
+                {credits?.balance ?? sub?.credits?.balance ?? 0}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                crédits disponibles · 1 crédit = 1 article généré
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Les crédits sont consommés <strong>après</strong> ton quota mensuel inclus dans ton plan.
+              Ils n'expirent jamais.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {(credits?.packs ?? []).map((pack) => {
+                const perCredit = pack.price_cad / pack.credits;
+                const isMedium = pack.key === "medium";
+                return (
+                  <Card
+                    key={pack.key}
+                    className={
+                      isMedium
+                        ? "border-primary/40 bg-primary/[0.03]"
+                        : ""
+                    }
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div>
+                        <div className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                          {pack.label}
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-bold tabular-nums">
+                            {pack.credits}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            crédits
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-sm">
+                        <span className="font-semibold">
+                          {pack.price_cad.toFixed(2)}$
+                        </span>
+                        <span className="text-muted-foreground text-xs ml-1.5">
+                          ({perCredit.toFixed(2)}$/crédit)
+                        </span>
+                      </div>
+                      <Button
+                        className="w-full"
+                        size="sm"
+                        variant={isMedium ? "default" : "outline"}
+                        onClick={() => buyCredits.mutate(pack.key)}
+                        disabled={busyPack !== null}
+                      >
+                        {busyPack === pack.key ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                            Redirection...
+                          </>
+                        ) : (
+                          "Acheter"
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Recent transactions */}
+            {credits?.transactions && credits.transactions.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">
+                  Historique des transactions ({credits.transactions.length})
+                </summary>
+                <div className="mt-3 divide-y divide-border/50 border border-border/50 rounded-lg">
+                  {credits.transactions.map((t, i) => {
+                    const positive = t.amount > 0;
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-3 px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {positive ? (
+                            <TrendingUp className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                          ) : (
+                            <TrendingDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          )}
+                          <span className="truncate">{t.description}</span>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span
+                            className={`tabular-nums font-mono text-xs font-semibold ${
+                              positive
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {positive ? "+" : ""}
+                            {t.amount}
+                          </span>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {new Date(t.created_at).toLocaleDateString("fr-CA", {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Plans */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

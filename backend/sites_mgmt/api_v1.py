@@ -371,8 +371,8 @@ class V1GenerateView(BaseV1View):
 
         alias = None if (site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
 
-        # Enforce monthly article quota
-        from .quota import check_article_quota, increment_article_quota
+        # Enforce article quota (monthly first, then top-up credits).
+        from .quota import check_article_quota, consume_article
         try:
             check_article_quota(request.user)
         except exceptions.PermissionDenied as e:
@@ -396,7 +396,7 @@ class V1GenerateView(BaseV1View):
                 keywords=keywords, dry_run=False,
                 language=language, brief=brief,
             )
-            increment_article_quota(request.user)
+            consume_article(request.user)
             return Response({
                 'output': result['output'],
                 'post_count': result['post_count'],

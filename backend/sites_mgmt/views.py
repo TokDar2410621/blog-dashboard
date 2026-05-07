@@ -1064,8 +1064,9 @@ class GenerateArticleView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Enforce monthly article quota (skip on dry_run since nothing is saved)
-        from .quota import check_article_quota, increment_article_quota
+        # Enforce article quota (monthly first, then top-up credits).
+        # Skip on dry_run since nothing is saved.
+        from .quota import check_article_quota, consume_article
         if not dry_run:
             try:
                 check_article_quota(request.user)
@@ -1097,9 +1098,9 @@ class GenerateArticleView(APIView):
                 brief=brief,
             )
 
-            # Count this generation against the user's monthly quota
+            # Count this generation: consumes monthly quota first, then a credit.
             if not dry_run:
-                increment_article_quota(request.user)
+                consume_article(request.user)
 
             trigger_vercel_deploy(site)
             return Response({
@@ -4460,7 +4461,7 @@ def _get_or_create_subscription(user):
 
 
 def _serialize_subscription(sub):
-    from .quota import get_articles_used, current_month_key
+    from .quota import get_articles_used, current_month_key, get_credit_balance
     used = get_articles_used(sub.user)
     return {
         'plan': sub.plan,
@@ -4473,6 +4474,9 @@ def _serialize_subscription(sub):
             'articles_this_month': used,
             'month_key': current_month_key(),
         },
+        'credits': {
+            'balance': get_credit_balance(sub.user),
+        },
     }
 
 
@@ -4483,6 +4487,106 @@ class BillingMeView(APIView):
     def get(self, request):
         sub = _get_or_create_subscription(request.user)
         return Response(_serialize_subscription(sub))
+
+
+class BillingCreditsView(APIView):
+    """GET /billing/credits/ — balance + recent transactions.
+    POST /billing/credits/buy/ is on `BillingCreditsCheckoutView` below.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .quota import get_credit_balance, CREDIT_PACKS
+        from .models import CreditTransaction
+        recent = CreditTransaction.objects.filter(
+            user=request.user
+        ).order_by('-created_at')[:30]
+        return Response({
+            'balance': get_credit_balance(request.user),
+            'transactions': [
+                {
+                    'amount': t.amount,
+                    'kind': t.kind,
+                    'description': t.description,
+                    'created_at': t.created_at.isoformat(),
+                }
+                for t in recent
+            ],
+            'packs': [
+                {
+                    'key': k,
+                    'credits': v['credits'],
+                    'price_cad': v['price_cents'] / 100,
+                    'label': v['label'],
+                }
+                for k, v in CREDIT_PACKS.items()
+            ],
+        })
+
+
+class BillingCreditsCheckoutView(APIView):
+    """POST /billing/credits/buy/ {pack: 'small'|'medium'|'large'}
+    Creates a Stripe Checkout session in mode='payment' (one-time charge).
+    On success, the webhook handler `checkout.session.completed` adds credits
+    to the user's balance.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .quota import CREDIT_PACKS
+        pack = (request.data.get('pack') or '').strip()
+        if pack not in CREDIT_PACKS:
+            return Response(
+                {'error': "Pack invalide. Valides: 'small', 'medium', 'large'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        secret = os.environ.get('STRIPE_SECRET_KEY')
+        if not secret:
+            return Response(
+                {'error': 'STRIPE_SECRET_KEY non configurée'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        env_key = CREDIT_PACKS[pack]['env']
+        price_id = os.environ.get(env_key)
+        if not price_id:
+            return Response(
+                {'error': f"{env_key} non configuré"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        sub = _get_or_create_subscription(request.user)
+        import stripe
+        stripe.api_key = secret
+        frontend_base = os.environ.get(
+            'FRONTEND_BASE_URL', 'https://blog-dashboard-ebon.vercel.app'
+        )
+        try:
+            kwargs = dict(
+                mode='payment',
+                line_items=[{'price': price_id, 'quantity': 1}],
+                success_url=f'{frontend_base}/billing?credits=success',
+                cancel_url=f'{frontend_base}/billing?credits=cancel',
+                metadata={
+                    'user_id': str(request.user.id),
+                    'pack': pack,
+                    'credits': str(CREDIT_PACKS[pack]['credits']),
+                },
+                # Important: pre-fill so Stripe attaches the new payment to the
+                # same customer record as their subscription, if any.
+            )
+            if sub.stripe_customer_id:
+                kwargs['customer'] = sub.stripe_customer_id
+            elif request.user.email:
+                kwargs['customer_email'] = request.user.email
+            session = stripe.checkout.Session.create(**kwargs)
+        except Exception as e:
+            logger.exception('Credits checkout failed')
+            return Response(
+                {'error': f'Erreur Stripe: {str(e)[:120]}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response({'url': session.url})
 
 
 class BillingCheckoutView(APIView):
@@ -4665,6 +4769,42 @@ class BillingWebhookView(APIView):
                 sub_obj.save()
                 logger.info('Stripe webhook updated subscription for user=%s plan=%s status=%s',
                             sub_obj.user_id, sub_obj.plan, sub_obj.status)
+
+        elif event_type == 'checkout.session.completed':
+            # One-time payment for credits. We identify the user via metadata
+            # (set in BillingCreditsCheckoutView). Subscription checkouts
+            # (mode='subscription') skip this branch since metadata lacks 'pack'.
+            if data.get('mode') == 'payment':
+                metadata = data.get('metadata') or {}
+                pack = metadata.get('pack')
+                user_id = metadata.get('user_id')
+                credits_str = metadata.get('credits')
+                session_id = data.get('id') or ''
+                if not pack or not user_id or not credits_str:
+                    logger.warning(
+                        'Credits checkout webhook missing metadata: %s', metadata
+                    )
+                else:
+                    try:
+                        from django.contrib.auth import get_user_model
+                        UserModel = get_user_model()
+                        user = UserModel.objects.get(id=int(user_id))
+                        from .quota import add_credits
+                        n = int(credits_str)
+                        new_balance = add_credits(
+                            user, n, kind='purchase',
+                            stripe_session_id=session_id,
+                            description=f'Pack {pack}: +{n} crédits',
+                        )
+                        logger.info(
+                            'Credits added: user=%s pack=%s +%d → balance=%d session=%s',
+                            user.id, pack, n, new_balance, session_id,
+                        )
+                    except Exception as e:
+                        logger.exception(
+                            'Failed to apply credits purchase (session=%s): %s',
+                            session_id, e,
+                        )
 
         return Response({'received': True})
 
