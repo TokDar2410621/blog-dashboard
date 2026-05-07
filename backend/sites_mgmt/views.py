@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 from rest_framework.throttling import UserRateThrottle
 from django.shortcuts import get_object_or_404
 from django.conf import settings
@@ -1051,6 +1052,17 @@ class GenerateArticleView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Enforce monthly article quota (skip on dry_run since nothing is saved)
+        from .quota import check_article_quota, increment_article_quota
+        if not dry_run:
+            try:
+                check_article_quota(request.user)
+            except DRFPermissionDenied as e:
+                return Response(
+                    {'error': str(e), 'quota_exceeded': True},
+                    status=status.HTTP_402_PAYMENT_REQUIRED,
+                )
+
         try:
             from .article_generator import ArticleGenerator
 
@@ -1072,6 +1084,10 @@ class GenerateArticleView(APIView):
                 language=language,
                 brief=brief,
             )
+
+            # Count this generation against the user's monthly quota
+            if not dry_run:
+                increment_article_quota(request.user)
 
             trigger_vercel_deploy(site)
             return Response({
@@ -4423,6 +4439,8 @@ def _get_or_create_subscription(user):
 
 
 def _serialize_subscription(sub):
+    from .quota import get_articles_used, current_month_key
+    used = get_articles_used(sub.user)
     return {
         'plan': sub.plan,
         'status': sub.status,
@@ -4430,6 +4448,10 @@ def _serialize_subscription(sub):
         'current_period_end': sub.current_period_end.isoformat() if sub.current_period_end else None,
         'cancel_at_period_end': sub.cancel_at_period_end,
         'limits': sub.get_limits(),
+        'usage': {
+            'articles_this_month': used,
+            'month_key': current_month_key(),
+        },
     }
 
 

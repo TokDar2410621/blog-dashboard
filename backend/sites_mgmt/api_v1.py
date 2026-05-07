@@ -171,12 +171,19 @@ class BaseV1View(APIView):
 class V1MeView(BaseV1View):
     """GET /api/v1/me/ — sanity check."""
     def get(self, request):
+        from .quota import get_articles_used, current_month_key
         sub = _get_subscription(request.user)
+        limits = sub.get_limits()
         return Response({
             'username': request.user.username,
             'email': request.user.email,
             'plan': sub.plan,
             'rate_limit_per_hour': PLAN_API_LIMITS.get(sub.plan, {}).get('per_hour', 0),
+            'usage': {
+                'articles_this_month': get_articles_used(request.user),
+                'articles_per_month_limit': limits.get('articles_per_month'),
+                'month_key': current_month_key(),
+            },
         })
 
 
@@ -363,6 +370,17 @@ class V1GenerateView(BaseV1View):
             )
 
         alias = None if (site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
+
+        # Enforce monthly article quota
+        from .quota import check_article_quota, increment_article_quota
+        try:
+            check_article_quota(request.user)
+        except exceptions.PermissionDenied as e:
+            return Response(
+                {'error': str(e), 'quota_exceeded': True},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
         try:
             generator = ArticleGenerator(
                 alias,
@@ -378,6 +396,7 @@ class V1GenerateView(BaseV1View):
                 keywords=keywords, dry_run=False,
                 language=language, brief=brief,
             )
+            increment_article_quota(request.user)
             return Response({
                 'output': result['output'],
                 'post_count': result['post_count'],

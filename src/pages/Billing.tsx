@@ -26,6 +26,10 @@ type Subscription = {
     articles_per_month: number | null;
     keywords_max: number;
   };
+  usage?: {
+    articles_this_month: number;
+    month_key: string;
+  };
 };
 
 const PLANS = [
@@ -221,6 +225,38 @@ export default function Billing() {
                       : "articles illimités"},{" "}
                     {sub.limits.keywords_max} mots-clés.
                   </div>
+                  {sub.usage && sub.limits.articles_per_month != null && (() => {
+                    const used = sub.usage.articles_this_month;
+                    const limit = sub.limits.articles_per_month;
+                    const pct = Math.min(100, Math.round((used / limit) * 100));
+                    const danger = pct >= 90;
+                    return (
+                      <div className="mt-3 max-w-xs">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">
+                            Articles ce mois-ci
+                          </span>
+                          <span
+                            className={`font-mono font-semibold ${
+                              danger
+                                ? "text-destructive"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {used} / {limit}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full transition-all ${
+                              danger ? "bg-destructive" : "bg-primary"
+                            }`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {sub.current_period_end && (
                     <div className="text-xs text-muted-foreground mt-1">
                       {sub.cancel_at_period_end
