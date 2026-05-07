@@ -253,8 +253,8 @@ export default function Landing() {
         <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-600 mb-6">
           Construit avec
         </p>
-        <div className="relative max-w-6xl mx-auto px-6">
-          <div className="flex motion-safe:marquee-x gap-12 whitespace-nowrap">
+        <div className="relative max-w-6xl mx-auto px-6 overflow-hidden">
+          <div className="flex marquee-x gap-12 whitespace-nowrap w-max">
             {[...TECH_LIST, ...TECH_LIST].map((label, i) => (
               <span
                 key={i}
