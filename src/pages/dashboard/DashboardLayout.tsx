@@ -1,9 +1,9 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Loader2 } from "lucide-react";
+import { Loader2, Newspaper } from "lucide-react";
 
 // Lazy-load every dashboard page so they ship as their own chunks.
 const Overview = lazy(() => import("./Overview"));
@@ -32,13 +32,18 @@ function PageLoader() {
 export default function DashboardLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <DashboardSidebar />
-        <SidebarInset className="flex-1">
-          <div className="p-6">
-            <ErrorBoundary>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
+      <DashboardSidebar />
+      <SidebarInset>
+        {/* Mobile-only top bar so users can reach the sidebar (offcanvas) */}
+        <header className="md:hidden sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border/50 bg-background/95 backdrop-blur px-3">
+          <SidebarTrigger />
+          <Newspaper className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-sm">Blog Dashboard</span>
+        </header>
+        <div className="p-4 md:p-6">
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
                   <Route index element={<Overview />} />
                   <Route path="articles" element={<PostList />} />
                   <Route path="articles/nouveau" element={<PostEditor />} />
@@ -58,8 +63,7 @@ export default function DashboardLayout() {
               </Suspense>
             </ErrorBoundary>
           </div>
-        </SidebarInset>
-      </div>
+      </SidebarInset>
     </SidebarProvider>
   );
 }
