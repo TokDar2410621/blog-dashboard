@@ -17,8 +17,11 @@ describe("AIGenerator - quota-blocked generation", () => {
     cy.mockBilling("free_exhausted");
     cy.visit("/dashboard/1/generer");
     cy.wait("@billingMe_free_exhausted");
-    // The button should now read 'Quota épuisé · Achète des crédits' and be disabled
-    cy.contains("button", /Quota épuisé/).should("be.disabled");
+    // The button should now read 'Quota épuisé · Achète des crédits' and be
+    // disabled - validates the pre-flight gate works as the user would see it
+    cy.get('[data-testid="generate-article"]', { timeout: 10000 })
+      .should("be.disabled")
+      .and("contain.text", "Quota épuisé");
   });
 
   it("keeps the Generate button enabled when credits cover the overflow", () => {
@@ -26,7 +29,7 @@ describe("AIGenerator - quota-blocked generation", () => {
     cy.visit("/dashboard/1/generer");
     cy.wait("@billingMe_pro_exhausted_with_credits");
     // Generate button is back to its normal label
-    cy.contains("button", /^Générer/i)
+    cy.get('[data-testid="generate-article"]')
       .should("not.be.disabled")
       .and("be.visible");
   });
@@ -36,11 +39,12 @@ describe("AIGenerator - quota-blocked generation", () => {
     cy.mockBilling("pro_healthy");
     cy.mockGenerateQuotaExceeded();
     cy.visit("/dashboard/1/generer");
-    cy.wait("@billingMe_pro_healthy");
-
-    // Fill minimal form input and submit
-    cy.get('input[type="text"]').first().clear().type("Mon article test");
-    cy.contains("button", /^Générer/i).click();
+    // Wait for the form to render before typing
+    cy.get('input[placeholder*="tendance"]', { timeout: 10000 })
+      .first()
+      .clear()
+      .type("Mon article test");
+    cy.get('[data-testid="generate-article"]').click();
     cy.wait("@generateBlocked");
 
     // Inline card visible (NOT a toast)
@@ -61,9 +65,11 @@ describe("AIGenerator - quota-blocked generation", () => {
     }).as("buyCreditsSmall");
 
     cy.visit("/dashboard/1/generer");
-    cy.wait("@billingMe_pro_healthy");
-    cy.get('input[type="text"]').first().clear().type("Mon article");
-    cy.contains("button", /^Générer/i).click();
+    cy.get('input[placeholder*="tendance"]', { timeout: 10000 })
+      .first()
+      .clear()
+      .type("Mon article");
+    cy.get('[data-testid="generate-article"]').click();
     cy.wait("@generateBlocked");
 
     cy.contains("button", /\+10 crédits.*25\$/).click();

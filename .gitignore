@@ -35,3 +35,6 @@ backend/.env
 
 # Claude worktrees (agent branches)
 .claude/
+cypress/downloads/
+cypress/screenshots/
+cypress/videos/

@@ -28,8 +28,41 @@ Cypress.Commands.add("login", () => {
     body: { access: "fake-access-token", refresh: "fake-refresh-token" },
   }).as("login");
 
-  window.localStorage.setItem("blog_token", "fake-access-token");
-  window.localStorage.setItem("blog_refresh", "fake-refresh-token");
+  // Mock the user-identity endpoint AuthGuard relies on; without this the
+  // guard would redirect to /login before any test page renders. We accept
+  // both `/auth/me/` and `/auth/me` to be defensive against trailing-slash
+  // differences.
+  cy.intercept("GET", "**/api/auth/me/**", {
+    statusCode: 200,
+    body: {
+      id: 1,
+      username: "alice_demo",
+      email: "alice@example.test",
+      first_name: "",
+      last_name: "",
+    },
+  }).as("authMe");
+
+  // The app reads its token from sessionStorage under the key
+  // 'blog_dashboard_token' (see src/lib/constants.ts > LS_KEY). Setting the
+  // wrong key (or wrong storage) silently makes AuthGuard redirect to /login.
+  // We seed sessionStorage on every page Cypress will visit (Cypress wipes
+  // window state between visits, so set it via window.beforeunload prevention
+  // or reseed before each visit by exposing it as a separate command).
+  cy.window().then((win) => {
+    win.sessionStorage.setItem("blog_dashboard_token", "fake-access-token");
+    win.sessionStorage.setItem("blog_dashboard_refresh", "fake-refresh-token");
+  });
+});
+
+// Seed sessionStorage tokens on EVERY page load. Cypress clears
+// sessionStorage between cy.visit calls in the same test, so we hook
+// 'window:before:load' to reseed before each navigation.
+beforeEach(() => {
+  cy.on("window:before:load", (win) => {
+    win.sessionStorage.setItem("blog_dashboard_token", "fake-access-token");
+    win.sessionStorage.setItem("blog_dashboard_refresh", "fake-refresh-token");
+  });
 });
 
 Cypress.Commands.add("mockAPI", () => {

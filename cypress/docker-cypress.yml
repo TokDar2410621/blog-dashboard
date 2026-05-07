@@ -1,0 +1,32 @@
+# Run the Cypress E2E suite against a locally-running Vite dev server, inside
+# the official Cypress Docker image (Chrome bundled, no Windows runtime
+# weirdness, identical to CI).
+#
+# Usage from repo root:
+#   1. Start dev server in another terminal:
+#        npm run dev
+#   2. Run all specs:
+#        docker compose -f cypress/docker-cypress.yml run --rm cypress
+#   3. Run a single spec:
+#        docker compose -f cypress/docker-cypress.yml run --rm cypress \
+#          run --spec "cypress/e2e/quota/quota-banner.cy.ts" --browser chrome
+#
+# Notes:
+# - We use cypress/included so Chrome + Cypress are pre-installed (no
+#   ELECTRON_RUN_AS_NODE leaks, no smoke-test failures).
+# - host.docker.internal lets the container reach the host's localhost:5173
+#   (works on Docker Desktop for Mac/Win; Linux uses --add-host).
+# - The cypress dir is mounted read-write so videos/screenshots end up on host.
+services:
+  cypress:
+    image: cypress/included:13.17.0
+    environment:
+      - CYPRESS_baseUrl=http://host.docker.internal:5173
+    volumes:
+      - ..:/e2e
+    working_dir: /e2e
+    network_mode: host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    entrypoint: ["cypress"]
+    command: ["run", "--browser", "chrome"]

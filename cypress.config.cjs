@@ -1,12 +1,12 @@
-import { defineConfig } from "cypress";
+const { defineConfig } = require("cypress");
 
-export default defineConfig({
+module.exports = defineConfig({
   e2e: {
     baseUrl: "http://localhost:5173",
     viewportWidth: 1280,
     viewportHeight: 720,
     video: false,
-    screenshotOnRunFailure: false,
+    screenshotOnRunFailure: true,
     defaultCommandTimeout: 8000,
   },
 });

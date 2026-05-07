@@ -139,7 +139,14 @@ export async function createSite(data: { name: string; database_url?: string; do
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new ApiError(JSON.stringify(err), res.status, "VALIDATION_ERROR");
+    // Prefer the backend's `error` field as the human message (used by quota
+    // gates: 'Limite de sites atteinte (1/1)...'). Fall back to a stringified
+    // body for validation errors.
+    const message =
+      typeof err.error === "string" && err.error
+        ? err.error
+        : JSON.stringify(err);
+    throw new ApiError(message, res.status, "VALIDATION_ERROR", err);
   }
   const json = await res.json();
   return siteSchema.parse(json);

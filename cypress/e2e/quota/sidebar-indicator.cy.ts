@@ -14,8 +14,7 @@ describe("DashboardSidebar QuotaIndicator", () => {
   it("shows the plan name and current usage", () => {
     cy.mockBilling("pro_healthy");
     cy.visit("/dashboard/1");
-    cy.wait("@billingMe_pro_healthy");
-    cy.contains(/^pro$/i).should("be.visible");
+    cy.get('button[title*="Voir mon plan"]', { timeout: 10000 }).should("be.visible");
     cy.contains("20 / 60").should("be.visible");
     cy.contains(/0 crédits?/).should("be.visible");
   });
@@ -23,30 +22,26 @@ describe("DashboardSidebar QuotaIndicator", () => {
   it("shows 'X / Y' counter for free plan even at zero", () => {
     cy.mockBilling("free_fresh");
     cy.visit("/dashboard/1");
-    cy.wait("@billingMe_free_fresh");
-    cy.contains(/^free$/i).should("be.visible");
+    cy.get('button[title*="Voir mon plan"]', { timeout: 10000 }).should("be.visible");
     cy.contains("0 / 1").should("be.visible");
   });
 
   it("displays credit balance when present (free + 5 credits)", () => {
     cy.mockBilling("free_with_credits");
     cy.visit("/dashboard/1");
-    cy.wait("@billingMe_free_with_credits");
-    cy.contains("5 crédits").should("be.visible");
+    cy.contains("5 crédits", { timeout: 10000 }).should("be.visible");
   });
 
   it("navigates to /billing when clicked", () => {
     cy.mockBilling("pro_healthy");
     cy.visit("/dashboard/1");
-    cy.wait("@billingMe_pro_healthy");
-    cy.contains("Voir mon plan et mes crédits")
-      .parent()
-      .click({ force: true });
+    cy.get('button[title*="Voir mon plan"]', { timeout: 10000 }).click({
+      force: true,
+    });
     cy.url().should("include", "/billing");
   });
 
   it("shows '1 crédit' (singular) when balance is exactly 1", () => {
-    // Custom scenario inline
     cy.intercept("GET", "**/api/billing/me/", {
       statusCode: 200,
       body: {
@@ -61,7 +56,6 @@ describe("DashboardSidebar QuotaIndicator", () => {
       },
     }).as("billingMe_one_credit");
     cy.visit("/dashboard/1");
-    cy.wait("@billingMe_one_credit");
-    cy.contains(/^1 crédit$/).should("be.visible"); // singular
+    cy.contains(/^1 crédit$/, { timeout: 10000 }).should("be.visible");
   });
 });

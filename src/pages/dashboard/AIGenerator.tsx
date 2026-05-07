@@ -332,6 +332,7 @@ export default function AIGenerator() {
             )}
 
             <Button
+              data-testid="generate-article"
               className="w-full"
               size="lg"
               onClick={handleGenerate}

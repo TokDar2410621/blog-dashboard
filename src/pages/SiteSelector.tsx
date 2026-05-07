@@ -132,8 +132,13 @@ export default function SiteSelector() {
       setDatabaseUrl("");
       setDomain("");
       toast.success(t("sites.added"));
-    } catch {
-      toast.error(t("sites.addError"));
+    } catch (err) {
+      // Close the dialog so the toast is not occluded by the Radix overlay.
+      // Otherwise the user submits, sees nothing change, and the error
+      // message stays hidden behind the modal.
+      setOpen(false);
+      const msg = err instanceof Error ? err.message : "";
+      toast.error(msg || t("sites.addError"));
     } finally {
       setLoading(false);
     }
