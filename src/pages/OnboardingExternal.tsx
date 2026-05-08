@@ -140,13 +140,13 @@ export default function BlogList() {
   );
 }
 
-// In App.tsx — register the route:
+// In App.tsx - register the route:
 // <Route path="/blog" element={<BlogList />} />
 // <Route path="/blog/:slug" element={<BlogPost />} />
 `;
   }
   // vite-spa
-  return `// src/pages/Blog.tsx — Vite SPA, no router (use #/blog hash)
+  return `// src/pages/Blog.tsx - Vite SPA, no router (use #/blog hash)
 import { useEffect, useState } from "react";
 
 export default function Blog() {
@@ -262,7 +262,7 @@ export default function BlogPost() {
 }
 `;
   }
-  return `// src/pages/Article.tsx — Vite SPA
+  return `// src/pages/Article.tsx - Vite SPA
 import { useEffect, useState } from "react";
 
 export default function Article({ slug }: { slug: string }) {
@@ -290,7 +290,7 @@ function sitemapCode(framework: Framework, siteId: number, domain: string) {
   // simplest path is to proxy our /api/sites/<id>/sitemap.xml endpoint.
   // For react-router / vite-spa we tell the user to host a redirect at /sitemap.xml.
   if (framework === "next-app") {
-    return `// app/sitemap.xml/route.ts — proxy our sitemap to your domain
+    return `// app/sitemap.xml/route.ts - proxy our sitemap to your domain
 export async function GET() {
   const res = await fetch(
     "https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml",
@@ -305,7 +305,7 @@ export async function GET() {
   });
 }
 
-// app/rss.xml/route.ts — same idea
+// app/rss.xml/route.ts - same idea
 export async function GET() {
   const res = await fetch(
     "https://api.blog-dashboard.ca/api/sites/${siteId}/rss.xml",
@@ -345,7 +345,7 @@ export default function Sitemap() { return null; }
   return `# Pour exposer le sitemap sur ${domain || "ton-domaine.com"}/sitemap.xml,
 # ajoute une rewrite dans la config de ton hébergeur :
 
-# === Si tu es sur Vercel — vercel.json ===
+# === Si tu es sur Vercel - vercel.json ===
 {
   "rewrites": [
     {
@@ -359,7 +359,7 @@ export default function Sitemap() { return null; }
   ]
 }
 
-# === Si tu es sur Netlify — _redirects ===
+# === Si tu es sur Netlify - _redirects ===
 /sitemap.xml  https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml  200
 /rss.xml      https://api.blog-dashboard.ca/api/sites/${siteId}/rss.xml      200
 
@@ -382,7 +382,7 @@ export default function OnboardingExternal() {
       const res = await authFetch("/sites/");
       if (!res.ok) throw new Error("sites fetch failed");
       const data = await res.json();
-      // sites endpoint returns array directly — normalize
+      // sites endpoint returns array directly - normalize
       const sites = Array.isArray(data) ? data : data.results || [];
       return { results: sites };
     },
@@ -554,7 +554,7 @@ export default function OnboardingExternal() {
               >
                 /account/api-keys
               </button>{" "}
-              et crée un token (par ex. "site-prod"). Copie-le tout de suite —
+              et crée un token (par ex. "site-prod"). Copie-le tout de suite -
               tu ne pourras plus le voir après.
             </p>
             <p>

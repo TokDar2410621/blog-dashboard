@@ -122,7 +122,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
           <DialogDescription>
             On publie tes articles directement dans le blog natif de ta boutique
-            Shopify, sur ton domaine — SEO 100 % bonifié.
+            Shopify, sur ton domaine - SEO 100 % bonifié.
           </DialogDescription>
         </DialogHeader>
 

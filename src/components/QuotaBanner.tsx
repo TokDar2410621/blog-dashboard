@@ -1,9 +1,9 @@
 /**
- * QuotaBanner — surfaces the user's monthly article quota state and credit
+ * QuotaBanner - surfaces the user's monthly article quota state and credit
  * balance. Hidden when usage is below `warnAt` (default 70%). Renders a soft
  * warning between `warnAt` and 100%, and a hard block when exhausted.
  *
- * Reuses the data already exposed on /billing/me/ — no extra request.
+ * Reuses the data already exposed on /billing/me/ - no extra request.
  */
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";

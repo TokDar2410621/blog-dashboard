@@ -135,13 +135,13 @@ export default function ApiKeys() {
           </Button>
         </div>
 
-        {/* Reveal banner — shown once after creation */}
+        {/* Reveal banner - shown once after creation */}
         {revealed && (
           <Card className="border-emerald-500/40 bg-emerald-500/5">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                 <AlertTriangle className="h-5 w-5" />
-                Copie ce token maintenant — il ne sera plus jamais affiché
+                Copie ce token maintenant - il ne sera plus jamais affiché
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">

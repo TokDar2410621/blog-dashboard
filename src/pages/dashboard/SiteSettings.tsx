@@ -125,7 +125,7 @@ export default function SiteSettings() {
         font_sans: tc.font_sans,
         logo_url: tc.logo_url,
       });
-      toast.success("Branding détecté — n'oublie pas d'enregistrer.");
+      toast.success("Branding détecté - n'oublie pas d'enregistrer.");
     },
     onError: (e: Error) => toast.error(e.message),
   });

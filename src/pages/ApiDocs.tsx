@@ -47,7 +47,7 @@ const ENDPOINTS: EndpointDoc[] = [
     method: "POST",
     path: "/sites/{id}/generate/",
     title: "Générer un article complet",
-    desc: "Le générateur IA produit un article SEO-ready et le publie. Coûte du temps GPU — utilise avec parcimonie.",
+    desc: "Le générateur IA produit un article SEO-ready et le publie. Coûte du temps GPU - utilise avec parcimonie.",
     curl: `curl -X POST -H "Authorization: Bearer btb_xxx" \\\n  -H "Content-Type: application/json" \\\n  -d '{"topic":"Comment choisir un CRM PME au Québec","article_type":"guide","length":"long","language":"fr"}' \\\n  ${BASE}/sites/12/generate/`,
   },
   {

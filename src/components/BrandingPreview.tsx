@@ -46,7 +46,7 @@ export function BrandingPreview({ domain, onAppliedChange }: Props) {
       onAppliedChange(apply ? data.theme_config : null);
     },
     onError: () => {
-      // Silent fail — branding is best-effort enhancement, not a blocker.
+      // Silent fail - branding is best-effort enhancement, not a blocker.
       setResult(null);
       onAppliedChange(null);
     },
@@ -123,7 +123,7 @@ export function BrandingPreview({ domain, onAppliedChange }: Props) {
         <div className="flex-1 min-w-0">
           <div className="font-medium truncate text-sm">{sample}</div>
           <div className="text-[11px] text-muted-foreground truncate">
-            {tc.font_sans || "—"} {tc.font_display && tc.font_display !== tc.font_sans ? `+ ${tc.font_display}` : ""}
+            {tc.font_sans || "-"} {tc.font_display && tc.font_display !== tc.font_sans ? `+ ${tc.font_display}` : ""}
           </div>
         </div>
 

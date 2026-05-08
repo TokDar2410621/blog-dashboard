@@ -161,7 +161,7 @@ export function WebflowConnectDialog({ open, onOpenChange }: Props) {
           </DialogTitle>
           <DialogDescription>
             On publie tes articles directement dans le CMS de ton site Webflow,
-            sur ton domaine — SEO 100 % bonifié.
+            sur ton domaine - SEO 100 % bonifié.
           </DialogDescription>
         </DialogHeader>
 
