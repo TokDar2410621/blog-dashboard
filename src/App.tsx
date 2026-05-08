@@ -15,6 +15,7 @@ const Billing = lazy(() => import("./pages/Billing"));
 const ApiKeys = lazy(() => import("./pages/ApiKeys"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const OnboardingExternal = lazy(() => import("./pages/OnboardingExternal"));
+const Docs = lazy(() => import("./pages/Docs"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -79,6 +80,7 @@ function App() {
                   }
                 />
                 <Route path="/api-docs" element={<ApiDocs />} />
+                <Route path="/docs/*" element={<Docs />} />
                 <Route
                   path="/onboarding/external"
                   element={

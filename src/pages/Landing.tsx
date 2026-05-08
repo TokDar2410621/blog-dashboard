@@ -134,6 +134,7 @@ export default function Landing() {
           <nav className="flex items-center gap-6">
             <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
             <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
+            <Link to="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
             <Link to="/login" className="text-sm text-zinc-400 hover:text-white">Connexion</Link>
             <Link to="/login">
               <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200">
@@ -607,9 +608,11 @@ export default function Landing() {
               </p>
             </div>
             <div className="flex flex-wrap gap-6 items-start">
-              <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
-              <Link to="/login" className="hover:text-zinc-100">Connexion</Link>
+              <Link to="/docs" className="hover:text-zinc-100">Documentation</Link>
+              <Link to="/api-docs" className="hover:text-zinc-100">API REST</Link>
               <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
+              <Link to="/login" className="hover:text-zinc-100">Connexion</Link>
+              <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
               <a
                 href="https://github.com/TokDar2410621/blog-dashboard"
                 target="_blank"
