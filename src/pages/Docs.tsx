@@ -76,6 +76,7 @@ const NAV: { label: string; slug: string; section?: boolean }[] = [
   { label: "Plans, crédits et quotas", slug: "plans-credits" },
   { label: "Multi-domaines (Agence)", slug: "multi-domain" },
   { label: "API REST publique", slug: "api" },
+  { label: "Intégrations (MCP, n8n)", slug: "integrations" },
 
   { label: "Recettes pratiques", slug: "use-cases", section: true },
   { label: "10 use cases", slug: "use-cases" },

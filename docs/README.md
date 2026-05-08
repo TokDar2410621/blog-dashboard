@@ -26,6 +26,7 @@ SaaS SEO bilingue FR-CA pour les PME québécoises. Génère, audit, publie et s
 - [Plans, crédits et quotas](plans-credits.md) - Essai, Solo, Pro, Agence, Enterprise + crédits à la pièce
 - [Comparaison multi-domaines](multi-domain.md) - Agence : tableau cross-sites + rapports white-label
 - [API REST publique](api.md) - automation via n8n, Zapier, Make ou tes propres scripts
+- [Intégrations & automatisations](integrations.md) - Claude Desktop / Cursor (MCP) + node n8n communautaire
 
 ## Recettes pratiques
 
