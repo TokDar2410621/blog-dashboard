@@ -162,3 +162,151 @@ Détecte et remplace en live ~50 termes France-spécifiques par leurs équivalen
 Tes lecteurs québécois remarquent IMMÉDIATEMENT les termes France-spécifiques (effet "site touriste"). Le lexique élimine ce signal.
 
 Liste éditable + extensible : Site Settings → Lexique → ajouter tes termes propres au métier.
+
+## Détection de cannibalisation (standalone)
+
+**Sidebar → Cannibalisation** (ou `POST /api/sites/<id>/cannibalization/`)
+
+Détecte les paires d'articles publiés qui se cannibalisent (rivalisent pour le même mot-clé Google). L'algo combine :
+
+- **Jaccard** sur les tokens du titre (similarité 0-1)
+- **SequenceMatcher** sur les slugs (similarité 0-1)
+- **Same language filter** : seuls les articles dans la même langue sont comparés
+
+Output : liste de paires avec score > 50 % de similarité, classées par sévérité. Pour chaque paire :
+- Choix recommandé : merge (garder le plus performant + 301 l'autre) ou différencier (réécrire un des deux pour cibler un keyword distinct)
+
+Différent de l'anti-cannibalisation **PRÉ-génération** qui empêche d'écrire un nouvel article trop similaire. Celui-ci nettoie l'historique.
+
+## Hreflang check
+
+**Sidebar → Hreflang check** (sites avec multilingue activé)
+
+Crawl tes articles publiés et vérifie l'intégrité des liens hreflang :
+- Toutes les pages d'un `translation_group` se réfèrent les unes les autres ?
+- Les codes hreflang sont valides (`fr-CA`, `en`, `es`...) ?
+- `x-default` défini ?
+- Pas de boucle / référence morte ?
+
+Score 0-100 + liste des erreurs avec correctifs suggérés.
+
+Pour les détails sur le multilingue : [Articles multilingues + hreflang](translation.md).
+
+## Page Speed Insights
+
+**Sidebar → Page Speed** ou `POST /api/page-speed/ {url}`
+
+Hit Google PageSpeed Insights API pour une URL de ton site. Récupère :
+- Score Performance (0-100, mobile + desktop)
+- Core Web Vitals : LCP, FID/INP, CLS
+- Suggestions d'optimisation Google : compress images, defer JS, reduce server response time, etc.
+- Lighthouse audits détaillés
+
+Coût : gratuit (Google PageSpeed API n'a pas de quota à notre échelle).
+
+Use case : audit hebdomadaire de ta home + 5-10 articles top-trafic. Repère les régressions de perf.
+
+## Backlinks
+
+**Sidebar → Backlinks** ou `POST /api/backlinks/ {url}`
+
+Découverte des backlinks vers ton site via :
+- Bing Webmaster API (si compte connecté)
+- Common Crawl Index (free, mais latence 1-3 mois)
+- Source agrégée Serper "site:" + "link:" queries
+
+Pour chaque backlink détecté :
+- Domaine source
+- URL exacte
+- Anchor text
+- Date de crawl
+- DR estimé (Domain Rating, basé sur ouvert source si pas Ahrefs)
+
+**Limite** : pas aussi exhaustif qu'Ahrefs / Majestic / SEMrush (qui crawlent eux-mêmes le web). Pour un audit backlinks pro, utilise Ahrefs en complément.
+
+Use case principal : surveillance des nouveaux backlinks (alertes quand un nouveau domaine link vers toi → opportunité de remerciement / partenariat).
+
+## Plagiarism check (Originality.ai)
+
+**Articles → un article → bouton "Vérifier originalité"** ou `POST /api/plagiarism-check/ {content}`
+
+Pousse ton contenu vers Originality.ai et récupère :
+- **Score originalité** (0-100, 100 = unique)
+- **AI detection** (probabilité que le texte soit IA-généré)
+- **Plagiat trouvé** : sources qui matchent (URL + % de similarité)
+
+Coût : ~0.01$/1000 mots. Désactivable dans Site Settings → Editor → "Disable plagiarism check".
+
+Important : le seuil "AI detection" donné par Originality est NON déterminant pour Google. Google ne pénalise pas l'IA en soi (Helpful Content Update). Mais si Originality flag > 80 % AI, c'est souvent un signal que ton contenu est trop générique → réécriture recommandée.
+
+## Readability check
+
+**Articles → un article → onglet "Lisibilité"** ou `POST /api/readability/ {content, language}`
+
+Score de lisibilité :
+- **Français** : Kandel-Moles (équivalent Flesch pour le FR)
+- **Anglais** : Flesch Reading Ease
+
+Échelle :
+- 90-100 : très facile (5e année primaire)
+- 60-69 : facile (12-14 ans)
+- 30-49 : moyen (universitaire)
+- 0-29 : difficile (académique)
+
+Cible idéale pour blog grand public : 60-80. Pour B2B technique : 30-50 acceptable.
+
+Le score est calculé sur :
+- Longueur moyenne des phrases
+- Longueur moyenne des mots
+- Complexité lexicale (mots > 3 syllabes)
+
+Suggestions : si score < 30, l'IA peut reformuler les paragraphes les plus complexes pour les simplifier sans perdre le sens.
+
+## Tags generation auto
+
+**PostEditor → bouton "Générer les tags"** ou `POST /api/generate-tags/ {content}`
+
+L'IA suggère 4-6 tags pertinents pour l'article basé sur son contenu. Évite les tags trop génériques ("blog", "article") et privilégie les concepts spécifiques.
+
+Use case : workflow d'écriture rapide où tu écris l'article puis fais générer titre + excerpt + tags + cover image en 30 sec total.
+
+## SEO synonymes
+
+**PostEditor → sélection texte → bouton "Synonymes"** ou `POST /api/seo-synonyms/ {term, language}`
+
+Suggère 5-10 synonymes pour un mot-clé donné, dans le contexte de ton article. Préserve l'intent SEO :
+- Variations sémantiques proches
+- Termes connexes / LSI keywords
+- Évite la répétition mécanique
+
+Use case : tu remarques que tu utilises "CRM" 47 fois dans ton article. Sélectionne CRM → synonymes → propose "logiciel client", "gestion relation client", "outil de pipeline ventes" pour varier.
+
+## Endpoints API liste complète
+
+Pour automatisation, tous les outils SEO ont leur endpoint :
+
+| Tool | Endpoint |
+|---|---|
+| Audit per article | `POST /api/seo-audit/` |
+| Audit fix | `POST /api/seo-fix/` |
+| Audit bulk | `POST /api/sites/<id>/audit-all/` |
+| Brief de contenu | `POST /api/v1/brief/` |
+| Cannibalisation | `POST /api/sites/<id>/cannibalization/` |
+| Hreflang check | `POST /api/hreflang-check/` |
+| Page speed | `POST /api/page-speed/` |
+| Backlinks | `POST /api/backlinks/` |
+| Plagiarism | `POST /api/plagiarism-check/` |
+| Readability | `POST /api/readability/` |
+| Generate tags | `POST /api/generate-tags/` |
+| SEO synonyms | `POST /api/seo-synonyms/` |
+| Lexicon check | `POST /api/lexicon-check/` |
+| Image SEO suggest | `POST /api/image-suggest/` |
+| Link suggestions | `POST /api/sites/<id>/link-suggestions/` |
+| Content decay | `GET /api/sites/<id>/content-decay/` |
+| Topic clusters | `GET /api/sites/<id>/topic-clusters/` |
+| Link graph | `GET /api/sites/<id>/link-graph/` |
+| Broken links | `GET /api/sites/<id>/broken-links/` |
+| Redirects CRUD | `GET/POST /api/sites/<id>/redirects/` |
+| Weekly digest | `GET /api/v1/sites/<id>/digest/weekly/` |
+
+Tous nécessitent JWT (interne) ou Bearer (API publique pour les v1) sauf sitemap/rss.

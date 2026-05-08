@@ -51,6 +51,7 @@ const NAV: { label: string; slug: string; section?: boolean }[] = [
   { label: "Démarrer", slug: "", section: true },
   { label: "Vue d'ensemble", slug: "" },
   { label: "Démarrage rapide", slug: "getting-started" },
+  { label: "Référence Site Settings", slug: "site-settings" },
 
   { label: "Connecter ton site", slug: "connect", section: true },
   { label: "Comparaison des modes", slug: "connect" },
@@ -62,15 +63,27 @@ const NAV: { label: string; slug: string; section?: boolean }[] = [
 
   { label: "Workflows", slug: "generate-article", section: true },
   { label: "Générer un article", slug: "generate-article" },
-  { label: "Outils SEO", slug: "seo-tools" },
+  { label: "Éditeur d'articles", slug: "editor" },
+  { label: "Articles multilingues", slug: "translation" },
+  { label: "Gestion des images", slug: "images" },
+
+  { label: "Outils SEO", slug: "seo-tools", section: true },
+  { label: "Outils SEO complets", slug: "seo-tools" },
+  { label: "Outils de recherche", slug: "research" },
+  { label: "Google Search Console", slug: "gsc" },
 
   { label: "Compte et facturation", slug: "plans-credits", section: true },
   { label: "Plans, crédits et quotas", slug: "plans-credits" },
+  { label: "Multi-domaines (Agence)", slug: "multi-domain" },
   { label: "API REST publique", slug: "api" },
+
+  { label: "Recettes pratiques", slug: "use-cases", section: true },
+  { label: "10 use cases", slug: "use-cases" },
 
   { label: "Aide", slug: "faq", section: true },
   { label: "FAQ", slug: "faq" },
   { label: "Dépannage", slug: "troubleshooting" },
+  { label: "Changelog", slug: "changelog" },
 ];
 
 function rewriteRelativeLink(href: string): string {
