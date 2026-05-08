@@ -546,6 +546,71 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Integrations */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 py-24 border-t border-white/5">
+        <Reveal>
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono mb-4">
+              <Zap className="h-3 w-3" />
+              Intégrations
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
+              Génère des articles depuis n'importe où
+            </h2>
+            <p className="mt-4 text-lg text-zinc-400 max-w-2xl mx-auto">
+              MCP server, node n8n, API REST. Branche Blog Dashboard à ton workflow et
+              automatise la génération sans écrire une ligne de code custom.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal>
+          <div className="grid sm:grid-cols-3 gap-4">
+            <Link
+              to="/docs/integrations"
+              className="group rounded-xl border border-white/10 p-6 hover:border-emerald-500/40 motion-safe:transition-all"
+            >
+              <Layers className="h-6 w-6 text-emerald-400 mb-3" />
+              <div className="font-semibold text-zinc-100 mb-1">Claude / Cursor (MCP)</div>
+              <p className="text-sm text-zinc-500">
+                10 tools dans Claude Desktop, Claude Code, Cursor. "Génère un article sur
+                X" et c'est fait.
+              </p>
+              <div className="mt-3 text-xs text-emerald-400 inline-flex items-center gap-1 group-hover:gap-2 motion-safe:transition-all">
+                Voir le guide <ArrowRight className="h-3 w-3" />
+              </div>
+            </Link>
+            <Link
+              to="/docs/integrations"
+              className="group rounded-xl border border-white/10 p-6 hover:border-emerald-500/40 motion-safe:transition-all"
+            >
+              <Zap className="h-6 w-6 text-emerald-400 mb-3" />
+              <div className="font-semibold text-zinc-100 mb-1">n8n communautaire</div>
+              <p className="text-sm text-zinc-500">
+                Node officiel : Article, Audit, Brief, Keywords, Sites. Schedule trigger →
+                article publié, sans toucher au code.
+              </p>
+              <div className="mt-3 text-xs text-emerald-400 inline-flex items-center gap-1 group-hover:gap-2 motion-safe:transition-all">
+                Voir le guide <ArrowRight className="h-3 w-3" />
+              </div>
+            </Link>
+            <Link
+              to="/api-docs"
+              className="group rounded-xl border border-white/10 p-6 hover:border-emerald-500/40 motion-safe:transition-all"
+            >
+              <Link2 className="h-6 w-6 text-emerald-400 mb-3" />
+              <div className="font-semibold text-zinc-100 mb-1">API REST</div>
+              <p className="text-sm text-zinc-500">
+                Bearer token, JSON. Zapier, Make, GitHub Actions, scripts maison. 30
+                req/h Pro, 200 req/h Agence.
+              </p>
+              <div className="mt-3 text-xs text-emerald-400 inline-flex items-center gap-1 group-hover:gap-2 motion-safe:transition-all">
+                Référence API <ArrowRight className="h-3 w-3" />
+              </div>
+            </Link>
+          </div>
+        </Reveal>
+      </section>
+
       {/* FAQ */}
       <section className="relative z-10 max-w-3xl mx-auto px-6 py-24 border-t border-white/5">
         <Reveal>
@@ -610,6 +675,7 @@ export default function Landing() {
             <div className="flex flex-wrap gap-6 items-start">
               <Link to="/docs" className="hover:text-zinc-100">Documentation</Link>
               <Link to="/api-docs" className="hover:text-zinc-100">API REST</Link>
+              <Link to="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
               <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
               <Link to="/login" className="hover:text-zinc-100">Connexion</Link>
               <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
