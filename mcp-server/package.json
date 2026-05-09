@@ -1,7 +1,7 @@
 {
-  "name": "@blog-dashboard/mcp-server",
+  "name": "@gridar/mcp-server",
   "version": "0.1.0",
-  "description": "Model Context Protocol server for Blog Dashboard - generate, audit, and publish SEO articles from Claude Code, Cursor, or any MCP-compatible client.",
+  "description": "Model Context Protocol server for Gridar - generate, audit, and publish SEO articles from Claude Code, Cursor, or any MCP-compatible client.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/TokDar2410621/blog-dashboard",
@@ -12,7 +12,7 @@
   },
   "keywords": ["mcp", "model-context-protocol", "claude", "cursor", "seo", "blog", "ai"],
   "bin": {
-    "blog-dashboard-mcp": "dist/index.js"
+    "gridar-mcp": "dist/index.js"
   },
   "files": ["dist", "README.md"],
   "scripts": {

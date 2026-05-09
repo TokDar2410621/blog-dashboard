@@ -8,7 +8,7 @@ const TOKEN = process.env.BLOG_DASHBOARD_TOKEN;
 if (!TOKEN) {
   // eslint-disable-next-line no-console
   console.error(
-    "[blog-dashboard-mcp] BLOG_DASHBOARD_TOKEN env var is required.\n" +
+    "[gridar-mcp] BLOG_DASHBOARD_TOKEN env var is required.\n" +
       "Generate one at https://blog-dashboard-ebon.vercel.app/account/api-keys " +
       "and pass it via your MCP client config (e.g. Claude Desktop config.json)."
   );
@@ -35,7 +35,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${TOKEN}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@blog-dashboard/mcp-server/0.1.0",
+    "User-Agent": "@gridar/mcp-server/0.1.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 

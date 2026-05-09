@@ -314,7 +314,7 @@ function zodFieldToJsonSchema(field: z.ZodTypeAny): Record<string, unknown> {
 
 const server = new Server(
   {
-    name: "blog-dashboard-mcp",
+    name: "gridar-mcp",
     version: "0.1.0",
   },
   {
@@ -390,4 +390,4 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 
 // eslint-disable-next-line no-console
-console.error("[blog-dashboard-mcp] connected (stdio)");
+console.error("[gridar-mcp] connected (stdio)");
