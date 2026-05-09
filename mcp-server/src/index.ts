@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Blog Dashboard MCP server.
+ * Gridar MCP server.
  *
- * Exposes the Blog Dashboard REST API as Model Context Protocol tools so any
+ * Exposes the Gridar REST API as Model Context Protocol tools so any
  * MCP-compatible client (Claude Desktop, Claude Code, Cursor, Continue, ...)
  * can generate, audit and publish SEO articles inside its own conversation.
  */
@@ -151,21 +151,21 @@ interface ToolDef<S extends z.ZodTypeAny = z.ZodTypeAny> {
 
 const tools: ToolDef[] = [
   {
-    name: "blog_dashboard_get_me",
+    name: "gridar_get_me",
     description:
       "Return the authenticated user's plan, current monthly article quota and remaining usage.",
     schema: NoArgs,
     handler: () => getMe(),
   },
   {
-    name: "blog_dashboard_list_sites",
+    name: "gridar_list_sites",
     description:
       "List the sites belonging to the user (id, domain, hosting mode, default language).",
     schema: NoArgs,
     handler: () => listSites(),
   },
   {
-    name: "blog_dashboard_list_articles",
+    name: "gridar_list_articles",
     description:
       "List articles on a given site. Optional filters: status, language, limit.",
     schema: ListArticlesArgs,
@@ -177,14 +177,14 @@ const tools: ToolDef[] = [
       }),
   },
   {
-    name: "blog_dashboard_get_article",
+    name: "gridar_get_article",
     description:
       "Return the full content (HTML + metadata) of a single article identified by site_id and slug.",
     schema: GetArticleArgs,
     handler: (input) => getArticle(input.site_id, input.slug),
   },
   {
-    name: "blog_dashboard_generate_article",
+    name: "gridar_generate_article",
     description:
       "Generate a new SEO-optimized article on the given site. Consumes one article from the user's monthly quota (or one credit). Returns the generated content and the new total post count.",
     schema: GenerateArticleArgs,
@@ -194,35 +194,35 @@ const tools: ToolDef[] = [
     },
   },
   {
-    name: "blog_dashboard_audit_article",
+    name: "gridar_audit_article",
     description:
       "Run the SEO auditor on raw content. Returns a 0-100 score plus actionable suggestions (length, keyword density, headings, links, meta).",
     schema: AuditArticleArgs,
     handler: (input) => auditArticle(input),
   },
   {
-    name: "blog_dashboard_get_brief",
+    name: "gridar_get_brief",
     description:
       "Build a content brief for a target keyword: search intent, outline, entities to cover, FAQ candidates, E-E-A-T signals.",
     schema: GetBriefArgs,
     handler: (input) => getBrief(input),
   },
   {
-    name: "blog_dashboard_list_keywords",
+    name: "gridar_list_keywords",
     description:
       "List the tracked keywords for a site with their latest recorded ranking.",
     schema: SiteIdOnly,
     handler: (input) => listKeywords(input.site_id),
   },
   {
-    name: "blog_dashboard_snapshot_keywords",
+    name: "gridar_snapshot_keywords",
     description:
       "Trigger a fresh ranking snapshot for all tracked keywords on a site. Returns the count of positions recorded.",
     schema: SiteIdOnly,
     handler: (input) => snapshotKeywords(input.site_id),
   },
   {
-    name: "blog_dashboard_weekly_digest",
+    name: "gridar_weekly_digest",
     description:
       "Return the weekly digest for a site (traffic, ranking, content decay) over the last 7 days.",
     schema: SiteIdOnly,
@@ -372,7 +372,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
         content: [
           {
             type: "text",
-            text: `Blog Dashboard API error (HTTP ${err.status}): ${err.message}\n\n${JSON.stringify(err.body ?? {}, null, 2)}`,
+            text: `Gridar API error (HTTP ${err.status}): ${err.message}\n\n${JSON.stringify(err.body ?? {}, null, 2)}`,
           },
         ],
         isError: true,

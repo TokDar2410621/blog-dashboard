@@ -24,16 +24,16 @@ Les trois utilisent le même token `btb_xxx` (Account → API keys) et consommen
 
 | Tool | Usage |
 |---|---|
-| `blog_dashboard_get_me` | Plan + quota mensuel restant |
-| `blog_dashboard_list_sites` | Tes sites connectés |
-| `blog_dashboard_list_articles` | Articles d'un site |
-| `blog_dashboard_get_article` | Contenu d'un article |
-| `blog_dashboard_generate_article` | **Génère un article (1 quota)** |
-| `blog_dashboard_audit_article` | Score SEO + suggestions |
-| `blog_dashboard_get_brief` | Brief de contenu (intent, plan, FAQ) |
-| `blog_dashboard_list_keywords` | Mots-clés trackés |
-| `blog_dashboard_snapshot_keywords` | Snapshot des positions |
-| `blog_dashboard_weekly_digest` | Digest hebdo |
+| `gridar_get_me` | Plan + quota mensuel restant |
+| `gridar_list_sites` | Tes sites connectés |
+| `gridar_list_articles` | Articles d'un site |
+| `gridar_get_article` | Contenu d'un article |
+| `gridar_generate_article` | **Génère un article (1 quota)** |
+| `gridar_audit_article` | Score SEO + suggestions |
+| `gridar_get_brief` | Brief de contenu (intent, plan, FAQ) |
+| `gridar_list_keywords` | Mots-clés trackés |
+| `gridar_snapshot_keywords` | Snapshot des positions |
+| `gridar_weekly_digest` | Digest hebdo |
 
 ### Installation Claude Desktop
 
@@ -53,7 +53,7 @@ Les trois utilisent le même token `btb_xxx` (Account → API keys) et consommen
 }
 ```
 
-Redémarre Claude Desktop. Demande lui : "*liste mes sites Gridar*" → tu vois `blog_dashboard_list_sites` se déclencher.
+Redémarre Claude Desktop. Demande lui : "*liste mes sites Gridar*" → tu vois `gridar_list_sites` se déclencher.
 
 ### Installation Claude Code
 
@@ -71,7 +71,7 @@ claude mcp add gridar \
 
 > **Toi :** Génère un article guide sur "meilleur CRM pour PME québécoises" pour le site 12, en français, 1500 mots, avec une FAQ.
 >
-> **Claude :** *(appelle `blog_dashboard_get_brief` pour récupérer un plan, puis `blog_dashboard_generate_article`)*
+> **Claude :** *(appelle `gridar_get_brief` pour récupérer un plan, puis `gridar_generate_article`)*
 >
 > Article généré ! Score SEO : 87/100. Quota restant ce mois : 47/60.
 

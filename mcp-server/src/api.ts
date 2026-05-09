@@ -1,4 +1,4 @@
-/** Thin HTTP client for the Blog Dashboard REST API. */
+/** Thin HTTP client for the Gridar REST API. */
 
 const API_BASE =
   process.env.BLOG_DASHBOARD_API_BASE || "https://api.blog-dashboard.ca/api/v1";

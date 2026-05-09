@@ -9,7 +9,7 @@ describe("Authentication", () => {
   it("should show login page when not authenticated", () => {
     cy.visit("/");
     cy.url().should("include", "/login");
-    cy.contains("Blog Dashboard").should("be.visible");
+    cy.contains("Gridar").should("be.visible");
   });
 
   it("should login successfully with valid credentials", () => {

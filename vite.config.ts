@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
       manifest: {
-        name: 'Blog Dashboard',
-        short_name: 'BlogDash',
-        description: 'Multi-site blog management dashboard',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        name: 'Gridar',
+        short_name: 'Gridar',
+        description: 'SEO content on autopilot for Quebec PMEs',
+        theme_color: '#10b981',
+        background_color: '#0a0a0a',
         display: 'standalone',
         start_url: '/',
         icons: [
