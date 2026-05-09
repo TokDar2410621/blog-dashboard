@@ -116,6 +116,50 @@ export async function login(username: string, password: string): Promise<LoginRe
   return loginResponseSchema.parse(data);
 }
 
+/** Check whether an email is already registered. Used by the lazy-registration
+ *  flow on /login: email-first, then ask for password (login) OR
+ *  password+confirm (signup) based on this check. */
+export async function checkEmail(email: string): Promise<{ exists: boolean }> {
+  const res = await fetch(`${BACKEND_URL}/auth/check-email/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    let detail = "Validation failed";
+    try {
+      const body = await res.json();
+      detail = body.error || detail;
+    } catch { /* ignore */ }
+    throw new ApiError(detail, res.status, "EMAIL_CHECK_FAILED");
+  }
+  return res.json();
+}
+
+/** Create a new account with email + password. Returns the JWT pair on
+ *  success (HTTP 201). Backend uses the email as the Django username. */
+export async function register(email: string, password: string): Promise<LoginResponse> {
+  const res = await fetch(`${BACKEND_URL}/auth/register/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    let detail = "Registration failed";
+    let code = "REGISTRATION_FAILED";
+    try {
+      const body = await res.json();
+      detail = body.error || detail;
+      if (body.email_exists) code = "EMAIL_EXISTS";
+    } catch { /* ignore */ }
+    throw new ApiError(detail, res.status, code);
+  }
+  const data = await res.json();
+  return loginResponseSchema.parse(data);
+}
+
 /** Exchange an OAuth `code` (from Google or GitHub) for our JWT cookie pair. */
 export async function socialLogin(
   provider: "google" | "github",
