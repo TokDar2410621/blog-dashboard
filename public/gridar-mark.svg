@@ -1,8 +1,0 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-label="Gridar">
-  <path
-    fill="#10b981"
-    fill-rule="evenodd"
-    d="M50 4L90 27L90 73L50 96L10 73L10 27ZM50 22L26 36L26 64L50 78L74 64L74 56L56 56L56 47L74 47L74 36Z"
-  />
-  <polygon fill="#10b981" points="40,62 50,44 60,62" />
-</svg>

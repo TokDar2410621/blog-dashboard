@@ -1,26 +1,22 @@
-/** Gridar brand mark — geometric "G" with hidden upward arrow in negative space.
- *  Single-color SVG, takes its color from currentColor so you can tint it via
- *  Tailwind text-* utilities (e.g. text-emerald-500). */
+/** Gridar brand mark — geometric "G" with subtle arrow integration.
+ *  Sourced from the Canva design (G1 candidate). The PNG ships with a
+ *  transparent background, so it sits cleanly on any bg color. */
+
 type Props = {
   className?: string;
+  size?: number;
 };
 
-export function GridarMark({ className = "h-5 w-5" }: Props) {
+export function GridarMark({ className = "h-5 w-5", size }: Props) {
   return (
-    <svg
-      viewBox="0 0 100 100"
-      xmlns="http://www.w3.org/2000/svg"
+    <img
+      src="/brand/gridar-mark-256.png"
+      alt="Gridar"
+      width={size}
+      height={size}
       className={className}
-      aria-label="Gridar"
-      role="img"
-    >
-      <path
-        fill="currentColor"
-        fillRule="evenodd"
-        d="M50 4L90 27L90 73L50 96L10 73L10 27ZM50 22L26 36L26 64L50 78L74 64L74 56L56 56L56 47L74 47L74 36Z"
-      />
-      <polygon fill="currentColor" points="40,62 50,44 60,62" />
-    </svg>
+      decoding="async"
+    />
   );
 }
 
