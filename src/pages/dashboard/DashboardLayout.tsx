@@ -3,7 +3,8 @@ import { Routes, Route } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { Loader2, Newspaper } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { GridarMark } from "@/components/GridarMark";
 
 // Lazy-load every dashboard page so they ship as their own chunks.
 const Overview = lazy(() => import("./Overview"));
@@ -37,7 +38,7 @@ export default function DashboardLayout() {
         {/* Mobile-only top bar so users can reach the sidebar (offcanvas) */}
         <header className="md:hidden sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border/50 bg-background/95 backdrop-blur px-3">
           <SidebarTrigger />
-          <Newspaper className="h-4 w-4 text-primary" />
+          <GridarMark className="h-4 w-4 text-primary" />
           <span className="font-semibold text-sm">Gridar</span>
         </header>
         <div className="p-4 md:p-6">

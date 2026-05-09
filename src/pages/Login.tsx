@@ -7,7 +7,8 @@ import { login } from "@/lib/api-client";
 import { setTokens, getToken } from "@/lib/sites";
 import { useAuth } from "@/hooks/useAuth";
 import { getApiErrorMessage } from "@/lib/api-errors";
-import { Loader2, Newspaper, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -69,7 +70,7 @@ export default function Login() {
         <div className="relative w-full max-w-sm space-y-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Newspaper className="h-7 w-7 text-emerald-400" />
+              <GridarMark className="h-7 w-7 text-emerald-400" />
               <span className="font-bold text-xl tracking-tight">
                 Gridar
               </span>

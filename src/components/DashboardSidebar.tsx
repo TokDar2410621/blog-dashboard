@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
+import { GridarMark } from "@/components/GridarMark";
 import {
   LayoutDashboard,
   FileText,
@@ -24,7 +25,6 @@ import {
   Settings,
   ArrowLeft,
   LogOut,
-  Newspaper,
   Languages,
   TrendingUp,
   TrendingDown,
@@ -74,7 +74,7 @@ export function DashboardSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <Newspaper className="h-6 w-6 text-primary" />
+          <GridarMark className="h-6 w-6 text-primary" />
           <div className="min-w-0">
             <p className="font-semibold text-sm truncate">{t("sidebar.appName")}</p>
             <p className="text-xs text-muted-foreground truncate">

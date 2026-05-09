@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GridarMark } from "@/components/GridarMark";
 import {
   Dialog,
   DialogContent,
@@ -154,7 +155,7 @@ export default function SiteSelector() {
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Newspaper className="h-8 w-8 text-primary" />
+            <GridarMark className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold">{t("sites.title")}</h1>
           </div>
           <p className="text-muted-foreground">

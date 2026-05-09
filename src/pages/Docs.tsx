@@ -15,7 +15,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { ArrowLeft, BookOpen, ExternalLink, Newspaper } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink } from "lucide-react";
+import { GridarMark } from "@/components/GridarMark";
 import { Button } from "@/components/ui/button";
 
 // Load every doc at build time as raw string.
@@ -134,7 +135,7 @@ export default function Docs() {
           </Button>
           <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-2">
-            <Newspaper className="h-5 w-5 text-primary" />
+            <GridarMark className="h-5 w-5 text-primary" />
             <span className="font-semibold">Gridar</span>
             <span className="text-muted-foreground hidden sm:inline">/ Docs</span>
           </div>

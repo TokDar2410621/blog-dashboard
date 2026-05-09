@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import ProductMockup3D from "@/components/ProductMockup3D";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
+import { GridarMark } from "@/components/GridarMark";
 import {
   Sparkles,
   Languages,
@@ -128,7 +129,7 @@ export default function Landing() {
       <header className="relative z-20 border-b border-white/5 backdrop-blur-xl bg-zinc-950/70 sticky top-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Newspaper className="h-5 w-5 text-emerald-400" />
+            <GridarMark className="h-5 w-5 text-emerald-400" />
             <span className="font-semibold tracking-tight">Gridar</span>
           </div>
           <nav className="flex items-center gap-6">
@@ -664,7 +665,7 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="max-w-md">
               <div className="flex items-center gap-2 mb-3 text-zinc-100">
-                <Newspaper className="h-5 w-5 text-emerald-400" />
+                <GridarMark className="h-5 w-5 text-emerald-400" />
                 <span className="font-semibold">Gridar</span>
               </div>
               <p>
