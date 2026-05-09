@@ -129,8 +129,8 @@ export default function Landing() {
       <header className="relative z-20 border-b border-white/5 backdrop-blur-xl bg-zinc-950/70 sticky top-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <GridarMark className="h-5 w-5 text-emerald-400" />
-            <span className="font-semibold tracking-tight">Gridar</span>
+            <GridarMark className="h-[30px] w-[30px] text-emerald-400" />
+            <span className="font-semibold tracking-tight text-[1.4rem]">Gridar</span>
           </div>
           <nav className="flex items-center gap-6">
             <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
@@ -665,8 +665,8 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div className="max-w-md">
               <div className="flex items-center gap-2 mb-3 text-zinc-100">
-                <GridarMark className="h-5 w-5 text-emerald-400" />
-                <span className="font-semibold">Gridar</span>
+                <GridarMark className="h-[30px] w-[30px] text-emerald-400" />
+                <span className="font-semibold text-[1.4rem]">Gridar</span>
               </div>
               <p>
                 Le SaaS SEO bilingue FR-CA, conçu et opéré au Québec. Pour les PME
