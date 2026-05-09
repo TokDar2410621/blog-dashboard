@@ -4702,9 +4702,21 @@ class BillingPortalView(APIView):
 
 
 class BillingWebhookView(APIView):
-    """POST /billing/webhook/ — Stripe webhook handler.
-    Updates Subscription rows on customer.subscription.{created,updated,deleted}.
-    No auth — verified via Stripe signature.
+    """POST /billing/webhook/ — Stripe webhook endpoint.
+
+    Handles:
+      - customer.subscription.{created,updated,deleted}  → mirror state into Subscription
+      - invoice.payment_failed                           → mark Subscription past_due
+      - invoice.payment_succeeded                        → ensure Subscription active
+      - checkout.session.completed (mode=payment)        → apply purchased credits
+
+    Security: no auth class — request is verified via Stripe's HMAC signature
+    in the Stripe-Signature header. A missing or invalid signature returns 400.
+
+    Reliability: any handler exception is caught + logged but the endpoint
+    still returns 200 to Stripe, so Stripe doesn't retry indefinitely (3-day
+    storm) when the bug is in OUR code. Stripe retries are only useful for
+    transient infra failures, not handler bugs.
     """
     permission_classes = []
 
@@ -4727,6 +4739,22 @@ class BillingWebhookView(APIView):
             logger.warning('Stripe webhook signature failed: %s', e)
             return Response({'error': 'invalid signature'}, status=400)
 
+        event_id = event.get('id', '')
+        event_type = event.get('type', '')
+        logger.info('Stripe webhook received: id=%s type=%s', event_id, event_type)
+
+        try:
+            self._dispatch(event)
+        except Exception as e:
+            # Never propagate handler bugs to Stripe — log and ack 200.
+            logger.exception(
+                'Stripe webhook handler crashed (event=%s type=%s): %s',
+                event_id, event_type, e,
+            )
+
+        return Response({'received': True})
+
+    def _dispatch(self, event):
         event_type = event['type']
         data = event['data']['object']
 
@@ -4735,78 +4763,140 @@ class BillingWebhookView(APIView):
             'customer.subscription.updated',
             'customer.subscription.deleted',
         ):
-            customer_id = data.get('customer')
-            sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
-            if sub_obj:
-                sub_obj.stripe_subscription_id = data.get('id', '')
-                stripe_status = data.get('status', 'active')
-                sub_obj.status = stripe_status
-                sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
-                # Determine plan from price id - check current then legacy envs
-                items = data.get('items', {}).get('data', [])
-                if items:
-                    price_id = items[0].get('price', {}).get('id', '')
-                    matched = False
-                    for plan_key, env_key in PLAN_PRICE_ENV.items():
-                        if os.environ.get(env_key) == price_id:
-                            sub_obj.plan = plan_key
-                            matched = True
-                            break
-                    if not matched:
-                        for plan_key, env_keys in PLAN_PRICE_ENV_LEGACY.items():
-                            if any(os.environ.get(k) == price_id for k in env_keys):
-                                sub_obj.plan = plan_key
-                                matched = True
-                                break
-                # Period end
-                period_end = data.get('current_period_end')
-                if period_end:
-                    from datetime import datetime, timezone as tz
-                    sub_obj.current_period_end = datetime.fromtimestamp(period_end, tz=tz.utc)
-                if event_type == 'customer.subscription.deleted':
-                    sub_obj.plan = 'free'
-                    sub_obj.status = 'canceled'
-                sub_obj.save()
-                logger.info('Stripe webhook updated subscription for user=%s plan=%s status=%s',
-                            sub_obj.user_id, sub_obj.plan, sub_obj.status)
-
+            self._handle_subscription_event(event_type, data)
+        elif event_type == 'invoice.payment_failed':
+            self._handle_invoice_payment_failed(data)
+        elif event_type == 'invoice.payment_succeeded':
+            self._handle_invoice_payment_succeeded(data)
         elif event_type == 'checkout.session.completed':
-            # One-time payment for credits. We identify the user via metadata
-            # (set in BillingCreditsCheckoutView). Subscription checkouts
-            # (mode='subscription') skip this branch since metadata lacks 'pack'.
-            if data.get('mode') == 'payment':
-                metadata = data.get('metadata') or {}
-                pack = metadata.get('pack')
-                user_id = metadata.get('user_id')
-                credits_str = metadata.get('credits')
-                session_id = data.get('id') or ''
-                if not pack or not user_id or not credits_str:
-                    logger.warning(
-                        'Credits checkout webhook missing metadata: %s', metadata
-                    )
-                else:
-                    try:
-                        from django.contrib.auth import get_user_model
-                        UserModel = get_user_model()
-                        user = UserModel.objects.get(id=int(user_id))
-                        from .quota import add_credits
-                        n = int(credits_str)
-                        new_balance = add_credits(
-                            user, n, kind='purchase',
-                            stripe_session_id=session_id,
-                            description=f'Pack {pack}: +{n} crédits',
-                        )
-                        logger.info(
-                            'Credits added: user=%s pack=%s +%d → balance=%d session=%s',
-                            user.id, pack, n, new_balance, session_id,
-                        )
-                    except Exception as e:
-                        logger.exception(
-                            'Failed to apply credits purchase (session=%s): %s',
-                            session_id, e,
-                        )
+            self._handle_checkout_completed(data)
 
-        return Response({'received': True})
+    def _handle_subscription_event(self, event_type, data):
+        customer_id = data.get('customer')
+        sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
+        if not sub_obj:
+            logger.warning(
+                'Stripe sub event for unknown customer_id=%s (event=%s)',
+                customer_id, event_type,
+            )
+            return
+
+        sub_obj.stripe_subscription_id = data.get('id', '')
+        sub_obj.status = data.get('status', 'active')
+        sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
+
+        # Determine plan from price id — check current then legacy envs.
+        items = data.get('items', {}).get('data', [])
+        if items:
+            price_id = items[0].get('price', {}).get('id', '')
+            matched = False
+            for plan_key, env_key in PLAN_PRICE_ENV.items():
+                if os.environ.get(env_key) == price_id:
+                    sub_obj.plan = plan_key
+                    matched = True
+                    break
+            if not matched:
+                for plan_key, env_keys in PLAN_PRICE_ENV_LEGACY.items():
+                    if any(os.environ.get(k) == price_id for k in env_keys):
+                        sub_obj.plan = plan_key
+                        break
+
+        period_end = data.get('current_period_end')
+        if period_end:
+            from datetime import datetime, timezone as tz
+            sub_obj.current_period_end = datetime.fromtimestamp(period_end, tz=tz.utc)
+
+        if event_type == 'customer.subscription.deleted':
+            sub_obj.plan = 'free'
+            sub_obj.status = 'canceled'
+
+        sub_obj.save()
+        logger.info(
+            'Stripe webhook subscription updated: user=%s plan=%s status=%s',
+            sub_obj.user_id, sub_obj.plan, sub_obj.status,
+        )
+
+    def _handle_invoice_payment_failed(self, invoice):
+        """Renewal payment failed (declined card, expired card, etc.).
+
+        Stripe retries for ~3 weeks. We mark the sub past_due immediately so
+        the dashboard can surface a "Update payment method" CTA. The plan
+        tier stays unchanged until the subscription is officially canceled.
+        """
+        customer_id = invoice.get('customer')
+        sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
+        if not sub_obj:
+            return
+        sub_obj.status = 'past_due'
+        sub_obj.save(update_fields=['status'])
+        logger.warning(
+            'Stripe invoice.payment_failed: user=%s amount=%s attempt=%s',
+            sub_obj.user_id,
+            invoice.get('amount_due'),
+            invoice.get('attempt_count'),
+        )
+        # TODO(notif): trigger email "ton paiement a échoué, mets à jour ta carte".
+
+    def _handle_invoice_payment_succeeded(self, invoice):
+        """Successful renewal. Ensure status is 'active' (it should be already
+        via customer.subscription.updated, but this is a belt-and-suspenders).
+        """
+        # Skip the very first invoice that Stripe creates with $0 (subscription_create)
+        # — the subscription event fires at the same time and is the source of truth.
+        if invoice.get('billing_reason') == 'subscription_create':
+            return
+        customer_id = invoice.get('customer')
+        sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
+        if not sub_obj:
+            return
+        if sub_obj.status != 'active':
+            sub_obj.status = 'active'
+            sub_obj.save(update_fields=['status'])
+        logger.info(
+            'Stripe invoice.payment_succeeded: user=%s amount=%s',
+            sub_obj.user_id, invoice.get('amount_paid'),
+        )
+
+    def _handle_checkout_completed(self, session):
+        """One-time payment (credits pack) — apply credits.
+
+        Subscription checkouts (mode='subscription') skip this branch and are
+        instead handled via customer.subscription.created.
+        """
+        if session.get('mode') != 'payment':
+            return
+        metadata = session.get('metadata') or {}
+        pack = metadata.get('pack')
+        user_id = metadata.get('user_id')
+        credits_str = metadata.get('credits')
+        session_id = session.get('id') or ''
+        if not pack or not user_id or not credits_str:
+            logger.warning(
+                'Credits checkout webhook missing metadata: %s', metadata
+            )
+            return
+
+        from django.contrib.auth import get_user_model
+        UserModel = get_user_model()
+        try:
+            user = UserModel.objects.get(id=int(user_id))
+        except UserModel.DoesNotExist:
+            logger.warning('Credits checkout: user_id=%s not found', user_id)
+            return
+
+        from .quota import add_credits
+        n = int(credits_str)
+        # add_credits is idempotent on stripe_session_id (see quota.py) so a
+        # re-delivered webhook will NOT double-credit the user.
+        new_balance = add_credits(
+            user, n, kind='purchase',
+            stripe_session_id=session_id,
+            description=f'Pack {pack}: +{n} crédits',
+        )
+        logger.info(
+            'Credits added: user=%s pack=%s +%d → balance=%d session=%s',
+            user.id, pack, n, new_balance, session_id,
+        )
 
 
 # ==========================================================================
