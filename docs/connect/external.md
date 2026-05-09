@@ -102,7 +102,7 @@ Pour que Google indexe ton blog, il faut que `tonsite.com/sitemap.xml` retourne 
 
 ### 7. Génère un article et teste
 
-Blog Dashboard → Générer un article → publie. Va sur `https://tonsite.com/blog/<slug>` → ton article est rendu avec ton layout.
+Gridar → Générer un article → publie. Va sur `https://tonsite.com/blog/<slug>` → ton article est rendu avec ton layout.
 
 ## Variantes
 

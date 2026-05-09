@@ -1,6 +1,6 @@
 # Recettes pratiques
 
-Scénarios concrets pour utiliser Blog Dashboard. Du débutant à l'agence, du B2C au B2B, du court terme au long terme.
+Scénarios concrets pour utiliser Gridar. Du débutant à l'agence, du B2C au B2B, du court terme au long terme.
 
 ## Recette 1 : Lancer un blog SEO PME en 30 jours
 
@@ -64,7 +64,7 @@ Scénarios concrets pour utiliser Blog Dashboard. Du débutant à l'agence, du B
 
 **Setup (jour 1, ~2h)**
 - Plan Agence (199.99$/mois) - jusqu'à 5 clients
-- Crée un site Blog Dashboard pour le client (slot #N/5)
+- Crée un site Gridar pour le client (slot #N/5)
 - Connecte le CMS du client (WP / Shopify / Webflow selon)
 - Configure Site Settings avec leurs infos (nom, EEAT auteur, knowledge base)
 - Connecte leur GSC (demande accès au client)
@@ -89,7 +89,7 @@ Scénarios concrets pour utiliser Blog Dashboard. Du débutant à l'agence, du B
 - Inclut : exec summary, top 5 articles, mouvement de positions, recommandations
 
 **Marges**
-- Coût Blog Dashboard : 199.99$ + crédits éventuels (~50-100$)
+- Coût Gridar : 199.99$ + crédits éventuels (~50-100$)
 - Tu factures le client : 2000-5000$ minimum
 - Marge : 90 %+ après ton temps
 

@@ -1,6 +1,6 @@
 # Outils SEO
 
-Au-delà de la génération, Blog Dashboard inclut une suite d'outils pour piloter ton SEO en continu. Tous accessibles depuis la sidebar du site.
+Au-delà de la génération, Gridar inclut une suite d'outils pour piloter ton SEO en continu. Tous accessibles depuis la sidebar du site.
 
 ## Brief de contenu
 

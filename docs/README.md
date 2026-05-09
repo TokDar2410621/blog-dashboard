@@ -1,4 +1,4 @@
-# Documentation Blog Dashboard
+# Documentation Gridar
 
 SaaS SEO bilingue FR-CA pour les PME québécoises. Génère, audit, publie et suit tes articles sur WordPress, Shopify, Webflow ou un blog hébergé chez nous, sans changer ta stack.
 

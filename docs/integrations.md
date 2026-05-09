@@ -42,9 +42,9 @@ Les trois utilisent le même token `btb_xxx` (Account → API keys) et consommen
 ```json
 {
   "mcpServers": {
-    "blog-dashboard": {
+    "gridar": {
       "command": "npx",
-      "args": ["-y", "@blog-dashboard/mcp-server"],
+      "args": ["-y", "@gridar/mcp-server"],
       "env": {
         "BLOG_DASHBOARD_TOKEN": "btb_ton_token_ici"
       }
@@ -53,14 +53,14 @@ Les trois utilisent le même token `btb_xxx` (Account → API keys) et consommen
 }
 ```
 
-Redémarre Claude Desktop. Demande lui : "*liste mes sites Blog Dashboard*" → tu vois `blog_dashboard_list_sites` se déclencher.
+Redémarre Claude Desktop. Demande lui : "*liste mes sites Gridar*" → tu vois `blog_dashboard_list_sites` se déclencher.
 
 ### Installation Claude Code
 
 ```bash
-claude mcp add blog-dashboard \
+claude mcp add gridar \
   --env BLOG_DASHBOARD_TOKEN=btb_ton_token \
-  -- npx -y @blog-dashboard/mcp-server
+  -- npx -y @gridar/mcp-server
 ```
 
 ### Installation Cursor
@@ -86,14 +86,14 @@ Pour les workflows visuels récurrents (planification, branchements, multi-étap
 n8n self-hosted → **Settings → Community Nodes → Install** :
 
 ```
-n8n-nodes-blog-dashboard
+n8n-nodes-gridar
 ```
 
 Ou via npm :
 
 ```bash
 cd ~/.n8n/custom
-npm install n8n-nodes-blog-dashboard
+npm install n8n-nodes-gridar
 ```
 
 Redémarre n8n.
@@ -102,8 +102,8 @@ Redémarre n8n.
 
 ### Configuration credentials
 
-1. Dans Blog Dashboard : **Account → API keys** → crée un token.
-2. Dans n8n : **Credentials → New → Blog Dashboard API** → colle le token. Le bouton "Test" hit `/me/` pour valider.
+1. Dans Gridar : **Account → API keys** → crée un token.
+2. Dans n8n : **Credentials → New → Gridar API** → colle le token. Le bouton "Test" hit `/me/` pour valider.
 
 ### Ressources et opérations
 
@@ -120,7 +120,7 @@ Redémarre n8n.
 ```
 Schedule (lundi 8h)
   ↓
-Blog Dashboard (Article: Generate)
+Gridar (Article: Generate)
   site_id: 12
   topic: "Tendances SEO Québec {{ $now.format('MMMM yyyy') }}"
   type: news
@@ -135,7 +135,7 @@ Slack (notifie l'équipe avec l'URL retournée)
 ```
 Webhook (POST /audit-incoming)
   ↓
-Blog Dashboard (Audit: Run)
+Gridar (Audit: Run)
   title: {{ $json.title }}
   content: {{ $json.content }}
   ↓
@@ -148,10 +148,10 @@ IF (score < 70)
 ```
 Schedule (tous les jours 6h)
   ↓
-Blog Dashboard (Keyword: Snapshot)
+Gridar (Keyword: Snapshot)
   site_id: 12
   ↓
-Blog Dashboard (Keyword: List)
+Gridar (Keyword: List)
   site_id: 12
   ↓
 Google Sheets (append rows : keyword, position, date)

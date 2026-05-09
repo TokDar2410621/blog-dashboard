@@ -24,7 +24,7 @@ Avantage business : tu sais quels articles convertissent vs ceux qui sont vus sa
 
 **Site Settings → onglet "Search Console" → bouton "Connecter Google Search Console"**
 
-1. Tu es redirigé vers Google : "Blog Dashboard demande l'accès à ton Search Console"
+1. Tu es redirigé vers Google : "Gridar demande l'accès à ton Search Console"
 2. Coche les permissions demandées : `webmasters.readonly`
 3. Autoriser → retour automatique sur Site Settings
 4. Le champ "Propriété GSC" devient un select avec tes propriétés disponibles
@@ -93,7 +93,7 @@ On demande **uniquement `webmasters.readonly`** (lecture seule). On ne peut pas 
 
 Tu peux révoquer notre accès à n'importe quel moment :
 - Côté nous : Site Settings → Search Console → Déconnecter
-- Côté Google : <https://myaccount.google.com/permissions> → Blog Dashboard → Supprimer l'accès
+- Côté Google : <https://myaccount.google.com/permissions> → Gridar → Supprimer l'accès
 
 ## Refresh token
 

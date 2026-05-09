@@ -1,6 +1,6 @@
 # Générer un article avec l'IA
 
-Le workflow signature de Blog Dashboard. Du sujet à l'article publié sur ton domaine en ~90 secondes, avec audit SEO + maillage interne automatiques.
+Le workflow signature de Gridar. Du sujet à l'article publié sur ton domaine en ~90 secondes, avec audit SEO + maillage interne automatiques.
 
 ## Le formulaire
 

@@ -14,7 +14,7 @@ Pour les boutiques Shopify (tous plans). Articles publiés directement dans `tab
 
 1. Shopify Admin → Settings → **Apps and sales channels**
 2. **Develop apps** (en haut à droite, peut nécessiter d'activer le développement d'app - clique le toggle si demandé)
-3. **Create an app** → nomme-la `Blog Dashboard`
+3. **Create an app** → nomme-la `Gridar`
 4. Onglet **Configuration** → **Admin API integration** → **Configure**
 5. Cherche et coche le scope `write_content` (et/ou `read_content`)
 6. **Save**
@@ -22,7 +22,7 @@ Pour les boutiques Shopify (tous plans). Articles publiés directement dans `tab
 8. Une fenêtre montre le **Admin API access token** (commence par `shpat_`)
 9. **Copie-le immédiatement** - il ne sera plus affiché
 
-### 2. Connecte dans Blog Dashboard
+### 2. Connecte dans Gridar
 
 Sites → **Connecter Shopify**. Tu remplis :
 
@@ -41,7 +41,7 @@ Sites → **Connecter Shopify**. Tu remplis :
 
 ### 4. Comportement après publication
 
-Article généré via Blog Dashboard → `POST admin/api/.../blogs/<id>/articles.json`. URL finale :
+Article généré via Gridar → `POST admin/api/.../blogs/<id>/articles.json`. URL finale :
 - Si tu as un custom domain : `taboutique.com/blogs/news/article-slug`
 - Sinon : `monstore.myshopify.com/blogs/news/article-slug`
 
@@ -63,7 +63,7 @@ L'article respecte le template Liquid de ta boutique - même typo, mêmes header
 ## Limites
 
 - **Pas de catégories** : Shopify a `tags` uniquement (pas de hiérarchie). Notre topic clusters reste calculé en interne mais ne mappe pas à Shopify.
-- **Suppression définitive** : Shopify ne fait pas de soft-delete. Si tu supprimes un article via Blog Dashboard, c'est irréversible côté Shopify.
+- **Suppression définitive** : Shopify ne fait pas de soft-delete. Si tu supprimes un article via Gridar, c'est irréversible côté Shopify.
 - **Custom domain** : on lit le custom domain depuis l'API Shopify et l'utilise pour le branding scan. Si Shopify ne le reporte pas (rare), on utilise `myshopify.com`.
 
 ## Dépannage

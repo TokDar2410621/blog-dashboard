@@ -2,7 +2,7 @@
 
 ## Général
 
-### C'est quoi exactement Blog Dashboard ?
+### C'est quoi exactement Gridar ?
 
 Un SaaS qui combine **génération IA d'articles** + **audit SEO** + **suivi de positions Google** + **publication multi-CMS** dans une seule interface, avec un focus sur le marché québécois (lexique FR-CA, schemas LocalBusiness, géo Google Trends FR-CA).
 
@@ -43,7 +43,7 @@ Oui mais tu dois autoriser nos requêtes. Cloudflare → Security → WAF → Cu
 ### Je peux changer de mode après coup ?
 
 Pas directement. Pour passer de hébergé → WordPress par ex., il faut :
-1. Créer un nouveau site Blog Dashboard en mode WordPress
+1. Créer un nouveau site Gridar en mode WordPress
 2. Migrer les articles via export CSV ou export-import API
 3. Désactiver l'ancien site hébergé
 

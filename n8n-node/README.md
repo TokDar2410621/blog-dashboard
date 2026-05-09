@@ -1,6 +1,6 @@
-# n8n-nodes-blog-dashboard
+# n8n-nodes-gridar
 
-n8n community node for [Blog Dashboard](https://blog-dashboard-ebon.vercel.app).
+n8n community node for [Gridar](https://blog-dashboard-ebon.vercel.app).
 
 Trigger SEO article generation, run audits, build content briefs and track keywords from any n8n workflow.
 
@@ -23,17 +23,17 @@ One node, 5 resources:
 In n8n, go to **Settings -> Community Nodes -> Install** and enter:
 
 ```
-n8n-nodes-blog-dashboard
+n8n-nodes-gridar
 ```
 
 ### Docker / npm
 
 ```bash
 cd ~/.n8n/custom
-npm install n8n-nodes-blog-dashboard
+npm install n8n-nodes-gridar
 ```
 
-Restart n8n. The "Blog Dashboard" node will appear in the node palette.
+Restart n8n. The "Gridar" node will appear in the node palette.
 
 ### n8n Cloud
 
@@ -41,9 +41,9 @@ Community nodes aren't supported on n8n Cloud yet. Use the [MCP server](../mcp-s
 
 ## Setup
 
-1. In Blog Dashboard, go to **Account -> API keys** and generate a token (`btb_xxx`).
-2. In n8n, create new credentials of type "Blog Dashboard API" and paste the token.
-3. Drop the "Blog Dashboard" node into a workflow.
+1. In Gridar, go to **Account -> API keys** and generate a token (`btb_xxx`).
+2. In n8n, create new credentials of type "Gridar API" and paste the token.
+3. Drop the "Gridar" node into a workflow.
 
 ## Example workflows
 
@@ -51,7 +51,7 @@ Community nodes aren't supported on n8n Cloud yet. Use the [MCP server](../mcp-s
 
 ```
 Schedule (Mon 8am)
-  -> Blog Dashboard (Article: Generate)
+  -> Gridar (Article: Generate)
        site_id: 12
        topic: "Tendances SEO Quebec {{ $now.format('MMMM yyyy') }}"
        type: news
@@ -63,7 +63,7 @@ Schedule (Mon 8am)
 
 ```
 Webhook (POST /audit-incoming)
-  -> Blog Dashboard (Audit: Run)
+  -> Gridar (Audit: Run)
        title: {{ $json.title }}
        content: {{ $json.content }}
   -> IF (score < 70)
@@ -74,16 +74,16 @@ Webhook (POST /audit-incoming)
 
 ```
 Schedule (every day 6am)
-  -> Blog Dashboard (Keyword: Snapshot)
+  -> Gridar (Keyword: Snapshot)
        site_id: 12
-  -> Blog Dashboard (Keyword: List)
+  -> Gridar (Keyword: List)
        site_id: 12
   -> Google Sheets (append rankings)
 ```
 
 ## Quotas
 
-This node uses your existing Blog Dashboard plan. `Article -> Generate` consumes 1 article from your monthly quota (or 1 credit). Read operations are free. See [Plans & Credits](https://blog-dashboard-ebon.vercel.app/docs/plans-credits).
+This node uses your existing Gridar plan. `Article -> Generate` consumes 1 article from your monthly quota (or 1 credit). Read operations are free. See [Plans & Credits](https://blog-dashboard-ebon.vercel.app/docs/plans-credits).
 
 ## Development
 
@@ -94,7 +94,7 @@ npm run build
 # Link into local n8n
 npm link
 cd ~/.n8n/custom
-npm link n8n-nodes-blog-dashboard
+npm link n8n-nodes-gridar
 # Then restart n8n
 ```
 

@@ -16,11 +16,11 @@ Pour les sites Webflow ayant une CMS Collection pour les articles. On publie dir
 2. Top-left menu (icône W) → **Project settings**
 3. Onglet **Apps & Integrations**
 4. Section **API access** → **Generate API token**
-5. Nom : `Blog Dashboard`
+5. Nom : `Gridar`
 6. Scopes : coche au minimum `CMS: read and write`
 7. **Generate** → copie le token (long string)
 
-### 2. Connecte dans Blog Dashboard
+### 2. Connecte dans Gridar
 
 Sites → **Connecter Webflow**. 3 étapes :
 

@@ -1,6 +1,6 @@
 # Articles multilingues + hreflang
 
-Blog Dashboard supporte FR, EN et ES sur le même site. Articles traduits sont liés ensemble (via `translation_group`) et déclarés à Google avec `hreflang` pour servir la bonne version selon la géo de l'utilisateur.
+Gridar supporte FR, EN et ES sur le même site. Articles traduits sont liés ensemble (via `translation_group`) et déclarés à Google avec `hreflang` pour servir la bonne version selon la géo de l'utilisateur.
 
 ## Activer le multilingue sur ton site
 
@@ -63,7 +63,7 @@ Score 0-100 + liste des erreurs avec correctifs suggérés.
 | Webflow | ⚠️ Webflow Localization (paid feature). Sans, pas de hreflang multilingue propre. |
 | Externe | ✅ Tu contrôles le rendu, le code généré par notre scaffolder inclut le hreflang. |
 
-Si ton CMS ne gère pas le multilingue nativement (WordPress sans Polylang), notre conseil : **un site Blog Dashboard par langue**, avec des domaines séparés (`tonsite.ca` pour FR, `tonsite.com` pour EN). Plus simple et meilleur SEO global.
+Si ton CMS ne gère pas le multilingue nativement (WordPress sans Polylang), notre conseil : **un site Gridar par langue**, avec des domaines séparés (`tonsite.ca` pour FR, `tonsite.com` pour EN). Plus simple et meilleur SEO global.
 
 ## Lexique FR-CA vs FR-FR
 

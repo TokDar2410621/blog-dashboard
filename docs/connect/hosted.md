@@ -7,13 +7,13 @@ Pour les sites custom (React, Vue, Astro, Next.js, ou n'importe quoi d'autre) qu
 1. Tu nous fournis un sous-domaine où tu veux que ton blog vive (ex : `blog.tonsite.ca`)
 2. Tu ajoutes un CNAME chez ton registrar pointant vers `cname.vercel-dns.com`
 3. Vercel + nous configurons le sous-domaine sur notre infra Next.js
-4. Tu génères des articles depuis Blog Dashboard → ils sont publiés à `blog.tonsite.ca/article-slug`
+4. Tu génères des articles depuis Gridar → ils sont publiés à `blog.tonsite.ca/article-slug`
 
 Les articles vivent dans **notre** Postgres mais sont servis sur **ton domaine** (sous-domaine). Le branding (logo, couleur, fonts) est appliqué automatiquement à partir du scan qu'on a fait au connect.
 
 ## Étapes
 
-### 1. Crée le site dans Blog Dashboard
+### 1. Crée le site dans Gridar
 
 Sites → **Blog clé-en-main**. Tu remplis :
 

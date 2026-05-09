@@ -1,6 +1,6 @@
-# @blog-dashboard/mcp-server
+# @gridar/mcp-server
 
-[Model Context Protocol](https://modelcontextprotocol.io) server for [Blog Dashboard](https://blog-dashboard-ebon.vercel.app).
+[Model Context Protocol](https://modelcontextprotocol.io) server for [Gridar](https://blog-dashboard-ebon.vercel.app).
 
 Generate, audit and publish SEO articles directly from Claude Desktop, Claude Code, Cursor, Continue or any other MCP-compatible client.
 
@@ -39,13 +39,13 @@ Sign in at https://blog-dashboard-ebon.vercel.app and visit **Account -> API key
 The fastest path is `npx`, no install needed:
 
 ```bash
-npx -y @blog-dashboard/mcp-server
+npx -y @gridar/mcp-server
 ```
 
 Or globally:
 
 ```bash
-npm install -g @blog-dashboard/mcp-server
+npm install -g @gridar/mcp-server
 ```
 
 ### 3. Wire it into your MCP client
@@ -57,9 +57,9 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 ```json
 {
   "mcpServers": {
-    "blog-dashboard": {
+    "gridar": {
       "command": "npx",
-      "args": ["-y", "@blog-dashboard/mcp-server"],
+      "args": ["-y", "@gridar/mcp-server"],
       "env": {
         "BLOG_DASHBOARD_TOKEN": "btb_your_token_here"
       }
@@ -73,9 +73,9 @@ Restart Claude Desktop. The 10 tools should now appear.
 #### Claude Code
 
 ```bash
-claude mcp add blog-dashboard \
+claude mcp add gridar \
   --env BLOG_DASHBOARD_TOKEN=btb_your_token_here \
-  -- npx -y @blog-dashboard/mcp-server
+  -- npx -y @gridar/mcp-server
 ```
 
 #### Cursor
@@ -85,9 +85,9 @@ Add to `~/.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "blog-dashboard": {
+    "gridar": {
       "command": "npx",
-      "args": ["-y", "@blog-dashboard/mcp-server"],
+      "args": ["-y", "@gridar/mcp-server"],
       "env": {
         "BLOG_DASHBOARD_TOKEN": "btb_your_token_here"
       }
@@ -101,7 +101,7 @@ Add to `~/.cursor/mcp.json`:
 Any MCP client supporting stdio transport works. Spawn:
 
 ```
-BLOG_DASHBOARD_TOKEN=btb_xxx npx -y @blog-dashboard/mcp-server
+BLOG_DASHBOARD_TOKEN=btb_xxx npx -y @gridar/mcp-server
 ```
 
 ## Configuration
@@ -113,7 +113,7 @@ BLOG_DASHBOARD_TOKEN=btb_xxx npx -y @blog-dashboard/mcp-server
 
 ## Quotas & costs
 
-Tools use your existing Blog Dashboard plan limits:
+Tools use your existing Gridar plan limits:
 
 - `generate_article` consumes 1 article from your monthly quota (or 1 credit if monthly quota is exhausted)
 - `audit_article`, `get_brief` are free

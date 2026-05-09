@@ -1,6 +1,6 @@
 # Outils de recherche
 
-Avant d'écrire un article, tu fais de la recherche : sujets pertinents, mots-clés à cibler, questions que pose l'audience, tendances émergentes, ce que font les concurrents. Blog Dashboard intègre 5 outils de recherche pour brancher tout ça dans le brief avant génération.
+Avant d'écrire un article, tu fais de la recherche : sujets pertinents, mots-clés à cibler, questions que pose l'audience, tendances émergentes, ce que font les concurrents. Gridar intègre 5 outils de recherche pour brancher tout ça dans le brief avant génération.
 
 Tous accessibles depuis l'AIGenerator (panneaux à droite ou via la sidebar).
 

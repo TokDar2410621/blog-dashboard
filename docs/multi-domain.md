@@ -64,7 +64,7 @@ Génère un PDF par site sélectionné, avec :
 
 **White-label** :
 - Agence : ton logo en haut + nom de ton agence dans le footer + ton contact
-- Le client ne voit pas "Blog Dashboard" sauf en mention discrète "Powered by"
+- Le client ne voit pas "Gridar" sauf en mention discrète "Powered by"
 - Customizable dans Site Settings → onglet "White-label" (Agence uniquement)
 
 ## API multi-domain

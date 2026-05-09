@@ -14,14 +14,14 @@ Pour les sites WordPress 5.6+. Aucun plugin requis - on utilise l'**Application 
 
 1. Connecte-toi à `tonsite.ca/wp-admin`
 2. Profil (en haut à droite) → scroll jusqu'à **Application Passwords**
-3. Donne un nom : `Blog Dashboard`
+3. Donne un nom : `Gridar`
 4. Clique **Add New Application Password**
 5. WordPress te montre un mot de passe au format `xxxx xxxx xxxx xxxx xxxx xxxx`
 6. **Copie-le immédiatement** - il ne sera plus affiché
 
 > Tu ne vois pas la section ? Vérifie que tu es en HTTPS (ou ajoute `define('WP_ENVIRONMENT_TYPE', 'local');` dans `wp-config.php` si tu es en HTTP local). Application Passwords est désactivé en HTTP par défaut depuis WP 5.6.
 
-### 2. Connecte dans Blog Dashboard
+### 2. Connecte dans Gridar
 
 Sites → **Connecter WordPress**. Tu remplis :
 
@@ -40,7 +40,7 @@ Si tout passe : confetti emerald + tu arrives au dashboard.
 
 ### 4. Comportement après publication
 
-Quand tu génères un article via Blog Dashboard, on `POST` vers `tonsite.ca/wp-json/wp/v2/posts` avec :
+Quand tu génères un article via Gridar, on `POST` vers `tonsite.ca/wp-json/wp/v2/posts` avec :
 - Titre, slug, contenu (HTML rendu depuis Markdown)
 - Statut `publish` par défaut
 - Excerpt
@@ -52,7 +52,7 @@ L'article apparaît immédiatement sur **ton site** à l'URL définie par ton pe
 
 - **Pas d'images cover automatiques** : le `featured_media` exige un upload séparé en deux étapes (upload media → set as featured). On ne le fait pas pour l'instant. Pour un cover, ajoute une image dans le contenu Markdown.
 - **Lexique FR-CA appliqué au contenu** mais pas aux catégories/tags WordPress (qui restent ce que tu as déjà).
-- **Polylang / WPML** : non supporté - on publie en une seule langue par site. Si tu as un setup multilingue avancé, crée un site Blog Dashboard par langue.
+- **Polylang / WPML** : non supporté - on publie en une seule langue par site. Si tu as un setup multilingue avancé, crée un site Gridar par langue.
 
 ## Dépannage
 
