@@ -128,17 +128,17 @@ export default function Landing() {
       {/* Top nav */}
       <header className="relative z-20 border-b border-white/5 backdrop-blur-xl bg-zinc-950/70 sticky top-0">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <GridarMark className="h-[26px] w-[26px] text-emerald-400" />
-            <span className="font-semibold tracking-tight text-[1.2rem]">Gridar</span>
+          <div className="flex items-center gap-2">
+            <GridarMark className="h-5 w-5 text-emerald-400" />
+            <span className="font-semibold tracking-tight">Gridar</span>
           </div>
           <nav className="flex items-center gap-6">
-            <a href="#features" className="hidden md:inline text-[1.05rem] text-zinc-400 hover:text-white">Fonctionnalités</a>
-            <a href="#pricing" className="hidden md:inline text-[1.05rem] text-zinc-400 hover:text-white">Tarifs</a>
-            <Link to="/docs" className="hidden md:inline text-[1.05rem] text-zinc-400 hover:text-white">Docs</Link>
-            <Link to="/login" className="text-[1.05rem] text-zinc-400 hover:text-white">Connexion</Link>
+            <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
+            <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
+            <Link to="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
+            <Link to="/login" className="text-sm text-zinc-400 hover:text-white">Connexion</Link>
             <Link to="/login">
-              <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200 text-[1.05rem] h-10 px-4">
+              <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200">
                 Commencer
               </Button>
             </Link>
