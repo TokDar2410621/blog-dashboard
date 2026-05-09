@@ -26,10 +26,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',  # required by allauth
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # required by dj-rest-auth JWT
     'corsheaders',
     'django_filters',
+    # Social auth (Google + GitHub login) via django-allauth + dj-rest-auth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.github',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
     'sites_mgmt',
     'blog',
 ]
@@ -44,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',  # required by allauth >= 0.56
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -185,4 +196,79 @@ LOGGING = {
             'propagate': False,
         },
     },
+}
+
+# ---------------------------------------------------------------------------
+# Social authentication (django-allauth + dj-rest-auth + simplejwt)
+# ---------------------------------------------------------------------------
+# We expose two endpoints used by the SPA: /api/auth/google/ and
+# /api/auth/github/. The frontend obtains the OAuth `code` from the provider's
+# redirect, POSTs it here, and we return the same JWT cookies that
+# CookieTokenObtainPairView issues for username/password login.
+
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# Allauth account behaviour. We don't run the allauth UI itself (the SPA owns
+# login/register pages), but allauth's account engine is still what creates the
+# Django user when a social login succeeds.
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_LOGIN_METHODS = {'username', 'email'}
+ACCOUNT_SIGNUP_FIELDS = ['username*', 'email*', 'password1*', 'password2*']
+ACCOUNT_UNIQUE_EMAIL = True
+
+# Auto-create accounts on first social login.
+SOCIALACCOUNT_AUTO_SIGNUP = True
+# Don't redirect on GET (the SPA owns the redirect; we only handle POST with a code).
+SOCIALACCOUNT_LOGIN_ON_GET = False
+# Pre-populate username from the email local part if the provider doesn't give one.
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID', ''),
+            'secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', ''),
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    },
+    'github': {
+        'APP': {
+            'client_id': os.getenv('GITHUB_OAUTH_CLIENT_ID', ''),
+            'secret': os.getenv('GITHUB_OAUTH_CLIENT_SECRET', ''),
+            'key': '',
+        },
+        'SCOPE': ['read:user', 'user:email'],
+    },
+}
+
+# Frontend-served callback URLs the SPA registers with each provider.
+GOOGLE_OAUTH_CALLBACK_URL = os.getenv(
+    'GOOGLE_OAUTH_CALLBACK_URL',
+    'https://gridar.app/auth/google/callback' if not DEBUG
+    else 'http://localhost:5173/auth/google/callback',
+)
+GITHUB_OAUTH_CALLBACK_URL = os.getenv(
+    'GITHUB_OAUTH_CALLBACK_URL',
+    'https://gridar.app/auth/github/callback' if not DEBUG
+    else 'http://localhost:5173/auth/github/callback',
+)
+
+# dj-rest-auth: emit JWT, set the SAME httpOnly cookies that
+# CookieTokenObtainPairView uses, so the rest of the app keeps working.
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'access_token',
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh_token',
+    'JWT_AUTH_HTTPONLY': True,
+    'JWT_AUTH_SECURE': not DEBUG,
+    'JWT_AUTH_SAMESITE': 'Lax',
+    'JWT_AUTH_RETURN_EXPIRATION': True,
+    'SESSION_LOGIN': False,
 }

@@ -18,6 +18,7 @@ const OnboardingExternal = lazy(() => import("./pages/OnboardingExternal"));
 const Docs = lazy(() => import("./pages/Docs"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -85,6 +86,7 @@ function App() {
                 <Route path="/docs/*" element={<Docs />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/auth/:provider/callback" element={<AuthCallback />} />
                 <Route
                   path="/onboarding/external"
                   element={

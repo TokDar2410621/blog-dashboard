@@ -116,6 +116,36 @@ export async function login(username: string, password: string): Promise<LoginRe
   return loginResponseSchema.parse(data);
 }
 
+/** Exchange an OAuth `code` (from Google or GitHub) for our JWT cookie pair. */
+export async function socialLogin(
+  provider: "google" | "github",
+  code: string,
+  redirectUri: string,
+): Promise<LoginResponse> {
+  const res = await fetch(`${BACKEND_URL}/auth/${provider}/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ code, redirect_uri: redirectUri }),
+  });
+  if (!res.ok) {
+    let detail = "OAuth login failed";
+    try {
+      const body = await res.json();
+      detail = body.detail || body.non_field_errors?.[0] || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(detail, res.status, "OAUTH_LOGIN_FAILED");
+  }
+  const data = await res.json();
+  // dj-rest-auth returns { access_token, refresh_token, user, access_expiration, refresh_expiration }
+  return loginResponseSchema.parse({
+    access: data.access_token ?? data.access,
+    refresh: data.refresh_token ?? data.refresh,
+  });
+}
+
 export async function fetchCurrentUser(): Promise<User> {
   const res = await authFetch("/auth/me/");
   if (!res.ok) throw new ApiError("Request failed", res.status, "REQUEST_FAILED");
