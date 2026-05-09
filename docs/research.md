@@ -41,7 +41,7 @@ Bonus : on génère automatiquement un schema **FAQPage** JSON-LD avec ces Q/R, 
 curl -X POST -H "Authorization: Bearer btb_xxx" \
   -H "Content-Type: application/json" \
   -d '{"keyword": "meilleur crm pme québec"}' \
-  https://api.blog-dashboard.ca/api/v1/paa/
+  https://api.gridar.app/api/v1/paa/
 ```
 
 ## 3. Search Trends (Google Trends FR-CA)

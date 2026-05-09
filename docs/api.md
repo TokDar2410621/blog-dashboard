@@ -28,7 +28,7 @@ Il n'y a pas de session, pas de cookie. Stateless.
 
 ```bash
 curl -H "Authorization: Bearer btb_xxx" \
-  https://api.blog-dashboard.ca/api/v1/me/
+  https://api.gridar.app/api/v1/me/
 ```
 
 Réponse :
@@ -204,14 +204,14 @@ Quand tu dépasses → HTTP 429 + `Retry-After: <seconds>`.
 ```bash
 #!/bin/bash
 curl -X POST -H "Authorization: Bearer $BLOG_DASHBOARD_TOKEN" \
-  https://api.blog-dashboard.ca/api/v1/sites/12/keywords/snapshot/
+  https://api.gridar.app/api/v1/sites/12/keywords/snapshot/
 ```
 
 ### n8n : générer un article quand on ajoute une row Airtable
 
 Trigger Airtable → HTTP Request node :
 - Method : POST
-- URL : `https://api.blog-dashboard.ca/api/v1/sites/12/generate/`
+- URL : `https://api.gridar.app/api/v1/sites/12/generate/`
 - Auth : Bearer `{{ $env.BLOG_DASHBOARD_TOKEN }}`
 - Body : `{"topic": "{{ $json.topic }}", "type": "guide", "language": "fr"}`
 
@@ -221,7 +221,7 @@ Trigger Airtable → HTTP Request node :
 - name: Fetch weekly digest
   run: |
     DIGEST=$(curl -H "Authorization: Bearer ${{ secrets.BLOG_DASHBOARD_TOKEN }}" \
-      https://api.blog-dashboard.ca/api/v1/sites/12/digest/weekly/)
+      https://api.gridar.app/api/v1/sites/12/digest/weekly/)
     curl -X POST -H 'Content-type: application/json' \
       --data "{\"text\":\"$DIGEST\"}" ${{ secrets.SLACK_WEBHOOK }}
 ```

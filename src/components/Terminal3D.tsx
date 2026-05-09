@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 const EMERALD = "#10b981";
 
 const COMMAND = `curl -H "Authorization: Bearer btb_xxx" \\
-  https://api.blog-dashboard.ca/api/v1/sites/12/articles/`;
+  https://api.gridar.app/api/v1/sites/12/articles/`;
 
 const RESPONSE = `{
   "results": [

@@ -71,7 +71,7 @@ Génère un PDF par site sélectionné, avec :
 
 ```bash
 curl -H "Authorization: Bearer btb_xxx" \
-  https://api.blog-dashboard.ca/api/v1/multi-domain-stats/
+  https://api.gridar.app/api/v1/multi-domain-stats/
 ```
 
 Retourne le JSON équivalent du tableau comparatif. Pratique pour brancher dans un dashboard client custom (Notion / Airtable / Google Sheets via Zapier).

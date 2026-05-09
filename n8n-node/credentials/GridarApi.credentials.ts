@@ -25,7 +25,7 @@ export class GridarApi implements ICredentialType {
 			displayName: 'API Base URL',
 			name: 'apiBase',
 			type: 'string',
-			default: 'https://api.blog-dashboard.ca/api/v1',
+			default: 'https://api.gridar.app/api/v1',
 			description: 'Override only if you self-host the Gridar backend.',
 		},
 	];

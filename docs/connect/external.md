@@ -10,7 +10,7 @@ Pour les développeurs qui veulent les articles **sur le domaine principal en su
 Visiteur → tonsite.com/blog/article-slug
             ↓ rendu par TON frontend React
             ↓
-Ton React → fetch GET https://api.blog-dashboard.ca/api/v1/sites/<id>/articles/<slug>/
+Ton React → fetch GET https://api.gridar.app/api/v1/sites/<id>/articles/<slug>/
             ↓ avec Bearer token
             ↓
 Notre Postgres → JSON {title, content_html, ...}
@@ -82,11 +82,11 @@ Pour que Google indexe ton blog, il faut que `tonsite.com/sitemap.xml` retourne 
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://api.blog-dashboard.ca/api/sites/<id>/sitemap.xml"
+      "destination": "https://api.gridar.app/api/sites/<id>/sitemap.xml"
     },
     {
       "source": "/rss.xml",
-      "destination": "https://api.blog-dashboard.ca/api/sites/<id>/rss.xml"
+      "destination": "https://api.gridar.app/api/sites/<id>/rss.xml"
     }
   ]
 }
@@ -94,8 +94,8 @@ Pour que Google indexe ton blog, il faut que `tonsite.com/sitemap.xml` retourne 
 
 **Si tu es sur Netlify** : `_redirects` :
 ```
-/sitemap.xml  https://api.blog-dashboard.ca/api/sites/<id>/sitemap.xml  200
-/rss.xml      https://api.blog-dashboard.ca/api/sites/<id>/rss.xml      200
+/sitemap.xml  https://api.gridar.app/api/sites/<id>/sitemap.xml  200
+/rss.xml      https://api.gridar.app/api/sites/<id>/rss.xml      200
 ```
 
 **Si tu as un backend Python (Django/FastAPI) qui sert le frontend** : ajoute une route qui proxy nos endpoints (cache 1h recommandé).

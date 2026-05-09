@@ -68,7 +68,7 @@ Latence GSC : Google met 2-3 jours à reporter les données. Donc le 8 mai, tu v
 
 ```bash
 curl -H "Authorization: Bearer btb_xxx" \
-  "https://api.blog-dashboard.ca/api/v1/sites/12/gsc/queries/?days=28&page_url=https://tonsite.ca/blog/article-slug"
+  "https://api.gridar.app/api/v1/sites/12/gsc/queries/?days=28&page_url=https://tonsite.ca/blog/article-slug"
 ```
 
 Réponse :

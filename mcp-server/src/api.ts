@@ -1,7 +1,7 @@
 /** Thin HTTP client for the Gridar REST API. */
 
 const API_BASE =
-  process.env.BLOG_DASHBOARD_API_BASE || "https://api.blog-dashboard.ca/api/v1";
+  process.env.BLOG_DASHBOARD_API_BASE || "https://api.gridar.app/api/v1";
 
 const TOKEN = process.env.BLOG_DASHBOARD_TOKEN;
 

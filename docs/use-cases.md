@@ -220,7 +220,7 @@ with open("villes_quebec.csv") as f:
     for row in csv.DictReader(f):
         ville = row["nom"]
         requests.post(
-            f"https://api.blog-dashboard.ca/api/v1/sites/{site_id}/generate/",
+            f"https://api.gridar.app/api/v1/sites/{site_id}/generate/",
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "topic": f"Meilleur électricien à {ville} en 2026",

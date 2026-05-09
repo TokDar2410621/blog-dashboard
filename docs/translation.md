@@ -91,7 +91,7 @@ Tu peux donc tracker le même keyword dans plusieurs langues / pays et voir comm
 curl -X POST -H "Authorization: Bearer btb_xxx" \
   -H "Content-Type: application/json" \
   -d '{"slug": "article-fr-original", "target_language": "en"}' \
-  https://api.blog-dashboard.ca/api/v1/sites/12/translate/
+  https://api.gridar.app/api/v1/sites/12/translate/
 ```
 
 Réponse : nouveau slug + URL de l'article traduit. Le `translation_group` est lié auto.

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Key, Code2, Zap, ShieldCheck } from "lucide-react";
 import Terminal3D from "@/components/Terminal3D";
 
-const BASE = "https://api.blog-dashboard.ca/api/v1";
+const BASE = "https://api.gridar.app/api/v1";
 
 type EndpointDoc = {
   method: "GET" | "POST" | "DELETE";

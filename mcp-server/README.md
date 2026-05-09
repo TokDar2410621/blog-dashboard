@@ -109,7 +109,7 @@ BLOG_DASHBOARD_TOKEN=btb_xxx npx -y @gridar/mcp-server
 | Env var | Default | Description |
 |---|---|---|
 | `BLOG_DASHBOARD_TOKEN` | required | Your API token (`btb_...`) |
-| `BLOG_DASHBOARD_API_BASE` | `https://api.blog-dashboard.ca/api/v1` | Override for self-hosted backends |
+| `BLOG_DASHBOARD_API_BASE` | `https://api.gridar.app/api/v1` | Override for self-hosted backends |
 
 ## Quotas & costs
 

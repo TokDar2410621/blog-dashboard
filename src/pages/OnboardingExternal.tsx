@@ -41,7 +41,7 @@ const FRAMEWORKS: { key: Framework; label: string; subtitle: string }[] = [
   { key: "vite-spa", label: "Vite SPA (sans router)", subtitle: "fetch côté client" },
 ];
 
-const API_BASE = "https://api.blog-dashboard.ca/api/v1";
+const API_BASE = "https://api.gridar.app/api/v1";
 
 // ----- Code templates per framework ----------------------------------------
 
@@ -293,7 +293,7 @@ function sitemapCode(framework: Framework, siteId: number, domain: string) {
     return `// app/sitemap.xml/route.ts - proxy our sitemap to your domain
 export async function GET() {
   const res = await fetch(
-    "https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml",
+    "https://api.gridar.app/api/sites/${siteId}/sitemap.xml",
     { next: { revalidate: 3600 } }
   );
   const xml = await res.text();
@@ -308,7 +308,7 @@ export async function GET() {
 // app/rss.xml/route.ts - same idea
 export async function GET() {
   const res = await fetch(
-    "https://api.blog-dashboard.ca/api/sites/${siteId}/rss.xml",
+    "https://api.gridar.app/api/sites/${siteId}/rss.xml",
     { next: { revalidate: 3600 } }
   );
   const xml = await res.text();
@@ -327,7 +327,7 @@ import type { GetServerSideProps } from 'next';
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   const upstream = await fetch(
-    "https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml"
+    "https://api.gridar.app/api/sites/${siteId}/sitemap.xml"
   );
   const xml = await upstream.text();
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
@@ -350,18 +350,18 @@ export default function Sitemap() { return null; }
   "rewrites": [
     {
       "source": "/sitemap.xml",
-      "destination": "https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml"
+      "destination": "https://api.gridar.app/api/sites/${siteId}/sitemap.xml"
     },
     {
       "source": "/rss.xml",
-      "destination": "https://api.blog-dashboard.ca/api/sites/${siteId}/rss.xml"
+      "destination": "https://api.gridar.app/api/sites/${siteId}/rss.xml"
     }
   ]
 }
 
 # === Si tu es sur Netlify - _redirects ===
-/sitemap.xml  https://api.blog-dashboard.ca/api/sites/${siteId}/sitemap.xml  200
-/rss.xml      https://api.blog-dashboard.ca/api/sites/${siteId}/rss.xml      200
+/sitemap.xml  https://api.gridar.app/api/sites/${siteId}/sitemap.xml  200
+/rss.xml      https://api.gridar.app/api/sites/${siteId}/rss.xml      200
 
 # === Si tu as un backend Python (Django/FastAPI) qui sert le frontend ===
 # Ajoute une route qui proxy notre endpoint, idem.
