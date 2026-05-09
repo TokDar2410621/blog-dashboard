@@ -690,9 +690,13 @@ export default function Landing() {
               </a>
             </div>
           </div>
-          <div className="mt-12 pt-6 border-t border-white/5 text-xs flex justify-between items-center">
-            <span>© {new Date().getFullYear()} Gridar</span>
-            <span>Fait à Saint-Hyacinthe, QC.</span>
+          <div className="mt-12 pt-6 border-t border-white/5 text-xs flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-center">
+            <span>© {new Date().getFullYear()} Gridar — Arivex Studio</span>
+            <div className="flex flex-wrap gap-4">
+              <Link to="/privacy" className="hover:text-zinc-100">Confidentialité</Link>
+              <Link to="/terms" className="hover:text-zinc-100">Conditions</Link>
+              <span>Fait à Saint-Hyacinthe, QC.</span>
+            </div>
           </div>
         </div>
       </footer>

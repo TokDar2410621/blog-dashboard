@@ -16,6 +16,8 @@ const ApiKeys = lazy(() => import("./pages/ApiKeys"));
 const ApiDocs = lazy(() => import("./pages/ApiDocs"));
 const OnboardingExternal = lazy(() => import("./pages/OnboardingExternal"));
 const Docs = lazy(() => import("./pages/Docs"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -81,6 +83,8 @@ function App() {
                 />
                 <Route path="/api-docs" element={<ApiDocs />} />
                 <Route path="/docs/*" element={<Docs />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
                 <Route
                   path="/onboarding/external"
                   element={
