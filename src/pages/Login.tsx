@@ -71,7 +71,7 @@ export default function Login() {
             <div className="flex items-center gap-2 mb-3">
               <Newspaper className="h-7 w-7 text-emerald-400" />
               <span className="font-bold text-xl tracking-tight">
-                blog-dashboard
+                Gridar
               </span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight">

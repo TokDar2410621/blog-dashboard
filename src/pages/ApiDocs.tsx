@@ -114,7 +114,7 @@ export default function ApiDocs() {
               API REST publique
             </h1>
             <p className="text-muted-foreground mt-1">
-              Intègre blog-dashboard à n8n, Zapier, Make ou tes propres scripts.
+              Intègre Gridar à n8n, Zapier, Make ou tes propres scripts.
               Authentification par Bearer token.
             </p>
           </div>

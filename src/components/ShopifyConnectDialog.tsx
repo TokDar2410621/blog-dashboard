@@ -141,7 +141,7 @@ export function ShopifyConnectDialog({ open, onOpenChange }: Props) {
                       <strong>Develop apps</strong>
                     </li>
                     <li>
-                      <strong>Create an app</strong> → nomme-la "Blog Dashboard"
+                      <strong>Create an app</strong> → nomme-la "Gridar"
                     </li>
                     <li>
                       Onglet <strong>Configuration</strong> → Admin API access

@@ -1,73 +1,72 @@
-# React + TypeScript + Vite
+# Gridar
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> SEO content on autopilot for Quebec PMEs.
+> 12 SEO agents in one product. Generate, audit and publish articles to WordPress, Shopify, Webflow or a hosted blog — without touching your code.
 
-Currently, two official plugins are available:
+**Made by [Arivex Studio](https://arivex.ca).**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What it does
 
-## React Compiler
+Gridar bundles 12 specialized SEO agents into one SaaS:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **ArticleGenerator** — Claude + Serper, FR/EN/ES, 7 archetypes
+- **AuditEngine** — 0-100 SEO score + actionable suggestions
+- **BriefBuilder** — search intent, outline, FAQ, entities
+- **KeywordResearch** — Serper + Gemini cross-checked volumes
+- **RankTracker** — daily SERP snapshots, geo-restricted to Quebec by default
+- **ContentDecay** — flags articles losing >30% traffic
+- **TopicClusters** — semantic grouping of your content
+- **LinkGraph** — internal linking opportunities
+- **BrokenLinkChecker** — periodic 404 crawl
+- **PlagiarismChecker** — detect copy-paste with the wider web
+- **ReadabilityScorer** — Flesch + lexical complexity
+- **PageSpeedAuditor** — Core Web Vitals via Google PSI
 
-## Expanding the ESLint configuration
+Plus: GSC OAuth, hreflang for multilingual, weekly digests, multi-domain dashboards, Stripe billing with credits, public REST API, MCP server, n8n community node.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Architecture
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Layer | Stack | Hosted on |
+|---|---|---|
+| Backend | Django 5 + DRF + Postgres | Render |
+| Frontend | React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui | Vercel |
+| AI | Anthropic Claude, Gemini, Serper, Google PSI | Pay-per-use |
+| Payments | Stripe Subscriptions + one-time credits | Stripe |
+| Integrations | MCP server (`@gridar/mcp-server`), n8n node (`n8n-nodes-gridar`), public REST API | npm + self-hosted |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Repo layout
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+backend/                  Django project
+src/                      React frontend
+public-blog/              Next.js public blog (hosted-mode customers)
+docs/                     User-facing product documentation (FR-CA)
+mcp-server/               Model Context Protocol server (npm package)
+n8n-node/                 n8n community node (npm package)
+cypress/                  E2E tests
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Local development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# Backend
+cd backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Frontend (separate terminal)
+npm install
+npm run dev
+
+# Visit http://localhost:5173
 ```
+
+## Documentation
+
+User-facing docs live in [docs/](docs/) and are served at [/docs/*](https://gridar.app/docs).
+
+## License
+
+Proprietary. © Arivex Studio. All rights reserved.

@@ -33,7 +33,7 @@
   },
 
   "login": {
-    "title": "Blog Dashboard",
+    "title": "Gridar",
     "subtitle": "Sign in to manage your sites",
     "username": "Username",
     "password": "Password",
@@ -44,7 +44,7 @@
   },
 
   "sites": {
-    "title": "Blog Dashboard",
+    "title": "Gridar",
     "subtitle": "Select a site to manage",
     "addSite": "Add a site",
     "addSiteTitle": "Add a site",
@@ -72,7 +72,7 @@
   },
 
   "sidebar": {
-    "appName": "Blog Dashboard",
+    "appName": "Gridar",
     "siteLabel": "Site #{{id}}",
     "nav": "Navigation",
     "dashboard": "Dashboard",

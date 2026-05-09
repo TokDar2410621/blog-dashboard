@@ -535,7 +535,7 @@ function MainMock() {
           }}
         >
           <Globe size={12} strokeWidth={2} />
-          app.blog-dashboard.ca/dashboard/12/posts
+          gridar.app/dashboard/12/posts
         </div>
       </div>
 

@@ -135,7 +135,7 @@ export default function Docs() {
           <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-2">
             <Newspaper className="h-5 w-5 text-primary" />
-            <span className="font-semibold">Blog Dashboard</span>
+            <span className="font-semibold">Gridar</span>
             <span className="text-muted-foreground hidden sm:inline">/ Docs</span>
           </div>
           <div className="flex-1" />

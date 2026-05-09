@@ -191,7 +191,7 @@ export default function Terminal3D() {
               color: "#94a3b8",
             }}
           >
-            ~ / blog-dashboard / api
+            ~ / gridar / api
           </div>
           <div style={{ width: 50 }} />
         </div>

@@ -125,7 +125,7 @@ export default function ApiKeys() {
               Clés API
             </h1>
             <p className="text-muted-foreground">
-              Crée des tokens pour intégrer blog-dashboard à n8n, Zapier, Make
+              Crée des tokens pour intégrer Gridar à n8n, Zapier, Make
               ou tes propres scripts.
             </p>
           </div>

@@ -38,7 +38,7 @@ export default function DashboardLayout() {
         <header className="md:hidden sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border/50 bg-background/95 backdrop-blur px-3">
           <SidebarTrigger />
           <Newspaper className="h-4 w-4 text-primary" />
-          <span className="font-semibold text-sm">Blog Dashboard</span>
+          <span className="font-semibold text-sm">Gridar</span>
         </header>
         <div className="p-4 md:p-6">
           <ErrorBoundary>

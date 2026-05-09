@@ -129,7 +129,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Newspaper className="h-5 w-5 text-emerald-400" />
-            <span className="font-semibold tracking-tight">Blog Dashboard</span>
+            <span className="font-semibold tracking-tight">Gridar</span>
           </div>
           <nav className="flex items-center gap-6">
             <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
@@ -558,7 +558,7 @@ export default function Landing() {
               Génère des articles depuis n'importe où
             </h2>
             <p className="mt-4 text-lg text-zinc-400 max-w-2xl mx-auto">
-              MCP server, node n8n, API REST. Branche Blog Dashboard à ton workflow et
+              MCP server, node n8n, API REST. Branche Gridar à ton workflow et
               automatise la génération sans écrire une ligne de code custom.
             </p>
           </div>
@@ -665,7 +665,7 @@ export default function Landing() {
             <div className="max-w-md">
               <div className="flex items-center gap-2 mb-3 text-zinc-100">
                 <Newspaper className="h-5 w-5 text-emerald-400" />
-                <span className="font-semibold">Blog Dashboard</span>
+                <span className="font-semibold">Gridar</span>
               </div>
               <p>
                 Le SaaS SEO bilingue FR-CA, conçu et opéré au Québec. Pour les PME
@@ -690,7 +690,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="mt-12 pt-6 border-t border-white/5 text-xs flex justify-between items-center">
-            <span>© {new Date().getFullYear()} Blog Dashboard</span>
+            <span>© {new Date().getFullYear()} Gridar</span>
             <span>Fait à Saint-Hyacinthe, QC.</span>
           </div>
         </div>

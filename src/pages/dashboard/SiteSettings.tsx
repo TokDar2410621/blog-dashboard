@@ -486,7 +486,7 @@ export default function SiteSettings() {
             <Textarea
               value={authorBio}
               onChange={(e) => setAuthorBio(e.target.value)}
-              placeholder="Ex: Fondateur de Blog Dashboard, j'aide les PME québécoises à atteindre la première page de Google. 10 ans d'expérience SEO."
+              placeholder="Ex: Fondateur de Gridar, j'aide les PME québécoises à atteindre la première page de Google. 10 ans d'expérience SEO."
               rows={3}
               className="resize-y"
             />
