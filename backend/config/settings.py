@@ -271,4 +271,6 @@ REST_AUTH = {
     'JWT_AUTH_SAMESITE': 'Lax',
     'JWT_AUTH_RETURN_EXPIRATION': True,
     'SESSION_LOGIN': False,
+    # We don't use DRF's authtoken model — JWT only.
+    'TOKEN_MODEL': None,
 }
