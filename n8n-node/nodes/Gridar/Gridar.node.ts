@@ -7,23 +7,23 @@ import {
 	NodeOperationError,
 } from 'n8n-workflow';
 
-export class BlogDashboard implements INodeType {
+export class Gridar implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'Blog Dashboard',
-		name: 'blogDashboard',
-		icon: 'file:blogDashboard.svg',
+		displayName: 'Gridar',
+		name: 'gridar',
+		icon: 'file:gridar.svg',
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Generate, audit and publish SEO articles via Blog Dashboard',
+		description: 'Generate, audit and publish SEO articles via Gridar',
 		defaults: {
-			name: 'Blog Dashboard',
+			name: 'Gridar',
 		},
 		inputs: [NodeConnectionType.Main],
 		outputs: [NodeConnectionType.Main],
 		credentials: [
 			{
-				name: 'blogDashboardApi',
+				name: 'gridarApi',
 				required: true,
 			},
 		],
@@ -463,7 +463,7 @@ export class BlogDashboard implements INodeType {
 
 				const response = await this.helpers.httpRequestWithAuthentication.call(
 					this,
-					'blogDashboardApi',
+					'gridarApi',
 					{
 						method,
 						url: endpoint,

@@ -5,9 +5,9 @@ import {
 	INodeProperties,
 } from 'n8n-workflow';
 
-export class BlogDashboardApi implements ICredentialType {
-	name = 'blogDashboardApi';
-	displayName = 'Blog Dashboard API';
+export class GridarApi implements ICredentialType {
+	name = 'gridarApi';
+	displayName = 'Gridar API';
 	documentationUrl = 'https://blog-dashboard-ebon.vercel.app/docs/api';
 
 	properties: INodeProperties[] = [
@@ -26,7 +26,7 @@ export class BlogDashboardApi implements ICredentialType {
 			name: 'apiBase',
 			type: 'string',
 			default: 'https://api.blog-dashboard.ca/api/v1',
-			description: 'Override only if you self-host the Blog Dashboard backend.',
+			description: 'Override only if you self-host the Gridar backend.',
 		},
 	];
 

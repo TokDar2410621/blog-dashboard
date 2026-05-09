@@ -1,7 +1,7 @@
 {
-  "name": "n8n-nodes-blog-dashboard",
+  "name": "n8n-nodes-gridar",
   "version": "0.1.0",
-  "description": "n8n community node for Blog Dashboard - generate, audit and publish SEO articles from any n8n workflow.",
+  "description": "n8n community node for Gridar - generate, audit and publish SEO articles from any n8n workflow.",
   "license": "MIT",
   "homepage": "https://github.com/TokDar2410621/blog-dashboard",
   "author": {
@@ -15,7 +15,7 @@
   "keywords": [
     "n8n-community-node-package",
     "n8n",
-    "blog-dashboard",
+    "gridar",
     "seo",
     "ai",
     "content"
@@ -35,10 +35,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/BlogDashboardApi.credentials.js"
+      "dist/credentials/GridarApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/BlogDashboard/BlogDashboard.node.js"
+      "dist/nodes/Gridar/Gridar.node.js"
     ]
   },
   "devDependencies": {
