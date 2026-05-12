@@ -1,12 +1,26 @@
 /**
- * Single blog post - /blog/:slug
+ * Single blog post. /blog/:slug
+ *
+ * Layout:
+ *   - Sticky reading-progress bar at the very top
+ *   - Compact nav header (back to /blog, brand mark)
+ *   - Hero band with gradient cover, title, meta, tags
+ *   - 2-column on desktop: main column for prose, sticky TOC on the right
+ *   - Bottom: prev/next nav, related posts CTA, author bio
  */
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { ArrowLeft, Clock, BookOpen, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Clock,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
 import { getAllPosts, getPost, readingTime } from "@/lib/posts";
@@ -24,10 +38,50 @@ function formatDate(iso: string): string {
   }
 }
 
+function gradientFor(slug: string): string {
+  let h = 0;
+  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
+  const angles = ["135deg", "120deg", "150deg", "180deg", "200deg", "165deg"];
+  const angle = angles[h % angles.length];
+  const hue = 145 + (h % 30);
+  return `linear-gradient(${angle}, hsl(${hue}, 60%, 30%) 0%, hsl(${hue + 10}, 70%, 18%) 50%, #0a0a0a 100%)`;
+}
+
+/** Pull all H2 + H3 from a markdown body for a TOC. */
+type Heading = { id: string; text: string; level: 2 | 3 };
+
+function extractHeadings(md: string): Heading[] {
+  const out: Heading[] = [];
+  // Strip code fences so we don't pick up '##' inside code samples.
+  const cleaned = md.replace(/```[\s\S]*?```/g, "");
+  for (const line of cleaned.split("\n")) {
+    const m = line.match(/^(#{2,3})\s+(.+?)\s*$/);
+    if (!m) continue;
+    const level = m[1].length as 2 | 3;
+    const text = m[2].trim();
+    const id = text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+    out.push({ id, text, level });
+  }
+  return out;
+}
+
 export default function BlogPost() {
   const { slug = "" } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const post = getPost(slug);
+  const articleRef = useRef<HTMLDivElement | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  const headings = useMemo(
+    () => (post ? extractHeadings(post.body) : []),
+    [post],
+  );
 
   // Inject per-post Article JSON-LD into <head> so Google sees it.
   useEffect(() => {
@@ -63,134 +117,300 @@ export default function BlogPost() {
     };
   }, [post]);
 
+  // Reading progress: how much of the article has scrolled past mid-viewport.
+  useEffect(() => {
+    function onScroll() {
+      const el = articleRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const total = el.offsetHeight - window.innerHeight;
+      const scrolled = -rect.top;
+      const pct = total <= 0 ? 100 : Math.max(0, Math.min(100, (scrolled / total) * 100));
+      setProgress(pct);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [post]);
+
   if (!post) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-center p-6">
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center text-center p-6">
         <div className="max-w-sm space-y-4">
-          <BookOpen className="h-12 w-12 text-muted-foreground/50 mx-auto" />
+          <BookOpen className="h-12 w-12 text-zinc-600 mx-auto" />
           <h1 className="text-2xl font-bold">Article introuvable</h1>
-          <p className="text-muted-foreground">
-            L'article <code className="bg-muted px-1.5 py-0.5 rounded text-sm">/blog/{slug}</code> n'existe pas (ou plus).
+          <p className="text-zinc-400">
+            L'article{" "}
+            <code className="bg-white/5 px-1.5 py-0.5 rounded text-sm">
+              /blog/{slug}
+            </code>{" "}
+            n'existe pas.
           </p>
           <Button onClick={() => navigate("/blog")}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Tous les articles
+            Retour au blog
           </Button>
         </div>
       </div>
     );
   }
 
-  // Adjacent posts (previous + next) for keep-reading at the bottom.
   const all = getAllPosts();
   const idx = all.findIndex((p) => p.slug === post.slug);
   const prev = idx > 0 ? all[idx - 1] : undefined;
   const next = idx < all.length - 1 ? all[idx + 1] : undefined;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-border/50 bg-background/95 backdrop-blur">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 h-14 flex items-center gap-3">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      {/* Reading progress bar - sticks at the absolute top */}
+      <div
+        className="fixed top-0 left-0 right-0 h-0.5 bg-emerald-400 z-50 transition-[width] duration-100"
+        style={{ width: `${progress}%` }}
+        aria-hidden
+      />
+
+      {/* Top nav */}
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate("/blog")}
-            className="-ml-2"
+            className="-ml-2 text-zinc-400 hover:text-white hover:bg-white/5"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Blog
           </Button>
-          <div className="h-4 w-px bg-border" />
+          <div className="h-4 w-px bg-white/10" />
           <div className="flex items-center gap-2">
             <GridarMark className="h-5 w-5" />
             <span className="font-semibold">Gridar</span>
           </div>
+          <div className="flex-1" />
+          <Link to="/login">
+            <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200">
+              Commencer
+            </Button>
+          </Link>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 md:px-6 py-10">
-        <article
-          className="prose prose-zinc dark:prose-invert max-w-none
-                     prose-headings:scroll-mt-20
-                     prose-h1:text-4xl prose-h1:font-bold prose-h1:tracking-tight
-                     prose-h2:mt-10 prose-h2:border-t prose-h2:border-border/40 prose-h2:pt-6
-                     prose-code:before:content-none prose-code:after:content-none
-                     prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em] prose-code:font-mono
-                     prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50
-                     prose-a:text-primary prose-a:no-underline hover:prose-a:underline"
-        >
-          <div className="text-sm text-muted-foreground mb-2 flex items-center gap-3">
+      {/* Hero band */}
+      <section className="relative border-b border-white/5 overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-50"
+          style={{ background: gradientFor(post.slug) }}
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(60% 50% at 50% 100%, rgba(0,0,0,0.6), transparent 70%)",
+          }}
+        />
+        <div className="relative max-w-3xl mx-auto px-4 md:px-6 py-16 md:py-24">
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-6">
+              {post.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-black/40 backdrop-blur border border-white/10 text-emerald-300 font-mono"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-6">
+            {post.title}
+          </h1>
+          {post.excerpt && (
+            <p className="text-lg md:text-xl text-zinc-300 leading-relaxed mb-8 max-w-2xl">
+              {post.excerpt}
+            </p>
+          )}
+          <div className="flex items-center gap-4 text-sm text-zinc-400">
+            {post.author && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
+                  <User className="h-3 w-3" />
+                </span>
+                {post.author}
+              </span>
+            )}
             {post.date && <span>{formatDate(post.date)}</span>}
             <span className="inline-flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3.5 w-3.5" />
               {readingTime(post.body)} min de lecture
             </span>
-            {post.author && <span>· par {post.author}</span>}
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">{post.title}</h1>
-          {post.excerpt && (
-            <p className="text-lg text-muted-foreground not-prose mb-8">{post.excerpt}</p>
-          )}
+        </div>
+      </section>
+
+      {/* Body + TOC */}
+      <main ref={articleRef} className="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-16 lg:grid lg:grid-cols-[1fr_220px] lg:gap-12">
+        <article
+          className="prose prose-invert prose-zinc max-w-none
+                     prose-headings:scroll-mt-24
+                     prose-h1:hidden
+                     prose-h2:text-2xl prose-h2:font-bold prose-h2:mt-12 prose-h2:mb-4 prose-h2:tracking-tight prose-h2:border-t prose-h2:border-white/10 prose-h2:pt-8
+                     prose-h3:text-xl prose-h3:font-semibold prose-h3:mt-8 prose-h3:mb-3
+                     prose-p:text-zinc-300 prose-p:leading-relaxed
+                     prose-strong:text-zinc-100
+                     prose-code:before:content-none prose-code:after:content-none
+                     prose-code:bg-white/5 prose-code:border prose-code:border-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-emerald-300 prose-code:text-[0.9em] prose-code:font-mono
+                     prose-pre:bg-zinc-900 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl
+                     prose-a:text-emerald-300 prose-a:no-underline hover:prose-a:text-emerald-200 hover:prose-a:underline
+                     prose-table:text-sm prose-th:text-zinc-200 prose-th:font-semibold prose-th:bg-white/5 prose-th:border-white/10 prose-td:border-white/10
+                     prose-blockquote:border-l-emerald-400/50 prose-blockquote:text-zinc-300"
+        >
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
+            components={{
+              h2: ({ children, ...rest }) => {
+                const text = typeof children === "string" ? children : Array.isArray(children) ? children.join("") : "";
+                const id = String(text)
+                  .toLowerCase()
+                  .normalize("NFD")
+                  .replace(/[̀-ͯ]/g, "")
+                  .replace(/[^a-z0-9\s-]/g, "")
+                  .trim()
+                  .replace(/\s+/g, "-");
+                return <h2 id={id} {...rest}>{children}</h2>;
+              },
+              h3: ({ children, ...rest }) => {
+                const text = typeof children === "string" ? children : Array.isArray(children) ? children.join("") : "";
+                const id = String(text)
+                  .toLowerCase()
+                  .normalize("NFD")
+                  .replace(/[̀-ͯ]/g, "")
+                  .replace(/[^a-z0-9\s-]/g, "")
+                  .trim()
+                  .replace(/\s+/g, "-");
+                return <h3 id={id} {...rest}>{children}</h3>;
+              },
+            }}
           >
             {post.body}
           </ReactMarkdown>
         </article>
 
-        {/* Adjacent posts */}
-        {(prev || next) && (
-          <nav className="mt-16 pt-8 border-t border-border/40 grid sm:grid-cols-2 gap-4">
-            {prev ? (
-              <Link
-                to={`/blog/${prev.slug}`}
-                className="group rounded-lg border border-border/50 p-4 hover:border-primary/40 motion-safe:transition-colors"
-              >
-                <div className="text-xs text-muted-foreground mb-1 inline-flex items-center gap-1">
-                  <ArrowLeft className="h-3 w-3" />
-                  Précédent
-                </div>
-                <div className="font-semibold group-hover:text-primary motion-safe:transition-colors">
-                  {prev.title}
-                </div>
-              </Link>
-            ) : (
-              <div />
-            )}
-            {next && (
-              <Link
-                to={`/blog/${next.slug}`}
-                className="group rounded-lg border border-border/50 p-4 hover:border-primary/40 motion-safe:transition-colors text-right"
-              >
-                <div className="text-xs text-muted-foreground mb-1 inline-flex items-center gap-1 justify-end">
-                  Suivant
-                  <ArrowRight className="h-3 w-3" />
-                </div>
-                <div className="font-semibold group-hover:text-primary motion-safe:transition-colors">
-                  {next.title}
-                </div>
-              </Link>
-            )}
-          </nav>
+        {/* Sticky TOC (desktop only) */}
+        {headings.length > 0 && (
+          <aside className="hidden lg:block">
+            <div className="sticky top-24">
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-3 font-mono">
+                Dans cet article
+              </div>
+              <nav className="space-y-1.5 text-sm border-l border-white/10 pl-4">
+                {headings.map((h) => (
+                  <a
+                    key={h.id}
+                    href={`#${h.id}`}
+                    className={`block text-zinc-400 hover:text-emerald-300 transition-colors leading-snug ${
+                      h.level === 3 ? "pl-3 text-[13px]" : ""
+                    }`}
+                  >
+                    {h.text}
+                  </a>
+                ))}
+              </nav>
+            </div>
+          </aside>
         )}
-
-        {/* Footer CTA - drive blog readers to /login (signup) */}
-        <div className="mt-16 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center">
-          <h2 className="text-2xl font-bold tracking-tight mb-2">
-            Tu veux générer ce genre d'article sur ton site ?
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            Gridar le fait pour toi - du brief à la publication WordPress / Shopify / Webflow.
-          </p>
-          <Link to="/login">
-            <Button size="lg">
-              Essayer gratuitement
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
-        </div>
       </main>
+
+      {/* Author + CTA + adjacent posts */}
+      <footer className="border-t border-white/5">
+        <div className="max-w-3xl mx-auto px-4 md:px-6 py-12 space-y-12">
+          {/* Author card */}
+          {post.author && (
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6 flex items-start gap-4">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300 shrink-0">
+                <User className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-zinc-500 mb-1 font-mono">
+                  Écrit par
+                </div>
+                <div className="font-semibold text-zinc-100 mb-1">
+                  {post.author}
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Fondateur d'Arivex Studio et de Gridar. Solo founder basé à
+                  Saint-Hyacinthe, QC. Spécialiste SEO bilingue FR-CA.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* CTA */}
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center relative overflow-hidden">
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(60% 50% at 50% 50%, rgba(16,185,129,0.15), transparent 70%)",
+              }}
+            />
+            <div className="relative">
+              <h2 className="text-2xl font-bold tracking-tight mb-2">
+                Tu veux générer ce genre d'article sur ton site ?
+              </h2>
+              <p className="text-zinc-400 mb-6">
+                Gridar le fait pour toi. Du brief à la publication directe sur
+                WordPress, Shopify ou Webflow.
+              </p>
+              <Link to="/login">
+                <Button size="lg" className="bg-white text-zinc-950 hover:bg-zinc-200">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Essayer gratuitement
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          {/* Adjacent posts */}
+          {(prev || next) && (
+            <nav className="grid sm:grid-cols-2 gap-4">
+              {prev ? (
+                <Link
+                  to={`/blog/${prev.slug}`}
+                  className="group rounded-xl border border-white/10 p-5 hover:border-emerald-400/40 transition-colors bg-zinc-900/40"
+                >
+                  <div className="text-xs text-zinc-500 mb-1.5 inline-flex items-center gap-1 uppercase tracking-wider font-mono">
+                    <ArrowLeft className="h-3 w-3" />
+                    Précédent
+                  </div>
+                  <div className="font-semibold leading-snug group-hover:text-emerald-300 transition-colors">
+                    {prev.title}
+                  </div>
+                </Link>
+              ) : (
+                <div />
+              )}
+              {next && (
+                <Link
+                  to={`/blog/${next.slug}`}
+                  className="group rounded-xl border border-white/10 p-5 hover:border-emerald-400/40 transition-colors bg-zinc-900/40 text-right"
+                >
+                  <div className="text-xs text-zinc-500 mb-1.5 inline-flex items-center gap-1 justify-end uppercase tracking-wider font-mono">
+                    Suivant
+                    <ArrowRight className="h-3 w-3" />
+                  </div>
+                  <div className="font-semibold leading-snug group-hover:text-emerald-300 transition-colors">
+                    {next.title}
+                  </div>
+                </Link>
+              )}
+            </nav>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
