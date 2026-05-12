@@ -238,6 +238,15 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 SOCIALACCOUNT_LOGIN_ON_GET = False
 # Pre-populate username from the email local part if the provider doesn't give one.
 SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+# CRITICAL UX: when a user clicks "Continue with Google" and the Google email
+# already matches a local Django user (created via username+password or a
+# previous social login), automatically connect the social account to that
+# local user instead of refusing with "email already exists". This is safe
+# because Google has already proven the user owns the email. Without this,
+# users who first signed up via password get locked out of OAuth forever,
+# and vice versa. Stripe / Linear / Vercel all do this.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
