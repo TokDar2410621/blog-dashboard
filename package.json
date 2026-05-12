@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-sitemap.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "sitemap": "node scripts/generate-sitemap.mjs",
     "brand:generate": "node scripts/generate-brand-assets.mjs",
     "cy:open": "cypress open",
     "cy:run": "cypress run"
