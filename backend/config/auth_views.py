@@ -3,6 +3,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -10,6 +12,13 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .throttles import LoginThrottle
+
+# All auth endpoints below are POST'd cross-origin by the SPA (gridar.app
+# -> api.gridar.app) BEFORE any session exists. Django's CsrfViewMiddleware
+# rejects them with 'CSRF Failed: CSRF token missing' unless we exempt
+# them. Safe because these endpoints don't rely on session-cookie auth.
+# The login flow's security comes from the username+password check (or the
+# OAuth code in the social variants), not from a CSRF token.
 
 COOKIE_OPTS = {
     'httponly': True,
@@ -22,6 +31,7 @@ ACCESS_MAX_AGE = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(
 REFRESH_MAX_AGE = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CookieTokenObtainPairView(TokenObtainPairView):
     """Login: returns tokens in httpOnly cookies + JSON body (for backwards compat)."""
     throttle_classes = [LoginThrottle]
@@ -41,6 +51,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         return response
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CookieTokenRefreshView(TokenRefreshView):
     """Refresh: reads refresh token from cookie or body."""
     throttle_classes = [LoginThrottle]
@@ -64,6 +75,7 @@ class CookieTokenRefreshView(TokenRefreshView):
         return response
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class CookieLogoutView(TokenObtainPairView):
     """Logout: clears auth cookies."""
 
@@ -103,6 +115,7 @@ def _set_jwt_cookies(response, access, refresh):
     )
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class EmailCheckView(APIView):
     """POST /api/auth/check-email/ {email} -> {exists: bool}."""
     permission_classes = [AllowAny]
@@ -125,6 +138,7 @@ class EmailCheckView(APIView):
         return Response({'exists': exists})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(APIView):
     """POST /api/auth/register/ {email, password} -> creates the user, sets
     the same JWT cookie pair as CookieTokenObtainPairView, returns the tokens
