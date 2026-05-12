@@ -16,6 +16,7 @@ from rest_framework.throttling import UserRateThrottle
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from django.core.cache import cache
+from django.db import ProgrammingError
 from django.db.models import Sum
 from django.utils.text import slugify
 from django.core.management import call_command
@@ -868,34 +869,55 @@ class SiteStatsView(APIView):
             })
 
         alias = ensure_site_connection(site)
-        posts = BlogPost.objects.using(alias)
-        total_posts = posts.count()
-        total_views = posts.aggregate(total=Sum('view_count'))['total'] or 0
-        drafts = posts.filter(status='draft').count()
-        scheduled = posts.filter(status='scheduled').count()
-        published = posts.filter(status='published').count()
+        # If the external DB has database_url set but the blog_* tables were
+        # never created (user forgot to run init_db), the count() raises
+        # ProgrammingError 'relation does not exist'. Catch it and degrade
+        # to zero stats with a flag so the frontend can prompt 'Init tables'.
+        try:
+            posts = BlogPost.objects.using(alias)
+            total_posts = posts.count()
+            total_views = posts.aggregate(total=Sum('view_count'))['total'] or 0
+            drafts = posts.filter(status='draft').count()
+            scheduled = posts.filter(status='scheduled').count()
+            published = posts.filter(status='published').count()
 
-        categories_data = []
-        for cat in Category.objects.using(alias).all():
-            categories_data.append({
-                'name': cat.name,
-                'count': cat.posts.using(alias).count(),
+            categories_data = []
+            for cat in Category.objects.using(alias).all():
+                categories_data.append({
+                    'name': cat.name,
+                    'count': cat.posts.using(alias).count(),
+                })
+
+            recent_posts = list(
+                posts.values('slug', 'title', 'status', 'view_count', 'created_at')
+                .order_by('-created_at')[:5]
+            )
+
+            return Response({
+                'total_posts': total_posts,
+                'total_views': total_views,
+                'drafts': drafts,
+                'scheduled': scheduled,
+                'published': published,
+                'categories': categories_data,
+                'recent_posts': recent_posts,
             })
-
-        recent_posts = list(
-            posts.values('slug', 'title', 'status', 'view_count', 'created_at')
-            .order_by('-created_at')[:5]
-        )
-
-        return Response({
-            'total_posts': total_posts,
-            'total_views': total_views,
-            'drafts': drafts,
-            'scheduled': scheduled,
-            'published': published,
-            'categories': categories_data,
-            'recent_posts': recent_posts,
-        })
+        except ProgrammingError:
+            logger.warning(
+                "Site %s: external DB connected but blog_* tables missing. "
+                "User needs to POST /api/sites/%s/init_db/ to migrate.",
+                site.id, site.id,
+            )
+            return Response({
+                'total_posts': 0,
+                'total_views': 0,
+                'drafts': 0,
+                'scheduled': 0,
+                'published': 0,
+                'categories': [],
+                'recent_posts': [],
+                'storage': 'external_uninitialized',
+            })
 
     def _cms_stats(self, site):
         """Fetch counts from the live CMS adapter. Wrapped in try/except so a
