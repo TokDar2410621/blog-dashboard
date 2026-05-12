@@ -1,4 +1,4 @@
-# Mission — SEO n°1 au Québec
+# Mission - SEO n°1 au Québec
 
 > **Énoncé verbatim de Darius** (2026-05-04)
 >
@@ -6,7 +6,7 @@
 
 ## Why
 
-Darius est fondateur solo. Il veut un produit différenciant qu'il peut commercialiser à des PME québécoises. Le marché québécois est sous-servi en outils SEO bilingues FR-CA / EN-CA — Ahrefs, Semrush, Surfer ne comprennent ni le marché ni la langue locale. Le créneau : un SaaS SEO **bilingue, abordable, calibré FR-CA**, qui génère ET optimise les articles pour les blogs des PME.
+Darius est fondateur solo. Il veut un produit différenciant qu'il peut commercialiser à des PME québécoises. Le marché québécois est sous-servi en outils SEO bilingues FR-CA / EN-CA - Ahrefs, Semrush, Surfer ne comprennent ni le marché ni la langue locale. Le créneau : un SaaS SEO **bilingue, abordable, calibré FR-CA**, qui génère ET optimise les articles pour les blogs des PME.
 
 ## Critères de succès
 
@@ -44,11 +44,11 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [x] Hreflang validator
 
 ### Tier 2 (feedback loop)
-- [x] Rank tracking (GSC + Serper history, alertes décay) — base + UI ; cron quotidien à brancher
+- [x] Rank tracking (GSC + Serper history, alertes décay) - base + UI ; cron quotidien à brancher
 - [x] Content decay detector
 - [x] Topic Cluster Planner (cards-based MVP ; graphe react-flow en option future)
 
-### Tier 3 (qualité produit) — 6/9 done
+### Tier 3 (qualité produit) - 6/9 done
 - [x] Reddit/Quora question harvesting (Serper site: queries)
 - [x] Internal link graph viz
 - [x] Broken link checker
@@ -59,12 +59,12 @@ Voir `ARCHITECTURE.md` pour le détail des endpoints. Résumé :
 - [ ] Bing Webmaster integration
 - [x] Search trends FR-CA
 
-### Tier 4 (finition / commercialisation) — 5/5 autonomes done ✅
+### Tier 4 (finition / commercialisation) - 5/5 autonomes done ✅
 - [x] Weekly digest (rapport téléchargeable, sans SMTP)
 - [x] EEAT author profile (Schema.org Person + UI SiteSettings)
-- [x] Plagiarism / originality check (Originality.ai integration — env key requise pour activation)
+- [x] Plagiarism / originality check (Originality.ai integration - env key requise pour activation)
 - [x] Multi-domain comparison (page `/compare`)
-- [x] Pricing + Stripe (Subscription model + 4 endpoints + Billing page — env keys Stripe requises pour activation)
+- [x] Pricing + Stripe (Subscription model + 4 endpoints + Billing page - env keys Stripe requises pour activation)
 - [x] Landing page commerciale (`/` public + 3-tier pricing)
 - [x] Onboarding flow (first-run guide 4 étapes sur Overview)
 

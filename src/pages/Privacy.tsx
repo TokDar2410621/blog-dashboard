@@ -71,8 +71,8 @@ export default function Privacy() {
             <li>Domaine, langue, configuration EEAT/Branding/Knowledge base que tu fournis</li>
             <li>Articles que tu génères ou édites dans Gridar</li>
             <li>Mots-clés trackés et historique de positions Google</li>
-            <li>Identifiants de connexion à ton CMS (WordPress Application Password, Shopify Admin Token, Webflow Site Token) — chiffrés au repos</li>
-            <li>Refresh token Google Search Console si tu connectes GSC — chiffré, révocable à tout moment</li>
+            <li>Identifiants de connexion à ton CMS (WordPress Application Password, Shopify Admin Token, Webflow Site Token) - chiffrés au repos</li>
+            <li>Refresh token Google Search Console si tu connectes GSC - chiffré, révocable à tout moment</li>
           </ul>
 
           <h3>Données de facturation</h3>

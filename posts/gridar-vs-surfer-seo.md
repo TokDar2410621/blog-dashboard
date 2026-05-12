@@ -1,5 +1,5 @@
 ---
-title: Gridar vs Surfer SEO — lequel pour une PME québécoise
+title: Gridar vs Surfer SEO - lequel pour une PME québécoise
 slug: gridar-vs-surfer-seo
 date: 2026-04-21
 author: Darius Tokam
@@ -11,7 +11,7 @@ Si tu cherches un outil SEO en 2026, **Surfer SEO** (89-219 $US/mois) apparaît 
 
 ## Disclaimer
 
-C'est un comparatif écrit par Gridar. J'ai utilisé Surfer pendant 8 mois en 2023 (l'outil sur lequel je me suis inspiré pour bâtir notre audit engine). Je ne vais pas faire semblant qu'il est mauvais — il est très bon. Je vais montrer **où il est mauvais pour le marché QC précis**, et où Gridar est nul à côté de Surfer (parce qu'on l'est dans 2-3 dimensions).
+C'est un comparatif écrit par Gridar. J'ai utilisé Surfer pendant 8 mois en 2023 (l'outil sur lequel je me suis inspiré pour bâtir notre audit engine). Je ne vais pas faire semblant qu'il est mauvais - il est très bon. Je vais montrer **où il est mauvais pour le marché QC précis**, et où Gridar est nul à côté de Surfer (parce qu'on l'est dans 2-3 dimensions).
 
 ## Comparatif feature par feature
 
@@ -44,7 +44,7 @@ C'est un comparatif écrit par Gridar. J'ai utilisé Surfer pendant 8 mois en 20
 
 **1. Génération + audit + publication en un produit.** Surfer demande Surfer AI (add-on à 19 $US/article) + un outil de publication séparé. Gridar fait tout en un, pour 30 à 90 $CAD/mois selon le plan.
 
-**2. Marché québécois en natif.** Le lexique, le hreflang, les schemas, la geolocalisation Québec — c'est l'ADN de Gridar. Surfer t'oblige à corriger manuellement.
+**2. Marché québécois en natif.** Le lexique, le hreflang, les schemas, la geolocalisation Québec - c'est l'ADN de Gridar. Surfer t'oblige à corriger manuellement.
 
 **3. Multi-sites pour les agences/freelance.** Le plan Agence Gridar à 199 $CAD/mois te donne 10 sites. Surfer équivalent : 219 $US/mois (~290 $CAD) pour 5 sites.
 

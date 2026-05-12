@@ -88,7 +88,7 @@ intentionally simple and additive to the usual static SEO score.
 All endpoints require authentication (JWT like the rest of the dashboard).
 
 - `GET  /api/sites/<site_id>/gsc/oauth-url/`
-  Returns `{ url }` — the Google consent URL. Includes `state` = base64 site id.
+  Returns `{ url }` - the Google consent URL. Includes `state` = base64 site id.
 
 - `POST /api/sites/<site_id>/gsc/oauth-callback/`
   Body: `{ code, state }`. Exchanges and stores the refresh token on the Site.
@@ -109,7 +109,7 @@ All endpoints require authentication (JWT like the rest of the dashboard).
   database layer (Postgres TDE, Railway disk encryption, etc.). If you need
   application-level encryption, wrap `save`/property accessors with
   `cryptography.fernet.Fernet` using a key from `GSC_TOKEN_ENCRYPTION_KEY`.
-- Only the `webmasters.readonly` scope is requested — the dashboard cannot
+- Only the `webmasters.readonly` scope is requested - the dashboard cannot
   modify Search Console data.
 - The refresh token is never exposed in any serializer. Only
   `gsc_property_url` is exposed on the Site API.

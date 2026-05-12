@@ -223,7 +223,7 @@ export default function Login() {
             </>
           )}
 
-          {/* Step 1 — email only */}
+          {/* Step 1 - email only */}
           {step === "email" && (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -254,7 +254,7 @@ export default function Login() {
             </form>
           )}
 
-          {/* Step 2 — existing user, ask password */}
+          {/* Step 2 - existing user, ask password */}
           {step === "login" && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-2">
@@ -291,7 +291,7 @@ export default function Login() {
             </form>
           )}
 
-          {/* Step 3 — new user, password + confirm */}
+          {/* Step 3 - new user, password + confirm */}
           {step === "signup" && (
             <form onSubmit={handleSignupSubmit} className="space-y-4">
               <div className="space-y-2">

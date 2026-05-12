@@ -1,4 +1,4 @@
-"""Webflow CMS API v2 adapter — wraps `/v2/collections/{id}/items` calls.
+"""Webflow CMS API v2 adapter - wraps `/v2/collections/{id}/items` calls.
 
 Authentication uses a Webflow **Site Token** (Project Settings → Apps &
 Integrations → API access → Generate API token). We store it on
@@ -141,7 +141,7 @@ class WebflowClient:
         Returns {valid, sites: [{id, displayName, shortName, customDomains}], error?}.
         """
         if not token or len(token) < 30:
-            return {'valid': False, 'error': 'Token Webflow trop court — colle bien le Site Token.'}
+            return {'valid': False, 'error': 'Token Webflow trop court - colle bien le Site Token.'}
         headers = {
             'Authorization': f'Bearer {token}',
             'accept-version': '2.0.0',
@@ -223,7 +223,7 @@ class WebflowClient:
         except http_requests.RequestException as e:
             raise WebflowError(f'Webflow injoignable : {str(e)[:120]}')
         if resp.status_code == 401:
-            raise WebflowError('Token Webflow révoqué — re-connecte le site.')
+            raise WebflowError('Token Webflow révoqué - re-connecte le site.')
         if not resp.ok:
             raise WebflowError(f'Webflow {resp.status_code}: {resp.text[:200]}')
         return resp.json() or {}
@@ -284,7 +284,7 @@ class WebflowClient:
         page = self.list_posts(per_page=100)
         for r in page['results']:
             if r['slug'] == slug_or_id or r.get('webflow_id') == slug_or_id:
-                # Re-fetch detail (list call may not include all fields — fetch by id)
+                # Re-fetch detail (list call may not include all fields - fetch by id)
                 return self.get_post(r['webflow_id'])
         return None
 

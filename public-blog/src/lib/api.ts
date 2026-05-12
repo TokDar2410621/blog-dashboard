@@ -1,5 +1,5 @@
 /**
- * Public API client. Reads the dashboard's public endpoints — no auth,
+ * Public API client. Reads the dashboard's public endpoints - no auth,
  * just the optional X-Api-Key header per site.
  */
 

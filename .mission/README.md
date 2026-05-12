@@ -1,4 +1,4 @@
-# `.mission/` — Mémoire long-terme partagée
+# `.mission/` - Mémoire long-terme partagée
 
 Ce dossier contient l'état persistant d'une **mission** au sens du skill Claude Code `/mission` (voir `~/.claude/skills/mission/SKILL.md` chez Darius).
 

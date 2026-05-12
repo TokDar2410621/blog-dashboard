@@ -13,16 +13,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='site',
             name='wp_app_password',
-            field=models.CharField(blank=True, default='', help_text='Application Password généré dans WP → Profil → Application Passwords.', max_length=200, verbose_name='WordPress — Application Password'),
+            field=models.CharField(blank=True, default='', help_text='Application Password généré dans WP → Profil → Application Passwords.', max_length=200, verbose_name='WordPress - Application Password'),
         ),
         migrations.AddField(
             model_name='site',
             name='wp_url',
-            field=models.URLField(blank=True, default='', help_text='Ex: https://monsite.ca (sans /wp-admin). Si renseigné, le site est en mode WordPress.', max_length=500, verbose_name='WordPress — URL du site'),
+            field=models.URLField(blank=True, default='', help_text='Ex: https://monsite.ca (sans /wp-admin). Si renseigné, le site est en mode WordPress.', max_length=500, verbose_name='WordPress - URL du site'),
         ),
         migrations.AddField(
             model_name='site',
             name='wp_username',
-            field=models.CharField(blank=True, default='', help_text="Le nom d'utilisateur WordPress qui possède l'Application Password.", max_length=100, verbose_name='WordPress — username'),
+            field=models.CharField(blank=True, default='', help_text="Le nom d'utilisateur WordPress qui possède l'Application Password.", max_length=100, verbose_name='WordPress - username'),
         ),
     ]

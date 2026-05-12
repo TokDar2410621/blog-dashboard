@@ -1,4 +1,4 @@
-"""Shopify Admin API adapter — wraps `/admin/api/.../articles.json` calls so the
+"""Shopify Admin API adapter - wraps `/admin/api/.../articles.json` calls so the
 rest of the dashboard can treat a Shopify store like any other backend.
 
 Authentication uses Shopify **custom app** Admin API access tokens. The store
@@ -105,7 +105,7 @@ class ShopifyClient:
         if not normalized:
             return {'valid': False, 'error': 'Domaine Shopify invalide.'}
         if not token or len(token) < 20:
-            return {'valid': False, 'error': 'Token Shopify trop court — colle bien le Admin API access token.'}
+            return {'valid': False, 'error': 'Token Shopify trop court - colle bien le Admin API access token.'}
 
         base = f'https://{normalized}/admin/api/{API_VERSION}'
         headers = {
@@ -120,9 +120,9 @@ class ShopifyClient:
         except http_requests.RequestException as e:
             return {'valid': False, 'error': f'Boutique injoignable : {str(e)[:120]}'}
         if resp.status_code == 401:
-            return {'valid': False, 'error': "Token invalide ou révoqué — vérifie le Admin API access token."}
+            return {'valid': False, 'error': "Token invalide ou révoqué - vérifie le Admin API access token."}
         if resp.status_code == 404:
-            return {'valid': False, 'error': "Domaine Shopify introuvable — vérifie l'orthographe du sous-domaine .myshopify.com."}
+            return {'valid': False, 'error': "Domaine Shopify introuvable - vérifie l'orthographe du sous-domaine .myshopify.com."}
         if not resp.ok:
             return {'valid': False, 'error': f'Erreur Shopify {resp.status_code}: {resp.text[:200]}'}
 
@@ -142,7 +142,7 @@ class ShopifyClient:
         if blogs_resp.status_code == 403:
             return {
                 'valid': False,
-                'error': "Token sans la permission 'write_content' — re-créé la custom app avec le scope write_content.",
+                'error': "Token sans la permission 'write_content' - re-créé la custom app avec le scope write_content.",
             }
         if not blogs_resp.ok:
             return {'valid': False, 'error': f'Erreur Shopify {blogs_resp.status_code}: {blogs_resp.text[:200]}'}
@@ -167,13 +167,13 @@ class ShopifyClient:
         }
 
     def test_auth(self):
-        """Quick auth check — used after connection to confirm credentials still work."""
+        """Quick auth check - used after connection to confirm credentials still work."""
         try:
             resp = http_requests.get(f'{self.base_url}/shop.json', headers=self.headers, timeout=10)
         except http_requests.RequestException as e:
             raise ShopifyError(f'Boutique injoignable : {str(e)[:120]}')
         if resp.status_code == 401:
-            raise ShopifyError('Token Shopify révoqué — re-connecte la boutique.')
+            raise ShopifyError('Token Shopify révoqué - re-connecte la boutique.')
         if not resp.ok:
             raise ShopifyError(f'Shopify {resp.status_code}: {resp.text[:200]}')
         return (resp.json() or {}).get('shop') or {}
@@ -255,7 +255,7 @@ class ShopifyClient:
             if not resp.ok:
                 raise ShopifyError(f'Shopify {resp.status_code}: {resp.text[:200]}')
             return self._serialize((resp.json() or {}).get('article') or {})
-        # Handle (slug) lookup — we list with handle filter
+        # Handle (slug) lookup - we list with handle filter
         try:
             resp = http_requests.get(
                 f'{self.base_url}/blogs/{blog_id}/articles.json',
@@ -371,7 +371,7 @@ class ShopifyClient:
     # ── Categories & Tags ─────────────────────────────────────────────
 
     def list_categories(self):
-        """Shopify articles don't have categories — only tags. Return empty so
+        """Shopify articles don't have categories - only tags. Return empty so
         existing UIs that call list_categories() degrade gracefully."""
         return []
 

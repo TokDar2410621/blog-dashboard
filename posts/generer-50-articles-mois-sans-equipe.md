@@ -1,9 +1,9 @@
 ---
-title: Générer 50 articles SEO par mois sans équipe — le playbook complet
+title: Générer 50 articles SEO par mois sans équipe - le playbook complet
 slug: generer-50-articles-mois-sans-equipe
 date: 2026-04-07
 author: Darius Tokam
-excerpt: Le record que j'ai battu avec Gridar — 52 articles publiés en 30 jours en dogfooding, sans embaucher personne. Le playbook complet avec chiffres, outils et la check-list quotidienne.
+excerpt: Le record que j'ai battu avec Gridar - 52 articles publiés en 30 jours en dogfooding, sans embaucher personne. Le playbook complet avec chiffres, outils et la check-list quotidienne.
 tags: [productivite, dogfooding, contenu]
 ---
 
@@ -28,11 +28,11 @@ La clé du gain : **j'ai arrêté d'écrire moi-même**. Je suis devenu chef d'o
 
 ## Le workflow quotidien (45 minutes en moyenne)
 
-### 8h00 — Sélection des sujets (5 min)
+### 8h00 - Sélection des sujets (5 min)
 
 Je consulte le panneau "Keyword research" de Gridar pour 1 de mes 3 sites (rotation). Je sélectionne 1-2 sujets à fort intent et faible difficulté.
 
-### 8h05 — Brief automatique (5 min)
+### 8h05 - Brief automatique (5 min)
 
 Pour chaque sujet, je clique "Générer un brief". Gridar produit :
 - Intent (informational, commercial, transactional, navigational)
@@ -43,13 +43,13 @@ Pour chaque sujet, je clique "Générer un brief". Gridar produit :
 
 Je relis. Souvent 1-2 ajustements (ajouter un angle interne, retirer une question redondante).
 
-### 8h10 — Génération (5-12 min de wait, 2 min de mon temps)
+### 8h10 - Génération (5-12 min de wait, 2 min de mon temps)
 
 Je clique "Générer l'article". Gridar attaque Claude Opus avec le brief enrichi de ma knowledge base (qui contient les infos spécifiques à mes entreprises : NEQ, services, prix, témoignages).
 
 L'article sort en 5-12 minutes. Pendant ce temps, je vais préparer le 2e brief.
 
-### 8h25 — Audit + retouches (10-15 min par article)
+### 8h25 - Audit + retouches (10-15 min par article)
 
 L'article généré arrive avec un score SEO. Je lis. Je modifie typiquement :
 - 1-2 paragraphes qui sonnent IA (je les ré-écris)
@@ -58,11 +58,11 @@ L'article généré arrive avec un score SEO. Je lis. Je modifie typiquement :
 - Ajoute 2-3 backlinks internes vers mes articles existants
 - Pousse le score SEO à 85+
 
-### 8h40 — Publication (2 min)
+### 8h40 - Publication (2 min)
 
-Je clique "Publier". L'article part sur le bon CMS (WP / Shopify / blog hébergé). Schema, hreflang, image de couverture (Pexels ou Gemini si visuel) — tout est automatique.
+Je clique "Publier". L'article part sur le bon CMS (WP / Shopify / blog hébergé). Schema, hreflang, image de couverture (Pexels ou Gemini si visuel) - tout est automatique.
 
-### 8h45 — Promo sociale (5 min)
+### 8h45 - Promo sociale (5 min)
 
 Je copie l'URL dans LinkedIn + Twitter. Manuel pour ne pas avoir l'air robotique.
 
@@ -96,7 +96,7 @@ Je n'ai qu'à valider, plus à chercher.
 
 ### Piège 1 : "Je vais juste relire vite"
 
-L'IA hallucine sur les chiffres et les programmes gouvernementaux. J'ai publié un article disant "le programme PRIME-Vert donne 12 000 $" — c'est 8 000 $. Heureusement un lecteur l'a flaggé en commentaire. **Toujours vérifier les montants, dates, lois.**
+L'IA hallucine sur les chiffres et les programmes gouvernementaux. J'ai publié un article disant "le programme PRIME-Vert donne 12 000 $" - c'est 8 000 $. Heureusement un lecteur l'a flaggé en commentaire. **Toujours vérifier les montants, dates, lois.**
 
 ### Piège 2 : Articles fades qui se ressemblent
 
@@ -108,7 +108,7 @@ J'ai eu une semaine où j'ai poussé pour 4 articles/jour. Les scores ont chuté
 
 ### Piège 4 : Ignorer le maillage interne
 
-50 articles publiés sans maillage = 50 îles déconnectées. Google ne voit pas le topic cluster. **Le LinkGraph Gridar propose automatiquement 3-5 liens internes par article — toujours en accepter au moins 2.**
+50 articles publiés sans maillage = 50 îles déconnectées. Google ne voit pas le topic cluster. **Le LinkGraph Gridar propose automatiquement 3-5 liens internes par article - toujours en accepter au moins 2.**
 
 ## Le coût total du mois d'avril
 
@@ -119,7 +119,7 @@ J'ai eu une semaine où j'ai poussé pour 4 articles/jour. Les scores ont chuté
 | Coût IA répercuté par Gridar | inclus |
 | Hébergement (Vercel + Railway gratuits) | 0 CAD |
 | Outils périphériques (n8n self-hosted VPS) | 5 USD/mois |
-| Mon temps (78 h × 0 $ — c'est mon temps de fondateur) | 0 CAD |
+| Mon temps (78 h × 0 $ - c'est mon temps de fondateur) | 0 CAD |
 | **Total cash** | **~195 CAD** |
 
 À titre de comparaison, faire écrire 52 articles à 50 $/h × 4h/article = **10 400 CAD**. Le ROI Gridar : **53x**.
@@ -132,7 +132,7 @@ J'ai eu une semaine où j'ai poussé pour 4 articles/jour. Les scores ont chuté
 - ⚠️ Engagement social moyen (l'IA ne sait pas créer la viralité)
 - ⚠️ 3 articles ont eu des corrections après publication (chiffres erronés)
 
-**Le SEO automatique en 2026 fonctionne — à condition d'être un chef d'orchestre éclairé, pas un robot.**
+**Le SEO automatique en 2026 fonctionne - à condition d'être un chef d'orchestre éclairé, pas un robot.**
 
 ## Lectures liées
 

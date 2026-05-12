@@ -1,9 +1,9 @@
 ---
-title: Le piège du SEO français — pourquoi écrire "shopping" tue ton ranking au Québec
+title: Le piège du SEO français - pourquoi écrire "shopping" tue ton ranking au Québec
 slug: seo-bilingue-fr-ca-piege
 date: 2026-05-08
 author: Darius Tokam
-excerpt: Tous les outils SEO traitent le "français" comme un seul marché. Spoiler — il y en a au moins quatre, et celui du Québec a son propre lexique, ses propres requêtes, et son propre SERP.
+excerpt: Tous les outils SEO traitent le "français" comme un seul marché. Spoiler - il y en a au moins quatre, et celui du Québec a son propre lexique, ses propres requêtes, et son propre SERP.
 tags: [seo, bilingue, lexique]
 ---
 
@@ -41,13 +41,13 @@ Notes : ce sont des estimations Serper + Google Trends mai 2026. Le sens des dé
 
 ## Le test des 5 secondes
 
-Ouvre n'importe quel article de ton site dans Chrome, fais `Ctrl+F`, cherche "shopping". Si tu trouves au moins une occurrence et que tu vises le marché québécois, tu as un problème de ranking immédiat. Remplace par "magasinage" — tu vas voir ton article remonter dans les 2-4 semaines suivantes (le temps que Google le re-crawle).
+Ouvre n'importe quel article de ton site dans Chrome, fais `Ctrl+F`, cherche "shopping". Si tu trouves au moins une occurrence et que tu vises le marché québécois, tu as un problème de ranking immédiat. Remplace par "magasinage" - tu vas voir ton article remonter dans les 2-4 semaines suivantes (le temps que Google le re-crawle).
 
 ## Pourquoi les outils SEO classiques ne t'aident pas
 
 Ahrefs, SEMrush et Surfer SEO catégorisent leurs corpus par `fr`, pas par `fr-CA`. Quand ils te suggèrent des mots-clés, ils te donnent les volumes France, pas Québec. Tu optimises pour la mauvaise audience sans le savoir.
 
-[Gridar](/) a été entraîné sur des corpus QC : tous les suggesteurs (keyword research, brief, audit) raisonnent en `fr-CA` par défaut. Tu peux toujours générer pour `fr-FR` si tu veux toucher Paris — mais c'est un toggle conscient, pas un défaut subi.
+[Gridar](/) a été entraîné sur des corpus QC : tous les suggesteurs (keyword research, brief, audit) raisonnent en `fr-CA` par défaut. Tu peux toujours générer pour `fr-FR` si tu veux toucher Paris - mais c'est un toggle conscient, pas un défaut subi.
 
 ## Comment vérifier ton lexique en 1 minute
 

@@ -1,4 +1,4 @@
-"""Branding extractor — given a public URL, scan the page HTML+CSS and infer:
+"""Branding extractor - given a public URL, scan the page HTML+CSS and infer:
   - logo_url (favicon, og:image, header <img>)
   - brand_color (theme-color meta, accent CSS color, link color)
   - brand_fg (text color)
@@ -8,7 +8,7 @@
   - description (meta description, og:description)
 
 The shape returned is compatible with `Site.theme_config` so callers can save
-it directly. This is a best-effort heuristic — not pixel-perfect — but enough
+it directly. This is a best-effort heuristic - not pixel-perfect - but enough
 to give a non-coder a "here's how your blog will look on your domain" preview.
 """
 from __future__ import annotations
@@ -226,7 +226,7 @@ def _pick_brand_fg(brand_color):
 
 
 def _extract_fonts(css_text):
-    """Return (sans_font, display_font) — best-effort. Body fonts are sans by
+    """Return (sans_font, display_font) - best-effort. Body fonts are sans by
     convention; first non-system font wins."""
     fonts = []
     for m in _FONT_FAMILY_RE.finditer(css_text):
@@ -325,7 +325,7 @@ def scan(url):
 
     # Extract from inline <style> blocks and any visible inline CSS.
     inline_css_combined = '\n'.join(parser.inline_css)
-    # Also scan inline style="" attributes — quick pattern match.
+    # Also scan inline style="" attributes - quick pattern match.
     inline_attr_css = ''
     for m in re.finditer(r'style\s*=\s*"([^"]*)"', html, flags=re.IGNORECASE):
         inline_attr_css += m.group(1) + ';'

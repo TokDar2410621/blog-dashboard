@@ -1,5 +1,5 @@
 ---
-title: Content decay — pourquoi tes meilleurs articles perdent du trafic (et comment le récupérer)
+title: Content decay - pourquoi tes meilleurs articles perdent du trafic (et comment le récupérer)
 slug: content-decay-detection
 date: 2026-04-10
 author: Darius Tokam
@@ -29,7 +29,7 @@ C'est différent d'un article qui n'a JAMAIS performé (ça, c'est un problème 
 2. **Information périmée.** Tu disais "le programme XYZ donne 5000 $", le programme a changé à 7000 $, Google détecte l'incohérence avec les sources récentes et te déclasse.
 3. **Search intent qui dérive.** Le mot-clé "meilleur CRM" voulait dire "comparatif d'outils" en 2023, il veut dire "comparatif avec démo vidéo" en 2026. Si tu n'as pas adapté, tu sors.
 4. **Backlinks qui s'évaporent.** Les sites qui te linkaient ferment ou repensent leurs articles sans toi.
-5. **Core update Google.** Septembre 2023, mars 2024, août 2025 — chaque update redistribue 10-30 % du trafic.
+5. **Core update Google.** Septembre 2023, mars 2024, août 2025 - chaque update redistribue 10-30 % du trafic.
 
 ## Comment le détecter (3 méthodes)
 
@@ -64,7 +64,7 @@ Pour chaque article flaggé, ouvre-le en mode incognito et compare-le aux 3 prem
 
 ### Étape 2 : Mettre à jour les infos périmées
 
-Stats, dates, prix, programmes, lois — tout doit refléter 2026.
+Stats, dates, prix, programmes, lois - tout doit refléter 2026.
 
 ### Étape 3 : Augmenter la profondeur
 
@@ -75,7 +75,7 @@ Si ton article fait 800 mots et que les top 3 font 2200 mots, ajoute 1500 mots. 
 - Update la `<meta property="article:modified_time">`
 - Ajoute "Mis à jour le [date]" en haut de l'article
 - Ajoute 2-3 backlinks internes vers tes articles plus récents
-- Republie (sans changer l'URL) — Google va re-crawler dans 1-7 jours
+- Republie (sans changer l'URL) - Google va re-crawler dans 1-7 jours
 
 ### Étape 5 : Re-promouvoir
 
@@ -89,7 +89,7 @@ Pour chaque article flaggé en decay, Gridar te propose un bouton "Régénérer"
 2. Compare ton article au top 3 actuel
 3. Génère une version refresh qui garde ton angle mais comble les écarts
 4. Te montre un diff avant/après
-5. Tu publies en un clic — l'URL reste, Google ne perd pas tes signaux historiques
+5. Tu publies en un clic - l'URL reste, Google ne perd pas tes signaux historiques
 
 Temps total : 5 minutes par article.
 

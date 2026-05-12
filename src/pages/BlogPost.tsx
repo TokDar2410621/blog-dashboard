@@ -1,5 +1,5 @@
 /**
- * Single blog post — /blog/:slug
+ * Single blog post - /blog/:slug
  */
 import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -175,13 +175,13 @@ export default function BlogPost() {
           </nav>
         )}
 
-        {/* Footer CTA — drive blog readers to /login (signup) */}
+        {/* Footer CTA - drive blog readers to /login (signup) */}
         <div className="mt-16 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center">
           <h2 className="text-2xl font-bold tracking-tight mb-2">
             Tu veux générer ce genre d'article sur ton site ?
           </h2>
           <p className="text-muted-foreground mb-6">
-            Gridar le fait pour toi — du brief à la publication WordPress / Shopify / Webflow.
+            Gridar le fait pour toi - du brief à la publication WordPress / Shopify / Webflow.
           </p>
           <Link to="/login">
             <Button size="lg">

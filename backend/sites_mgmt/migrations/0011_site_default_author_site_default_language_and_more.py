@@ -60,12 +60,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='site',
             name='gsc_property_url',
-            field=models.URLField(blank=True, default='', help_text='URL de la propriété Search Console (ex: https://tokamdarius.ca/)', max_length=300, verbose_name='Search Console — URL propriété'),
+            field=models.URLField(blank=True, default='', help_text='URL de la propriété Search Console (ex: https://tokamdarius.ca/)', max_length=300, verbose_name='Search Console - URL propriété'),
         ),
         migrations.AlterField(
             model_name='site',
             name='gsc_refresh_token',
-            field=models.TextField(blank=True, default='', help_text='OAuth2 refresh token (sensible — ne pas exposer côté frontend)', verbose_name='Search Console — refresh token'),
+            field=models.TextField(blank=True, default='', help_text='OAuth2 refresh token (sensible - ne pas exposer côté frontend)', verbose_name='Search Console - refresh token'),
         ),
         migrations.AlterField(
             model_name='site',

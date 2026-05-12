@@ -84,7 +84,7 @@ def sync_blog_schema(alias, site=None):
 
             if is_view:
                 logger.info(
-                    "%s on %s is a VIEW with missing columns %s — will rebuild",
+                    "%s on %s is a VIEW with missing columns %s - will rebuild",
                     table, alias, [f.column for f in missing]
                 )
                 rebuild_views = True
@@ -105,12 +105,12 @@ def sync_blog_schema(alias, site=None):
         return True
 
     if not site:
-        logger.warning("Cannot rebuild views on %s — no site object", alias)
+        logger.warning("Cannot rebuild views on %s - no site object", alias)
         return False
 
     if not site.blog_config:
         logger.warning(
-            "Cannot rebuild views on %s — site.blog_config is empty. "
+            "Cannot rebuild views on %s - site.blog_config is empty. "
             "Run /api/sites/%s/detect_blog/ then /setup_blog/ to regenerate views.",
             alias, site.id
         )

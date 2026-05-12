@@ -1,10 +1,10 @@
 # Servir le blog sous `tonsite.ca/blog`
 
 Trois patterns de proxy reverse selon ton hébergeur. Le plus SEO-optimal : tout
-le jus de domaine reste sur ton site principal — Google traite `/blog` comme
+le jus de domaine reste sur ton site principal - Google traite `/blog` comme
 une section de ton domaine, pas un site externe.
 
-## Pattern A — Cloudflare Worker (recommandé, gratuit, marche partout)
+## Pattern A - Cloudflare Worker (recommandé, gratuit, marche partout)
 
 Pré-requis : ton DNS pointe vers Cloudflare (passage gratuit avec son plan
 gratuit).
@@ -13,7 +13,7 @@ gratuit).
 2. Colle ce code dans le Worker :
 
 ```javascript
-// blog-proxy.js — proxy /blog/* du site principal vers blog-dashboard-public
+// blog-proxy.js - proxy /blog/* du site principal vers blog-dashboard-public
 const BLOG_HOST = 'blog-dashboard-public.vercel.app'; // remplace si custom Vercel
 
 export default {
@@ -74,7 +74,7 @@ export default {
 
 ---
 
-## Pattern B — Vercel rewrites (si ton site principal est sur Vercel)
+## Pattern B - Vercel rewrites (si ton site principal est sur Vercel)
 
 Si ton site principal `tonsite.ca` est déjà sur Vercel, ajoute dans son
 `vercel.json` :
@@ -114,7 +114,7 @@ Vercel du projet `blog-dashboard-public` (mode mono-tenant).
 
 ---
 
-## Pattern C — Nginx reverse proxy (VPS / hébergeur custom)
+## Pattern C - Nginx reverse proxy (VPS / hébergeur custom)
 
 Dans ta config Nginx :
 
@@ -140,7 +140,7 @@ Reload Nginx : `sudo nginx -s reload`.
 
 ---
 
-## Pattern D — Apache .htaccess (cPanel / hébergement mutualisé)
+## Pattern D - Apache .htaccess (cPanel / hébergement mutualisé)
 
 ```apacheconf
 RewriteEngine On
@@ -171,6 +171,6 @@ Si ton hébergeur ne permet aucun de ces 4 patterns, tu peux toujours utiliser
 le mode sous-domaine custom (`blog.tonsite.ca`) qui ne demande qu'un CNAME
 DNS.
 
-Si tu bloques sur la config DNS / Worker, contacte Darius — il a vécu chaque
+Si tu bloques sur la config DNS / Worker, contacte Darius - il a vécu chaque
 hébergeur québécois (Hostinger, OVH, GoDaddy, Cloudflare, Vercel) et peut
 te débloquer en 15 minutes.

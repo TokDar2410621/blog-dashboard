@@ -43,7 +43,7 @@ class Command(BaseCommand):
         api_key = os.environ.get('SERPER_API_KEY')
         if not api_key:
             self.stderr.write(self.style.ERROR(
-                'SERPER_API_KEY non configurée — abort.'
+                'SERPER_API_KEY non configurée - abort.'
             ))
             return
 

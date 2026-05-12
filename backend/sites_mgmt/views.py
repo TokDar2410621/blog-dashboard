@@ -62,7 +62,7 @@ def trigger_vercel_deploy(site):
     try:
         http_requests.post(site.vercel_deploy_hook, timeout=5)
     except Exception:
-        pass  # Non-blocking — don't fail the request if deploy hook fails
+        pass  # Non-blocking - don't fail the request if deploy hook fails
 
 
 class SiteViewSet(viewsets.ModelViewSet):
@@ -1033,7 +1033,7 @@ class GenerateArticleView(APIView):
         keywords = request.data.get('keywords', None) or None
         dry_run = request.data.get('dry_run', False)
         language = request.data.get('language', 'fr')
-        # Optional Content Brief from /content-brief/ — passed through to the
+        # Optional Content Brief from /content-brief/ - passed through to the
         # generator which injects it into the Claude prompt.
         brief = request.data.get('brief')
         if not isinstance(brief, dict):
@@ -1122,7 +1122,7 @@ class GenerateArticleView(APIView):
 
 
 class GenerateInlineView(APIView):
-    """Generate article content and return it without saving — fills the editor."""
+    """Generate article content and return it without saving - fills the editor."""
     permission_classes = [IsAuthenticated]
     throttle_classes = [UserRateThrottle]
     throttle_scope = 'ai_generate'
@@ -1269,7 +1269,7 @@ class UploadImageView(APIView):
 
 class ServeImageView(APIView):
     """Serve an uploaded image from DB. Public (no auth) for blog display."""
-    permission_classes = []  # Public — images are referenced in articles
+    permission_classes = []  # Public - images are referenced in articles
 
     def get(self, request, uid):
         img = get_object_or_404(UploadedImage, uid=uid)
@@ -1536,7 +1536,7 @@ Content (first 5000 chars):
 
 Evaluate:
 - Search intent alignment (does the article answer what someone would Google?)
-- Keyword placement (title, intro, H2s, natural density — NOT stuffing)
+- Keyword placement (title, intro, H2s, natural density - NOT stuffing)
 - Content depth & originality (is this the same as 100 other articles?)
 - E-E-A-T signals (experience, expertise, authority, trust cues)
 - Readability (sentence length, active voice, scannability)
@@ -1578,7 +1578,7 @@ Respond in JSON only (no markdown):
 
 
 class SEOAuditView(APIView):
-    """Full SEO audit via Gemini — returns score + strengths + weaknesses + actions."""
+    """Full SEO audit via Gemini - returns score + strengths + weaknesses + actions."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -1669,7 +1669,7 @@ class SEOFixView(APIView):
                 keyword_block = f"""
 PRIMARY KEYWORD: {keyword}
 - The keyword (or a close variant) MUST appear naturally in the title, the first paragraph, and at least one H2.
-- Do NOT stuff it — one occurrence per zone is enough.
+- Do NOT stuff it - one occurrence per zone is enough.
 """
 
             competitor_block = f"\nCOMPETITOR CONTEXT:\n{competitor_summary}\n" if competitor_summary else ''
@@ -1695,7 +1695,7 @@ RULES:
 - Excerpt/meta description: 120-160 characters, contains the primary keyword if provided
 - If content is too short or weaker than competitors, expand with relevant paragraphs (keep markdown format, same tone)
 - Respect and reinforce the author's existing voice and style
-- Only return fields that actually need changes — null for fields already good
+- Only return fields that actually need changes - null for fields already good
 - Use the competitor and audit context above to inform depth, structure, and angle
 
 Respond in JSON only (no markdown blocks):
@@ -2119,7 +2119,7 @@ class PageSpeedView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Cache results for 30 min — PSI is slow and quota-limited
+        # Cache results for 30 min - PSI is slow and quota-limited
         cache_key = _seo_cache_key('page-speed:', url, strategy)
         cached = cache.get(cache_key)
         if cached is not None:
@@ -2157,7 +2157,7 @@ class PageSpeedView(APIView):
                 err_msg = err_body.get('error', {}).get('message', f'HTTP {resp.status_code}')
             except Exception:
                 err_msg = f'HTTP {resp.status_code}'
-            # Common: 429 quota exceeded — guide the user
+            # Common: 429 quota exceeded - guide the user
             hint = ''
             if resp.status_code == 429:
                 hint = ' Configure PAGESPEED_API_KEY (gratuit chez Google Cloud) pour eviter les limites.'
@@ -2370,7 +2370,7 @@ class BacklinksView(APIView):
 
         url = (request.data.get('url') or '').strip()
         warning = (
-            'Serper results are approximations — for real data use Ahrefs/SEMrush'
+            'Serper results are approximations - for real data use Ahrefs/SEMrush'
         )
 
         if not url:
@@ -2943,7 +2943,7 @@ class ContentBriefView(APIView):
         if cached:
             return Response(cached)
 
-        # 1) Serper — SERP top 10 + People Also Ask (best-effort)
+        # 1) Serper - SERP top 10 + People Also Ask (best-effort)
         serper_key = os.environ.get('SERPER_API_KEY')
         organic = []
         paa = []
@@ -2986,7 +2986,7 @@ class ContentBriefView(APIView):
             title = (item.get('title') or '').strip()
             snippet = (item.get('snippet') or '').strip()
             if title:
-                serp_lines.append(f"{idx}. {title} — {snippet}")
+                serp_lines.append(f"{idx}. {title} - {snippet}")
         serp_block = '\n'.join(serp_lines) if serp_lines else '(no SERP data available)'
         paa_block = '\n'.join(f"- {q}" for q in paa[:10]) if paa else '(no PAA available)'
         related_block = ', '.join(related[:10]) if related else '(none)'
@@ -3007,7 +3007,7 @@ PEOPLE ALSO ASK:
 RELATED SEARCHES: {related_block}
 
 Produce a content brief as JSON. The brief MUST be in {lang_label}. Be specific and
-actionable — a writer should be able to start writing from it without further research.
+actionable - a writer should be able to start writing from it without further research.
 
 For "search_intent" choose ONE of: informational, commercial, transactional, navigational.
 
@@ -3195,7 +3195,7 @@ class HreflangCheckView(APIView):
                 groups_complete += 1
 
         # Articles published in only ONE language across the whole site,
-        # whose group has no siblings — candidates for translation.
+        # whose group has no siblings - candidates for translation.
         single_lang_orphans = [
             {
                 'slug': members[0]['slug'],
@@ -3429,7 +3429,7 @@ class PAAView(APIView):
             ('es', 'es') if language == 'es' else ('fr', 'ca')
         )
 
-        # 1) Serper — peopleAlsoAsk
+        # 1) Serper - peopleAlsoAsk
         try:
             resp = http_requests.post(
                 'https://google.serper.dev/search',
@@ -3480,7 +3480,7 @@ class PAAView(APIView):
             cache.set(cache_key, result, SEO_CACHE_TTL)
             return Response(result)
 
-        # 2) Gemini — short answers (best-effort; if it fails, fall back to snippet)
+        # 2) Gemini - short answers (best-effort; if it fails, fall back to snippet)
         if generate_answers:
             gemini_key = os.environ.get('GEMINI_API_KEY')
             if gemini_key:
@@ -3690,7 +3690,7 @@ Respond with JSON only (no markdown):
 
 
 class SearchTrendsView(APIView):
-    """Google Trends data via pytrends — interest over time + related/rising
+    """Google Trends data via pytrends - interest over time + related/rising
     queries for a keyword. Geo-scoped to Quebec / Canada / France / US per
     language. Cached 24h (trends move slowly).
 
@@ -3727,7 +3727,7 @@ class SearchTrendsView(APIView):
             geo = 'ES'
             hl = 'es-ES'
         else:
-            geo = 'CA'  # Canada — pytrends doesn't support sub-region directly for this query
+            geo = 'CA'  # Canada - pytrends doesn't support sub-region directly for this query
             hl = 'fr-CA'
 
         try:
@@ -3873,7 +3873,7 @@ class PlagiarismCheckView(APIView):
 
         data = resp.json() or {}
 
-        # Extract scores — defensive parsing since the API shape can vary
+        # Extract scores - defensive parsing since the API shape can vary
         ai_score_raw = (
             data.get('aiScore')
             or data.get('ai', {}).get('score')
@@ -3935,7 +3935,7 @@ class PlagiarismCheckView(APIView):
 class CommunityQuestionsView(APIView):
     """Harvest questions and discussions about a keyword from Reddit and Quora
     via Serper. Useful to find the real-world phrasing people use when they
-    have a problem in your topic area — strong source of long-tail headings
+    have a problem in your topic area - strong source of long-tail headings
     and FAQ content.
 
     POST /community-questions/ {keyword, language: 'fr'|'en'|'es'}
@@ -4057,7 +4057,7 @@ class BrokenLinksView(APIView):
             request.data.get('language') or request.query_params.get('language') or ''
         ).strip().lower() or None
 
-        # Domain to know what's "internal" — we skip internal links here.
+        # Domain to know what's "internal" - we skip internal links here.
         site_domain = (site.domain or '').lower().replace('https://', '').replace('http://', '').rstrip('/')
 
         # Fetch published articles
@@ -4105,7 +4105,7 @@ class BrokenLinksView(APIView):
                 # Skip internal links
                 if site_domain and site_domain in url.lower():
                     continue
-                # Skip non-content links (mailto, tel, etc. — already filtered by regex but defense)
+                # Skip non-content links (mailto, tel, etc. - already filtered by regex but defense)
                 if not url.startswith(('http://', 'https://')):
                     continue
                 url_to_articles.setdefault(url, []).append(
@@ -4169,7 +4169,7 @@ class BrokenLinksView(APIView):
                 allow_redirects=True,
                 headers={'User-Agent': 'Mozilla/5.0 BlogDashboard/1.0'},
             )
-            # Some servers return 405/403 on HEAD but work on GET — try GET.
+            # Some servers return 405/403 on HEAD but work on GET - try GET.
             if resp.status_code in (403, 405, 501):
                 try:
                     resp = http_requests.get(
@@ -4435,7 +4435,7 @@ class LocalBusinessSchemaView(APIView):
 
 
 # ==========================================================================
-# BILLING — Stripe subscriptions
+# BILLING - Stripe subscriptions
 # ==========================================================================
 
 # Plan slug → env var of the Stripe Price ID. Configured by the operator.
@@ -4481,7 +4481,7 @@ def _serialize_subscription(sub):
 
 
 class BillingMeView(APIView):
-    """GET /billing/me/ — current user's subscription state."""
+    """GET /billing/me/ - current user's subscription state."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -4490,7 +4490,7 @@ class BillingMeView(APIView):
 
 
 class BillingCreditsView(APIView):
-    """GET /billing/credits/ — balance + recent transactions.
+    """GET /billing/credits/ - balance + recent transactions.
     POST /billing/credits/buy/ is on `BillingCreditsCheckoutView` below.
     """
     permission_classes = [IsAuthenticated]
@@ -4702,7 +4702,7 @@ class BillingPortalView(APIView):
 
 
 class BillingWebhookView(APIView):
-    """POST /billing/webhook/ — Stripe webhook endpoint.
+    """POST /billing/webhook/ - Stripe webhook endpoint.
 
     Handles:
       - customer.subscription.{created,updated,deleted}  → mirror state into Subscription
@@ -4710,7 +4710,7 @@ class BillingWebhookView(APIView):
       - invoice.payment_succeeded                        → ensure Subscription active
       - checkout.session.completed (mode=payment)        → apply purchased credits
 
-    Security: no auth class — request is verified via Stripe's HMAC signature
+    Security: no auth class - request is verified via Stripe's HMAC signature
     in the Stripe-Signature header. A missing or invalid signature returns 400.
 
     Reliability: any handler exception is caught + logged but the endpoint
@@ -4746,7 +4746,7 @@ class BillingWebhookView(APIView):
         try:
             self._dispatch(event)
         except Exception as e:
-            # Never propagate handler bugs to Stripe — log and ack 200.
+            # Never propagate handler bugs to Stripe - log and ack 200.
             logger.exception(
                 'Stripe webhook handler crashed (event=%s type=%s): %s',
                 event_id, event_type, e,
@@ -4785,7 +4785,7 @@ class BillingWebhookView(APIView):
         sub_obj.status = data.get('status', 'active')
         sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
 
-        # Determine plan from price id — check current then legacy envs.
+        # Determine plan from price id - check current then legacy envs.
         items = data.get('items', {}).get('data', [])
         if items:
             price_id = items[0].get('price', {}).get('id', '')
@@ -4842,7 +4842,7 @@ class BillingWebhookView(APIView):
         via customer.subscription.updated, but this is a belt-and-suspenders).
         """
         # Skip the very first invoice that Stripe creates with $0 (subscription_create)
-        # — the subscription event fires at the same time and is the source of truth.
+        # - the subscription event fires at the same time and is the source of truth.
         if invoice.get('billing_reason') == 'subscription_create':
             return
         customer_id = invoice.get('customer')
@@ -4858,7 +4858,7 @@ class BillingWebhookView(APIView):
         )
 
     def _handle_checkout_completed(self, session):
-        """One-time payment (credits pack) — apply credits.
+        """One-time payment (credits pack) - apply credits.
 
         Subscription checkouts (mode='subscription') skip this branch and are
         instead handled via customer.subscription.created.
@@ -4900,7 +4900,7 @@ class BillingWebhookView(APIView):
 
 
 # ==========================================================================
-# WORDPRESS — discover & connect
+# WORDPRESS - discover & connect
 # ==========================================================================
 
 
@@ -4930,7 +4930,7 @@ class WordPressConnectView(APIView):
     create / update a Site row for it.
 
     POST /wp/connect/ {url, username, app_password, name?}
-    On success returns the Site dict — frontend can then redirect to the
+    On success returns the Site dict - frontend can then redirect to the
     dashboard for that site.
     """
     permission_classes = [IsAuthenticated]
@@ -4987,7 +4987,7 @@ class WordPressConnectView(APIView):
                     wp_url=url,
                     description=discovery.get('description', '') or '',
                 )
-            # Always (re)set credentials and save before testing — WPClient reads them from the model.
+            # Always (re)set credentials and save before testing - WPClient reads them from the model.
             site.wp_url = url
             site.wp_username = username
             site.wp_app_password = app_password
@@ -5137,7 +5137,7 @@ class WeeklyDigestView(APIView):
 
         # Broken-link count (only if a recent scan was cached)
         # We don't trigger a scan; just sample the cache for a known key.
-        # MVP: skip — leave 0 unless integrated later.
+        # MVP: skip - leave 0 unless integrated later.
         broken_link_cache_count = 0
 
         # Active redirects + recent redirects (created or updated this week)
@@ -5176,7 +5176,7 @@ class WeeklyDigestView(APIView):
 
 
 class MultiDomainStatsView(APIView):
-    """Aggregate stats for ALL sites of the authenticated user — useful for
+    """Aggregate stats for ALL sites of the authenticated user - useful for
     agencies / multi-site owners who want a single view across their portfolio.
 
     GET /multi-domain-stats/
@@ -5295,8 +5295,8 @@ class PersonSchemaView(APIView):
 
 
 def _count_syllables_en(word):
-    """Heuristic English syllable count. Good enough for Flesch — not perfect."""
-    word = word.lower().strip(".,!?;:'\"()[]{}—–-")
+    """Heuristic English syllable count. Good enough for Flesch - not perfect."""
+    word = word.lower().strip(".,!?;:'\"()[]{}---")
     if len(word) <= 3:
         return 1
     word = re.sub(r'(?:[^laeiouy]es|ed|[^laeiouy]e)$', '', word)
@@ -5307,7 +5307,7 @@ def _count_syllables_en(word):
 
 def _count_syllables_fr(word):
     """Heuristic French syllable count."""
-    word = word.lower().strip(".,!?;:'\"()[]{}—–-")
+    word = word.lower().strip(".,!?;:'\"()[]{}---")
     if len(word) <= 2:
         return 1
     # Remove silent terminal 'e' (very common in French)
@@ -5659,7 +5659,7 @@ articles below from a single blog and group them into 3-8 THEMATIC CLUSTERS.
 
 For each cluster:
 - Pick a clear theme name in {lang_label}.
-- Identify ONE pillar_candidate_slug — the article that best summarizes the theme
+- Identify ONE pillar_candidate_slug - the article that best summarizes the theme
   and could be expanded into a comprehensive pillar page. Use the slug exactly
   as written below.
 - List the spokes (other articles in the cluster) by their slugs.
@@ -5775,7 +5775,7 @@ class ContentDecayView(APIView):
     a sorted list of decaying pages with their before/after numbers,
     delta percentages, and a suggested action (refresh / expand / redirect).
 
-    Two GSC API calls (current period + previous period). No cache for now —
+    Two GSC API calls (current period + previous period). No cache for now -
     Darius can launch on demand; aggregating ~50 articles takes <15s.
     """
     permission_classes = [IsAuthenticated]
@@ -5975,7 +5975,7 @@ class ContentDecayView(APIView):
 
 
 # ==========================================================================
-# RANK TRACKING — TrackedKeyword + SerpRank snapshots
+# RANK TRACKING - TrackedKeyword + SerpRank snapshots
 # ==========================================================================
 
 class RedirectsView(APIView):
@@ -6178,7 +6178,7 @@ class RankSnapshotView(APIView):
     record one SerpRank snapshot per keyword. Designed to be called from a
     cron / scheduled agent (daily). Returns counts.
 
-    Body: {keyword_ids?: [int]} — optional filter to only crawl specific
+    Body: {keyword_ids?: [int]} - optional filter to only crawl specific
     keywords (default: all active for the site).
     """
     permission_classes = [IsAuthenticated]
@@ -6350,7 +6350,7 @@ class RankHistoryView(APIView):
 
 
 # ==========================================================================
-# PUBLIC API — consumed by site frontends (no auth, optional API key check)
+# PUBLIC API - consumed by site frontends (no auth, optional API key check)
 # ==========================================================================
 
 def _public_get_site(site_id, request):
@@ -6433,7 +6433,7 @@ def _serialize_public_site(site):
 
 
 class PublicSiteView(APIView):
-    """GET /api/public/sites/<id>/ — basic site info + EEAT author profile."""
+    """GET /api/public/sites/<id>/ - basic site info + EEAT author profile."""
     permission_classes = []
 
     def get(self, request, site_id):
@@ -6449,7 +6449,7 @@ class PublicSiteByDomainView(APIView):
     Used by the public-blog Next.js app to resolve the current site from
     the request Host header. Match priority: `public_blog_domain` exact match
     first, then `domain` exact match. Both stored without scheme.
-    No auth — this is intentionally public so the Next.js SSR can fetch it.
+    No auth - this is intentionally public so the Next.js SSR can fetch it.
     """
     permission_classes = []
 
@@ -6477,7 +6477,7 @@ class PublicSiteByDomainView(APIView):
 
 
 class PublicPostsView(APIView):
-    """GET /api/public/sites/<id>/posts/ — list published articles."""
+    """GET /api/public/sites/<id>/posts/ - list published articles."""
     permission_classes = []
 
     def get(self, request, site_id):
@@ -6550,7 +6550,7 @@ class PublicPostsView(APIView):
 
 
 class PublicPostDetailView(APIView):
-    """GET /api/public/sites/<id>/posts/<slug>/ — single article.
+    """GET /api/public/sites/<id>/posts/<slug>/ - single article.
 
     If the slug doesn't exist as a current article, look up an active
     Redirect entry (per-language) and return a 301-style payload pointing
@@ -6622,7 +6622,7 @@ class PublicPostDetailView(APIView):
 
 
 class PublicTranslationsView(APIView):
-    """GET /api/public/sites/<id>/posts/<slug>/translations/ — all language versions of an article.
+    """GET /api/public/sites/<id>/posts/<slug>/translations/ - all language versions of an article.
 
     Returns every published article sharing the same translation_group, INCLUDING
     the current one. This lets the frontend render a complete language switcher
@@ -7025,7 +7025,7 @@ class ShopifyConnectView(APIView):
     """Authenticate with a Shopify store and create/update a Site row for it.
 
     POST /shopify/connect/ {domain, token, blog_id?, name?}
-    On success returns the Site dict — frontend can then redirect to the dashboard.
+    On success returns the Site dict - frontend can then redirect to the dashboard.
     """
     permission_classes = [IsAuthenticated]
 
@@ -7282,7 +7282,7 @@ def _xml_escape(s):
 
 
 class SiteSitemapView(APIView):
-    """Public sitemap.xml for a site. No auth — must be reachable by Googlebot.
+    """Public sitemap.xml for a site. No auth - must be reachable by Googlebot.
     GET /sites/<int:site_id>/sitemap.xml
     """
     authentication_classes = []
@@ -7372,7 +7372,7 @@ class SiteRSSView(APIView):
 
 
 # ============================================================================
-# Branding extractor — scan a domain and return colors/logo/fonts
+# Branding extractor - scan a domain and return colors/logo/fonts
 # ============================================================================
 
 class BrandingScanView(APIView):
@@ -7481,7 +7481,7 @@ class WebflowCollectionsView(APIView):
                     {'slug': f.get('slug'), 'displayName': f.get('displayName'), 'type': f.get('type'), 'required': f.get('isRequired')}
                     for f in (schema.get('fields') or [])
                 ]
-                # Flag whether the auto-mapping found a body field — this is the
+                # Flag whether the auto-mapping found a body field - this is the
                 # main signal that "this collection looks like a blog".
                 entry['looks_like_blog'] = bool(entry['field_map'].get('body'))
             except WebflowError:

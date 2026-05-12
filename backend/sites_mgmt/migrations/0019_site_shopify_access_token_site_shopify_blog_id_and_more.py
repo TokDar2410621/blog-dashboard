@@ -13,16 +13,16 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='site',
             name='shopify_access_token',
-            field=models.CharField(blank=True, default='', help_text='Token de la custom app Shopify (Admin → Apps → Develop apps → Create app → Admin API access token). Scope requis: write_content.', max_length=200, verbose_name='Shopify — Admin API access token'),
+            field=models.CharField(blank=True, default='', help_text='Token de la custom app Shopify (Admin → Apps → Develop apps → Create app → Admin API access token). Scope requis: write_content.', max_length=200, verbose_name='Shopify - Admin API access token'),
         ),
         migrations.AddField(
             model_name='site',
             name='shopify_blog_id',
-            field=models.CharField(blank=True, default='', help_text='ID du blog Shopify où publier (un store peut avoir plusieurs blogs). Auto-détecté à la connexion.', max_length=50, verbose_name='Shopify — Blog ID'),
+            field=models.CharField(blank=True, default='', help_text='ID du blog Shopify où publier (un store peut avoir plusieurs blogs). Auto-détecté à la connexion.', max_length=50, verbose_name='Shopify - Blog ID'),
         ),
         migrations.AddField(
             model_name='site',
             name='shopify_domain',
-            field=models.CharField(blank=True, db_index=True, default='', help_text='Ex: monstore.myshopify.com (le domaine technique, pas le custom domain). Si renseigné, le site est en mode Shopify.', max_length=255, verbose_name='Shopify — myshopify.com'),
+            field=models.CharField(blank=True, db_index=True, default='', help_text='Ex: monstore.myshopify.com (le domaine technique, pas le custom domain). Si renseigné, le site est en mode Shopify.', max_length=255, verbose_name='Shopify - myshopify.com'),
         ),
     ]

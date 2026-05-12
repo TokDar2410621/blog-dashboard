@@ -3,7 +3,7 @@ title: Comment ranker sur Google au Québec en 2026
 slug: comment-ranker-google-quebec-2026
 date: 2026-05-11
 author: Darius Tokam
-excerpt: Le SERP québécois fonctionne autrement que le SERP français. Voici les 7 signaux que Google.ca privilégie en 2026 — et pourquoi écrire "shopping" au lieu de "magasinage" te coûte des positions.
+excerpt: Le SERP québécois fonctionne autrement que le SERP français. Voici les 7 signaux que Google.ca privilégie en 2026 - et pourquoi écrire "shopping" au lieu de "magasinage" te coûte des positions.
 tags: [seo, quebec, ranking]
 ---
 
@@ -17,13 +17,13 @@ Quand un Québécois cherche "où faire mon magasinage", Google sait qu'il est a
 
 ## Les 7 signaux Google.ca priorise en 2026
 
-1. **`hreflang="fr-CA"`** — pas `fr` tout court. La différence sur le SERP : être 1er au Québec vs 8e en France.
-2. **Lexique québécois** — *magasinage*, *courriel*, *clavardage*, *avoir l'air de*, *fin de semaine*. Au moins 3-5 occurrences naturelles par article.
-3. **Schema `LocalBusiness` avec `addressRegion: "QC"`** — confirme à Google ta zone d'opération.
-4. **Backlinks de domaines `.qc.ca` ou `.ca`** — un lien d'une chambre de commerce locale vaut 10 liens étrangers.
-5. **Mentions de villes québécoises** — Saint-Hyacinthe, Trois-Rivières, Sherbrooke, pas juste Montréal. Le SEO local granulaire est encore peu attaqué.
-6. **Auteur identifié avec adresse QC** — schema `Person` + bio mentionnant le Québec. Helpful Content Update aime ça.
-7. **Hreflang complet vers la version anglaise canadienne** — pas vers `en-US`. Si tu fais bilingue, c'est `en-CA`.
+1. **`hreflang="fr-CA"`** - pas `fr` tout court. La différence sur le SERP : être 1er au Québec vs 8e en France.
+2. **Lexique québécois** - *magasinage*, *courriel*, *clavardage*, *avoir l'air de*, *fin de semaine*. Au moins 3-5 occurrences naturelles par article.
+3. **Schema `LocalBusiness` avec `addressRegion: "QC"`** - confirme à Google ta zone d'opération.
+4. **Backlinks de domaines `.qc.ca` ou `.ca`** - un lien d'une chambre de commerce locale vaut 10 liens étrangers.
+5. **Mentions de villes québécoises** - Saint-Hyacinthe, Trois-Rivières, Sherbrooke, pas juste Montréal. Le SEO local granulaire est encore peu attaqué.
+6. **Auteur identifié avec adresse QC** - schema `Person` + bio mentionnant le Québec. Helpful Content Update aime ça.
+7. **Hreflang complet vers la version anglaise canadienne** - pas vers `en-US`. Si tu fais bilingue, c'est `en-CA`.
 
 ## L'erreur classique : copier-coller un article de France
 

@@ -3,7 +3,7 @@ title: 5 workflows n8n pour automatiser ton SEO
 slug: n8n-seo-workflows
 date: 2026-05-01
 author: Darius Tokam
-excerpt: n8n est l'outil d'automatisation visuel qui a tué Zapier sur le marché tech. Voici 5 workflows SEO qu'il te permet d'orchestrer en 10 minutes — sans écrire une ligne de code.
+excerpt: n8n est l'outil d'automatisation visuel qui a tué Zapier sur le marché tech. Voici 5 workflows SEO qu'il te permet d'orchestrer en 10 minutes - sans écrire une ligne de code.
 tags: [n8n, automatisation, seo]
 ---
 

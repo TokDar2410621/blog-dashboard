@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/auth/google/', GoogleLoginView.as_view(), name='google_login'),
     path('api/auth/github/', GitHubLoginView.as_view(), name='github_login'),
     # Allauth's own URLs (signup confirmation flows etc., not used by the SPA but
-    # required by allauth internals — namespaced under /accounts/).
+    # required by allauth internals - namespaced under /accounts/).
     path('accounts/', include('allauth.urls')),
     path('api/', include('sites_mgmt.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,5 +1,5 @@
 """
-Social authentication endpoints — Google + GitHub login over JWT cookies.
+Social authentication endpoints - Google + GitHub login over JWT cookies.
 
 The SPA flow:
   1. User clicks "Continue with Google/GitHub" on /login.

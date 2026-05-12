@@ -3,7 +3,7 @@
  *
  * Markdown files live in `/posts/*.md` at the repo root. Each starts with
  * a YAML-style frontmatter block we parse with a tiny regex (no need for
- * gray-matter — the format is under our control). Vite's import.meta.glob
+ * gray-matter - the format is under our control). Vite's import.meta.glob
  * bundles every file at build time so the SPA serves them with zero
  * backend round-trip.
  */

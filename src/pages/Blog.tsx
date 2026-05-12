@@ -1,5 +1,5 @@
 /**
- * Blog index — lists every post in /posts/, newest first.
+ * Blog index - lists every post in /posts/, newest first.
  * Public, indexable, served at /blog.
  */
 import { Link, useNavigate } from "react-router-dom";
@@ -54,7 +54,7 @@ export default function Blog() {
           </h1>
           <p className="text-lg text-muted-foreground">
             Tactiques SEO concrètes pour PME québécoises. Tout est rédigé,
-            audité et publié avec Gridar — on dogfoode notre propre produit.
+            audité et publié avec Gridar - on dogfoode notre propre produit.
           </p>
         </div>
 

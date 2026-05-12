@@ -4,10 +4,10 @@ Règles de fonctionnement pour tout Claude (local OU cloud /schedule) qui poursu
 
 ## 1. Démarrage de session
 
-1. Lire `MISSION.md` — pour savoir où on va.
-2. Lire la **dernière entrée** de `PROGRESS_LOG.md` — pour savoir où on en est.
-3. Lire `ROADMAP.md` — pour savoir ce qui vient après.
-4. Lire `PENDING_HUMAN.md` (si existe) — pour ne PAS retravailler sur quelque chose qui attend Darius.
+1. Lire `MISSION.md` - pour savoir où on va.
+2. Lire la **dernière entrée** de `PROGRESS_LOG.md` - pour savoir où on en est.
+3. Lire `ROADMAP.md` - pour savoir ce qui vient après.
+4. Lire `PENDING_HUMAN.md` (si existe) - pour ne PAS retravailler sur quelque chose qui attend Darius.
 
 ## 2. Pendant la session
 
@@ -31,7 +31,7 @@ Toujours, **avant que le contexte se compacte ou que la session se termine** :
 
 1. Append une nouvelle entrée à `PROGRESS_LOG.md` :
    ```
-   ## Session YYYY-MM-DD — <résumé court>
+   ## Session YYYY-MM-DD - <résumé court>
 
    **Fait** : <bullets>
    **Tests** : <statut>
@@ -60,13 +60,13 @@ Pour tout le reste : **agir, ne pas demander.**
 - Ne pas refactorer pour le plaisir.
 - Ne pas abstraire prématurément.
 - Ne pas ajouter de comments verbeux ou de docstrings rituelles.
-- Ne pas terminer en "vague" — toujours laisser un "Prochain bloc concret" précis.
+- Ne pas terminer en "vague" - toujours laisser un "Prochain bloc concret" précis.
 - Ne pas accumuler des fichiers mémoire stale.
 - Ne pas supprimer/renommer un endpoint existant sans vérifier qu'aucun frontend ne l'utilise.
 
-## 7. RÈGLE D'OR — Pas de backend sans frontend
+## 7. RÈGLE D'OR - Pas de backend sans frontend
 
-> **"Le meilleur backend ne vaut rien sans front."** — Darius, 2026-05-04
+> **"Le meilleur backend ne vaut rien sans front."** - Darius, 2026-05-04
 
 Aucune feature n'est terminée tant que Darius ne peut pas l'utiliser via l'UI du dashboard. Un endpoint testable seulement par curl est un demi-livrable.
 
@@ -78,7 +78,7 @@ Aucune feature n'est terminée tant que Darius ne peut pas l'utiliser via l'UI d
 
 3. **Si vraiment court en temps**, préférer une **UI minimale et moche** (textarea, table brute, JSON pretty-printed) qui fonctionne, à un backend sophistiqué sans UI. Le polish vient ensuite.
 
-4. **Le `Prochain bloc concret` doit toujours, à terme, déboucher sur un écran utilisateur**. Si une session ne livre que du backend, la session suivante DOIT compléter le frontend correspondant — sans laisser le backend orphelin sur la prochaine roadmap.
+4. **Le `Prochain bloc concret` doit toujours, à terme, déboucher sur un écran utilisateur**. Si une session ne livre que du backend, la session suivante DOIT compléter le frontend correspondant - sans laisser le backend orphelin sur la prochaine roadmap.
 
 5. **Critère "done" mis à jour** : une feature est "done" quand :
    - Endpoint backend OK (`python manage.py check`)
@@ -90,7 +90,7 @@ Aucune feature n'est terminée tant que Darius ne peut pas l'utiliser via l'UI d
 
 6. **Exception** : seules les **fonctions internes / helpers utilitaires** peuvent rester backend-only. Tout ce qui produit une donnée ou un effet visible pour l'utilisateur final passe par une UI.
 
-## 7. Cloud `/schedule` agent — spécificités
+## 7. Cloud `/schedule` agent - spécificités
 
 L'agent cloud :
 - Clone le repo dans un environnement Anthropic.

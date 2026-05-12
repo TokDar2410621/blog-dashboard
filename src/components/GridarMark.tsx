@@ -1,4 +1,4 @@
-/** Gridar brand mark — geometric "G" with subtle arrow integration.
+/** Gridar brand mark - geometric "G" with subtle arrow integration.
  *  Sourced from the Canva design (G1 candidate). The PNG ships with a
  *  transparent background, so it sits cleanly on any bg color. */
 
@@ -20,7 +20,7 @@ export function GridarMark({ className = "h-5 w-5", size }: Props) {
   );
 }
 
-/** Full Gridar logo lockup — brand mark + wordmark. */
+/** Full Gridar logo lockup - brand mark + wordmark. */
 export function GridarLogo({
   markClass = "h-6 w-6",
   textClass = "font-semibold tracking-tight",

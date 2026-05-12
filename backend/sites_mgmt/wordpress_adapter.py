@@ -1,4 +1,4 @@
-"""WordPress REST API adapter — wraps `/wp-json/wp/v2/posts` calls so the rest
+"""WordPress REST API adapter - wraps `/wp-json/wp/v2/posts` calls so the rest
 of the dashboard can treat a WordPress site like any other backend.
 
 Authentication uses WordPress Application Passwords (built-in since WP 5.6).
@@ -92,12 +92,12 @@ class WordPressClient:
         try:
             data = resp.json()
         except ValueError:
-            return {'valid_wp': False, 'error': 'Réponse invalide — ce ne semble pas être WordPress.'}
+            return {'valid_wp': False, 'error': 'Réponse invalide - ce ne semble pas être WordPress.'}
 
         # Confirm it has the wp/v2 namespace
         namespaces = data.get('namespaces') or []
         if 'wp/v2' not in namespaces:
-            return {'valid_wp': False, 'error': 'Ce site n\'expose pas wp/v2 — REST API désactivée ?'}
+            return {'valid_wp': False, 'error': 'Ce site n\'expose pas wp/v2 - REST API désactivée ?'}
 
         # Try to count posts (HEAD to list endpoint)
         post_count = None
@@ -134,7 +134,7 @@ class WordPressClient:
         except http_requests.RequestException as e:
             raise WordPressError(f'Site injoignable : {str(e)[:120]}')
         if resp.status_code == 401:
-            raise WordPressError('Identifiants WordPress invalides — vérifie l\'username + Application Password.')
+            raise WordPressError('Identifiants WordPress invalides - vérifie l\'username + Application Password.')
         if not resp.ok:
             raise WordPressError(f'Erreur WP {resp.status_code}: {resp.text[:200]}')
         return resp.json()

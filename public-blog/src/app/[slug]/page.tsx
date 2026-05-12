@@ -110,7 +110,7 @@ export default async function ArticlePage({ params }: Props) {
       />
 
       {/* hreflang alternates as <link> tags via metadata is preferred but Next 14
-          doesn't expose hreflang easily — render as visible language switcher */}
+          doesn't expose hreflang easily - render as visible language switcher */}
       {translations && translations.translations.length > 1 && (
         <div className="text-xs text-zinc-500 mb-4">
           {translations.translations.map((t, i) => (

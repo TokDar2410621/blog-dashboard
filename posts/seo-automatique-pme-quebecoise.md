@@ -1,13 +1,13 @@
 ---
-title: SEO automatique pour PME québécoise — la promesse 2026 et ce qu'elle vaut vraiment
+title: SEO automatique pour PME québécoise - la promesse 2026 et ce qu'elle vaut vraiment
 slug: seo-automatique-pme-quebecoise
 date: 2026-04-14
 author: Darius Tokam
-excerpt: "SEO automatique" est devenu le buzzword 2026. Spoiler — il y a 80% de bullshit et 20% de vrai. Voici comment trier, et ce qui marche réellement pour une PME québécoise en 2026.
+excerpt: "SEO automatique" est devenu le buzzword 2026. Spoiler - il y a 80% de bullshit et 20% de vrai. Voici comment trier, et ce qui marche réellement pour une PME québécoise en 2026.
 tags: [seo, automatisation, pme]
 ---
 
-Depuis l'arrivée de Claude Sonnet 4 et GPT-5 fin 2025, le marché s'est inondé d'outils qui promettent du "SEO automatique" — entendu : tu cliques un bouton, l'IA fait tout, tu rankes. La majorité de ces outils sont des wrappers ChatGPT à 49 $/mois qui n'apportent rien.
+Depuis l'arrivée de Claude Sonnet 4 et GPT-5 fin 2025, le marché s'est inondé d'outils qui promettent du "SEO automatique" - entendu : tu cliques un bouton, l'IA fait tout, tu rankes. La majorité de ces outils sont des wrappers ChatGPT à 49 $/mois qui n'apportent rien.
 
 Voici ce qui est **réellement automatisable** en 2026, et ce qui ne l'est pas (encore).
 
@@ -27,11 +27,11 @@ Avec accès aux APIs Serper + Google Trends + cross-check Gemini, l'IA peut sugg
 
 ### ✅ Optimisation on-page systématique
 
-Densité de mots-clés, hiérarchie H1/H2/H3, meta description, schema FAQPage — l'IA fait ça plus vite et mieux qu'un humain qui appliquerait une checklist.
+Densité de mots-clés, hiérarchie H1/H2/H3, meta description, schema FAQPage - l'IA fait ça plus vite et mieux qu'un humain qui appliquerait une checklist.
 
 ### ✅ Détection de content decay
 
-Comparer le trafic GSC mois sur mois et flagger les articles qui perdent > 30 % — c'est de la donnée pure, l'IA gère.
+Comparer le trafic GSC mois sur mois et flagger les articles qui perdent > 30 % - c'est de la donnée pure, l'IA gère.
 
 ## Ce que l'IA ne peut PAS faire seule en 2026
 
@@ -41,7 +41,7 @@ Si ton article doit citer "le programme PRIME-Vert au Québec donne 3500 $ pour 
 
 ### ❌ Authority building (E-E-A-T)
 
-L'IA peut formater ton autorité, mais elle ne peut pas la créer. Tes diplômes, tes années d'expérience, tes témoignages clients réels — c'est du contenu humain non-substituable.
+L'IA peut formater ton autorité, mais elle ne peut pas la créer. Tes diplômes, tes années d'expérience, tes témoignages clients réels - c'est du contenu humain non-substituable.
 
 ### ❌ Stratégie de cluster topique
 

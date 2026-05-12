@@ -52,7 +52,7 @@ class Site(models.Model):
         verbose_name="Auteur par défaut",
         help_text="Nom d'auteur attribué aux articles générés (utilisé aussi pour Schema.org). Vide = 'Admin'."
     )
-    # ── EEAT — author profile (Schema.org Person) ─────────────────────
+    # ── EEAT - author profile (Schema.org Person) ─────────────────────
     author_role = models.CharField(
         max_length=200, blank=True, default='',
         verbose_name="Rôle / titre de l'auteur",
@@ -122,56 +122,56 @@ class Site(models.Model):
     # ── WordPress integration (mode "WP") ─────────────────────────────
     wp_url = models.URLField(
         max_length=500, blank=True, default='',
-        verbose_name="WordPress — URL du site",
+        verbose_name="WordPress - URL du site",
         help_text="Ex: https://monsite.ca (sans /wp-admin). Si renseigné, le site est en mode WordPress."
     )
     wp_username = models.CharField(
         max_length=100, blank=True, default='',
-        verbose_name="WordPress — username",
+        verbose_name="WordPress - username",
         help_text="Le nom d'utilisateur WordPress qui possède l'Application Password."
     )
     wp_app_password = models.CharField(
         max_length=200, blank=True, default='',
-        verbose_name="WordPress — Application Password",
+        verbose_name="WordPress - Application Password",
         help_text="Application Password généré dans WP → Profil → Application Passwords."
     )
 
     # ── Shopify integration (mode "Shopify") ──────────────────────────
     shopify_domain = models.CharField(
         max_length=255, blank=True, default='', db_index=True,
-        verbose_name="Shopify — myshopify.com",
+        verbose_name="Shopify - myshopify.com",
         help_text="Ex: monstore.myshopify.com (le domaine technique, pas le custom domain). Si renseigné, le site est en mode Shopify."
     )
     shopify_access_token = models.CharField(
         max_length=200, blank=True, default='',
-        verbose_name="Shopify — Admin API access token",
+        verbose_name="Shopify - Admin API access token",
         help_text="Token de la custom app Shopify (Admin → Apps → Develop apps → Create app → Admin API access token). Scope requis: write_content."
     )
     shopify_blog_id = models.CharField(
         max_length=50, blank=True, default='',
-        verbose_name="Shopify — Blog ID",
+        verbose_name="Shopify - Blog ID",
         help_text="ID du blog Shopify où publier (un store peut avoir plusieurs blogs). Auto-détecté à la connexion."
     )
 
     # ── Webflow integration (mode "Webflow") ──────────────────────────
     webflow_token = models.CharField(
         max_length=300, blank=True, default='',
-        verbose_name="Webflow — API token",
+        verbose_name="Webflow - API token",
         help_text="Site Token (Project Settings → Apps & Integrations → API access). Si renseigné avec un site_id et collection_id, le site est en mode Webflow."
     )
     webflow_site_id = models.CharField(
         max_length=64, blank=True, default='',
-        verbose_name="Webflow — Site ID",
+        verbose_name="Webflow - Site ID",
         help_text="Identifiant du Webflow site (auto-rempli à la connexion)."
     )
     webflow_collection_id = models.CharField(
         max_length=64, blank=True, default='',
-        verbose_name="Webflow — Collection ID",
+        verbose_name="Webflow - Collection ID",
         help_text="ID de la collection CMS où publier les articles (auto-rempli à la connexion)."
     )
     webflow_field_map = models.JSONField(
         blank=True, null=True, default=None,
-        verbose_name="Webflow — Mapping de champs",
+        verbose_name="Webflow - Mapping de champs",
         help_text="Mapping de nos champs vers les slugs Webflow. Format: {title, slug, body, summary, image, status}. Auto-détecté à la connexion."
     )
 
@@ -183,13 +183,13 @@ class Site(models.Model):
     )
     gsc_property_url = models.URLField(
         max_length=300, blank=True, default='',
-        verbose_name="Search Console — URL propriété",
+        verbose_name="Search Console - URL propriété",
         help_text="URL de la propriété Search Console (ex: https://tokamdarius.ca/)"
     )
     gsc_refresh_token = models.TextField(
         blank=True, default='',
-        verbose_name="Search Console — refresh token",
-        help_text="OAuth2 refresh token (sensible — ne pas exposer côté frontend)"
+        verbose_name="Search Console - refresh token",
+        help_text="OAuth2 refresh token (sensible - ne pas exposer côté frontend)"
     )
 
     # ── API publique ──────────────────────────────────────────────────
@@ -354,7 +354,7 @@ class HostedPost(models.Model):
 class ApiToken(models.Model):
     """Long-lived API token for the developer-facing /api/v1/ endpoints.
 
-    The plain-text token is shown ONCE at creation and never stored — only
+    The plain-text token is shown ONCE at creation and never stored - only
     its SHA256 hash. Format: `btb_<43-char url-safe random>`.
     Multiple tokens per user (different scopes / contexts).
     """
@@ -419,7 +419,7 @@ class Subscription(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username} — {self.plan} ({self.status})"
+        return f"{self.user.username} - {self.plan} ({self.status})"
 
     @property
     def is_paid(self):
@@ -554,7 +554,7 @@ class TrackedKeyword(models.Model):
     language = models.CharField(max_length=2, choices=LANGUAGE_CHOICES, default='fr')
     target_url = models.URLField(
         max_length=500, blank=True, default='',
-        help_text="Optional. The article URL we expect to rank — used to highlight if the page actually ranks."
+        help_text="Optional. The article URL we expect to rank - used to highlight if the page actually ranks."
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -568,7 +568,7 @@ class TrackedKeyword(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.keyword} ({self.language}) — {self.site.name}"
+        return f"{self.keyword} ({self.language}) - {self.site.name}"
 
 
 class SerpRank(models.Model):

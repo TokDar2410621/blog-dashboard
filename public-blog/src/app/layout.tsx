@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   }
   return {
-    title: { default: site.name, template: `%s — ${site.name}` },
+    title: { default: site.name, template: `%s - ${site.name}` },
     description: site.description || `Blog de ${site.name}`,
     openGraph: {
       title: site.name,
@@ -43,7 +43,7 @@ export default async function RootLayout({
         {site && <Header site={site} />}
         <main className="flex-1">{children}</main>
         {site && <Footer site={site} />}
-        {/* Schema.org Person — boost EEAT */}
+        {/* Schema.org Person - boost EEAT */}
         {site?.person_schema && (
           <script
             type="application/ld+json"
@@ -86,7 +86,7 @@ function Footer({ site }: { site: NonNullable<Awaited<ReturnType<typeof getCurre
           <p className="mt-2">
             <strong>{site.author.name}</strong>
             {site.author.role && ` · ${site.author.role}`}
-            {site.author.bio && ` — ${site.author.bio}`}
+            {site.author.bio && ` - ${site.author.bio}`}
           </p>
         )}
       </div>

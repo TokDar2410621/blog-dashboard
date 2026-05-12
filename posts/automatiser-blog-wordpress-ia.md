@@ -1,5 +1,5 @@
 ---
-title: Automatiser ton blog WordPress avec l'IA — guide 2026
+title: Automatiser ton blog WordPress avec l'IA - guide 2026
 slug: automatiser-blog-wordpress-ia
 date: 2026-05-05
 author: Darius Tokam
@@ -30,11 +30,11 @@ C'est tout. WordPress est désormais branchable à n'importe quel outil qui parl
 
 L'API REST WordPress expose tout :
 
-- `GET /wp-json/wp/v2/posts` — lister tes articles
-- `POST /wp-json/wp/v2/posts` — publier un article (status `publish`, `draft`, `pending`)
-- `POST /wp-json/wp/v2/media` — uploader une image de couverture
-- `GET /wp-json/wp/v2/categories` — tes catégories
-- `GET /wp-json/wp/v2/tags` — tes tags
+- `GET /wp-json/wp/v2/posts` - lister tes articles
+- `POST /wp-json/wp/v2/posts` - publier un article (status `publish`, `draft`, `pending`)
+- `POST /wp-json/wp/v2/media` - uploader une image de couverture
+- `GET /wp-json/wp/v2/categories` - tes catégories
+- `GET /wp-json/wp/v2/tags` - tes tags
 
 Donc un outil externe peut : générer un article via IA → uploader une image de couverture (Pexels, Gemini, ou IA générative) → assigner la bonne catégorie → publier directement avec les bons hreflang, schema, meta description.
 
@@ -52,9 +52,9 @@ Les plugins ont l'avantage du "tout-en-un dans WP". Le SaaS dédié a l'avantage
 
 90 % des plugins gratuits "AI Blog Generator" du WordPress repository ont 2-3 problèmes communs :
 
-1. **Aucun contrôle sur le modèle** — ils utilisent souvent GPT-3.5 ou des proxies cheap qui produisent du contenu peu performant
-2. **Pas de lexique localisé** — le contenu sera générique français de France
-3. **Pas d'audit SEO post-génération** — tu publies sans savoir si l'article respecte les bonnes pratiques
+1. **Aucun contrôle sur le modèle** - ils utilisent souvent GPT-3.5 ou des proxies cheap qui produisent du contenu peu performant
+2. **Pas de lexique localisé** - le contenu sera générique français de France
+3. **Pas d'audit SEO post-génération** - tu publies sans savoir si l'article respecte les bonnes pratiques
 
 Ce que [Gridar](/) fait différemment : Claude Opus pour la rédaction (le modèle le plus capable en 2026), corpus québécois pour le lexique, audit SEO automatique avant publication, schemas générés (Article + FAQPage + Person EEAT).
 

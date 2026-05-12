@@ -13,21 +13,21 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='site',
             name='webflow_collection_id',
-            field=models.CharField(blank=True, default='', help_text='ID de la collection CMS où publier les articles (auto-rempli à la connexion).', max_length=64, verbose_name='Webflow — Collection ID'),
+            field=models.CharField(blank=True, default='', help_text='ID de la collection CMS où publier les articles (auto-rempli à la connexion).', max_length=64, verbose_name='Webflow - Collection ID'),
         ),
         migrations.AddField(
             model_name='site',
             name='webflow_field_map',
-            field=models.JSONField(blank=True, default=None, help_text='Mapping de nos champs vers les slugs Webflow. Format: {title, slug, body, summary, image, status}. Auto-détecté à la connexion.', null=True, verbose_name='Webflow — Mapping de champs'),
+            field=models.JSONField(blank=True, default=None, help_text='Mapping de nos champs vers les slugs Webflow. Format: {title, slug, body, summary, image, status}. Auto-détecté à la connexion.', null=True, verbose_name='Webflow - Mapping de champs'),
         ),
         migrations.AddField(
             model_name='site',
             name='webflow_site_id',
-            field=models.CharField(blank=True, default='', help_text='Identifiant du Webflow site (auto-rempli à la connexion).', max_length=64, verbose_name='Webflow — Site ID'),
+            field=models.CharField(blank=True, default='', help_text='Identifiant du Webflow site (auto-rempli à la connexion).', max_length=64, verbose_name='Webflow - Site ID'),
         ),
         migrations.AddField(
             model_name='site',
             name='webflow_token',
-            field=models.CharField(blank=True, default='', help_text='Site Token (Project Settings → Apps & Integrations → API access). Si renseigné avec un site_id et collection_id, le site est en mode Webflow.', max_length=300, verbose_name='Webflow — API token'),
+            field=models.CharField(blank=True, default='', help_text='Site Token (Project Settings → Apps & Integrations → API access). Si renseigné avec un site_id et collection_id, le site est en mode Webflow.', max_length=300, verbose_name='Webflow - API token'),
         ),
     ]

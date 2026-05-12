@@ -255,7 +255,7 @@ class ArticleGenerator:
 
     def _is_too_similar(self, candidate_title, existing_titles, threshold=0.55):
         """Return (matched_title, similarity) if candidate_title is too
-        similar to any existing title — Jaccard on token sets."""
+        similar to any existing title - Jaccard on token sets."""
         a = self._title_tokens(candidate_title)
         if not a:
             return None
@@ -614,7 +614,7 @@ Reponds UNIQUEMENT au format JSON:
 {language_rule}
 {search_results}
 
-ARTICLES DEJA PUBLIES — NE PAS DUPLIQUER NI PARAPHRASER:
+ARTICLES DEJA PUBLIES - NE PAS DUPLIQUER NI PARAPHRASER:
 {existing_str}
 
 REGLE STRICTE: Le titre que tu proposes DOIT etre fondamentalement different
@@ -658,7 +658,7 @@ PROFIL DE L'AUTEUR:
 {search_results}
 
 {kb_hint}
-ARTICLES DEJA PUBLIES — NE PAS DUPLIQUER NI PARAPHRASER:
+ARTICLES DEJA PUBLIES - NE PAS DUPLIQUER NI PARAPHRASER:
 {existing_str}
 
 REGLE STRICTE: Le titre que tu proposes DOIT etre fondamentalement different
@@ -802,7 +802,7 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
 
 Commence directement (pas de titre H1).'''
         else:
-            # Knowledge base context — smart retrieval of relevant chunks only
+            # Knowledge base context - smart retrieval of relevant chunks only
             kb_context = ""
             if self.knowledge_base:
                 topic_hint = ' '.join([
@@ -1343,7 +1343,7 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
             defaults={'name': category_name}
         )
 
-        # Create article — respect target language
+        # Create article - respect target language
         post = BlogPost(
             title=title,
             slug=slug,

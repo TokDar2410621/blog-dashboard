@@ -1,6 +1,6 @@
 # Architecture actuelle (snapshot 2026-05-04)
 
-À mettre à jour quand on ajoute/refactore une feature SEO majeure. Doit rester < 200 lignes — c'est un **résumé** pour briefer un nouvel agent, pas la doc complète.
+À mettre à jour quand on ajoute/refactore une feature SEO majeure. Doit rester < 200 lignes - c'est un **résumé** pour briefer un nouvel agent, pas la doc complète.
 
 ## Stack
 
@@ -74,7 +74,7 @@ class XxxView(APIView):
 
 ## DB / migrations
 
-- `sites_mgmt/migrations/` — historique. Avant d'ajouter un modèle, créer `python manage.py makemigrations sites_mgmt`.
+- `sites_mgmt/migrations/` - historique. Avant d'ajouter un modèle, créer `python manage.py makemigrations sites_mgmt`.
 - Ne pas casser la compat Arivex (contrainte `unique(slug, language)` côté external).
 
 ## Tests

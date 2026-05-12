@@ -1,4 +1,4 @@
-"""Public developer API — `/api/v1/*` endpoints.
+"""Public developer API - `/api/v1/*` endpoints.
 
 Authenticated via Bearer ApiToken (separate from the dashboard JWT). Designed
 for clients to integrate with their own automation (n8n, Zapier, Make, custom
@@ -84,7 +84,7 @@ class ApiTokenAuthentication(authentication.BaseAuthentication):
         except ApiToken.DoesNotExist:
             raise exceptions.AuthenticationFailed('Token invalide ou révoqué.')
 
-        # Soft last_used update — fire-and-forget, no transaction
+        # Soft last_used update - fire-and-forget, no transaction
         ApiToken.objects.filter(pk=tok.pk).update(last_used_at=timezone.now())
         return (tok.user, tok)
 
@@ -169,7 +169,7 @@ class BaseV1View(APIView):
 # --------------------------------------------------------------------------
 
 class V1MeView(BaseV1View):
-    """GET /api/v1/me/ — sanity check."""
+    """GET /api/v1/me/ - sanity check."""
     def get(self, request):
         from .quota import get_articles_used, current_month_key
         sub = _get_subscription(request.user)
@@ -188,7 +188,7 @@ class V1MeView(BaseV1View):
 
 
 class V1SitesView(BaseV1View):
-    """GET /api/v1/sites/ — list sites the authenticated user owns."""
+    """GET /api/v1/sites/ - list sites the authenticated user owns."""
     def get(self, request):
         sites = Site.objects.filter(owner=request.user, is_active=True)
         return Response({
@@ -277,7 +277,7 @@ class V1ArticlesView(BaseV1View):
 
 
 class V1ArticleDetailView(BaseV1View):
-    """GET /api/v1/sites/<id>/articles/<slug>/ — single article with full content."""
+    """GET /api/v1/sites/<id>/articles/<slug>/ - single article with full content."""
     def get(self, request, site_id, slug):
         site = self.get_user_site(request, site_id)
 
@@ -441,12 +441,12 @@ class V1BriefView(BaseV1View):
         view = ContentBriefView()
         view.request = request
         view.kwargs = {}
-        # ContentBriefView.post just reads request.data — call it directly.
+        # ContentBriefView.post just reads request.data - call it directly.
         return view.post(request)
 
 
 class V1KeywordsView(BaseV1View):
-    """GET /api/v1/sites/<id>/keywords/ — list tracked keywords + latest rank."""
+    """GET /api/v1/sites/<id>/keywords/ - list tracked keywords + latest rank."""
     def get(self, request, site_id):
         site = self.get_user_site(request, site_id)
         items = list(TrackedKeyword.objects.filter(site=site, is_active=True))
@@ -480,7 +480,7 @@ class V1KeywordsView(BaseV1View):
 
 
 class V1RankSnapshotView(BaseV1View):
-    """POST /api/v1/sites/<id>/keywords/snapshot/ — trigger rank crawl now."""
+    """POST /api/v1/sites/<id>/keywords/snapshot/ - trigger rank crawl now."""
     def post(self, request, site_id):
         site = self.get_user_site(request, site_id)
         from .views import RankSnapshotView
@@ -491,7 +491,7 @@ class V1RankSnapshotView(BaseV1View):
 
 
 class V1DigestView(BaseV1View):
-    """GET /api/v1/sites/<id>/digest/weekly/ — weekly digest JSON."""
+    """GET /api/v1/sites/<id>/digest/weekly/ - weekly digest JSON."""
     def get(self, request, site_id):
         site = self.get_user_site(request, site_id)
         from .views import WeeklyDigestView
@@ -502,14 +502,14 @@ class V1DigestView(BaseV1View):
 
 
 # --------------------------------------------------------------------------
-# Token management — uses the dashboard's JWT auth (not Bearer api_token)
+# Token management - uses the dashboard's JWT auth (not Bearer api_token)
 # --------------------------------------------------------------------------
 
 from rest_framework.permissions import IsAuthenticated  # noqa: E402
 
 
 class TokenManagementView(APIView):
-    """GET / POST /account/api-tokens/ — list user's tokens or create one."""
+    """GET / POST /account/api-tokens/ - list user's tokens or create one."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -547,12 +547,12 @@ class TokenManagementView(APIView):
             'token': plain,  # shown ONCE
             'prefix': tok.key_prefix,
             'created_at': tok.created_at.isoformat(),
-            'message': "Stocke ce token dans un endroit sûr — il ne sera plus jamais affiché.",
+            'message': "Stocke ce token dans un endroit sûr - il ne sera plus jamais affiché.",
         }, status=status.HTTP_201_CREATED)
 
 
 class TokenRevokeView(APIView):
-    """DELETE /account/api-tokens/<id>/ — revoke (soft-delete) a token."""
+    """DELETE /account/api-tokens/<id>/ - revoke (soft-delete) a token."""
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):

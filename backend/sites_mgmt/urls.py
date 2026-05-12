@@ -73,7 +73,7 @@ urlpatterns = [
     path('webflow/collections/', WebflowCollectionsView.as_view(), name='webflow-collections'),
     path('webflow/connect/', WebflowConnectView.as_view(), name='webflow-connect'),
     path('branding/scan/', BrandingScanView.as_view(), name='branding-scan'),
-    # Public XML feeds (no auth — must be reachable by Googlebot)
+    # Public XML feeds (no auth - must be reachable by Googlebot)
     path('sites/<int:site_id>/sitemap.xml', SiteSitemapView.as_view(), name='site-sitemap-xml'),
     path('sites/<int:site_id>/rss.xml', SiteRSSView.as_view(), name='site-rss-xml'),
     path('billing/me/', BillingMeView.as_view(), name='billing-me'),
@@ -110,7 +110,7 @@ urlpatterns = [
     path('sites/<int:site_id>/gsc/oauth-url/', GSCOAuthUrlView.as_view(), name='gsc-oauth-url'),
     path('sites/<int:site_id>/gsc/oauth-callback/', GSCOAuthCallbackView.as_view(), name='gsc-oauth-callback'),
     path('sites/<int:site_id>/gsc/queries/', GSCQueriesView.as_view(), name='gsc-queries'),
-    # Public API — for site frontends
+    # Public API - for site frontends
     path('public/site-by-domain/', PublicSiteByDomainView.as_view(), name='public-site-by-domain'),
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),

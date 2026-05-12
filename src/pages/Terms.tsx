@@ -84,7 +84,7 @@ export default function Terms() {
             <li>Tu dois avoir au moins 18 ans pour créer un compte</li>
             <li>Tu fournis des informations exactes lors de l'inscription</li>
             <li>Tu es responsable de la confidentialité de ton mot de passe et de tes tokens API</li>
-            <li>Un seul compte par personne ou entreprise — pas de comptes multiples pour contourner les quotas</li>
+            <li>Un seul compte par personne ou entreprise - pas de comptes multiples pour contourner les quotas</li>
             <li>Tu nous notifies immédiatement si tu suspectes un accès non autorisé à ton compte</li>
           </ul>
 
@@ -153,7 +153,7 @@ export default function Terms() {
             héberger, traiter et te livrer ton contenu.
           </p>
           <p>
-            <strong>Important — contenu IA</strong> : les articles générés par
+            <strong>Important - contenu IA</strong> : les articles générés par
             l'IA sont produits à partir de tes inputs (sujet, mots-clés, brief,
             knowledge base). La législation sur le droit d'auteur appliqué au
             contenu généré par IA évolue ; selon les juridictions, tu peux ne
@@ -245,7 +245,7 @@ export default function Terms() {
             Ces conditions sont régies par les lois en vigueur dans la
             <strong> province de Québec, Canada</strong>, sans égard aux conflits
             de lois. Tout litige sera tranché par les tribunaux compétents du
-            district de Saint-Hyacinthe, Québec, Canada — sauf si la loi sur
+            district de Saint-Hyacinthe, Québec, Canada - sauf si la loi sur
             la protection du consommateur du Québec t'accorde un droit plus
             favorable.
           </p>

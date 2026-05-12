@@ -1,9 +1,9 @@
 ---
-title: MCP et content marketing — Claude qui écrit tes articles depuis ton chat
+title: MCP et content marketing - Claude qui écrit tes articles depuis ton chat
 slug: mcp-claude-content-marketing
 date: 2026-04-28
 author: Darius Tokam
-excerpt: Le Model Context Protocol d'Anthropic est en train de changer la façon dont les marketers utilisent l'IA. Tu n'as plus à copier-coller entre 5 outils — tu parles à Claude, et Claude exécute.
+excerpt: Le Model Context Protocol d'Anthropic est en train de changer la façon dont les marketers utilisent l'IA. Tu n'as plus à copier-coller entre 5 outils - tu parles à Claude, et Claude exécute.
 tags: [mcp, claude, ia]
 ---
 

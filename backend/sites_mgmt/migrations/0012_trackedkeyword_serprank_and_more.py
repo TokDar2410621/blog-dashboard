@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('keyword', models.CharField(max_length=255)),
                 ('language', models.CharField(choices=[('fr', 'Français'), ('en', 'English'), ('es', 'Español')], default='fr', max_length=2)),
-                ('target_url', models.URLField(blank=True, default='', help_text='Optional. The article URL we expect to rank — used to highlight if the page actually ranks.', max_length=500)),
+                ('target_url', models.URLField(blank=True, default='', help_text='Optional. The article URL we expect to rank - used to highlight if the page actually ranks.', max_length=500)),
                 ('is_active', models.BooleanField(default=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),

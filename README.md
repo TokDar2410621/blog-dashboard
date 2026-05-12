@@ -1,7 +1,7 @@
 # Gridar
 
 > SEO content on autopilot for Quebec PMEs.
-> 12 SEO agents in one product. Generate, audit and publish articles to WordPress, Shopify, Webflow or a hosted blog — without touching your code.
+> 12 SEO agents in one product. Generate, audit and publish articles to WordPress, Shopify, Webflow or a hosted blog - without touching your code.
 
 **Made by [Arivex Studio](https://arivex.ca).**
 
@@ -9,18 +9,18 @@
 
 Gridar bundles 12 specialized SEO agents into one SaaS:
 
-- **ArticleGenerator** — Claude + Serper, FR/EN/ES, 7 archetypes
-- **AuditEngine** — 0-100 SEO score + actionable suggestions
-- **BriefBuilder** — search intent, outline, FAQ, entities
-- **KeywordResearch** — Serper + Gemini cross-checked volumes
-- **RankTracker** — daily SERP snapshots, geo-restricted to Quebec by default
-- **ContentDecay** — flags articles losing >30% traffic
-- **TopicClusters** — semantic grouping of your content
-- **LinkGraph** — internal linking opportunities
-- **BrokenLinkChecker** — periodic 404 crawl
-- **PlagiarismChecker** — detect copy-paste with the wider web
-- **ReadabilityScorer** — Flesch + lexical complexity
-- **PageSpeedAuditor** — Core Web Vitals via Google PSI
+- **ArticleGenerator** - Claude + Serper, FR/EN/ES, 7 archetypes
+- **AuditEngine** - 0-100 SEO score + actionable suggestions
+- **BriefBuilder** - search intent, outline, FAQ, entities
+- **KeywordResearch** - Serper + Gemini cross-checked volumes
+- **RankTracker** - daily SERP snapshots, geo-restricted to Quebec by default
+- **ContentDecay** - flags articles losing >30% traffic
+- **TopicClusters** - semantic grouping of your content
+- **LinkGraph** - internal linking opportunities
+- **BrokenLinkChecker** - periodic 404 crawl
+- **PlagiarismChecker** - detect copy-paste with the wider web
+- **ReadabilityScorer** - Flesch + lexical complexity
+- **PageSpeedAuditor** - Core Web Vitals via Google PSI
 
 Plus: GSC OAuth, hreflang for multilingual, weekly digests, multi-domain dashboards, Stripe billing with credits, public REST API, MCP server, n8n community node.
 

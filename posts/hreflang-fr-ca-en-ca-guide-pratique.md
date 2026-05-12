@@ -1,5 +1,5 @@
 ---
-title: Hreflang fr-CA + en-CA — le guide pratique pour un site bilingue québécois
+title: Hreflang fr-CA + en-CA - le guide pratique pour un site bilingue québécois
 slug: hreflang-fr-ca-en-ca-guide-pratique
 date: 2026-04-03
 author: Darius Tokam
@@ -89,7 +89,7 @@ Pour 95 % des cas PME québécoise : `<head>` HTML.
    - ✅ Au moins 1 tag `fr-CA` self-referencing
    - ✅ Au moins 1 tag `en-CA` ou `en-US` vers la version anglaise
    - ✅ 1 tag `x-default`
-5. Ouvre la version EN, fais pareil — les tags doivent être MIROIRS
+5. Ouvre la version EN, fais pareil - les tags doivent être MIROIRS
 
 Si une de ces 5 conditions n'est pas remplie, tu as un problème SEO bilingue.
 

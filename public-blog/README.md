@@ -1,4 +1,4 @@
-# public-blog — frontend public générique
+# public-blog - frontend public générique
 
 App Next.js 14 (App Router) qui sert le blog public d'un site géré par
 blog-dashboard. Une seule app pour TOUS les clients : la résolution se
@@ -26,7 +26,7 @@ fait au runtime via le header `Host`.
 cd public-blog
 npm install
 NEXT_PUBLIC_SITE_ID=3 npm run dev
-# Ouvre http://localhost:3001 — affiche le blog du site #3 (TokamDarius)
+# Ouvre http://localhost:3001 - affiche le blog du site #3 (TokamDarius)
 ```
 
 Sans `NEXT_PUBLIC_SITE_ID`, l'app fait un lookup par `Host`. En local le host
@@ -43,11 +43,11 @@ est `localhost:3001`, donc aucun site ne match et l'app affiche la page
 
 ## Routes
 
-- `/` — liste des articles
-- `/[slug]` — article (gère 301 si redirect dans le dashboard)
-- `/sitemap.xml` — sitemap dynamique pour Google
-- `/rss.xml` — flux RSS
-- `/robots.txt` — pointe vers le sitemap
+- `/` - liste des articles
+- `/[slug]` - article (gère 301 si redirect dans le dashboard)
+- `/sitemap.xml` - sitemap dynamique pour Google
+- `/rss.xml` - flux RSS
+- `/robots.txt` - pointe vers le sitemap
 
 ## SEO inclus
 

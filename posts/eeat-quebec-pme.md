@@ -1,9 +1,9 @@
 ---
-title: E-E-A-T pour PME québécoises — 6 signaux que Google attend de toi
+title: E-E-A-T pour PME québécoises - 6 signaux que Google attend de toi
 slug: eeat-quebec-pme
 date: 2026-04-24
 author: Darius Tokam
-excerpt: Le Helpful Content Update a fait disparaître 40 % des blogs anonymes. Voici les 6 signaux E-E-A-T spécifiques au contexte québécois — et comment les générer en 30 minutes.
+excerpt: Le Helpful Content Update a fait disparaître 40 % des blogs anonymes. Voici les 6 signaux E-E-A-T spécifiques au contexte québécois - et comment les générer en 30 minutes.
 tags: [eeat, seo, quebec]
 ---
 
@@ -53,7 +53,7 @@ Mentionne ton NEQ dans le footer ou sur la page "À propos". Pas de schema oblig
 
 ### 4. Cas client ou témoignages avec noms réels
 
-Pas "Jean D., satisfait" — "Jean Doucet, propriétaire de Café Bélanger à Sherbrooke". Les noms abstraits sont devenus suspects post-HCU.
+Pas "Jean D., satisfait" - "Jean Doucet, propriétaire de Café Bélanger à Sherbrooke". Les noms abstraits sont devenus suspects post-HCU.
 
 ### 5. Date de dernière mise à jour visible
 

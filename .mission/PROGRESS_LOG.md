@@ -3,7 +3,7 @@
 Une entrée par session. Format strict :
 
 ```
-## Session YYYY-MM-DD — <résumé court>
+## Session YYYY-MM-DD - <résumé court>
 
 **Fait** : ...
 **Tests** : ...
@@ -12,11 +12,11 @@ Une entrée par session. Format strict :
 **Blocages** : ...
 ```
 
-Garder ce fichier sous **500 lignes** — quand on dépasse, archiver les sessions anciennes dans `PROGRESS_LOG_ARCHIVE.md`.
+Garder ce fichier sous **500 lignes** - quand on dépasse, archiver les sessions anciennes dans `PROGRESS_LOG_ARCHIVE.md`.
 
 ---
 
-## Session 2026-05-05 — Content Brief Generator — backend POST /content-brief/
+## Session 2026-05-05 - Content Brief Generator - backend POST /content-brief/
 
 **Fait** :
 - Implémenté `ContentBriefView(APIView)` dans `backend/sites_mgmt/views.py` (après `CompetitorAnalysisView`).
@@ -44,17 +44,17 @@ Garder ce fichier sous **500 lignes** — quand on dépasse, archiver les sessio
 
 **Prochain bloc concret** :
 Implémenter le frontend `src/components/ContentBrief.tsx` + intégration dans `SEOAnalyzer.tsx` :
-1. Créer `src/components/ContentBrief.tsx` — composant qui prend `{keyword, language}` props, appelle `POST /content-brief/` via `useMutation` react-query, affiche le résultat structuré (intent badge, titles, outline accordion, FAQ, entities chips, schemas badges, EEAT signals).
+1. Créer `src/components/ContentBrief.tsx` - composant qui prend `{keyword, language}` props, appelle `POST /content-brief/` via `useMutation` react-query, affiche le résultat structuré (intent badge, titles, outline accordion, FAQ, entities chips, schemas badges, EEAT signals).
 2. Ajouter clés i18n dans `src/i18n/fr.json` et `src/i18n/en.json` (ex: `content_brief.title`, `content_brief.intent`, `content_brief.outline`, etc.).
 3. Intégrer dans `SEOAnalyzer.tsx` : nouveau tab ou nouvelle section "Content Brief" avec le composant `ContentBrief`.
 4. `npm run build` doit passer sans erreur TS.
 5. Cocher `[ ] Frontend ContentBrief.tsx` dans ROADMAP.md.
 
-**Blocages** : aucun. Clés Serper + Gemini sont sur Railway — l'endpoint backend requiert un test humain sur l'env de prod.
+**Blocages** : aucun. Clés Serper + Gemini sont sur Railway - l'endpoint backend requiert un test humain sur l'env de prod.
 
 ---
 
-## Session 2026-05-04 — Bootstrap mission + .mission/ + skill /mission
+## Session 2026-05-04 - Bootstrap mission + .mission/ + skill /mission
 
 **Fait** :
 - Cristallisation de la mission "SEO n°1 au Québec" dans `MISSION.md`.
@@ -62,7 +62,7 @@ Implémenter le frontend `src/components/ContentBrief.tsx` + intégration dans `
 - Création du skill `/mission` dans `~/.claude/skills/mission/SKILL.md` (côté local Darius).
 - Permission `Bash(git push:*)` ajoutée à `~/.claude/settings.json`.
 - Avant cette session : commit `eb243e7` (dedup translation_group sur public posts list) poussé sur `main`.
-- Avant cette session : tentative commit fix markdown image Arivex — perdu lors d'un revert côté Darius (cf `arivex-ignition` repo).
+- Avant cette session : tentative commit fix markdown image Arivex - perdu lors d'un revert côté Darius (cf `arivex-ignition` repo).
 
 **Tests** : pas d'exécution (cette session est de la doc/mémoire).
 
@@ -70,13 +70,13 @@ Implémenter le frontend `src/components/ContentBrief.tsx` + intégration dans `
 
 **Prochain bloc concret** :
 
-Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
+Implémenter le **Tier 1 #1 - Content Brief Generator**. Étapes :
 
-1. Lire `backend/sites_mgmt/views.py` — chercher `class CompetitorAnalysisView` et `class KeywordResearchView` pour réutiliser leurs patterns Serper/Gemini.
+1. Lire `backend/sites_mgmt/views.py` - chercher `class CompetitorAnalysisView` et `class KeywordResearchView` pour réutiliser leurs patterns Serper/Gemini.
 2. Ajouter `class ContentBriefView(APIView)` après `CompetitorAnalysisView`. Body :
    - Reçoit `{keyword: str, language: str ('fr'/'en'), site_id?: int}`
    - Cache key via `_seo_cache_key('content_brief', keyword, language)`
-   - Étape A : appelle Serper SERP (top 10 + peopleAlsoAsk) — réutiliser le client Serper de `CompetitorAnalysisView`
+   - Étape A : appelle Serper SERP (top 10 + peopleAlsoAsk) - réutiliser le client Serper de `CompetitorAnalysisView`
    - Étape B : envoie le résultat à Gemini avec prompt qui demande JSON :
      ```
      {
@@ -106,11 +106,11 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 ---
 
-## Session 2026-05-04 (suite) — Content Brief Generator (backend)
+## Session 2026-05-04 (suite) - Content Brief Generator (backend)
 
 **Fait** :
 - Backend `ContentBriefView` ajouté dans `backend/sites_mgmt/views.py` (entre `CompetitorAnalysisView` et la section public API).
-  - Input : `{keyword, language: 'fr'|'en'|'es'}` (`site_id` optionnel mais ignoré pour l'instant — réservé pour usages futurs comme contextualiser sur un site).
+  - Input : `{keyword, language: 'fr'|'en'|'es'}` (`site_id` optionnel mais ignoré pour l'instant - réservé pour usages futurs comme contextualiser sur un site).
   - Étape 1 : Serper SERP top 10 + `peopleAlsoAsk` + `relatedSearches` (best-effort, l'absence de `SERPER_API_KEY` n'est pas bloquante).
   - Étape 2 : Gemini 2.5 flash avec un prompt structuré qui demande JSON :
     `search_intent`, `intent_explanation`, `recommended_titles[3]`, `outline[]` (level 2/3),
@@ -128,7 +128,7 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 **Branches/commits** : commit local à venir, **pas de push** (cf workflow local-first).
 
-**Prochain bloc concret** : (voir entrée suivante — frontend fait dans la même session)
+**Prochain bloc concret** : (voir entrée suivante - frontend fait dans la même session)
 
 **Blocages** : aucun.
 
@@ -136,10 +136,10 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 ---
 
-## Session 2026-05-04 (suite 2) — Content Brief Generator (frontend) ✅ Tier 1 #1 DONE
+## Session 2026-05-04 (suite 2) - Content Brief Generator (frontend) ✅ Tier 1 #1 DONE
 
 **Fait** :
-- Composant `src/components/ContentBrief.tsx` (`ContentBriefPanel`) — UI complète :
+- Composant `src/components/ContentBrief.tsx` (`ContentBriefPanel`) - UI complète :
   - Input mot-clé + bouton générer (mutation react-query → `POST /content-brief/`).
   - Skeleton pendant chargement.
   - Brief reçu : sections collapsibles (search intent badge, 3 titres cliquables → clipboard, outline H2/H3 indenté, word count target, FAQ expandable details, entities en tags, schemas en badges, EEAT en checklist verte, top 5 concurrents SERP).
@@ -158,11 +158,11 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 **Branches/commits** : commit local à venir (pas de push).
 
-**Prochain bloc concret** : (voir entrée suivante — PAA fait dans la même session)
+**Prochain bloc concret** : (voir entrée suivante - PAA fait dans la même session)
 
 (Roadmap suivante après PAA :)
 
-**Tier 1 #2 — People Also Ask harvester + auto-FAQ schema** (estimé 2h) :
+**Tier 1 #2 - People Also Ask harvester + auto-FAQ schema** (estimé 2h) :
 
 1. Lire dans `backend/sites_mgmt/views.py` la classe `KeywordResearchView` (~ligne 1574) qui appelle déjà Serper avec `peopleAlsoAsk`. Réutiliser le pattern.
 2. Ajouter `class PAAView(APIView)` après `ContentBriefView`. Body :
@@ -172,19 +172,19 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
    - Étape B (optionnel mais utile) : pour chaque question, demander à Gemini une réponse courte (1-2 phrases) factuelle, prête pour le schema FAQPage.
    - Retour : `{questions: [{question, answer}], faq_schema: {…JSON-LD FAQPage…}}`.
 3. Ajouter route `path('paa/', PAAView.as_view(), name='paa')` dans `urls.py`.
-4. Frontend : ajouter une section dans `src/components/SEOAnalyzer.tsx` (le hub SEO) — ou un nouveau composant `PAAPanel.tsx` — avec champ mot-clé, bouton "Récupérer PAA", liste questions/réponses, bouton "Insérer FAQ schema dans l'article courant" (insère le JSON-LD dans `<script type="application/ld+json">`).
+4. Frontend : ajouter une section dans `src/components/SEOAnalyzer.tsx` (le hub SEO) - ou un nouveau composant `PAAPanel.tsx` - avec champ mot-clé, bouton "Récupérer PAA", liste questions/réponses, bouton "Insérer FAQ schema dans l'article courant" (insère le JSON-LD dans `<script type="application/ld+json">`).
 5. i18n `paa.*` keys.
 6. `python manage.py check` + `npm run build` doivent passer.
 
-**Alternative** (si tu veux varier) : Tier 1 #4 — Hreflang validator (1h, plus rapide) ou Tier 1 #3 — Bulk SEO audit (3h, plus impactant).
+**Alternative** (si tu veux varier) : Tier 1 #4 - Hreflang validator (1h, plus rapide) ou Tier 1 #3 - Bulk SEO audit (3h, plus impactant).
 
 **Blocages** : aucun.
 
-**Actions humaines en attente** : aucune (la PR éventuellement ouverte par le run cloud déclenché plus tôt peut être ignorée/fermée — la feature est faite en local).
+**Actions humaines en attente** : aucune (la PR éventuellement ouverte par le run cloud déclenché plus tôt peut être ignorée/fermée - la feature est faite en local).
 
 ---
 
-## Session 2026-05-04 (suite 3) — PAA harvester + FAQ schema ✅ Tier 1 #2 DONE
+## Session 2026-05-04 (suite 3) - PAA harvester + FAQ schema ✅ Tier 1 #2 DONE
 
 **Fait** :
 - Backend `PAAView` ajouté dans `views.py` (juste après `ContentBriefView`).
@@ -211,7 +211,7 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 
 **Prochain bloc concret** :
 
-**Tier 1 #4 — Hreflang validator** (estimé 1h, gain rapide) :
+**Tier 1 #4 - Hreflang validator** (estimé 1h, gain rapide) :
 
 1. Ouvrir `backend/sites_mgmt/views.py`, trouver `class SEOAuditView` (~ligne 1163).
 2. Dans la méthode `post`, après l'audit Gemini, ajouter une vérification hreflang :
@@ -222,7 +222,7 @@ Implémenter le **Tier 1 #1 — Content Brief Generator**. Étapes :
 4. i18n `audit.hreflang.*`.
 5. `python manage.py check` + `npm run build`.
 
-Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur tous les articles publiés d'un site, agrège les problèmes, dashboard agrégé. Choisir entre #4 (rapide, pertinent multi-langue) et #3 (gros impact).
+Alternative : **Tier 1 #3 - Bulk SEO audit** (3h, plus impactant). Itère sur tous les articles publiés d'un site, agrège les problèmes, dashboard agrégé. Choisir entre #4 (rapide, pertinent multi-langue) et #3 (gros impact).
 
 **Recommandation pour la prochaine session** : faire #4 d'abord (1h, finit Tier 1) puis #3.
 
@@ -232,7 +232,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 4) — Hreflang validator ✅ Tier 1 #4 DONE
+## Session 2026-05-04 (suite 4) - Hreflang validator ✅ Tier 1 #4 DONE
 
 **Fait** :
 - Backend `HreflangCheckView` ajouté dans `views.py` (juste avant `PAAView`).
@@ -261,7 +261,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Prochain bloc concret** :
 
-**Tier 1 #3 — Bulk SEO audit** (estimé 3h) :
+**Tier 1 #3 - Bulk SEO audit** (estimé 3h) :
 
 1. Ouvrir `backend/sites_mgmt/views.py`. Ajouter `class BulkSEOAuditView(APIView)` après `HreflangCheckView`.
 2. Endpoint `GET /sites/<site_id>/audit-all/` (ou POST avec body `{site_id, async?: bool}`).
@@ -270,7 +270,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
    - Pour chaque, appeler la même logique que `SEOAuditView` (extraire dans une fonction helper `_run_seo_audit(title, excerpt, content, keyword, language)` partagée).
    - Cache par article via `_seo_cache_key`.
    - Agréger : score moyen, distribution scores (excellent/bon/moyen/faible), top 5 weakness les plus fréquentes, top 5 actions les plus fréquentes, articles les plus faibles (top 10 par score asc).
-4. Pour gros sites : optionnel `async: true` → spawn `threading.Thread`, retourne immédiatement un job_id, endpoint de polling `GET /audit-jobs/<id>/`. **Skipper l'async pour le MVP** — sites de Darius < 50 articles, OK synchrone.
+4. Pour gros sites : optionnel `async: true` → spawn `threading.Thread`, retourne immédiatement un job_id, endpoint de polling `GET /audit-jobs/<id>/`. **Skipper l'async pour le MVP** - sites de Darius < 50 articles, OK synchrone.
 5. Frontend : nouvelle page `src/pages/dashboard/BulkAudit.tsx` avec :
    - Bouton "Lancer l'audit complet du site" (bloquant, peut prendre 1-2 min).
    - Loader pendant exécution.
@@ -286,7 +286,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 5) — Bulk SEO audit ✅ Tier 1 #3 DONE — TIER 1 COMPLETED 🎯
+## Session 2026-05-04 (suite 5) - Bulk SEO audit ✅ Tier 1 #3 DONE - TIER 1 COMPLETED 🎯
 
 **Fait** :
 - **Refactor** : extrait la logique d'audit Gemini dans une fonction helper `_run_seo_audit(title, excerpt, content, keyword, language, api_key)` partagée. Renvoie tuple `(result, from_cache)`. `SEOAuditView` simplifié pour l'utiliser.
@@ -325,7 +325,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Prochain bloc concret** :
 
-**Tier 2 #5 — Rank tracking** (estimé 8-12h, multi-sessions). Planifier l'architecture en premier :
+**Tier 2 #5 - Rank tracking** (estimé 8-12h, multi-sessions). Planifier l'architecture en premier :
 
 **Étape A (1h, prochaine session)** : Concevoir le modèle DB `SerpRank`, écrire la migration.
 1. Modèle `SerpRank(site FK, keyword str, language str(2), position int, url str, source str, recorded_at datetime)`. Index sur (site, keyword, language, recorded_at).
@@ -353,7 +353,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 6) — Rank tracking étape A + B + (presque) C ✅ Tier 2 #5 (90% DONE)
+## Session 2026-05-04 (suite 6) - Rank tracking étape A + B + (presque) C ✅ Tier 2 #5 (90% DONE)
 
 **Fait** :
 - Modèles DB ajoutés dans `models.py` :
@@ -361,10 +361,10 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
   - `SerpRank(tracked FK, position nullable, url, title, is_target_match, source, recorded_at)`. Index sur (tracked, -recorded_at).
 - Migration `0012_trackedkeyword_serprank_and_more` créée et appliquée.
 - 4 endpoints backend ajoutés :
-  - `GET/POST /sites/<id>/keywords/` (TrackedKeywordsView) — list/create. Le list inclut le `latest` snapshot par mot-clé via une seule requête optimisée (group by tracked_id en mémoire).
+  - `GET/POST /sites/<id>/keywords/` (TrackedKeywordsView) - list/create. Le list inclut le `latest` snapshot par mot-clé via une seule requête optimisée (group by tracked_id en mémoire).
   - `DELETE /sites/<id>/keywords/<pk>/` (TrackedKeywordDetailView).
-  - `POST /sites/<id>/rank-snapshot/` (RankSnapshotView) — itère TrackedKeyword actifs, query Serper SERP top 100, cherche d'abord le `target_url` exact puis `site.domain`, stocke un SerpRank (position null si pas trouvé). **Designed for cron / /schedule.**
-  - `GET /sites/<id>/rank-history/?tracked_id=X&days=90` (RankHistoryView) — retourne tous les snapshots dans la fenêtre + `decay_alert` (severity warning si chute >5 places vs médiane, critical si tombe hors top 100).
+  - `POST /sites/<id>/rank-snapshot/` (RankSnapshotView) - itère TrackedKeyword actifs, query Serper SERP top 100, cherche d'abord le `target_url` exact puis `site.domain`, stocke un SerpRank (position null si pas trouvé). **Designed for cron / /schedule.**
+  - `GET /sites/<id>/rank-history/?tracked_id=X&days=90` (RankHistoryView) - retourne tous les snapshots dans la fenêtre + `decay_alert` (severity warning si chute >5 places vs médiane, critical si tombe hors top 100).
 - Frontend `src/pages/dashboard/KeywordTracker.tsx` :
   - Form d'ajout (keyword + langue + target_url optionnelle).
   - Bouton "Snapshot maintenant" (déclenche un crawl Serper synchrone).
@@ -390,7 +390,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Prochain bloc concret** :
 
-**Étape C — Cloud schedule pour rank tracking quotidien** (estimé 30 min) :
+**Étape C - Cloud schedule pour rank tracking quotidien** (estimé 30 min) :
 
 1. Créer une routine `/schedule` distincte (ou bien coupler à celle de mission désactivée) qui appelle `POST /sites/<id>/rank-snapshot/` chaque jour. Mais : l'agent cloud n'a pas la `SERPER_API_KEY` locale. Solution : appeler l'endpoint Railway en HTTP avec un token API (bearer pré-existant ou nouveau bearer dédié).
 2. **Alternative simple, recommandée** : ajouter un management command Django `python manage.py rank_snapshot --site <id>` qui invoque la même logique que `RankSnapshotView` côté serveur Railway. Puis :
@@ -399,7 +399,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
    - **Soit** Heroku-style scheduled jobs si dispo.
 3. Une fois le cron en place, les snapshots arrivent tout seuls et le frontend les affiche.
 
-**Ou alternative — Étape D : graphe d'évolution** (estimé 2h) :
+**Ou alternative - Étape D : graphe d'évolution** (estimé 2h) :
 - Ajouter recharts `<LineChart>` dans `KeywordTracker.tsx` pour visualiser l'historique des positions au lieu de la liste texte. Plus impactant visuellement.
 
 **Recommandation prochaine session** : faire **Étape D (graphe)** d'abord (vite + très visible). L'étape C peut attendre que Darius ait quelques mots-clés réels suivis pour valider l'utilité.
@@ -420,12 +420,12 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 7) — Règle d'or "no backend without frontend"
+## Session 2026-05-04 (suite 7) - Règle d'or "no backend without frontend"
 
 **Fait** :
 - Darius a explicité la règle de fond : *"le meilleur backend ne vaut rien sans front"*.
 - Section §7 ajoutée à `.mission/WORKFLOW.md` avec 6 sous-règles concrètes (slicer en vertical end-to-end, UI moche > pas d'UI, critère "done" mis à jour pour exiger l'UI, etc.).
-- Section "GOLDEN RULE" ajoutée au skill `~/.claude/skills/mission/SKILL.md` — applicable à TOUTES les missions futures, pas seulement celle-ci.
+- Section "GOLDEN RULE" ajoutée au skill `~/.claude/skills/mission/SKILL.md` - applicable à TOUTES les missions futures, pas seulement celle-ci.
 
 **Tests** : N/A (changement de règles, pas de code).
 
@@ -441,30 +441,30 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 8) — Étape D : graphe recharts dans KeywordTracker ✅
+## Session 2026-05-04 (suite 8) - Étape D : graphe recharts dans KeywordTracker ✅
 
 **Fait** :
 - Composant interne `RankChart` ajouté à la fin de `src/pages/dashboard/KeywordTracker.tsx`.
   - Utilise `recharts` (déjà dans `package.json` à `^3.7.0`).
-  - `LineChart` avec X-axis temporel (date du snapshot, formatée FR-CA) et Y-axis **inversé** (`reversed`) avec `domain` calculé dynamiquement (min/max ±2-5) — convention SEO : position 1 (la meilleure) en haut.
+  - `LineChart` avec X-axis temporel (date du snapshot, formatée FR-CA) et Y-axis **inversé** (`reversed`) avec `domain` calculé dynamiquement (min/max ±2-5) - convention SEO : position 1 (la meilleure) en haut.
   - Snapshots avec `position === null` (hors top 100) plottés à `101` comme plafond avec label "100+".
   - Deux `ReferenceLine` horizontales pour les seuils top 3 (vert foncé) et top 10 (emerald), pointillés.
   - Tooltip custom : date complète + titre du résultat (ou "Position").
   - Légende sous le graphe.
   - `connectNulls` pour ne pas couper la ligne si un snapshot manque.
-- Remplace l'ancienne liste texte mono-spaced dans la row expansée — l'alerte décay (warning/critical) reste affichée au-dessus du graphe.
+- Remplace l'ancienne liste texte mono-spaced dans la row expansée - l'alerte décay (warning/critical) reste affichée au-dessus du graphe.
 
 **Tests** :
-- `npm run build` → ✓ built in 17.05s. Bundle a grossi de +340KB (precache 1191 → 1531 KB) — coût attendu de recharts. Pas critique pour un dashboard interne.
+- `npm run build` → ✓ built in 17.05s. Bundle a grossi de +340KB (precache 1191 → 1531 KB) - coût attendu de recharts. Pas critique pour un dashboard interne.
 - **Test live à faire (humain)** : ajouter quelques mots-clés sur `/dashboard/<siteId>/positions`, lancer 3-4 snapshots, expand une row → vérifier que le graphe s'affiche avec axe Y inversé (position 1 en haut), que les hover tooltips fonctionnent, que les lignes de référence top 3 / top 10 sont visibles.
 
 **Branches/commits** : commit local à venir.
 
-**Note règle d'or** : ✅ respectée. Le graphe est une amélioration UI directe — pas de backend orphelin.
+**Note règle d'or** : ✅ respectée. Le graphe est une amélioration UI directe - pas de backend orphelin.
 
 **Prochain bloc concret** :
 
-**Tier 2 #6 — Content decay detector** (estimé 3h) :
+**Tier 2 #6 - Content decay detector** (estimé 3h) :
 
 1. Lire `backend/sites_mgmt/views.py` la classe `GSCQueriesView` (~ligne ?, à grep) pour comprendre comment elle interroge la Google Search Console et quelles données elle expose.
 2. Ajouter `class ContentDecayView(APIView)` dans `views.py`. Endpoint `GET /sites/<site_id>/content-decay/?days=30`.
@@ -473,7 +473,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
    - Comparer avec les 30 jours d'avant (60-30 jours).
    - Calculer le delta : si impressions chutent de >30% OU clics chutent de >40%, c'est un "decay alert".
    - Retourner : `{decaying: [{slug, title, impressions_now, impressions_before, clicks_now, clicks_before, delta_pct, suggested_action}], healthy_count, no_data_count}`.
-   - `suggested_action` peut être un texte simple : "refresh content", "expand", "redirect" — basé sur des règles simples (si delta très fort → redirect, si delta modéré + score audit faible → refresh, etc.).
+   - `suggested_action` peut être un texte simple : "refresh content", "expand", "redirect" - basé sur des règles simples (si delta très fort → redirect, si delta modéré + score audit faible → refresh, etc.).
 4. Frontend : nouvelle page `src/pages/dashboard/ContentDecay.tsx` :
    - Bouton "Analyser le décay" (peut prendre 30s-1min selon nombre d'articles + GSC API).
    - Liste des articles en décay : titre, ancien vs nouveau (sparkline ou bar), delta %, suggested action, lien vers PostEditor.
@@ -489,7 +489,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 ---
 
-## Session 2026-05-04 (suite 9) — Content decay detector ✅ Tier 2 #6 DONE (end-to-end)
+## Session 2026-05-04 (suite 9) - Content decay detector ✅ Tier 2 #6 DONE (end-to-end)
 
 **Fait** :
 - Backend `ContentDecayView` ajouté dans `views.py` (juste avant la section RANK TRACKING).
@@ -524,7 +524,7 @@ Alternative : **Tier 1 #3 — Bulk SEO audit** (3h, plus impactant). Itère sur 
 
 **Prochain bloc concret** :
 
-Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, multi-sessions). Étape A (~2h) :
+Tier 2 fini à 100%. **Tier 3 #7 - Topic Cluster Planner** (estimé 6-8h, multi-sessions). Étape A (~2h) :
 
 1. Lire `backend/sites_mgmt/views.py` autour des fonctions qui itèrent les articles (`SiteCannibalizationView` ou `LinkSuggestionsView` pour le pattern).
 2. Ajouter `class TopicClusterView(APIView)`. Endpoint `POST /sites/<id>/topic-clusters/`.
@@ -544,7 +544,7 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 
 ---
 
-## Session 2026-05-04 (suite 10) — Topic Cluster Planner ✅ Tier 3 #7 DONE (end-to-end)
+## Session 2026-05-04 (suite 10) - Topic Cluster Planner ✅ Tier 3 #7 DONE (end-to-end)
 
 **Fait** :
 - Backend `TopicClusterView` (juste avant `ContentDecayView`) :
@@ -560,7 +560,7 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
   - Select langue + bouton "Analyser" (Gemini 10-30s).
   - Header avec compteur clusters / articles / unassigned (en ambre si > 0).
   - Pour chaque cluster : carte avec theme + summary + section **Pillar** mise en valeur (border-2 primary, étoile ambre) + grid 2-col **Spokes** (icône GitBranch) + section **Suggested Gaps** (border dashed, bouton "Générer" qui pré-remplit AIGenerator via `?title=...`).
-  - Bouton "Générer" sur chaque suggestion → navigate vers `/generer?title=<encoded>` pour pré-remplir le titre. (NB : il faut peut-être ajouter le support du query param `title` dans AIGenerator — TODO mineur, à voir prochaine session.)
+  - Bouton "Générer" sur chaque suggestion → navigate vers `/generer?title=<encoded>` pour pré-remplir le titre. (NB : il faut peut-être ajouter le support du query param `title` dans AIGenerator - TODO mineur, à voir prochaine session.)
   - Section "Unassigned" en bas si présente.
   - Empty state si pas encore lancé.
 - Route `/dashboard/<siteId>/clusters` + sidebar link "Topic clusters" avec icône `Network`.
@@ -576,11 +576,11 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 
 **Note règle d'or** : ✅ respectée. Backend + frontend + route + sidebar + i18n dans la même session.
 
-**TODO mineur** : `AIGenerator.tsx` ne lit pas encore `?title=...` depuis l'URL pour préremplir. À ajouter pour que le bouton "Générer" depuis un cluster gap arrive avec le titre déjà en place. Ligne ~57 dans AIGenerator (le `useEffect` qui lit `tpl_id`) — il suffit d'ajouter la lecture de `searchParams.get('title')`. À faire prochaine session.
+**TODO mineur** : `AIGenerator.tsx` ne lit pas encore `?title=...` depuis l'URL pour préremplir. À ajouter pour que le bouton "Générer" depuis un cluster gap arrive avec le titre déjà en place. Ligne ~57 dans AIGenerator (le `useEffect` qui lit `tpl_id`) - il suffit d'ajouter la lecture de `searchParams.get('title')`. À faire prochaine session.
 
 **Prochain bloc concret** :
 
-**Tier 3 #8 — Internal link graph viz** (estimé 4h, end-to-end) :
+**Tier 3 #8 - Internal link graph viz** (estimé 4h, end-to-end) :
 
 1. Backend `GET /sites/<id>/link-graph/` qui :
    - Itère tous les articles publiés.
@@ -593,7 +593,7 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
    - MVP : 3 cards "Orphans", "Hubs", "Dead-ends" avec listes cliquables, sans graphe SVG. Le graphe react-flow vient en deuxième passe.
 3. i18n + routes + sidebar + build.
 
-**Alternative** : le TODO mineur `AIGenerator.tsx ?title=` (5 min) — peut être combiné en bonus dans la session de #8.
+**Alternative** : le TODO mineur `AIGenerator.tsx ?title=` (5 min) - peut être combiné en bonus dans la session de #8.
 
 **Statistiques fin de session 9 (cumulatif)** :
 - Tier 1 : ✅ 4/4 features
@@ -608,18 +608,18 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 
 **Actions humaines en attente** :
 - Tester les 7 nouvelles pages dashboard.
-- Décider du déploiement (push) — toutes les modifs sont safe (pas de breaking change), une migration unique (0012) safe à appliquer.
+- Décider du déploiement (push) - toutes les modifs sont safe (pas de breaking change), une migration unique (0012) safe à appliquer.
 
 ---
 
-## Session 2026-05-04 (suite 11) — Fix AIGenerator query params + Tier 3 #8 Internal link graph ✅
+## Session 2026-05-04 (suite 11) - Fix AIGenerator query params + Tier 3 #8 Internal link graph ✅
 
 **Fait** :
 
 **Fix AIGenerator query params** :
 - Ligne 56 de `src/pages/dashboard/AIGenerator.tsx` : le `useEffect` lisait seulement `tpl_id`. Étendu pour lire aussi `title`, `topic`, `keywords`. Permet aux pages cluster + decay (et toute future feature) de pré-remplir le formulaire de génération.
 
-**Tier 3 #8 — Internal link graph (end-to-end)** :
+**Tier 3 #8 - Internal link graph (end-to-end)** :
 - Backend `LinkGraphView` ajouté (juste avant `TopicClusterView`).
   - Endpoint `GET /sites/<id>/link-graph/?language=fr&limit=200`.
   - Itère articles publiés (max 200 par défaut, 500 cap), parse leur contenu pour extraire les liens internes via deux regex :
@@ -632,7 +632,7 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 - Frontend `src/pages/dashboard/LinkGraph.tsx` :
   - Header avec select langue (Toutes / FR / EN / ES).
   - 4 KPI cards : articles, edges, orphans (ambre), hubs (vert).
-  - Grid 3 colonnes : **Orphans**, **Hubs**, **Dead-ends** — chacun avec liste cliquable max 30 entries, indicateurs de degré, hint explicatif.
+  - Grid 3 colonnes : **Orphans**, **Hubs**, **Dead-ends** - chacun avec liste cliquable max 30 entries, indicateurs de degré, hint explicatif.
   - Section "Top 10 articles les mieux connectés" en bas (somme in+out_degree).
   - Empty state si pas d'articles.
 - Route `/dashboard/<siteId>/link-graph` + sidebar link "Maillage interne" (icône `Link2`).
@@ -651,14 +651,14 @@ Tier 2 fini à 100%. **Tier 3 #7 — Topic Cluster Planner** (estimé 6-8h, mult
 
 Tier 3 a 2 features done sur 9 (#7 clusters + #8 link graph). Items rapides Tier 3 restants :
 
-**Tier 3 #12 — Readability scores FR/EN** (~2h, end-to-end) :
+**Tier 3 #12 - Readability scores FR/EN** (~2h, end-to-end) :
 
-1. Backend : ajouter helper `_compute_readability(text, lang)` qui calcule Flesch-Kincaid (FR + EN — formule légèrement différente) et ARI. Pas d'API externe.
+1. Backend : ajouter helper `_compute_readability(text, lang)` qui calcule Flesch-Kincaid (FR + EN - formule légèrement différente) et ARI. Pas d'API externe.
 2. Brancher dans `_run_seo_audit` ou créer endpoint dédié `POST /readability/` avec `{content, language}` → retourne `{flesch, ari, level, suggestions}`.
 3. Frontend : ajouter une card dans `SEOAnalyzer.tsx` qui montre le score + interprétation (très facile / facile / moyen / difficile / très difficile) avec barre de progression colorée.
 4. i18n + build.
 
-Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mini UI) :
+Ou **Tier 3 #10 - Auto-redirect 301 sur slug change** (~2h, end-to-end avec mini UI) :
 
 1. DB : modèle `Redirect(site, from_slug, to_slug, language, hit_count, created_at)`.
 2. Migration.
@@ -685,13 +685,13 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 
 ---
 
-## Session 2026-05-04 (suite 12) — Readability scores ✅ Tier 3 #12 DONE (end-to-end, sans API externe)
+## Session 2026-05-04 (suite 12) - Readability scores ✅ Tier 3 #12 DONE (end-to-end, sans API externe)
 
 **Fait** :
 - Backend : ajout de `import re` global dans `views.py` (manquait).
 - Helpers ajoutés (juste avant `LinkGraphView`) :
-  - `_count_syllables_en(word)` — heuristique simple (vowel groups + silent e + leading y).
-  - `_count_syllables_fr(word)` — règle "e final muet" + groupes vocaliques avec accents et œ.
+  - `_count_syllables_en(word)` - heuristique simple (vowel groups + silent e + leading y).
+  - `_count_syllables_fr(word)` - règle "e final muet" + groupes vocaliques avec accents et œ.
   - `_compute_readability(text, language)` :
     - Strip markdown/HTML noise (code blocks, inline code, images, links, tags, headings, bold/italic).
     - Compte phrases (split sur `[.!?]+`), mots (regex Latin1 + accentués), syllabes, caractères.
@@ -699,7 +699,7 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
     - **Flesch EN** : `206.835 - 1.015·(...) - 84.6·(...)`
     - **ARI** : `4.71·(chars/words) + 0.5·(words/sentences) - 21.43`
     - 6 buckets de niveau (very_easy → very_difficult) avec label texte.
-- `ReadabilityView` (POST `/readability/`) — wrapper, accepte `{content, language}`.
+- `ReadabilityView` (POST `/readability/`) - wrapper, accepte `{content, language}`.
 - Route `path('readability/', ReadabilityView.as_view(), name='readability')`.
 - Frontend `src/components/ReadabilityCard.tsx` :
   - Debounce 800ms après la dernière frappe avant d'appeler le backend.
@@ -727,7 +727,7 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 
 **Prochain bloc concret** :
 
-**Tier 3 #10 — Auto-redirect 301 sur slug change** (estimé 2h, end-to-end). Architecture :
+**Tier 3 #10 - Auto-redirect 301 sur slug change** (estimé 2h, end-to-end). Architecture :
 
 1. **DB** : nouveau modèle `Redirect` dans `models.py` :
    ```python
@@ -770,7 +770,7 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 
 ---
 
-## Session 2026-05-04 (suite 13) — Auto-redirect 301 ✅ Tier 3 #10 DONE (end-to-end)
+## Session 2026-05-04 (suite 13) - Auto-redirect 301 ✅ Tier 3 #10 DONE (end-to-end)
 
 **Fait** :
 - **DB** : modèle `Redirect(site, from_slug, to_slug, language, hit_count, is_active, created_at, updated_at)` ajouté dans `models.py`. Unique sur (site, from_slug, language). Index sur (site, from_slug, language).
@@ -778,8 +778,8 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 - **Auto-hook** : `SitePostDetailView.patch` capture l'ancien slug avant les setattr ; si `data['slug']` est différent, crée/update un `Redirect(from=old, to=new)` via `update_or_create`. Implémenté pour les deux modes : hosted (HostedPost) et external (BlogPost via `using(alias)`).
 - **301 dans public API** : `PublicPostDetailView.get` modifié pour appeler `_resolve_redirect` quand le slug demandé n'existe pas en DB. Si une redirect active matche → incrémente `hit_count` et retourne HTTP 301 avec header `Location: /blog/<new_slug>` + body `{redirect_to, status: 301}` pour les frontends qui préfèrent une redirection client-side. Per-language priorisé, fallback any-language.
 - **CRUD endpoints** :
-  - `GET /sites/<id>/redirects/` — liste 500 max ordonnée par `-updated_at`.
-  - `POST /sites/<id>/redirects/` — création manuelle avec `update_or_create` (idempotent).
+  - `GET /sites/<id>/redirects/` - liste 500 max ordonnée par `-updated_at`.
+  - `POST /sites/<id>/redirects/` - création manuelle avec `update_or_create` (idempotent).
   - `DELETE /sites/<id>/redirects/<pk>/`.
 - **Frontend** `src/pages/dashboard/Redirects.tsx` :
   - Form d'ajout : from_slug + to_slug + langue (FR/EN/ES) + bouton.
@@ -808,14 +808,14 @@ Ou **Tier 3 #10 — Auto-redirect 301 sur slug change** (~2h, end-to-end avec mi
 
 Tier 3 a 4/9 fait (#7 #8 #10 #12). Items restants Tier 3 :
 
-- **#9 Broken link checker** (3h, end-to-end) — le plus impactant restant.
-- **#11 Image SEO** (4h) — WebP auto, srcset, descriptive filenames. Plus lourd.
-- **#13 Quebec lexicon** (4h) — FR-CA, schema LocalBusiness. Différenciation clé.
-- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
-- **#15 Search trends FR-CA** (3h) — pytrends.
-- **#16 Reddit/Quora harvesting** (2h) — court.
+- **#9 Broken link checker** (3h, end-to-end) - le plus impactant restant.
+- **#11 Image SEO** (4h) - WebP auto, srcset, descriptive filenames. Plus lourd.
+- **#13 Quebec lexicon** (4h) - FR-CA, schema LocalBusiness. Différenciation clé.
+- **#14 Bing Webmaster** (6h) - action humaine pour clé API.
+- **#15 Search trends FR-CA** (3h) - pytrends.
+- **#16 Reddit/Quora harvesting** (2h) - court.
 
-**Recommandation** : **#9 Broken link checker** — court, impact direct sur le SEO, end-to-end naturel.
+**Recommandation** : **#9 Broken link checker** - court, impact direct sur le SEO, end-to-end naturel.
 
 Plan Étape A pour #9 :
 1. Backend `POST /sites/<id>/broken-links/` qui :
@@ -843,14 +843,14 @@ Plan Étape A pour #9 :
 
 ---
 
-## Session 2026-05-04 (suite 14) — Broken link checker ✅ Tier 3 #9 DONE (end-to-end)
+## Session 2026-05-04 (suite 14) - Broken link checker ✅ Tier 3 #9 DONE (end-to-end)
 
 **Fait** :
 - Backend `BrokenLinksView` ajouté (juste avant `_count_syllables_en`).
   - Endpoint `POST /sites/<id>/broken-links/?limit=100&language=fr`.
   - Itère articles publiés (max 200, default 100), filtre langue optionnel.
   - Extraction des URLs externes via 3 regex : markdown `[text](url)`, HTML `<a href>`, plain `https?://...`.
-  - Skip les liens internes (matching site.domain) — déjà couverts par link-graph.
+  - Skip les liens internes (matching site.domain) - déjà couverts par link-graph.
   - Pour chaque URL unique : `requests.head(url, timeout=5, allow_redirects=True)` + GET fallback pour 403/405/501.
   - Cache 24h par URL via `_seo_cache_key('broken-link:', url)` (les sites cassés ne se réparent pas vite).
   - Considéré broken : status >= 400 OU error (timeout, connection_error, autre).
@@ -878,23 +878,23 @@ Plan Étape A pour #9 :
 
 Tier 3 a maintenant **5/9 fait** (#7, #8, #9, #10, #12). Items restants (priorité décroissante) :
 
-**Tier 3 #16 — Reddit/Quora question harvesting** (~2h, end-to-end, plus court) :
+**Tier 3 #16 - Reddit/Quora question harvesting** (~2h, end-to-end, plus court) :
 
 1. Backend : Serper supporte un type de query `q="reddit.com {keyword}"` ou `q="quora.com {keyword}"` qui retourne des questions communautaires. Pas d'API officielle Reddit/Quora gratuite.
-2. Endpoint `POST /community-questions/` — input `{keyword, language}` → renvoie liste de questions Reddit + Quora trouvées via Serper.
+2. Endpoint `POST /community-questions/` - input `{keyword, language}` → renvoie liste de questions Reddit + Quora trouvées via Serper.
 3. Cache 1h.
 4. Frontend : composant simple à intégrer dans `SEOAnalyzer.tsx` ou page dédiée. Suggestion : intégrer dans `PAAPanel` étendu (déjà au même endroit).
 
-**Ou Tier 3 #13 — Quebec lexicon (FR-CA + LocalBusiness schema)** (~4h, gros impact différenciation) :
+**Ou Tier 3 #13 - Quebec lexicon (FR-CA + LocalBusiness schema)** (~4h, gros impact différenciation) :
 
 1. Helper Python avec dictionnaire FR-FR → FR-CA (ex: "shopping" → "magasinage", "fin de semaine" vs "week-end", etc.).
 2. Endpoint `POST /lexicon-check/` qui scanne le contenu et signale les termes non-québécois avec suggestions.
 3. Helper Schema.org LocalBusiness avec champs spécifiques au Québec (TPS/TVQ optionnel, NEQ).
 4. Frontend : carte dans audit + générateur de schema LocalBusiness dans SEO settings.
 
-**Ou Tier 3 #11 — Image SEO** (4h) — automatique WebP, srcset, descriptive filenames. Plus complexe, modifie le pipeline upload + génération.
+**Ou Tier 3 #11 - Image SEO** (4h) - automatique WebP, srcset, descriptive filenames. Plus complexe, modifie le pipeline upload + génération.
 
-**Recommandation** : **#16 Reddit/Quora** — court (2h), end-to-end immédiat, complète bien la collecte de questions (PAA déjà fait, Reddit/Quora ajoute la richesse communautaire).
+**Recommandation** : **#16 Reddit/Quora** - court (2h), end-to-end immédiat, complète bien la collecte de questions (PAA déjà fait, Reddit/Quora ajoute la richesse communautaire).
 
 **Statistiques fin de session 14** :
 - Tier 1 : ✅ 4/4
@@ -912,7 +912,7 @@ Tier 3 a maintenant **5/9 fait** (#7, #8, #9, #10, #12). Items restants (priorit
 
 ---
 
-## Session 2026-05-04 (suite 15) — Reddit/Quora harvester ✅ Tier 3 #16 DONE (end-to-end)
+## Session 2026-05-04 (suite 15) - Reddit/Quora harvester ✅ Tier 3 #16 DONE (end-to-end)
 
 **Fait** :
 - Backend `CommunityQuestionsView` ajouté (juste avant `BrokenLinksView`).
@@ -943,12 +943,12 @@ Tier 3 a maintenant **5/9 fait** (#7, #8, #9, #10, #12). Items restants (priorit
 
 Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
 
-- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage.
-- **#13 Quebec lexicon (FR-CA + LocalBusiness schema)** (4h) — gros impact différenciation.
-- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
-- **#15 Search trends FR-CA** (3h) — pytrends, fonctionne sans clé, parfois rate-limited.
+- **#11 Image SEO** (4h) - auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage.
+- **#13 Quebec lexicon (FR-CA + LocalBusiness schema)** (4h) - gros impact différenciation.
+- **#14 Bing Webmaster** (6h) - action humaine pour clé API.
+- **#15 Search trends FR-CA** (3h) - pytrends, fonctionne sans clé, parfois rate-limited.
 
-**Recommandation** : **#13 Quebec lexicon** — différenciation cœur de la mission "n°1 au Québec". Plan :
+**Recommandation** : **#13 Quebec lexicon** - différenciation cœur de la mission "n°1 au Québec". Plan :
 
 1. Helper Python `_quebecois_check(text)` avec dictionnaire `FRENCH_TO_QUEBECOIS = {"shopping": "magasinage", "week-end": "fin de semaine", "parking": "stationnement", "email": "courriel", ...}` (~30-50 entries pour démarrer).
 2. Endpoint `POST /lexicon-check/` → input `{content, language}` → retourne `{matches: [{term, suggestion, count, positions: [{line, col}]}]}`.
@@ -972,13 +972,13 @@ Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
 
 ---
 
-## Session 2026-05-04 (suite 16) — Quebec lexicon (FR-CA) + LocalBusiness schema ✅ Tier 3 #13 DONE
+## Session 2026-05-04 (suite 16) - Quebec lexicon (FR-CA) + LocalBusiness schema ✅ Tier 3 #13 DONE
 
 **Fait** :
 - Backend dans `views.py` (juste avant `_count_syllables_en`) :
   - Constante `QUEBECOIS_LEXICON` : ~50 entrées `(term_FR-FR, suggestion_FR-CA, optional_explanation)` couvrant lifestyle/commerce (shopping→magasinage, week-end→fin de semaine, parking→stationnement, email→courriel...), education (lycée→cégep, bac→baccalauréat), money (TVA→TPS+TVQ, SARL→Inc.), food (petit déjeuner→déjeuner, déjeuner→dîner...), tech (login→identifiant, startup→jeune pousse...), daily life (soldes→rabais, ticket→billet...).
   - `_quebecois_check(text)` : regex `\b...\b` case-insensitive par terme, calcule positions line/col, dédupliqué, max 20 positions par terme.
-  - `_generate_local_business_schema(site, address, hours, phone, price_range, area_served)` : génère `Schema.org/LocalBusiness` JSON-LD adapté Québec — `addressCountry: 'CA'`, `addressRegion: 'QC'`, `areaServed: 'Québec'` par défaut.
+  - `_generate_local_business_schema(site, address, hours, phone, price_range, area_served)` : génère `Schema.org/LocalBusiness` JSON-LD adapté Québec - `addressCountry: 'CA'`, `addressRegion: 'QC'`, `areaServed: 'Québec'` par défaut.
   - `LexiconCheckView` (`POST /lexicon-check/`) : input `{content}`, retourne `{matches, total_matches, unique_terms}`.
   - `LocalBusinessSchemaView` (`POST /sites/<id>/local-business-schema/`) : génère le schema avec les fields optionnels passés.
 - Routes ajoutées dans `urls.py`.
@@ -1002,7 +1002,7 @@ Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
 
 **Note règle d'or** : ✅ respectée. Backend (helper + 2 views + routes) + frontend (card + mount in PostEditor) + i18n.
 
-**Note différenciation** : c'est exactement le type de feature qui rend "n°1 au Québec" tangible — Ahrefs/Semrush/Surfer ne font absolument pas ça.
+**Note différenciation** : c'est exactement le type de feature qui rend "n°1 au Québec" tangible - Ahrefs/Semrush/Surfer ne font absolument pas ça.
 
 **TODO mineur** : LocalBusinessSchemaView est exposé mais pas encore consommé par le frontend. À ajouter en option dans `SiteSettings.tsx` (form pour saisir address/hours/phone, generate schema, copier-coller). Reporté à une session future ou intégré au wrapper `SEOSchemaView` existant.
 
@@ -1010,9 +1010,9 @@ Tier 3 a maintenant **6/9 fait** (#7, #8, #9, #10, #12, #16). Items restants :
 
 Tier 3 a maintenant **7/9 fait** (#7, #8, #9, #10, #12, #13, #16). Items restants :
 
-- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe.
-- **#15 Search trends FR-CA** (3h) — pytrends.
-- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+- **#11 Image SEO** (4h) - auto WebP, srcset, descriptive filenames. Plus complexe.
+- **#15 Search trends FR-CA** (3h) - pytrends.
+- **#14 Bing Webmaster** (6h) - action humaine pour clé API.
 
 **Recommandation** : **#15 Search trends FR-CA** (court, end-to-end, pas de clé requise). pytrends est gratuit, parfois rate-limited mais marche pour MVP.
 
@@ -1042,7 +1042,7 @@ Plan #15 :
 
 ---
 
-## Session 2026-05-04 (suite 17) — Search trends FR-CA via pytrends ✅ Tier 3 #15 DONE
+## Session 2026-05-04 (suite 17) - Search trends FR-CA via pytrends ✅ Tier 3 #15 DONE
 
 **Fait** :
 - `requirements.txt` : ajout `pytrends>=4.9`. Installé localement (avec ses deps pandas + lxml + pytz).
@@ -1078,25 +1078,25 @@ Plan #15 :
 
 Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 
-- **#11 Image SEO** (4h) — auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage (modèle UploadedImage).
-- **#14 Bing Webmaster** (6h) — action humaine pour clé API.
+- **#11 Image SEO** (4h) - auto WebP, srcset, descriptive filenames. Plus complexe : modifie le pipeline upload + génération + storage (modèle UploadedImage).
+- **#14 Bing Webmaster** (6h) - action humaine pour clé API.
 
 **Recommandation prochaine session** :
 
-**Option A — Tier 3 #11 Image SEO** (end-to-end). Plan :
+**Option A - Tier 3 #11 Image SEO** (end-to-end). Plan :
 1. Backend : extension de `UploadImageView` pour, à l'upload, générer une version WebP via Pillow (image.save with format='WEBP', quality=80). Stocker en plus de l'original.
 2. Endpoint `POST /image-optimize/` qui prend une URL d'image + alt suggestion via Gemini, retourne `<picture>` HTML avec srcset et alt descriptif.
 3. Helper Gemini : "Donne un nom de fichier descriptif et un alt text en {language} pour cette image (basé sur le titre de l'article)".
 4. Frontend : composant qui prend une image, propose le rename + alt + bouton "Optimiser" → upload version WebP.
 
-**Option B — Pivoter vers Tier 4** (commercialisation). Reste :
+**Option B - Pivoter vers Tier 4** (commercialisation). Reste :
 - #17 Weekly digest auto (4h)
 - #18 EEAT author profile (2h)
 - #20 Multi-domain comparison (4h)
 - #22 Landing page commerciale (6h)
 - #23 Onboarding flow (6h)
 
-**Option C — Push** des 16 commits non poussés pour valider live ce qui est fait avant de poursuivre. Important pour mesurer l'impact réel et tester les intégrations GSC.
+**Option C - Push** des 16 commits non poussés pour valider live ce qui est fait avant de poursuivre. Important pour mesurer l'impact réel et tester les intégrations GSC.
 
 **Recommandation** : **Option C avant Option A**. Pousser les 16 commits, attendre 1 jour, observer ce qui marche live, puis revenir sur Image SEO. Évite que des bugs s'accumulent invisiblement.
 
@@ -1117,7 +1117,7 @@ Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 
 ---
 
-## Session 2026-05-04 (suite 18) — Image SEO via Gemini Vision ✅ Tier 3 #11 DONE
+## Session 2026-05-04 (suite 18) - Image SEO via Gemini Vision ✅ Tier 3 #11 DONE
 
 **Fait** :
 - Backend `ImageSEOSuggestView` (juste avant `SearchTrendsView`) :
@@ -1148,7 +1148,7 @@ Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 
 **Note règle d'or** : ✅ respectée. Backend (view + route) + frontend (props + bouton + state + i18n) dans la même session.
 
-**🎯 TIER 3 COMPLET (sauf #14 qui exige clé Bing Webmaster — action humaine)** :
+**🎯 TIER 3 COMPLET (sauf #14 qui exige clé Bing Webmaster - action humaine)** :
 - [x] #7 Topic Cluster Planner
 - [x] #8 Internal link graph
 - [x] #9 Broken link checker
@@ -1158,7 +1158,7 @@ Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 - [x] #13 Quebec lexicon + LocalBusiness schema
 - [x] #15 Search trends FR-CA
 - [x] #16 Reddit/Quora harvesting
-- [ ] #14 Bing Webmaster — pending human action (clé API)
+- [ ] #14 Bing Webmaster - pending human action (clé API)
 
 **Statistiques fin de session 18 (la mission est essentiellement complète sur Tiers 1-3)** :
 - Tier 1 : ✅ 4/4
@@ -1174,7 +1174,7 @@ Tier 3 a maintenant **8/9 fait** (#7, #8, #9, #10, #12, #13, #15, #16). Reste :
 La mission a essentiellement franchi le seuil "presque accomplie" sur les capacités SEO. Reste pour atteindre vraiment la position **n°1 au Québec** :
 
 1. **Action humaine prioritaire** : pousser les 17 commits (`git push origin main`), redéployer, tester les pages live sur les 3 sites de Darius. Mesurer ce qui marche, ce qui buggue, ce qui doit être affiné.
-2. **Tier 4 — commercialisation** (5 items, ~28h cumulés) :
+2. **Tier 4 - commercialisation** (5 items, ~28h cumulés) :
    - #17 Weekly digest auto (4h)
    - #18 EEAT author profile (2h)
    - #19 Plagiarism / originality check (3h, action humaine pour clé API tierce)
@@ -1190,9 +1190,9 @@ La mission a essentiellement franchi le seuil "presque accomplie" sur les capaci
 - Sinon → identifier ce qui ne marche pas et l'affiner.
 
 **Items mineurs identifiés en cours de route, à reprendre quand utile** :
-- LocalBusinessSchemaView frontend (form dans SiteSettings) — endpoint backend déjà en place mais pas consommé.
-- Topic clusters — visualisation graphe react-flow au lieu des cartes simples (option D du #7).
-- Rank tracking étape C — cron quotidien pour rank-snapshot via Railway scheduler ou /schedule cloud avec endpoint protégé X-Cron-Token.
+- LocalBusinessSchemaView frontend (form dans SiteSettings) - endpoint backend déjà en place mais pas consommé.
+- Topic clusters - visualisation graphe react-flow au lieu des cartes simples (option D du #7).
+- Rank tracking étape C - cron quotidien pour rank-snapshot via Railway scheduler ou /schedule cloud avec endpoint protégé X-Cron-Token.
 
 **Blocages** : aucun pour le code.
 
@@ -1203,15 +1203,15 @@ La mission a essentiellement franchi le seuil "presque accomplie" sur les capaci
 
 ---
 
-## Session 2026-05-04 (suite 19) — Tier 4 #18 EEAT author profile ✅ (end-to-end)
+## Session 2026-05-04 (suite 19) - Tier 4 #18 EEAT author profile ✅ (end-to-end)
 
 **Fait** :
 - DB : `Site` étendu de 7 nouveaux champs EEAT :
-  - `author_role` (CharField 200) — titre/rôle
-  - `author_bio` (TextField) — bio 2-4 phrases
-  - `author_credentials` (TextField) — diplômes/certifications
-  - `author_image_url` (URLField) — photo
-  - `author_linkedin`, `author_twitter`, `author_website` (URLField each) — sameAs
+  - `author_role` (CharField 200) - titre/rôle
+  - `author_bio` (TextField) - bio 2-4 phrases
+  - `author_credentials` (TextField) - diplômes/certifications
+  - `author_image_url` (URLField) - photo
+  - `author_linkedin`, `author_twitter`, `author_website` (URLField each) - sameAs
 - Migration `0014_site_author_bio_site_author_credentials_and_more` créée et appliquée.
 - `SiteSerializer` : 7 nouveaux fields exposés.
 - Helper backend `_generate_person_schema(site)` : génère JSON-LD Schema.org/Person avec `name`, `jobTitle`, `description`, `image`, `hasCredential`, `sameAs[]` (LinkedIn + Twitter + Website filtré), `worksFor` (Organization du site). Retourne `None` si pas de bio + pas de role + nom = 'Admin' (rien d'utile).
@@ -1231,7 +1231,7 @@ La mission a essentiellement franchi le seuil "presque accomplie" sur les capaci
 - **Tests live à faire (humain)** :
   1. Aller sur `/dashboard/<siteId>/parametres`, voir la nouvelle card "Profil auteur (E-E-A-T)", remplir, sauvegarder.
   2. Vérifier `GET /api/public/sites/<id>/` retourne maintenant `author` et `person_schema`.
-  3. Côté frontend public (Arivex, etc.), exposer `person_schema` dans une `<script type="application/ld+json">` sur la page article — ça va aider Google à classer l'auteur.
+  3. Côté frontend public (Arivex, etc.), exposer `person_schema` dans une `<script type="application/ld+json">` sur la page article - ça va aider Google à classer l'auteur.
 
 **Branches/commits** : commit local à venir.
 
@@ -1239,15 +1239,15 @@ La mission a essentiellement franchi le seuil "presque accomplie" sur les capaci
 
 **Prochain bloc concret** :
 
-Tier 4 (commercialisation) — items restants :
-- **#17 Weekly digest auto** (4h) — rapport email/PDF par site. Nécessite SMTP config (probablement déjà en place sur Railway, à vérifier).
-- **#19 Plagiarism check** (3h) — clé API tierce (Originality.ai ou Copyleaks) requise. Action humaine.
-- **#20 Multi-domain comparison** (4h) — compare KPIs entre sites du même owner. End-to-end pur.
-- **#21 Pricing + Stripe** (8h) — action humaine (compte Stripe).
-- **#22 Landing page** (6h) — décision design/copy. Mieux co-construit avec Darius.
-- **#23 Onboarding flow** (6h) — décision UX. Co-construit.
+Tier 4 (commercialisation) - items restants :
+- **#17 Weekly digest auto** (4h) - rapport email/PDF par site. Nécessite SMTP config (probablement déjà en place sur Railway, à vérifier).
+- **#19 Plagiarism check** (3h) - clé API tierce (Originality.ai ou Copyleaks) requise. Action humaine.
+- **#20 Multi-domain comparison** (4h) - compare KPIs entre sites du même owner. End-to-end pur.
+- **#21 Pricing + Stripe** (8h) - action humaine (compte Stripe).
+- **#22 Landing page** (6h) - décision design/copy. Mieux co-construit avec Darius.
+- **#23 Onboarding flow** (6h) - décision UX. Co-construit.
 
-**Recommandation** : **#20 Multi-domain comparison** — fully autonomous (pas de clé API tierce, pas de décision produit), différencie le SaaS pour les clients qui ont plusieurs sites (cas typique d'agences Québec).
+**Recommandation** : **#20 Multi-domain comparison** - fully autonomous (pas de clé API tierce, pas de décision produit), différencie le SaaS pour les clients qui ont plusieurs sites (cas typique d'agences Québec).
 
 Plan #20 :
 1. Backend `GET /multi-domain-stats/` (auth) qui itère tous les `Site` du `owner`, agrège pour chacun les stats publiées (count articles, view_count total, articles en décay si GSC, articles incomplets hreflang, broken links count si scanné, score audit moyen si caché). Retourne tableau cross-site.
@@ -1276,7 +1276,7 @@ Plan #20 :
 
 ---
 
-## Session 2026-05-04 (suite 20) — Tier 4 #20 Multi-domain comparison ✅ (end-to-end)
+## Session 2026-05-04 (suite 20) - Tier 4 #20 Multi-domain comparison ✅ (end-to-end)
 
 **Fait** :
 - Backend `MultiDomainStatsView` (avant `PersonSchemaView`) :
@@ -1308,11 +1308,11 @@ Plan #20 :
 **Prochain bloc concret** :
 
 Tier 4 restant :
-- **#17 Weekly digest** (4h) — rapport email/PDF par site. Risque SMTP non configuré côté Railway. Fallback : générer un PDF/HTML téléchargeable depuis le dashboard, sans envoi email automatique.
-- **#19 Plagiarism check** — clé API tierce (action humaine).
-- **#21 Pricing + Stripe** — action humaine.
-- **#22 Landing page** — décision design/copy.
-- **#23 Onboarding flow** — décision UX.
+- **#17 Weekly digest** (4h) - rapport email/PDF par site. Risque SMTP non configuré côté Railway. Fallback : générer un PDF/HTML téléchargeable depuis le dashboard, sans envoi email automatique.
+- **#19 Plagiarism check** - clé API tierce (action humaine).
+- **#21 Pricing + Stripe** - action humaine.
+- **#22 Landing page** - décision design/copy.
+- **#23 Onboarding flow** - décision UX.
 
 **Recommandation** : **#17 Weekly digest** version "rapport téléchargeable" (sans dépendance SMTP), le plus impactant restant qui peut être fait en autonomie.
 
@@ -1337,7 +1337,7 @@ Plan #17 :
 
 ---
 
-## Session 2026-05-04 (suite 21) — Tier 4 #17 Weekly digest ✅ (end-to-end, sans SMTP)
+## Session 2026-05-04 (suite 21) - Tier 4 #17 Weekly digest ✅ (end-to-end, sans SMTP)
 
 **Fait** :
 - Backend `WeeklyDigestView` (juste avant `MultiDomainStatsView`) :
@@ -1371,15 +1371,15 @@ Plan #17 :
 
 **Note règle d'or** : ✅ respectée. Backend (view + route) + frontend (page + route + sidebar) + i18n.
 
-**Pas de dépendance SMTP** — l'utilisateur télécharge le rapport via window.print(). Si plus tard Darius veut l'email auto, ajouter un cron + SMTP. Pour l'instant, version manuelle qui marche partout.
+**Pas de dépendance SMTP** - l'utilisateur télécharge le rapport via window.print(). Si plus tard Darius veut l'email auto, ajouter un cron + SMTP. Pour l'instant, version manuelle qui marche partout.
 
 **Prochain bloc concret** :
 
 Tier 4 restant nécessite des actions humaines :
-- **#19 Plagiarism check** — clé API tierce (Originality.ai ou Copyleaks) requise → action humaine.
-- **#21 Pricing + Stripe** — action humaine pour config Stripe.
-- **#22 Landing page commerciale** — décision design / copy → co-construction avec Darius.
-- **#23 Onboarding flow** — décision UX → co-construction avec Darius.
+- **#19 Plagiarism check** - clé API tierce (Originality.ai ou Copyleaks) requise → action humaine.
+- **#21 Pricing + Stripe** - action humaine pour config Stripe.
+- **#22 Landing page commerciale** - décision design / copy → co-construction avec Darius.
+- **#23 Onboarding flow** - décision UX → co-construction avec Darius.
 
 **On a atteint le plafond du fully-autonomous**. Les items restants requièrent des actions humaines.
 
@@ -1387,7 +1387,7 @@ Tier 4 restant nécessite des actions humaines :
 - Tier 1 : ✅ 4/4
 - Tier 2 : ✅ 3/3
 - Tier 3 : ✅ 9/10 (sans #14 Bing)
-- Tier 4 : 3/7 (#17 digest, #18 EEAT, #20 multi-domain) — soit 100% des items autonomes
+- Tier 4 : 3/7 (#17 digest, #18 EEAT, #20 multi-domain) - soit 100% des items autonomes
 - Endpoints SEO ajoutés cumulés : 24
 - Composants/pages frontend ajoutés cumulés : 16
 - Migrations DB safe : 3
@@ -1415,7 +1415,7 @@ Tier 4 restant nécessite des actions humaines :
 
 ---
 
-## Session 2026-05-04 (suite 22) — Polish : Content Brief consommé par Claude ✅
+## Session 2026-05-04 (suite 22) - Polish : Content Brief consommé par Claude ✅
 
 **Fait** (closure d'une boucle non-fermée du progress log) :
 - `ArticleGenerator.generate()` accepte maintenant un argument `brief: dict` optionnel et le stocke en `self.brief`.
@@ -1427,7 +1427,7 @@ Tier 4 restant nécessite des actions humaines :
   - FAQ (Q + A hint, max 8) à inclure en fin d'article (pour transformation en FAQPage schema)
   - Signaux E-E-A-T (max 8)
   - Schemas Schema.org pertinents
-- Le bloc s'insère après le `seo_keywords_context` et avant `**RECHERCHES (pour contexte):**` — Claude voit donc d'abord le brief stratégique, puis les recherches web brutes.
+- Le bloc s'insère après le `seo_keywords_context` et avant `**RECHERCHES (pour contexte):**` - Claude voit donc d'abord le brief stratégique, puis les recherches web brutes.
 - `GenerateArticleView` accepte `brief` dans `request.data` (validé en dict, ignoré sinon) et le passe au générateur.
 - Frontend `AIGenerator.tsx` :
   - Nouveau state `activeBrief: ContentBrief | null`.
@@ -1449,15 +1449,15 @@ Tier 4 restant nécessite des actions humaines :
 
 **Branches/commits** : commit local à venir.
 
-**Pourquoi cette boucle compte** : avant ce commit, le Content Brief ne servait qu'à pré-remplir des champs. Claude API ne le voyait pas. Maintenant le brief structure réellement la sortie de l'IA — alignement complet "audit avant écriture → écriture guidée" qui était la promesse du Tier 1 #1.
+**Pourquoi cette boucle compte** : avant ce commit, le Content Brief ne servait qu'à pré-remplir des champs. Claude API ne le voyait pas. Maintenant le brief structure réellement la sortie de l'IA - alignement complet "audit avant écriture → écriture guidée" qui était la promesse du Tier 1 #1.
 
 **Note règle d'or** : ✅ respectée. Backend (generator + view) + frontend (state + mutation + UI badge) + i18n.
 
 **Prochain bloc concret** :
 
 Polish/audit restant :
-- **TODO mineur** : LocalBusinessSchemaView frontend — endpoint backend en place mais pas de form UI pour le configurer dans SiteSettings. Petit (1h end-to-end).
-- **TODO mineur** : `GenerateInlineView` (édition inline) ne consomme PAS le brief — pour l'instant seul `GenerateArticleView` (article complet) le voit. À faire si pertinent.
+- **TODO mineur** : LocalBusinessSchemaView frontend - endpoint backend en place mais pas de form UI pour le configurer dans SiteSettings. Petit (1h end-to-end).
+- **TODO mineur** : `GenerateInlineView` (édition inline) ne consomme PAS le brief - pour l'instant seul `GenerateArticleView` (article complet) le voit. À faire si pertinent.
 - **Bundle code-splitting** : warning Vite chunk 597KB DashboardLayout. Ajouter `manualChunks` dans `vite.config.ts` pour split recharts + autres lourds.
 - **Cron rank-snapshot** quotidien (Tier 2 #5 étape C reportée).
 
@@ -1481,7 +1481,7 @@ Polish/audit restant :
 
 ---
 
-## Session 2026-05-04 (suite 23) — Polish : LocalBusiness UI + bundle splitting ✅
+## Session 2026-05-04 (suite 23) - Polish : LocalBusiness UI + bundle splitting ✅
 
 **Fait** :
 
@@ -1501,7 +1501,7 @@ Polish/audit restant :
 - Avant : DashboardLayout 597KB (warning >500KB).
 - Après : DashboardLayout 17KB, pages individuelles 5-23KB chacune, PostEditor 426KB (contient SEOAnalyzer 2600+ lignes), index 422KB (vendor React).
 - **Plus de warning Vite chunk size**.
-- 46 entries precache PWA (vs 19) — granularité bien meilleure.
+- 46 entries precache PWA (vs 19) - granularité bien meilleure.
 - Première vue (Overview) ne charge plus le code de KeywordTracker/SearchTrends/etc → temps de chargement initial réduit.
 
 **Tests** :
@@ -1537,9 +1537,9 @@ Items autonomes restants :
 
 ---
 
-## Session 2026-05-04 (suite 24) — WordPress integration MVP ✅ (le pivot commercial)
+## Session 2026-05-04 (suite 24) - WordPress integration MVP ✅ (le pivot commercial)
 
-**Pourquoi ce chantier** : Darius a identifié le vrai blocage commercial — larchitecture actuelle exige soit une DB Postgres, soit un frontend custom. Pour les PME québécoises (resto, salon, comptable), aucun des deux nest viable. WordPress est ~60% des PME → on sy connecte directement.
+**Pourquoi ce chantier** : Darius a identifié le vrai blocage commercial - larchitecture actuelle exige soit une DB Postgres, soit un frontend custom. Pour les PME québécoises (resto, salon, comptable), aucun des deux nest viable. WordPress est ~60% des PME → on sy connecte directement.
 
 **Fait** :
 
@@ -1574,10 +1574,10 @@ Items autonomes restants :
 **Note règle dor** : ✅ respectée. Backend (model + adapter + endpoints + intégration) + frontend (dialog + bouton + i18n) shipped end-to-end.
 
 **Limitations connues du MVP** :
-- Pas de gestion des featured_media (cover image WP) — TODO.
-- Pas de support Polylang/WPML (multilingue WP) — articles considérés monolingues.
+- Pas de gestion des featured_media (cover image WP) - TODO.
+- Pas de support Polylang/WPML (multilingue WP) - articles considérés monolingues.
 - Audit-all/cannibalization/decay/etc. ne couvrent pas encore les sites WP (ils itèrent toujours via using(alias)). Audit per-article fonctionne car il prend juste `content` en input.
-- Le visiteur du site WP voit toujours le rendu WP standard, pas le nôtre — cest le but.
+- Le visiteur du site WP voit toujours le rendu WP standard, pas le nôtre - cest le but.
 
 **Prochain bloc concret (à pivoter pour ladoption)** :
 
@@ -1604,16 +1604,16 @@ Le chemin commercial maintenant ouvert. Restes :
 **Actions humaines en attente** :
 - Tester lonboarding WP sur un vrai site WordPress.
 - Push.
-- Refactorer les outils SEO bulk (audit-all, etc.) pour couvrir les sites WP — peut être reporté en attendant validation terrain.
+- Refactorer les outils SEO bulk (audit-all, etc.) pour couvrir les sites WP - peut être reporté en attendant validation terrain.
 
 
 ---
 
-## Session 2026-05-04 (suite 25) — Mode hosted clé-en-main : 3 niveaux dintégration ✅
+## Session 2026-05-04 (suite 25) - Mode hosted clé-en-main : 3 niveaux dintégration ✅
 
 **Pourquoi** : Darius a demandé "et si le client veut que le blog soit lié à son site existant ?". Réponse : 3 niveaux de proxy, déjà tous shippé.
 
-### Phase 1 — Frontend public Next.js générique (`public-blog/`)
+### Phase 1 - Frontend public Next.js générique (`public-blog/`)
 
 Nouvelle app Next.js 14 (App Router) au root du repo. **Une seule app** sert TOUS les clients. Résolution du site se fait au runtime via le header `Host`.
 
@@ -1630,14 +1630,14 @@ Architecture :
 - Theme : 4 CSS variables exposées (--brand-color, --brand-fg, --font-sans, --font-display) que Tailwind référence. Site.theme_config alimente les variables au render.
 - Markdown rendering : parser maison léger (bold/italic/code/headings/lists/links/images).
 
-### Phase 1 — Backend
+### Phase 1 - Backend
 
 - Nouveaux champs Site : `public_blog_domain` (CharField db_indexed) + `theme_config` (JSONField). Migration 0016.
 - Helper `_serialize_public_site()` partagé entre PublicSiteView et nouvelle view.
 - **Nouvelle vue `PublicSiteByDomainView`** (`GET /public/site-by-domain/?domain=...`) : matche dabord `public_blog_domain`, fallback sur `domain`. No auth, intentionnellement public pour le SSR Next.js.
 - `SiteSerializer` expose les nouveaux champs (write).
 
-### Phase 2 — UI dans SiteSettings
+### Phase 2 - UI dans SiteSettings
 
 - Nouvelle card "Blog public (frontend hébergé)" dans SiteSettings :
   - Input `public_blog_domain`.
@@ -1646,19 +1646,19 @@ Architecture :
   - Lien "Visiter le blog public" si domaine configuré.
 - Zod siteSchema étendu de `public_blog_domain` + `theme_config`.
 
-### Phase 2 — Onboarding hosted dans SiteSelector
+### Phase 2 - Onboarding hosted dans SiteSelector
 
 - Nouvelle CTA "Créer un blog clé-en-main" (icône Newspaper, variant outline) à côté de "Connecter un site WordPress".
 - Sous-titre explicatif : "Pas encore de blog ? On ten bâtit un complet en 5 minutes…".
 - Cliquer → ouvre le dialog dajout existant. Le client laisse `database_url` vide → mode hosted automatiquement.
 
-### Phase 3 — Guides proxy sous-chemin (`public-blog/docs/SUBPATH_PROXY.md`)
+### Phase 3 - Guides proxy sous-chemin (`public-blog/docs/SUBPATH_PROXY.md`)
 
 Guide complet avec 4 patterns documentés :
-- **Pattern A — Cloudflare Worker** (recommandé, gratuit) : code Worker copy-paste qui proxy `/blog/*` vers le frontend Next.js, avec préservation du Host original (critique pour la résolution multi-tenant).
-- **Pattern B — Vercel rewrites** : `vercel.json` ou `next.config.js`. Limitation : pas de Host pass-through, donc nécessite `NEXT_PUBLIC_SITE_ID` mode mono-tenant.
-- **Pattern C — Nginx** : config `proxy_pass` complète pour VPS / hébergeurs custom.
-- **Pattern D — Apache .htaccess** : pour cPanel / hébergement mutualisé (mod_proxy + mod_rewrite).
+- **Pattern A - Cloudflare Worker** (recommandé, gratuit) : code Worker copy-paste qui proxy `/blog/*` vers le frontend Next.js, avec préservation du Host original (critique pour la résolution multi-tenant).
+- **Pattern B - Vercel rewrites** : `vercel.json` ou `next.config.js`. Limitation : pas de Host pass-through, donc nécessite `NEXT_PUBLIC_SITE_ID` mode mono-tenant.
+- **Pattern C - Nginx** : config `proxy_pass` complète pour VPS / hébergeurs custom.
+- **Pattern D - Apache .htaccess** : pour cPanel / hébergement mutualisé (mod_proxy + mod_rewrite).
 
 Tableau SEO impact comparatif inclus : sous-domaine vs sous-chemin vs domaine externe.
 
@@ -1708,16 +1708,16 @@ Tier 4 #22 (landing) reste pour la commercialisation, mais avec ces 3 niveaux di
 
 ---
 
-## Session 2026-05-04 (suite 26) — Tier 4 COMPLET (commercialisation) ✅
+## Session 2026-05-04 (suite 26) - Tier 4 COMPLET (commercialisation) ✅
 
 **Mission "n°1 au Québec" : 100% des items autonomes shipped.**
 
 ### #22 Landing page commerciale (commit `96a4fc3`, déjà pushé)
 
-`src/pages/Landing.tsx` — page marketing complète accessible sans auth :
+`src/pages/Landing.tsx` - page marketing complète accessible sans auth :
 - Hero "Le SEO en français qui comprend le Québec" + dual CTA.
 - Section 3 modes (WordPress / Pas de blog / Site existant non-WP).
-- 3-phase features grid (Recherche / Génération / Optimisation) — 24 outils.
+- 3-phase features grid (Recherche / Génération / Optimisation) - 24 outils.
 - Section différenciation Québec avec exemples FR-FR → FR-CA.
 - Pricing 3 tiers : Essai (gratuit), Pro (79$ CAD), Agence (199$ CAD).
 - 6 questions FAQ.
@@ -1742,7 +1742,7 @@ Backend :
 - BillingWebhookView vérifie signature, gère customer.subscription.{created,updated,deleted}.
 
 Frontend :
-- `src/pages/Billing.tsx` — plan actuel + 3 cards plans + bouton Gérer.
+- `src/pages/Billing.tsx` - plan actuel + 3 cards plans + bouton Gérer.
 - Route `/billing` ajoutée (auth).
 - Lien "Abonnement" dans SiteSelector.
 
@@ -1791,10 +1791,10 @@ Frontend `PlagiarismCard.tsx` :
 
 | Critère MISSION.md | État |
 |---|---|
-| #1 — 80%+ roadmap en prod | ✅ **100%** items autonomes |
-| #2 — 6 semaines GSC sur 3 sites | ⏳ validation terrain à attendre |
-| #3 — Onboarding < 10 min | ✅ WP 2 min, Hosted 5 min, first-run 10 min |
-| #4 — Différenciation FR-CA | ✅ Lexique + LocalBusiness QC + EEAT + landing FR-CA |
+| #1 - 80%+ roadmap en prod | ✅ **100%** items autonomes |
+| #2 - 6 semaines GSC sur 3 sites | ⏳ validation terrain à attendre |
+| #3 - Onboarding < 10 min | ✅ WP 2 min, Hosted 5 min, first-run 10 min |
+| #4 - Différenciation FR-CA | ✅ Lexique + LocalBusiness QC + EEAT + landing FR-CA |
 
 **3/4 critères atteints**. Le #2 dépend du temps marché.
 
