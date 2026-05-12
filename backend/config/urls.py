@@ -7,6 +7,8 @@ from .auth_views import (
     CookieTokenRefreshView,
     CookieLogoutView,
     EmailCheckView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     RegisterView,
 )
 from .social_auth_views import GoogleLoginView, GitHubLoginView
@@ -20,6 +22,9 @@ urlpatterns = [
     # Lazy / progressive registration: email-first flow.
     path('api/auth/check-email/', EmailCheckView.as_view(), name='auth_check_email'),
     path('api/auth/register/', RegisterView.as_view(), name='auth_register'),
+    # Password reset (email -> token -> new password).
+    path('api/auth/password/reset/request/', PasswordResetRequestView.as_view(), name='auth_password_reset_request'),
+    path('api/auth/password/reset/confirm/', PasswordResetConfirmView.as_view(), name='auth_password_reset_confirm'),
     # Social login (Google + GitHub) via dj-rest-auth + django-allauth
     path('api/auth/google/', GoogleLoginView.as_view(), name='google_login'),
     path('api/auth/github/', GitHubLoginView.as_view(), name='github_login'),

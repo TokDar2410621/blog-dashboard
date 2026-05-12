@@ -294,3 +294,29 @@ REST_AUTH = {
     # We don't use DRF's authtoken model - JWT only.
     'TOKEN_MODEL': None,
 }
+
+# ---------------------------------------------------------------------------
+# Email backend
+# ---------------------------------------------------------------------------
+# Used by the password reset flow. Until an SMTP/SaaS provider is configured,
+# we use the console backend so the reset URL is logged to Railway's stdout
+# (visible via `railway logs --tail`). The password reset view ALSO logs the
+# URL at INFO level so it's findable regardless of which backend is wired.
+#
+# To wire a real provider (Resend / Mailgun / SES / Postmark) later, set:
+#   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+#   EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, EMAIL_USE_TLS
+# all via env vars on Railway.
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Gridar <noreply@gridar.app>')
+
+# Used by the password reset view to construct the click-through URL.
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://gridar.app')

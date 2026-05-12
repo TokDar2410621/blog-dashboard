@@ -8,8 +8,21 @@ export const loginResponseSchema = z.object({
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 
 export const userSchema = z.object({
+  id: z.number().optional(),
   username: z.string(),
   email: z.string(),
+  is_staff: z.boolean().optional(),
+  is_superuser: z.boolean().optional(),
+  has_password: z.boolean().optional(),
+  social_providers: z.array(z.string()).optional(),
+  sites_count: z.number().optional(),
+  plan: z.string().optional(),
+  subscription_status: z.string().optional(),
+  cancel_at_period_end: z.boolean().optional(),
+  current_period_end: z.string().nullable().optional(),
+  credit_balance: z.number().optional(),
+  date_joined: z.string().optional(),
+  last_login: z.string().nullable().optional(),
 });
 export type User = z.infer<typeof userSchema>;
 

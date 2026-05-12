@@ -116,10 +116,21 @@ export async function login(username: string, password: string): Promise<LoginRe
   return loginResponseSchema.parse(data);
 }
 
-/** Check whether an email is already registered. Used by the lazy-registration
- *  flow on /login: email-first, then ask for password (login) OR
- *  password+confirm (signup) based on this check. */
-export async function checkEmail(email: string): Promise<{ exists: boolean }> {
+export type EmailCheckResult = {
+  exists: boolean;
+  has_password: boolean;
+  social_providers: string[];
+};
+
+/** Check whether an email is already registered, and how the account
+ *  authenticates (password / OAuth providers). The lazy-registration flow
+ *  on /login uses this to pivot:
+ *    - !exists                       -> signup with password
+ *    - exists && has_password        -> show password field (login)
+ *    - exists && !has_password       -> show "Continue with <provider>" only
+ *      (account is OAuth-only, no password was ever set)
+ */
+export async function checkEmail(email: string): Promise<EmailCheckResult> {
   const res = await fetch(`${BACKEND_URL}/auth/check-email/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -160,6 +171,51 @@ export async function register(email: string, password: string): Promise<LoginRe
   return loginResponseSchema.parse(data);
 }
 
+/** Request a password reset email. Always returns success even if the email
+ *  doesn't exist (the backend does enumeration-safe responses). */
+export async function requestPasswordReset(email: string): Promise<{ detail: string }> {
+  const res = await fetch(`${BACKEND_URL}/auth/password/reset/request/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    let detail = "Reset request failed";
+    try {
+      const body = await res.json();
+      detail = body.error || detail;
+    } catch { /* ignore */ }
+    throw new ApiError(detail, res.status, "PASSWORD_RESET_REQUEST_FAILED");
+  }
+  return res.json();
+}
+
+/** Submit a new password using the uid+token from the reset email link.
+ *  Returns the JWT pair (user is logged in immediately on success). */
+export async function confirmPasswordReset(
+  uid: string,
+  token: string,
+  password: string,
+): Promise<LoginResponse> {
+  const res = await fetch(`${BACKEND_URL}/auth/password/reset/confirm/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ uid, token, password }),
+  });
+  if (!res.ok) {
+    let detail = "Reset failed";
+    try {
+      const body = await res.json();
+      detail = body.error || detail;
+    } catch { /* ignore */ }
+    throw new ApiError(detail, res.status, "PASSWORD_RESET_FAILED");
+  }
+  const data = await res.json();
+  return loginResponseSchema.parse(data);
+}
+
 /** Exchange an OAuth `code` (from Google or GitHub) for our JWT cookie pair. */
 export async function socialLogin(
   provider: "google" | "github",
@@ -188,6 +244,19 @@ export async function socialLogin(
     access: data.access_token ?? data.access,
     refresh: data.refresh_token ?? data.refresh,
   });
+}
+
+/** Tell the backend to wipe the httpOnly auth cookies. Best-effort: a failure
+ *  here doesn't block the local clearTokens() that the caller should also do. */
+export async function backendLogout(): Promise<void> {
+  try {
+    await fetch(`${BACKEND_URL}/auth/logout/`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    /* swallow - the local clearTokens() is what matters for UX */
+  }
 }
 
 export async function fetchCurrentUser(): Promise<User> {

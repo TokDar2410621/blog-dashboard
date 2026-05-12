@@ -155,12 +155,52 @@ class SiteViewSet(viewsets.ModelViewSet):
 
 
 class UserProfileView(APIView):
+    """GET /api/auth/me/
+
+    Returns a denormalized snapshot of the current user so the SPA doesn't
+    need to fan out to /billing/me/ + /sites/ + /credit-balance/ on every
+    page load. The frontend AuthContext caches this and re-fetches on
+    explicit checkAuth() calls (after login, register, social-login, password
+    reset, plan change, etc.).
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from .models import CreditBalance, Subscription
+
+        u = request.user
+        sub = Subscription.objects.filter(user=u).only(
+            'plan', 'status', 'current_period_end', 'cancel_at_period_end',
+        ).first()
+        bal = CreditBalance.objects.filter(user=u).only('balance').first()
+
+        # Social providers linked to this account (for the UI to show "Linked
+        # accounts" + the OAuth-only login pivot if has_password is False).
+        social_providers = []
+        try:
+            from allauth.socialaccount.models import SocialAccount
+            social_providers = list(
+                SocialAccount.objects.filter(user=u).values_list('provider', flat=True)
+            )
+        except Exception:
+            pass
+
         return Response({
-            'username': request.user.username,
-            'email': request.user.email,
+            'id': u.id,
+            'username': u.username,
+            'email': u.email,
+            'is_staff': u.is_staff,
+            'is_superuser': u.is_superuser,
+            'has_password': u.has_usable_password(),
+            'social_providers': social_providers,
+            'sites_count': u.sites.count(),
+            'plan': sub.plan if sub else 'free',
+            'subscription_status': sub.status if sub else 'active',
+            'cancel_at_period_end': bool(sub.cancel_at_period_end) if sub else False,
+            'current_period_end': sub.current_period_end.isoformat() if sub and sub.current_period_end else None,
+            'credit_balance': bal.balance if bal else 0,
+            'date_joined': u.date_joined.isoformat(),
+            'last_login': u.last_login.isoformat() if u.last_login else None,
         })
 
 

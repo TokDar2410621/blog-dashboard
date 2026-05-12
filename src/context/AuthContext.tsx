@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { getToken, clearTokens } from "@/lib/sites";
-import { fetchCurrentUser } from "@/lib/api-client";
+import { backendLogout, fetchCurrentUser } from "@/lib/api-client";
 import type { User } from "@/lib/schemas";
 
 type AuthContextValue = {
@@ -54,8 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [checkAuth]);
 
   const logout = useCallback(() => {
+    // Clear local state immediately so the UI flips right away.
     clearTokens();
     setUser(null);
+    // Fire-and-forget the backend cookie wipe. A failure here is non-blocking:
+    // the local clearTokens() already broke the SPA's auth context, and the
+    // server-side cookies will expire on their own anyway (2h access / 7d
+    // refresh TTL).
+    void backendLogout();
   }, []);
 
   const value = useMemo(
