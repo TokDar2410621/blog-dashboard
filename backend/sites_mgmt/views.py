@@ -818,6 +818,15 @@ class SiteStatsView(APIView):
     def get(self, request, site_id):
         site = get_site_for_user(request, site_id)
 
+        # CMS-mode sites (WordPress, Shopify, Webflow) store posts in the
+        # external CMS, not in our DB. Hitting BlogPost.objects.using(...)
+        # would crash with 'relation blog_blogpost does not exist' on
+        # Railway's primary DB. We fetch live counts from the CMS adapter
+        # instead. Counts only - fetching all post titles for 'recent_posts'
+        # would be too slow on every dashboard load.
+        if site.is_wordpress or site.is_shopify or site.is_webflow:
+            return Response(self._cms_stats(site))
+
         if site.is_hosted:
             posts = HostedPost.objects.filter(site=site)
             total_posts = posts.count()
@@ -841,6 +850,21 @@ class SiteStatsView(APIView):
                 'published': published,
                 'categories': categories_data,
                 'recent_posts': recent_posts,
+            })
+
+        # External-mode site (site.database_url set, blog_* tables in their
+        # own Postgres). If database_url is empty (no mode set at all), bail
+        # with zero stats so the dashboard renders instead of crashing.
+        if not site.database_url:
+            return Response({
+                'total_posts': 0,
+                'total_views': 0,
+                'drafts': 0,
+                'scheduled': 0,
+                'published': 0,
+                'categories': [],
+                'recent_posts': [],
+                'storage': 'unconfigured',
             })
 
         alias = ensure_site_connection(site)
@@ -872,6 +896,60 @@ class SiteStatsView(APIView):
             'categories': categories_data,
             'recent_posts': recent_posts,
         })
+
+    def _cms_stats(self, site):
+        """Fetch counts from the live CMS adapter. Wrapped in try/except so a
+        CMS API outage degrades to empty stats rather than 500 on the dashboard."""
+        empty = {
+            'total_posts': 0,
+            'total_views': 0,
+            'drafts': 0,
+            'scheduled': 0,
+            'published': 0,
+            'categories': [],
+            'recent_posts': [],
+        }
+        try:
+            if site.is_wordpress:
+                from .wordpress_adapter import WordPressClient
+                client = WordPressClient(site)
+                storage = 'wordpress'
+            elif site.is_shopify:
+                from .shopify_adapter import ShopifyClient
+                client = ShopifyClient(site)
+                storage = 'shopify'
+            elif site.is_webflow:
+                from .webflow_adapter import WebflowClient
+                client = WebflowClient(site)
+                storage = 'webflow'
+            else:
+                return {**empty, 'storage': 'unknown'}
+
+            published_page = client.list_posts(status='published', per_page=5)
+            draft_page = client.list_posts(status='draft', per_page=1)
+            published_total = published_page.get('total', len(published_page.get('items', [])))
+            drafts_total = draft_page.get('total', len(draft_page.get('items', [])))
+            recent = [
+                {
+                    'slug': item.get('slug', ''),
+                    'title': item.get('title', ''),
+                    'status': 'published',
+                    'view_count': 0,
+                    'created_at': item.get('created_at') or item.get('published_at'),
+                }
+                for item in published_page.get('items', [])[:5]
+            ]
+            return {
+                **empty,
+                'total_posts': published_total + drafts_total,
+                'published': published_total,
+                'drafts': drafts_total,
+                'recent_posts': recent,
+                'storage': storage,
+            }
+        except Exception:
+            logger.exception("Failed to fetch CMS stats for site %s", site.id)
+            return {**empty, 'storage': 'cms_error'}
 
 
 class SiteCategoriesView(APIView):
