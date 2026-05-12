@@ -2,11 +2,14 @@
 Django admin for Gridar. Surfaces every user-facing entity so the operator
 can debug, support, and intervene without writing SQL.
 """
-from django.contrib import admin
+from datetime import timedelta
+
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.db.models import Count, Sum
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
@@ -112,6 +115,98 @@ class UserAdmin(DjangoUserAdmin):
     def sites_count(self, obj):
         return obj._sites
 
+    # -----------------------------------------------------------------------
+    # Bulk actions: grant a plan or add credits to selected users in one
+    # click. Useful for support (give Pro to a customer who reported a bug),
+    # marketing (free month to early signups), and dogfooding (make ourselves
+    # Pro on the prod DB without touching Stripe).
+    # -----------------------------------------------------------------------
+    actions = [
+        'grant_solo_30d', 'grant_pro_30d', 'grant_agency_30d',
+        'grant_pro_1y', 'grant_agency_1y',
+        'reset_to_free',
+        'add_10_credits', 'add_50_credits', 'add_200_credits',
+    ]
+
+    def _grant_plan(self, request, queryset, plan, days):
+        from .models import Subscription
+        end = timezone.now() + timedelta(days=days)
+        count = 0
+        for user in queryset:
+            sub, _ = Subscription.objects.get_or_create(user=user)
+            sub.plan = plan
+            sub.status = 'active'
+            sub.current_period_end = end
+            sub.cancel_at_period_end = False
+            sub.save()
+            count += 1
+        self.message_user(
+            request,
+            f"{count} user(s) passes en {plan} jusqu'au {end.strftime('%Y-%m-%d')}.",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Donner Solo (30 jours)")
+    def grant_solo_30d(self, request, queryset):
+        self._grant_plan(request, queryset, 'solo', 30)
+
+    @admin.action(description="Donner Pro (30 jours)")
+    def grant_pro_30d(self, request, queryset):
+        self._grant_plan(request, queryset, 'pro', 30)
+
+    @admin.action(description="Donner Agence (30 jours)")
+    def grant_agency_30d(self, request, queryset):
+        self._grant_plan(request, queryset, 'agency', 30)
+
+    @admin.action(description="Donner Pro (1 an)")
+    def grant_pro_1y(self, request, queryset):
+        self._grant_plan(request, queryset, 'pro', 365)
+
+    @admin.action(description="Donner Agence (1 an)")
+    def grant_agency_1y(self, request, queryset):
+        self._grant_plan(request, queryset, 'agency', 365)
+
+    @admin.action(description="Repasser en Free (annule la sub)")
+    def reset_to_free(self, request, queryset):
+        from .models import Subscription
+        count = 0
+        for user in queryset:
+            sub, _ = Subscription.objects.get_or_create(user=user)
+            sub.plan = 'free'
+            sub.status = 'canceled'
+            sub.cancel_at_period_end = False
+            sub.current_period_end = None
+            sub.save()
+            count += 1
+        self.message_user(
+            request, f"{count} user(s) repasses en Free.", messages.SUCCESS,
+        )
+
+    def _add_credits(self, request, queryset, amount):
+        from .quota import add_credits
+        for user in queryset:
+            add_credits(
+                user, amount, kind='gift',
+                description=f"Cadeau admin (+{amount}) par {request.user.username}",
+            )
+        self.message_user(
+            request,
+            f"{queryset.count()} user(s) ont recu +{amount} credits.",
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Ajouter 10 credits")
+    def add_10_credits(self, request, queryset):
+        self._add_credits(request, queryset, 10)
+
+    @admin.action(description="Ajouter 50 credits")
+    def add_50_credits(self, request, queryset):
+        self._add_credits(request, queryset, 50)
+
+    @admin.action(description="Ajouter 200 credits")
+    def add_200_credits(self, request, queryset):
+        self._add_credits(request, queryset, 200)
+
 
 # ---------------------------------------------------------------------------
 # Subscription, billing, credits
@@ -134,10 +229,82 @@ class SubscriptionAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     date_hierarchy = 'updated_at'
     readonly_fields = ('created_at', 'updated_at')
+    actions = [
+        'upgrade_to_solo_30d', 'upgrade_to_pro_30d', 'upgrade_to_agency_30d',
+        'extend_30d', 'extend_365d', 'cancel_subscription',
+    ]
 
     @admin.display(description='Payé', boolean=True)
     def is_paid_display(self, obj):
         return obj.is_paid
+
+    def _bulk_update(self, request, queryset, **kwargs):
+        end = kwargs.pop('current_period_end', None)
+        count = queryset.count()
+        for sub in queryset:
+            for field, value in kwargs.items():
+                setattr(sub, field, value)
+            if end is not None:
+                sub.current_period_end = end
+            sub.save()
+        return count
+
+    @admin.action(description="Upgrade -> Solo (30 jours)")
+    def upgrade_to_solo_30d(self, request, queryset):
+        end = timezone.now() + timedelta(days=30)
+        n = self._bulk_update(
+            request, queryset,
+            plan='solo', status='active', cancel_at_period_end=False, current_period_end=end,
+        )
+        self.message_user(request, f"{n} sub(s) -> Solo jusqu'au {end:%Y-%m-%d}.", messages.SUCCESS)
+
+    @admin.action(description="Upgrade -> Pro (30 jours)")
+    def upgrade_to_pro_30d(self, request, queryset):
+        end = timezone.now() + timedelta(days=30)
+        n = self._bulk_update(
+            request, queryset,
+            plan='pro', status='active', cancel_at_period_end=False, current_period_end=end,
+        )
+        self.message_user(request, f"{n} sub(s) -> Pro jusqu'au {end:%Y-%m-%d}.", messages.SUCCESS)
+
+    @admin.action(description="Upgrade -> Agence (30 jours)")
+    def upgrade_to_agency_30d(self, request, queryset):
+        end = timezone.now() + timedelta(days=30)
+        n = self._bulk_update(
+            request, queryset,
+            plan='agency', status='active', cancel_at_period_end=False, current_period_end=end,
+        )
+        self.message_user(request, f"{n} sub(s) -> Agence jusqu'au {end:%Y-%m-%d}.", messages.SUCCESS)
+
+    @admin.action(description="Prolonger de 30 jours (plan inchange)")
+    def extend_30d(self, request, queryset):
+        count = 0
+        for sub in queryset:
+            base = sub.current_period_end or timezone.now()
+            sub.current_period_end = base + timedelta(days=30)
+            sub.status = 'active'
+            sub.save()
+            count += 1
+        self.message_user(request, f"{count} sub(s) prolongees de 30 jours.", messages.SUCCESS)
+
+    @admin.action(description="Prolonger de 365 jours (plan inchange)")
+    def extend_365d(self, request, queryset):
+        count = 0
+        for sub in queryset:
+            base = sub.current_period_end or timezone.now()
+            sub.current_period_end = base + timedelta(days=365)
+            sub.status = 'active'
+            sub.save()
+            count += 1
+        self.message_user(request, f"{count} sub(s) prolongees de 365 jours.", messages.SUCCESS)
+
+    @admin.action(description="Annuler (passer en Free)")
+    def cancel_subscription(self, request, queryset):
+        n = self._bulk_update(
+            request, queryset,
+            plan='free', status='canceled', cancel_at_period_end=False, current_period_end=None,
+        )
+        self.message_user(request, f"{n} sub(s) annulees.", messages.SUCCESS)
 
 
 @admin.register(CreditBalance)
