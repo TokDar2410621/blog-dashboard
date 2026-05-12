@@ -21,6 +21,47 @@
     <meta name="twitter:title" content="Gridar — SEO content on autopilot" />
     <meta name="twitter:description" content="12 agents SEO en un produit." />
     <meta name="twitter:image" content="https://gridar.app/brand/gridar-mark-512.png" />
+    <link rel="canonical" href="https://gridar.app/" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://gridar.app/#org",
+          "name": "Arivex Studio",
+          "url": "https://gridar.app",
+          "logo": "https://gridar.app/brand/gridar-mark-512.png",
+          "sameAs": ["https://github.com/TokDar2410621"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://gridar.app/#product",
+          "name": "Gridar",
+          "applicationCategory": "BusinessApplication",
+          "applicationSubCategory": "SEO Software",
+          "operatingSystem": "Web",
+          "description": "SaaS SEO bilingue FR-CA pour les PME québécoises. 12 agents IA pour générer, auditer et publier des articles SEO sur WordPress, Shopify, Webflow ou un blog hébergé.",
+          "url": "https://gridar.app",
+          "publisher": {"@id": "https://gridar.app/#org"},
+          "inLanguage": ["fr-CA", "en-CA", "es"],
+          "offers": [
+            {"@type": "Offer", "name": "Solo", "price": "29.99", "priceCurrency": "CAD"},
+            {"@type": "Offer", "name": "Pro", "price": "89.99", "priceCurrency": "CAD"},
+            {"@type": "Offer", "name": "Agence", "price": "199.99", "priceCurrency": "CAD"}
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://gridar.app/#site",
+          "url": "https://gridar.app",
+          "name": "Gridar",
+          "publisher": {"@id": "https://gridar.app/#org"},
+          "inLanguage": "fr-CA"
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

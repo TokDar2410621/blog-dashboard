@@ -675,6 +675,7 @@ export default function Landing() {
             </div>
             <div className="flex flex-wrap gap-6 items-start">
               <Link to="/docs" className="hover:text-zinc-100">Documentation</Link>
+              <Link to="/blog" className="hover:text-zinc-100">Blog</Link>
               <Link to="/api-docs" className="hover:text-zinc-100">API REST</Link>
               <Link to="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
               <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
