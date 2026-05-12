@@ -41,6 +41,18 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // Do not cache authenticated API responses in the service worker
+        // The SPA navigation fallback (workbox NavigationRoute) hijacks ALL
+        // requests that look like a page navigation and serves index.html
+        // from cache. That breaks /sitemap.xml and /robots.txt — Googlebot
+        // doesn't care (bots don't load service workers) but humans who
+        // already had the PWA cached see the landing in place of the file.
+        // navigateFallbackDenylist tells workbox: never substitute these.
+        navigateFallbackDenylist: [
+          /^\/sitemap\.xml$/,
+          /^\/robots\.txt$/,
+          /^\/api\//,
+          /^\/auth\//,
+        ],
       },
     }),
   ],
