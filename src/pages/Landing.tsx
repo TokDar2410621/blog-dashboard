@@ -135,6 +135,7 @@ export default function Landing() {
           <nav className="flex items-center gap-6">
             <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
             <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
+            <Link to="/blog" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Blog</Link>
             <Link to="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
             <Link to="/login" className="text-sm text-zinc-400 hover:text-white">Connexion</Link>
             <Link to="/login">
