@@ -19,6 +19,22 @@ if not SECRET_KEY:
         )
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Django 4+ requires explicit trust for cross-origin POSTs (admin login,
+# OAuth callbacks behind a proxy, etc.). Comma-separated, must include the
+# scheme. Wildcard subdomains are supported: 'https://*.up.railway.app'.
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://gridar.app,https://www.gridar.app,https://api.gridar.app,'
+    'https://blog-dashboard-ebon.vercel.app,'
+    'https://*.up.railway.app,'
+    'http://localhost:5173,http://localhost:4173,http://localhost:8888'
+).split(',')
+
+# When Django sits behind Railway's reverse proxy, the X-Forwarded-Proto
+# header tells Django the original request was HTTPS. Without this, secure
+# cookies + CSRF fail because Django thinks it's plain HTTP.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
