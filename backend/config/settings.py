@@ -17,18 +17,13 @@ if not SECRET_KEY:
             'SECRET_KEY environment variable is required in production. '
             'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
         )
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h.strip()]
 
 # Django 4+ requires explicit trust for cross-origin POSTs (admin login,
-# OAuth callbacks behind a proxy, etc.). Comma-separated, must include the
-# scheme. Wildcard subdomains are supported: 'https://*.up.railway.app'.
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS',
-    'https://gridar.app,https://www.gridar.app,https://api.gridar.app,'
-    'https://blog-dashboard-ebon.vercel.app,'
-    'https://*.up.railway.app,'
-    'http://localhost:5173,http://localhost:4173,http://localhost:8888'
-).split(',')
+# OAuth callbacks behind a proxy, etc.). Comma-separated values pulled from
+# the env, must include the scheme. Wildcard subdomains supported:
+# 'https://*.up.railway.app'. See .env.example for the values to copy in.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
 
 # When Django sits behind Railway's reverse proxy, the X-Forwarded-Proto
 # header tells Django the original request was HTTPS. Without this, secure
