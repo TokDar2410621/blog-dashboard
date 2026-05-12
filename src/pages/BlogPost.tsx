@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -18,12 +19,13 @@ import {
   ArrowRight,
   BookOpen,
   Clock,
+  Loader2,
   Sparkles,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
-import { getAllPosts, getPost, readingTime } from "@/lib/posts";
+import { fetchBlogPost, fetchBlogPosts, readingTime } from "@/lib/blog-api";
 
 function formatDate(iso: string): string {
   if (!iso) return "";
@@ -74,12 +76,27 @@ function extractHeadings(md: string): Heading[] {
 export default function BlogPost() {
   const { slug = "" } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const post = getPost(slug);
   const articleRef = useRef<HTMLDivElement | null>(null);
   const [progress, setProgress] = useState(0);
 
+  const { data: post, isLoading } = useQuery({
+    queryKey: ["blog", "post", slug],
+    queryFn: () => fetchBlogPost(slug),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!slug,
+  });
+
+  // The list is needed for the prev/next adjacent navigation at the bottom.
+  // Cached separately so the click-through from /blog -> /blog/:slug doesn't
+  // refetch (react-query dedupe).
+  const { data: allPosts = [] } = useQuery({
+    queryKey: ["blog", "posts"],
+    queryFn: fetchBlogPosts,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const headings = useMemo(
-    () => (post ? extractHeadings(post.body) : []),
+    () => (post ? extractHeadings(post.content) : []),
     [post],
   );
 
@@ -91,7 +108,7 @@ export default function BlogPost() {
       "@type": "Article",
       headline: post.title,
       description: post.excerpt,
-      datePublished: post.date,
+      datePublished: post.published_at,
       author: post.author
         ? { "@type": "Person", name: post.author }
         : { "@type": "Organization", name: "Arivex Studio" },
@@ -133,6 +150,14 @@ export default function BlogPost() {
     return () => window.removeEventListener("scroll", onScroll);
   }, [post]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+      </div>
+    );
+  }
+
   if (!post) {
     return (
       <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center text-center p-6">
@@ -155,10 +180,9 @@ export default function BlogPost() {
     );
   }
 
-  const all = getAllPosts();
-  const idx = all.findIndex((p) => p.slug === post.slug);
-  const prev = idx > 0 ? all[idx - 1] : undefined;
-  const next = idx < all.length - 1 ? all[idx + 1] : undefined;
+  const idx = allPosts.findIndex((p) => p.slug === post.slug);
+  const prev = idx > 0 ? allPosts[idx - 1] : undefined;
+  const next = idx >= 0 && idx < allPosts.length - 1 ? allPosts[idx + 1] : undefined;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -240,10 +264,10 @@ export default function BlogPost() {
                 {post.author}
               </span>
             )}
-            {post.date && <span>{formatDate(post.date)}</span>}
+            {post.published_at && <span>{formatDate(post.published_at)}</span>}
             <span className="inline-flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
-              {readingTime(post.body)} min de lecture
+              {readingTime(post.content)} min de lecture
             </span>
           </div>
         </div>
@@ -294,7 +318,7 @@ export default function BlogPost() {
               },
             }}
           >
-            {post.body}
+            {post.content}
           </ReactMarkdown>
         </article>
 

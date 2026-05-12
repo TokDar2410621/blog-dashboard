@@ -8,16 +8,18 @@
  */
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowRight,
   Clock,
   Filter,
+  Loader2,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
-import { getAllPosts, readingTime, type Post } from "@/lib/posts";
+import { fetchBlogPosts, readingTime, type BlogPost } from "@/lib/blog-api";
 
 function formatDate(iso: string): string {
   if (!iso) return "";
@@ -46,8 +48,16 @@ function gradientFor(slug: string): string {
 
 export default function Blog() {
   const navigate = useNavigate();
-  const posts = getAllPosts();
   const [activeTag, setActiveTag] = useState<string | null>(null);
+
+  // Posts come from the Gridar backend HostedPost table (Site #1, hosted mode).
+  // 5-min stale time because content updates are not real-time; long enough
+  // to avoid refetch noise, short enough to pick up new articles on F5.
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ["blog", "posts"],
+    queryFn: fetchBlogPosts,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const allTags = useMemo(() => {
     const s = new Set<string>();
@@ -55,7 +65,7 @@ export default function Blog() {
     return Array.from(s).sort();
   }, [posts]);
 
-  const filtered: Post[] = useMemo(() => {
+  const filtered: BlogPost[] = useMemo(() => {
     if (!activeTag) return posts;
     return posts.filter((p) => p.tags?.includes(activeTag));
   }, [posts, activeTag]);
@@ -157,9 +167,16 @@ export default function Blog() {
           </div>
         )}
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16 text-zinc-500">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            Chargement des articles...
+          </div>
+        ) : filtered.length === 0 ? (
           <p className="text-zinc-500 text-center py-16">
-            Aucun article pour ce filtre.
+            {activeTag
+              ? "Aucun article pour ce filtre."
+              : "Aucun article publié pour l'instant. Reviens bientôt."}
           </p>
         ) : (
           <>
@@ -180,10 +197,10 @@ export default function Blog() {
                   </div>
                   <div className="p-8 md:p-10 flex flex-col justify-center">
                     <div className="flex items-center gap-3 text-xs text-zinc-500 mb-3">
-                      {featured.date && <span>{formatDate(featured.date)}</span>}
+                      {featured.published_at && <span>{formatDate(featured.published_at)}</span>}
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {readingTime(featured.body)} min
+                        {readingTime(featured.content)} min
                       </span>
                       {featured.tags?.[0] && (
                         <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-zinc-400">
@@ -228,10 +245,10 @@ export default function Blog() {
                       </div>
                       <div className="p-6 flex flex-col flex-1">
                         <div className="flex items-center gap-3 text-xs text-zinc-500 mb-2">
-                          {post.date && <span>{formatDate(post.date)}</span>}
+                          {post.published_at && <span>{formatDate(post.published_at)}</span>}
                           <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            {readingTime(post.body)} min
+                            {readingTime(post.content)} min
                           </span>
                         </div>
                         <h3 className="text-lg font-semibold tracking-tight leading-snug mb-2 group-hover:text-emerald-300 transition-colors">
