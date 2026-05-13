@@ -91,6 +91,16 @@ class Command(BaseCommand):
             '--language', default='fr',
             help="Language code to tag the imported posts with (default: fr).",
         )
+        parser.add_argument(
+            '--force-hosted', action='store_true',
+            help=(
+                "If the matching Site is NOT in hosted mode (has database_url, "
+                "wp_url, shopify_domain or webflow_token), wipe those fields "
+                "so the blog routes can serve from HostedPost. Destructive: "
+                "any data in the external Postgres pointed at by database_url "
+                "stays where it is, but the Site row will no longer reference it."
+            ),
+        )
 
     def handle(self, *args, **options):
         User = get_user_model()
@@ -139,10 +149,32 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"Using existing Site #{site.id} for {domain}.")
             if not site.is_hosted:
-                self.stdout.write(self.style.WARNING(
-                    "  WARNING: this site is NOT in hosted mode. Posts will be created "
-                    "but the dashboard / public blog routes assume hosted mode."
-                ))
+                if options['force_hosted']:
+                    self.stdout.write(self.style.WARNING(
+                        "  --force-hosted: wiping database_url + CMS fields to convert to hosted mode..."
+                    ))
+                    site.database_url = ''
+                    site.wp_url = ''
+                    site.wp_username = ''
+                    site.wp_app_password = ''
+                    site.shopify_domain = ''
+                    site.shopify_access_token = ''
+                    site.shopify_blog_id = ''
+                    site.webflow_token = ''
+                    site.webflow_site_id = ''
+                    site.webflow_collection_id = ''
+                    site.save()
+                    self.stdout.write(self.style.SUCCESS(
+                        f"  Site #{site.id} is now in hosted mode."
+                    ))
+                else:
+                    self.stderr.write(self.style.ERROR(
+                        "  This site is NOT in hosted mode (has database_url, WP, Shopify or Webflow config).\n"
+                        "  Posts in the hosted-mode HostedPost table would not be served by the public blog endpoint.\n"
+                        "  Re-run with --force-hosted to wipe the conflicting fields, OR use a different\n"
+                        "  --domain (e.g. --domain=blog.gridar.app) to create a separate Site row."
+                    ))
+                    return
 
         # 3. Find posts/ folder
         posts_dir = find_posts_dir()
