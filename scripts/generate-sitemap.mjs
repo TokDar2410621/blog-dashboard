@@ -93,8 +93,11 @@ async function main() {
     );
   }
 
-  // Blog posts
-  const postsDir = join(ROOT, "posts");
+  // Blog posts. Source of truth moved from repo-root posts/ to backend/posts/
+  // so Railway ships it with the deploy (see commit moving posts/ into backend/).
+  // The frontend build (this script) still scans the file tree so the sitemap
+  // includes a <url> per article without round-tripping to the API.
+  const postsDir = join(ROOT, "backend", "posts");
   const postFiles = await walkMd(postsDir, postsDir);
   for (const file of postFiles) {
     const slug = file.replace(/\.md$/, "");

@@ -59,11 +59,14 @@ def parse_frontmatter(raw: str):
 
 
 def find_posts_dir() -> Path | None:
-    """Locate the posts/ folder either inside the Railway container (/app/posts)
-    or in the local repo (../posts relative to backend/)."""
+    """Locate the backend/posts/ folder.
+
+    Lives inside backend/ now (was at repo root) so it ships with Railway
+    deployments and railway ssh can find it at /app/posts/. The repo-root
+    candidate is kept as a fallback for any leftover local checkout."""
     candidates = [
-        Path(settings.BASE_DIR).parent / 'posts',  # /app/posts on Railway
-        Path(settings.BASE_DIR) / '..' / 'posts',  # local dev
+        Path(settings.BASE_DIR) / 'posts',          # /app/posts on Railway + local backend/posts
+        Path(settings.BASE_DIR).parent / 'posts',   # legacy repo-root location
         Path('/app/posts'),
     ]
     for c in candidates:
