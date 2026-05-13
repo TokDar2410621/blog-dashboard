@@ -9,6 +9,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // SELF-DESTROYING SERVICE WORKER.
+      // The previous PWA setup cached aggressively and served stale JS bundles
+      // to users after every backend/frontend change, requiring manual SW
+      // unregister + Clear site data. We aren't shipping a real offline app
+      // yet, so the PWA features aren't worth the cache-debug pain.
+      // selfDestroying: true publishes a NEW service worker that, on first
+      // run, unregisters itself AND clears every cache it owned. After every
+      // existing user has been served this version once (~1 visit), no more
+      // SW. Future deploys go live instantly with no cache layer in between.
+      // ref: https://vite-pwa-org.netlify.app/guide/auto-update.html#self-destroying-service-worker
+      selfDestroying: true,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'favicon-16.png', 'favicon-32.png'],
       manifest: {
@@ -36,22 +47,6 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'any maskable',
           },
-        ],
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Do not cache authenticated API responses in the service worker
-        // The SPA navigation fallback (workbox NavigationRoute) hijacks ALL
-        // requests that look like a page navigation and serves index.html
-        // from cache. That breaks /sitemap.xml and /robots.txt - Googlebot
-        // doesn't care (bots don't load service workers) but humans who
-        // already had the PWA cached see the landing in place of the file.
-        // navigateFallbackDenylist tells workbox: never substitute these.
-        navigateFallbackDenylist: [
-          /^\/sitemap\.xml$/,
-          /^\/robots\.txt$/,
-          /^\/api\//,
-          /^\/auth\//,
         ],
       },
     }),
