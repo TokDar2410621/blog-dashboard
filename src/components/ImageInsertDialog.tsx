@@ -19,6 +19,7 @@ import {
   Check,
   ImageIcon,
   Sparkles,
+  Link as LinkIcon,
 } from "lucide-react";
 
 interface PexelsPhoto {
@@ -49,8 +50,9 @@ export function ImageInsertDialog({
   articleContext,
 }: ImageInsertDialogProps) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"pexels" | "upload">("pexels");
+  const [tab, setTab] = useState<"pexels" | "upload" | "url">("pexels");
   const [query, setQuery] = useState("");
+  const [urlInput, setUrlInput] = useState("");
   const [results, setResults] = useState<PexelsPhoto[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -155,7 +157,15 @@ export function ImageInsertDialog({
     setAiDescription(null);
     setResults([]);
     setQuery("");
+    setUrlInput("");
     onOpenChange(false);
+  };
+
+  const handleUrlConfirm = () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed) return;
+    setSelectedUrl(trimmed);
+    if (!altText) setAltText("image");
   };
 
   const selectPhoto = (photo: PexelsPhoto) => {
@@ -195,6 +205,15 @@ export function ImageInsertDialog({
           >
             <Upload className="h-3.5 w-3.5 mr-1.5" />
             Upload
+          </Button>
+          <Button
+            type="button"
+            variant={tab === "url" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTab("url")}
+          >
+            <LinkIcon className="h-3.5 w-3.5 mr-1.5" />
+            URL
           </Button>
         </div>
 
@@ -286,6 +305,27 @@ export function ImageInsertDialog({
                   onChange={handleFileUpload}
                 />
               </div>
+            </div>
+          )}
+
+          {tab === "url" && (
+            <div className="space-y-3">
+              <Label className="text-xs">URL de l'image</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://exemple.com/photo.jpg"
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => e.key === "Enter" && handleUrlConfirm()}
+                />
+                <Button type="button" size="sm" onClick={handleUrlConfirm} disabled={!urlInput.trim()}>
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Collez le lien direct vers une image (jpg, png, webp, gif).
+              </p>
             </div>
           )}
         </div>

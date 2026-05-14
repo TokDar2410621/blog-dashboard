@@ -24,6 +24,7 @@ from .models import (
     Redirect,
     SerpRank,
     Site,
+    SiteMemory,
     Subscription,
     TrackedKeyword,
     UploadedImage,
@@ -365,7 +366,7 @@ class SiteAdmin(admin.ModelAdmin):
             ),
             'classes': ('collapse',),
         }),
-        ('Knowledge base', {'fields': ('knowledge_base',), 'classes': ('collapse',)}),
+        ('Knowledge base', {'fields': ('knowledge_base', 'competitors'), 'classes': ('collapse',)}),
         ('WordPress', {
             'fields': ('wp_url', 'wp_username', 'wp_app_password'),
             'classes': ('collapse',),
@@ -432,6 +433,21 @@ class HostedTagAdmin(admin.ModelAdmin):
     list_display = ('name', 'site')
     search_fields = ('name',)
     raw_id_fields = ('site',)
+
+
+@admin.register(SiteMemory)
+class SiteMemoryAdmin(admin.ModelAdmin):
+    list_display = ('site', 'kind', 'title_short', 'token_count', 'source_ref', 'updated_at')
+    list_filter = ('kind', 'site')
+    search_fields = ('title', 'content', 'source_ref')
+    raw_id_fields = ('site',)
+    readonly_fields = ('embedding', 'content_hash', 'token_count', 'created_at', 'updated_at')
+    fields = ('site', 'kind', 'title', 'content', 'source_ref', 'metadata',
+              'embedding', 'content_hash', 'token_count', 'created_at', 'updated_at')
+
+    def title_short(self, obj):
+        return (obj.title or obj.content[:60] + '...') if obj.title or obj.content else ''
+    title_short.short_description = 'Titre / contenu'
 
 
 # ---------------------------------------------------------------------------

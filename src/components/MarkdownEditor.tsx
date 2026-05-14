@@ -35,14 +35,28 @@ export function MarkdownEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+  // Cached cursor position - updated on every selection change so it survives
+  // focus loss to toolbar buttons or other UI. Toolbar actions read this
+  // instead of selectionStart so the insertion always lands where the user
+  // last had their caret, not at position 0 if the textarea was never focused.
+  const lastSelection = useRef({ start: 0, end: 0 });
+
+  const trackSelection = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    lastSelection.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+  }, []);
 
   const insertAtCursor = useCallback(
     (before: string, after = "", placeholder = "") => {
       const textarea = textareaRef.current;
       if (!textarea) return;
 
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
+      const start = lastSelection.current.start;
+      const end = lastSelection.current.end;
       const selected = value.substring(start, end);
       const text = selected || placeholder;
 
@@ -102,6 +116,20 @@ export function MarkdownEditor({
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!onImageDrop) return;
+    const item = Array.from(e.clipboardData.items).find((i) =>
+      i.type.startsWith("image/")
+    );
+    if (!item) return;
+    const file = item.getAsFile();
+    if (!file) return;
+    e.preventDefault();
+    const textarea = textareaRef.current;
+    const pos = textarea ? textarea.selectionStart : value.length;
+    onImageDrop(file, pos);
+  };
+
   const tools = [
     {
       icon: Bold,
@@ -135,9 +163,7 @@ export function MarkdownEditor({
       label: t("markdown.image"),
       action: () => {
         if (onImageInsert) {
-          const textarea = textareaRef.current;
-          const pos = textarea ? textarea.selectionStart : 0;
-          onImageInsert(pos);
+          onImageInsert(lastSelection.current.start);
         } else {
           insertAtCursor("![", "](url)", "description");
         }
@@ -197,7 +223,15 @@ export function MarkdownEditor({
       <Textarea
         ref={textareaRef}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          trackSelection();
+        }}
+        onSelect={trackSelection}
+        onKeyUp={trackSelection}
+        onMouseUp={trackSelection}
+        onBlur={trackSelection}
+        onPaste={handlePaste}
         placeholder={placeholder || t("markdown.placeholder")}
         className="min-h-[400px] border-0 rounded-none resize-y focus-visible:ring-0 font-mono text-sm"
       />

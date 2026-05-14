@@ -9,7 +9,7 @@ class SiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Site
         fields = ['id', 'name', 'domain', 'description', 'og_image_url',
-                  'database_url', 'knowledge_base',
+                  'database_url', 'knowledge_base', 'competitors',
                   'default_author', 'default_language', 'available_languages',
                   'author_role', 'author_bio', 'author_credentials',
                   'author_image_url', 'author_linkedin', 'author_twitter',

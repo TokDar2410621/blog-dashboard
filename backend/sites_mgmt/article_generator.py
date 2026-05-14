@@ -149,19 +149,106 @@ class ArticleGenerator:
     """Generates articles for a specific site using dynamic DB connections."""
 
     def __init__(self, alias, knowledge_base='', wp_site=None, shopify_site=None,
-                 webflow_site=None):
+                 webflow_site=None, site=None):
         """alias: Django DB alias for external Postgres mode (None for WP/hosted/Shopify/Webflow).
         wp_site: Site model instance when the site is in WordPress mode.
         shopify_site: Site model instance when the site is in Shopify mode.
         webflow_site: Site model instance when the site is in Webflow mode.
+        site: Site model instance - used to inject brand context (name, domain,
+            description, competitors to avoid) into the generation prompt so the
+            article anchors to the client's brand instead of citing generic
+            competitors without self-reference.
         """
         self.alias = alias
         self.knowledge_base = knowledge_base
         self.wp_site = wp_site  # if set → save via WP REST API instead of BlogPost
         self.shopify_site = shopify_site  # if set → save via Shopify Admin API
         self.webflow_site = webflow_site  # if set → save via Webflow CMS API
+        self.site = site or wp_site or shopify_site or webflow_site
         self.serper_images = []
         self.logs = []
+
+    def _memory_block(self, topic_analysis):
+        """Pull top-k relevant SiteMemory chunks (past articles, KB, audits,
+        manual notes) using semantic search on the article's topic.
+
+        Returns a prompt-ready string or '' if no memories exist / retrieval
+        fails. Bounded to ~4000 chars so it doesn't crowd out the rest of the
+        prompt.
+        """
+        if not self.site:
+            return ''
+        try:
+            from .memory_index import retrieve, format_memory_block
+        except ImportError:
+            return ''
+
+        # Build a rich query from the topic analysis - title is the dominant
+        # signal, angle + keyPoints add nuance.
+        parts = [
+            topic_analysis.get('title') or '',
+            topic_analysis.get('angle') or '',
+            ' '.join(topic_analysis.get('keyPoints') or []),
+        ]
+        query = ' '.join(p for p in parts if p).strip()
+        if not query:
+            return ''
+
+        try:
+            retrieved = retrieve(site=self.site, query=query, k=8)
+        except Exception as e:
+            self.log(f'[MEM] Retrieve skipped: {e}')
+            return ''
+
+        if not retrieved:
+            return ''
+
+        self.log(f'[MEM] {len(retrieved)} chunks retrieved '
+                 f'(top score: {retrieved[0].get("score", 0):.2f})')
+        return format_memory_block(retrieved, max_chars=4000)
+
+    def _brand_block(self):
+        """Build the MARQUE DU SITE prompt section from self.site. Returns ''
+        if no Site is available (back-compat with old callers)."""
+        s = self.site
+        if not s or not getattr(s, 'name', ''):
+            return ''
+        domain = (getattr(s, 'domain', '') or '').strip().rstrip('/')
+        url = f"https://{domain}" if domain else ''
+        url_line = f"- URL : {url}" if url else ''
+        desc = (getattr(s, 'description', '') or '').strip()
+        desc_line = f"- Description : {desc}" if desc else ''
+        link_rule = (
+            f"- Inclus au moins 1 lien naturel `[{s.name}]({url})` dans le corps"
+            if url else
+            f"- Mentionne explicitement \"{s.name}\" comme la voix qui parle"
+        )
+
+        competitors_raw = (getattr(s, 'competitors', '') or '').strip()
+        forbid_block = ''
+        if competitors_raw:
+            comp_list = [c.strip() for c in competitors_raw.splitlines() if c.strip()]
+            if comp_list:
+                forbid_block = (
+                    "\n**INTERDIT DE CITER (marques concurrentes) :**\n"
+                    + ', '.join(comp_list)
+                    + "\nSi le sujet l'impose absolument, mentionne-les en texte brut "
+                    "SANS lien hypertexte. Sinon, ignore-les."
+                )
+
+        return f"""
+**MARQUE DU SITE (à respecter strictement) :**
+- Nom : {s.name}
+{url_line}
+{desc_line}
+
+**REGLES DE BRAND :**
+- Mentionne "{s.name}" naturellement 2 a 3 fois dans l'article (pas en spam)
+{link_rule}
+- L'article parle AU NOM de {s.name}, jamais comme un tiers neutre
+- Aucun lien sortant vers un concurrent
+{forbid_block}
+"""
 
     # === KNOWLEDGE BASE ===
 
@@ -777,11 +864,18 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
         existing_articles = self._get_existing_articles()
         internal_links = self._get_internal_linking_instructions(existing_articles)
 
+        brand_block = self._brand_block()
+        memory_block = self._memory_block(topic_analysis)
+
         if self.article_type == 'local':
             prompt = f'''Tu ecris un article ANNUAIRE/GUIDE listant les entreprises d'une region.
 
 **TITRE:** {topic_analysis['title']}
 **REGION/SUJET:** {topic_analysis.get('topic', self.custom_topic)}
+
+{brand_block}
+
+{memory_block}
 
 {TYPE_INSTRUCTIONS.get('local')}
 
@@ -831,6 +925,10 @@ Integre naturellement ses experiences, anecdotes et opinions dans l'article.
 Cet article doit etre ecrit ENTIEREMENT en {lang_native} ({lang_en}).
 Toute la sortie (titre, intro, H2, paragraphes, conclusion) doit etre en {lang_native}.
 NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le francais.
+
+{brand_block}
+
+{memory_block}
 
 {kb_context}
 

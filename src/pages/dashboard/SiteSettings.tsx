@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSite, useUpdateSite } from "@/hooks/useDashboard";
 import { authFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles, Brain, RefreshCw, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -23,6 +23,126 @@ export default function SiteSettings() {
   const { siteId } = useParams<{ siteId: string }>();
   const { data: site, isLoading } = useSite();
   const updateSite = useUpdateSite();
+
+  // Memory (RAG) state + queries
+  const [manualNote, setManualNote] = useState("");
+  const [manualNoteTitle, setManualNoteTitle] = useState("");
+  type MemoryRow = {
+    id: number; kind: string; title: string; content_preview: string;
+    token_count: number; source_ref: string; has_embedding: boolean; updated_at: string;
+  };
+  type MemoriesResponse = {
+    memories: MemoryRow[];
+    counts_by_kind: Record<string, number>;
+    total: number;
+  };
+  const memoriesQuery = useQuery<MemoriesResponse>({
+    queryKey: ["site-memories", siteId],
+    enabled: !!siteId,
+    queryFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/memories/`);
+      if (!res.ok) throw new Error("Erreur chargement memoires");
+      return res.json();
+    },
+  });
+
+  const rebuildMemory = useMutation({
+    mutationFn: async (wipe: boolean) => {
+      const res = await authFetch(`/sites/${siteId}/memories/rebuild/`, {
+        method: "POST",
+        body: JSON.stringify({ wipe }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur reindexation");
+      }
+      return res.json() as Promise<{
+        articles_processed: number;
+        articles_errors: Array<{ slug: string; error: string }>;
+        total_memories: number;
+      }>;
+    },
+    onSuccess: (data) => {
+      toast.success(
+        `Reindexation OK : ${data.articles_processed} articles, ${data.total_memories} memoires totales`
+      );
+      if (data.articles_errors?.length) {
+        toast.error(`${data.articles_errors.length} erreurs (voir admin)`);
+      }
+      memoriesQuery.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const addManualNote = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/memories/`, {
+        method: "POST",
+        body: JSON.stringify({
+          content: manualNote,
+          title: manualNoteTitle,
+          kind: "manual",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur ajout note");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Note ajoutee a la memoire du site.");
+      setManualNote("");
+      setManualNoteTitle("");
+      memoriesQuery.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMemory = useMutation({
+    mutationFn: async (memoryId: number) => {
+      const res = await authFetch(`/sites/${siteId}/memories/${memoryId}/`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Erreur suppression");
+    },
+    onSuccess: () => {
+      toast.success("Memoire supprimee");
+      memoriesQuery.refetch();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const suggestCompetitors = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/suggest-competitors/`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur suggestion concurrents");
+      }
+      return res.json() as Promise<{ competitors: string[] }>;
+    },
+    onSuccess: (data) => {
+      const fresh = (data.competitors || []).filter(Boolean);
+      if (fresh.length === 0) {
+        toast.info("Aucun concurrent suggere - le contexte du site est trop generique.");
+        return;
+      }
+      const existing = competitors
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const merged = Array.from(
+        new Set([...existing, ...fresh].map((s) => s.trim()).filter(Boolean))
+      );
+      setCompetitors(merged.join("\n"));
+      toast.success(`${fresh.length} concurrents suggeres. Revois la liste avant d'enregistrer.`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   // LocalBusiness schema form
   const [lbStreet, setLbStreet] = useState("");
@@ -72,6 +192,7 @@ export default function SiteSettings() {
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [knowledgeBase, setKnowledgeBase] = useState("");
+  const [competitors, setCompetitors] = useState("");
   const [vercelDeployHook, setVercelDeployHook] = useState("");
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [description, setDescription] = useState("");
@@ -136,6 +257,7 @@ export default function SiteSettings() {
       setName(site.name || "");
       setDomain(site.domain || "");
       setKnowledgeBase(site.knowledge_base || "");
+      setCompetitors(site.competitors || "");
       setVercelDeployHook(site.vercel_deploy_hook || "");
       setAvailableLanguages(site.available_languages || []);
       setDescription(site.description || "");
@@ -170,6 +292,7 @@ export default function SiteSettings() {
         name,
         domain,
         knowledge_base: knowledgeBase,
+        competitors,
         vercel_deploy_hook: vercelDeployHook,
         available_languages: availableLanguages,
         description,
@@ -834,6 +957,164 @@ export default function SiteSettings() {
           <p className="text-xs text-muted-foreground mt-2">
             {knowledgeBase.length} {t("common.characters")}
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Marques a ne PAS citer */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg">Marques a ne PAS citer</CardTitle>
+              <CardDescription>
+                Une marque par ligne. Le generateur evitera de les mentionner et n'y mettra jamais de lien sortant.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={suggestCompetitors.isPending}
+              onClick={() => suggestCompetitors.mutate()}
+            >
+              {suggestCompetitors.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Suggerer avec IA
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            value={competitors}
+            onChange={(e) => setCompetitors(e.target.value)}
+            placeholder={"Concurrent SARL\nAutre Marque inc.\nProduitX"}
+            className="min-h-[140px] font-mono text-sm"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            Les suggestions IA s'ajoutent a la liste existante (sans ecraser ce que tu as deja ecrit).
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Memoire du site (RAG) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Brain className="h-5 w-5" />
+                Memoire du site (RAG)
+              </CardTitle>
+              <CardDescription>
+                Index vectoriel pgvector + Voyage AI. Chaque generation d'article retrieve les 8 extraits les plus pertinents (articles passes, KB, audits, notes) au lieu de tout balancer en prompt. Permet a l'IA de rester coherente entre les requetes.
+              </CardDescription>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => rebuildMemory.mutate(false)}
+                disabled={rebuildMemory.isPending}
+              >
+                {rebuildMemory.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Reindexer
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {memoriesQuery.isLoading ? (
+            <p className="text-xs text-muted-foreground">Chargement...</p>
+          ) : memoriesQuery.data ? (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {(["article", "kb", "audit", "decision", "manual"] as const).map((k) => (
+                <div
+                  key={k}
+                  className="rounded-md border bg-muted/30 p-2 text-center"
+                >
+                  <div className="text-xl font-bold">
+                    {memoriesQuery.data.counts_by_kind?.[k] || 0}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {k === "article" ? "Articles"
+                      : k === "kb" ? "KB"
+                      : k === "audit" ? "Audits"
+                      : k === "decision" ? "Decisions"
+                      : "Notes"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-sm flex items-center gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter une note manuelle
+            </Label>
+            <Input
+              value={manualNoteTitle}
+              onChange={(e) => setManualNoteTitle(e.target.value)}
+              placeholder="Titre court (ex: Voix de marque)"
+              className="h-8 text-sm"
+            />
+            <Textarea
+              value={manualNote}
+              onChange={(e) => setManualNote(e.target.value)}
+              placeholder={"Ex: 'Ne jamais utiliser le tutoiement.' / 'Cibler Montreal, pas Quebec.' / 'Mettre tous les chiffres en majuscule.'"}
+              className="min-h-[100px] text-sm"
+            />
+            <Button
+              size="sm"
+              onClick={() => addManualNote.mutate()}
+              disabled={!manualNote.trim() || addManualNote.isPending}
+            >
+              {addManualNote.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Ajouter
+            </Button>
+          </div>
+
+          {memoriesQuery.data?.memories && memoriesQuery.data.memories.length > 0 && (
+            <div className="border-t pt-4">
+              <Label className="text-sm mb-2 block">Memoires recentes</Label>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {memoriesQuery.data.memories.slice(0, 30).map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-start gap-2 p-2 rounded-md border bg-muted/20 text-xs"
+                  >
+                    <span className="inline-block px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase text-[10px] font-mono shrink-0">
+                      {m.kind}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {m.title && <div className="font-medium truncate">{m.title}</div>}
+                      <div className="text-muted-foreground truncate">{m.content_preview}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteMemory.mutate(m.id)}
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

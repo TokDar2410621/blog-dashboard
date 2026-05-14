@@ -1225,6 +1225,7 @@ class GenerateArticleView(APIView):
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
                 webflow_site=site if site.is_webflow else None,
+                site=site,
             )
             result = generator.generate(
                 search_method=search_method,
@@ -1318,6 +1319,7 @@ class GenerateInlineView(APIView):
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
                 webflow_site=site if site.is_webflow else None,
+                site=site,
             )
             # Use dry_run to prevent saving
             result = generator.generate(
@@ -7776,3 +7778,295 @@ class WebflowConnectView(APIView):
             'field_map': field_map,
         }, status=status.HTTP_201_CREATED)
 
+
+class SiteMemoryView(APIView):
+    """List + manage SiteMemory rows for a site.
+
+    GET  /api/sites/<id>/memories/?kind=manual
+        Returns paginated rows + counts by kind. Strips the raw embedding
+        (huge, never needed client-side).
+    POST /api/sites/<id>/memories/
+        Body: {content: str, title?: str, kind?: 'manual'}
+        Creates a manual memory + auto-embeds.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        kind = request.query_params.get('kind')
+        from .models import SiteMemory
+        from collections import Counter
+
+        qs = SiteMemory.objects.filter(site=site).order_by('-updated_at')
+        counts = dict(Counter(qs.values_list('kind', flat=True)))
+        if kind:
+            qs = qs.filter(kind=kind)
+
+        rows = []
+        for m in qs[:100]:
+            rows.append({
+                'id': m.id,
+                'kind': m.kind,
+                'title': m.title,
+                'content_preview': m.content[:200],
+                'token_count': m.token_count,
+                'source_ref': m.source_ref,
+                'has_embedding': m.embedding is not None,
+                'updated_at': m.updated_at.isoformat(),
+            })
+        return Response({
+            'memories': rows,
+            'counts_by_kind': counts,
+            'total': sum(counts.values()),
+        })
+
+    def post(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        content = (request.data.get('content') or '').strip()
+        title = (request.data.get('title') or '').strip()
+        kind = (request.data.get('kind') or 'manual').strip()
+
+        if kind not in ('manual', 'decision'):
+            return Response(
+                {'error': "Seuls 'manual' et 'decision' sont autorises en creation manuelle."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not content:
+            return Response(
+                {'error': 'Content vide.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Use indexer so we get chunking + dedup + embedding consistently.
+        # source_ref includes a timestamp so the user can create multiple
+        # manual notes without one overwriting the other.
+        from datetime import datetime as _dt
+        from .memory_index import index_source
+
+        ref = f'{kind}:{_dt.utcnow().strftime("%Y%m%d%H%M%S")}'
+        result = index_source(
+            site=site, kind=kind, content=content,
+            source_ref=ref, title=title,
+        )
+        return Response({
+            'created': result.get('created', 0),
+            'source_ref': ref,
+            'error': result.get('error'),
+        }, status=status.HTTP_201_CREATED if not result.get('error') else status.HTTP_502_BAD_GATEWAY)
+
+
+class SiteMemoryDetailView(APIView):
+    """DELETE /api/sites/<id>/memories/<memory_id>/ - remove one memory."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, site_id, pk):
+        from .models import SiteMemory
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        m = get_object_or_404(SiteMemory, pk=pk, site=site)
+        m.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SiteMemoryRebuildView(APIView):
+    """POST /api/sites/<id>/memories/rebuild/ - trigger full re-index of
+    HostedPost + Site.knowledge_base.
+
+    Runs synchronously (blocking) since the user clicked a button and expects
+    feedback. For sites with >50 articles, will take ~30-60s.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        from .memory_index import index_source
+        from .models import HostedPost, SiteMemory
+
+        wipe = bool(request.data.get('wipe'))
+        if wipe:
+            SiteMemory.objects.filter(site=site).delete()
+
+        # 1. KB
+        kb_result = {'created': 0, 'reused': 0}
+        if site.knowledge_base:
+            kb_result = index_source(
+                site=site, kind='kb', content=site.knowledge_base,
+                source_ref='site-kb', title='Knowledge base',
+            )
+
+        # 2. Articles
+        articles_processed = 0
+        articles_errors = []
+        for p in HostedPost.objects.filter(site=site, status='published'):
+            full = f"# {p.title}\n\n{p.content or ''}"
+            r = index_source(
+                site=site, kind='article', content=full,
+                source_ref=f'hosted:{p.slug}', title=p.title,
+            )
+            if r.get('error'):
+                articles_errors.append({'slug': p.slug, 'error': r['error']})
+            else:
+                articles_processed += 1
+
+        from collections import Counter
+        counts = Counter(SiteMemory.objects.filter(site=site).values_list('kind', flat=True))
+        return Response({
+            'kb': kb_result,
+            'articles_processed': articles_processed,
+            'articles_errors': articles_errors,
+            'counts_by_kind': dict(counts),
+            'total_memories': sum(counts.values()),
+        })
+
+
+class SuggestCompetitorsView(APIView):
+    """Suggest competitor brand names for a Site so the user can pre-fill the
+    Site.competitors field.
+
+    Method: Serper SERP scrape of "{name} alternatives" + "{name} competitors"
+    -> Claude shrinks the noisy SERP titles/domains/snippets into a clean JSON
+    list of 5-10 plausible competitor brand names, scoped to the site's niche.
+
+    Why both: Serper anchors the answer in real market data (Claude alone
+    hallucinates plausible-sounding brands that don't exist); Claude cleans up
+    the SERP noise (self-listings, listicles, generic words).
+
+    Output: {competitors: [str, ...]} - one name per line, ready to paste into
+    the Site.competitors textarea. The user reviews and edits before saving.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        import json as _json
+        import re
+
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        if not site.name:
+            return Response(
+                {'error': "Le site doit avoir un nom pour suggerer des concurrents."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serper_key = os.environ.get('SERPER_API_KEY')
+        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not anthropic_key:
+            return Response(
+                {'error': 'ANTHROPIC_API_KEY non configuree.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Hint from the site's own domain so we filter out self-listings.
+        own_domain = (site.domain or '').lower().strip().rstrip('/')
+
+        serp_lines = []
+        if serper_key:
+            queries = [
+                f'"{site.name}" alternatives',
+                f'"{site.name}" competitors',
+            ]
+            for q in queries:
+                try:
+                    r = http_requests.post(
+                        'https://google.serper.dev/search',
+                        headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
+                        json={'q': q, 'num': 8, 'hl': 'fr', 'gl': 'ca'},
+                        timeout=10,
+                    )
+                    if r.status_code == 200:
+                        for item in (r.json().get('organic') or [])[:8]:
+                            link = (item.get('link') or '').lower()
+                            if own_domain and own_domain in link:
+                                continue
+                            title = (item.get('title') or '').strip()
+                            snippet = (item.get('snippet') or '').strip()
+                            if title:
+                                serp_lines.append(f'- {title} | {link} | {snippet[:160]}')
+                except Exception:
+                    pass
+
+        serp_block = '\n'.join(serp_lines[:25]) if serp_lines else '(pas de donnees Serper disponibles)'
+
+        prompt = f"""Tu es un analyste marketing. Liste les concurrents directs de la marque suivante.
+
+MARQUE:
+- Nom: {site.name}
+- Domaine: {site.domain or '(non renseigne)'}
+- Description: {site.description or '(non renseignee)'}
+
+CONTEXTE SERP (resultats Google pour "{site.name} alternatives" et "{site.name} competitors"):
+{serp_block}
+
+Ta tache: identifie 5 a 10 concurrents directs. Sois STRICT:
+- Uniquement des marques/produits qui s'adressent au meme public avec une offre similaire.
+- IGNORE les listicles ("Top 10 ..."), articles de blog, agences generalistes, et la marque elle-meme.
+- IGNORE les noms generiques (ex: "logiciel de SEO", "outil SaaS").
+- Si tu n'es pas sur qu'un nom soit un vrai concurrent, ne le mets pas.
+
+Reponds UNIQUEMENT en JSON valide, sans markdown:
+{{"competitors": ["NomMarque1", "NomMarque2", ...]}}
+"""
+
+        try:
+            resp = http_requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={
+                    'x-api-key': anthropic_key,
+                    'anthropic-version': '2023-06-01',
+                    'content-type': 'application/json',
+                },
+                json={
+                    'model': 'claude-sonnet-4-20250514',
+                    'max_tokens': 600,
+                    'messages': [{'role': 'user', 'content': prompt}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            text = resp.json()['content'][0]['text']
+        except http_requests.RequestException as e:
+            return Response(
+                {'error': f'Erreur Claude: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return Response(
+                {'error': 'Reponse Claude non parsable', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        try:
+            parsed = _json.loads(match.group())
+        except _json.JSONDecodeError:
+            return Response(
+                {'error': 'JSON Claude invalide', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        raw_list = parsed.get('competitors') or []
+        # Dedup case-insensitively, strip, cap at 10.
+        seen = set()
+        cleaned = []
+        for item in raw_list:
+            if not isinstance(item, str):
+                continue
+            name = item.strip()
+            key = name.lower()
+            if not name or key in seen:
+                continue
+            # Skip self
+            if site.name.lower() == key:
+                continue
+            seen.add(key)
+            cleaned.append(name)
+            if len(cleaned) >= 10:
+                break
+
+        return Response({
+            'competitors': cleaned,
+            'serp_sources_used': len(serp_lines),
+        })

@@ -33,6 +33,7 @@ export const siteSchema = z.object({
   domain: z.string(),
   database_url: z.string().optional(),
   knowledge_base: z.string().optional(),
+  competitors: z.string().optional(),
   vercel_deploy_hook: z.string().optional(),
   gsc_property_url: z.string().optional(),
   api_key: z.string().optional(),

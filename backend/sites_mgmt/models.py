@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models
 from django.contrib.auth.models import User
+from pgvector.django import VectorField
 
 
 class UploadedImage(models.Model):
@@ -46,6 +47,11 @@ class Site(models.Model):
         blank=True, default='',
         verbose_name="Base de connaissances",
         help_text="Contexte personnel pour la génération d'articles (qui tu es, tes projets, ton ton, etc.)"
+    )
+    competitors = models.TextField(
+        blank=True, default='',
+        verbose_name="Marques à NE PAS citer",
+        help_text="Une marque par ligne. Le générateur évitera de les mentionner et n'y mettra jamais de lien sortant."
     )
     default_author = models.CharField(
         max_length=100, blank=True, default='',
@@ -272,6 +278,54 @@ class Site(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.domain or 'no domain'})"
+
+
+class SiteMemory(models.Model):
+    """Per-site RAG store. Each row is one chunk (article paragraph, KB section,
+    audit summary, editorial decision, manual note) with its pgvector embedding.
+
+    Used by ArticleGenerator (and any future LLM call) to fetch the top-k most
+    relevant past context for the current generation query, bypassing the
+    stateless prompt limitation: the LLM 'remembers' the site across calls.
+
+    Dimensions = 512 (voyage-3-lite). Content_hash lets us skip re-embedding
+    identical chunks on re-index.
+    """
+    KIND_CHOICES = [
+        ('article', 'Article publié'),
+        ('kb', 'Knowledge base'),
+        ('audit', 'Audit SEO'),
+        ('decision', 'Décision éditoriale'),
+        ('manual', 'Note manuelle'),
+    ]
+
+    site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name='memories')
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, db_index=True)
+    title = models.CharField(max_length=300, blank=True, default='')
+    content = models.TextField()
+    embedding = VectorField(dimensions=512, null=True, blank=True)
+    source_ref = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Pointer back to the source (HostedPost slug, audit id, etc.). "
+                  "Used to wipe + re-index when the source mutates.",
+    )
+    content_hash = models.CharField(max_length=64, db_index=True)
+    token_count = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Mémoire site"
+        verbose_name_plural = "Mémoires sites"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['site', 'kind']),
+            models.Index(fields=['site', 'source_ref']),
+        ]
+
+    def __str__(self):
+        return f"[{self.kind}] {self.title or self.content[:50]} ({self.site_id})"
 
 
 class HostedCategory(models.Model):

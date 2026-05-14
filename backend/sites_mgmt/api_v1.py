@@ -388,6 +388,7 @@ class V1GenerateView(BaseV1View):
                 wp_site=site if site.is_wordpress else None,
                 shopify_site=site if site.is_shopify else None,
                 webflow_site=site if site.is_webflow else None,
+                site=site,
             )
             result = generator.generate(
                 search_method='serper',
