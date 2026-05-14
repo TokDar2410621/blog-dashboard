@@ -1,9 +1,12 @@
 """Embeddings service for SiteMemory RAG.
 
-Provider: Voyage AI (voyage-3-lite, 512 dims).
+Provider: Voyage AI (voyage-3.5-lite, 512 dims via Matryoshka truncation).
 - Why Voyage: Anthropic-recommended, fits our Claude stack, $0.02/1M tokens.
-- Why voyage-3-lite vs voyage-3: half the dims (512 vs 1024) -> faster pgvector
-  cosine + less storage, quality drop negligible for retrieval at our scale.
+- Why voyage-3.5-lite vs voyage-3.5: same $0.02/1M tokens but optimized for
+  cost/latency at indexing scale. Quality drop is tiny for retrieval.
+- Why output_dimension=512 (default is 1024): Matryoshka-trained model lets
+  us truncate to 512 dims with near-zero quality loss while halving storage
+  and pgvector cosine cost. Matches our pgvector(512) column.
 
 Single env var: VOYAGE_API_KEY. If missing, raises a clear error rather than
 silently degrading - we want callers to know when memory isn't being indexed.
@@ -18,7 +21,7 @@ import hashlib
 import os
 from typing import Iterable
 
-EMBEDDING_MODEL = 'voyage-3-lite'
+EMBEDDING_MODEL = 'voyage-3.5-lite'
 EMBEDDING_DIMS = 512
 # Voyage caps a single batch at 128 inputs and 120k tokens; we stay safe.
 MAX_BATCH_SIZE = 64
@@ -54,6 +57,7 @@ def embed_text(text: str, input_type: str = 'document') -> list[float]:
         texts=[text],
         model=EMBEDDING_MODEL,
         input_type=input_type,
+        output_dimension=EMBEDDING_DIMS,
     )
     return result.embeddings[0]
 
@@ -76,6 +80,7 @@ def embed_batch(
             texts=safe,
             model=EMBEDDING_MODEL,
             input_type=input_type,
+            output_dimension=EMBEDDING_DIMS,
         )
         out.extend(result.embeddings)
     return out
