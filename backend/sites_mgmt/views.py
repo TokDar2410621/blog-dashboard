@@ -4881,8 +4881,11 @@ class BillingWebhookView(APIView):
             logger.warning('Stripe webhook signature failed: %s', e)
             return Response({'error': 'invalid signature'}, status=400)
 
-        event_id = event.get('id', '')
-        event_type = event.get('type', '')
+        # Stripe SDK 12+ removed dict.get() from StripeObject - bracket access
+        # is the supported pattern (raises KeyError if missing, but Stripe
+        # guarantees these fields on every event so we don't guard them).
+        event_id = event['id']
+        event_type = event['type']
         logger.info('Stripe webhook received: id=%s type=%s', event_id, event_type)
 
         try:
