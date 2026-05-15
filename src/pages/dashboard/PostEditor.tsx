@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Save, Send, Loader2, Search, Settings2, Star,
   ImageIcon, Sparkles, Check, PenLine, Eye, CalendarClock, Wand2, Globe, Plus, X,
+  ThumbsUp, ThumbsDown,
   Languages,
 } from "lucide-react";
 import {
@@ -106,6 +107,13 @@ export default function PostEditor() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreview, setAiPreview] = useState("");
   const [aiImageUrl, setAiImageUrl] = useState("");
+  // RAG feedback loop: captured from /generate-inline response when AI
+  // produced the article, then passed to /sites/<id>/posts/ on save so the
+  // chunk IDs are persisted on HostedPost.memory_chunks_used. After publish,
+  // the user can rate the article and feedback flows back to those chunks.
+  const [memoryChunksUsed, setMemoryChunksUsed] = useState<number[]>([]);
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [feedbackPending, setFeedbackPending] = useState(false);
   const [imageTab, setImageTab] = useState<"pexels" | "serper" | "ai">("pexels");
   const [serperQuery, setSerperQuery] = useState("");
   const [serperResults, setSerperResults] = useState<{ id: number; url: string; thumb: string; alt: string; photographer: string }[]>([]);
@@ -230,6 +238,9 @@ export default function PostEditor() {
       if (data.tags) setTagsInput(data.tags.join(", "));
       if (data.cover_image) setCoverImage(data.cover_image);
       if (data.slug && !isEditing) setPostSlug(data.slug);
+      if (Array.isArray(data.memory_chunks_used)) {
+        setMemoryChunksUsed(data.memory_chunks_used);
+      }
       setAiDialogOpen(false);
       toast.success("Article généré !");
     } catch (err) {
@@ -402,6 +413,12 @@ export default function PostEditor() {
       setFeatured(existingPost.featured || false);
       setLanguage((existingPost as { language?: string }).language || "fr");
       setTranslationGroup((existingPost as { translation_group?: string }).translation_group || "");
+      setMemoryChunksUsed(
+        (existingPost as { memory_chunks_used?: number[] }).memory_chunks_used || []
+      );
+      setFeedbackRating(
+        (existingPost as { feedback_rating?: number }).feedback_rating || 0
+      );
       if (existingPost.scheduled_at) {
         setScheduledAt(new Date(existingPost.scheduled_at).toISOString().slice(0, 16));
       }
@@ -460,6 +477,7 @@ export default function PostEditor() {
       language,
     };
     if (translationGroup) data.translation_group = translationGroup;
+    if (memoryChunksUsed.length > 0) data.memory_chunks_used = memoryChunksUsed;
     if (finalStatus === POST_STATUS.SCHEDULED && scheduledAt) {
       data.scheduled_at = new Date(scheduledAt).toISOString();
     }
@@ -481,6 +499,46 @@ export default function PostEditor() {
   };
 
   const isSaving = createPost.isPending || updatePost.isPending;
+
+  // RAG feedback loop: bump SiteMemory.feedback_score on the chunks that
+  // contributed to this article. Only meaningful for AI-generated posts that
+  // have already been saved (we need a slug to address the post).
+  const handleFeedback = async (newRating: 1 | -1) => {
+    if (!isEditing || !slug) {
+      toast.error("Sauvegarde l'article avant de noter.");
+      return;
+    }
+    if (memoryChunksUsed.length === 0) {
+      toast.info("Cet article n'a pas ete genere avec la memoire RAG.");
+      return;
+    }
+    // Toggle off if clicking the same rating twice.
+    const rating = feedbackRating === newRating ? 0 : newRating;
+    setFeedbackPending(true);
+    try {
+      const { authFetch } = await import("@/lib/api-client");
+      const res = await authFetch(
+        `/sites/${siteId}/posts/${slug}/feedback/`,
+        { method: "POST", body: JSON.stringify({ rating }) }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur feedback");
+      }
+      setFeedbackRating(rating);
+      toast.success(
+        rating === 1
+          ? "Bon article. Les chunks utilises sont boostes pour les prochaines generations."
+          : rating === -1
+          ? "Mauvais article. Les chunks utilises sont penalises."
+          : "Feedback annule."
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setFeedbackPending(false);
+    }
+  };
 
   if (isEditing && loadingPost) {
     return (
@@ -513,6 +571,35 @@ export default function PostEditor() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isEditing && memoryChunksUsed.length > 0 && (
+            <div className="flex items-center gap-1 border rounded-md px-1.5 py-0.5 mr-1">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">
+                Article IA
+              </span>
+              <Button
+                type="button"
+                variant={feedbackRating === 1 ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                disabled={feedbackPending}
+                onClick={() => handleFeedback(1)}
+                title="Bon article - booste les chunks RAG utilises"
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant={feedbackRating === -1 ? "destructive" : "ghost"}
+                size="icon"
+                className="h-7 w-7"
+                disabled={feedbackPending}
+                onClick={() => handleFeedback(-1)}
+                title="Mauvais article - penalise les chunks RAG utilises"
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
           <Button
             variant="outline"
             size="sm"

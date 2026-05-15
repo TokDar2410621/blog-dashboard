@@ -175,6 +175,10 @@ class ArticleGenerator:
         Returns a prompt-ready string or '' if no memories exist / retrieval
         fails. Bounded to ~4000 chars so it doesn't crowd out the rest of the
         prompt.
+
+        Side effect: stores the list of chunk IDs that were actually used in
+        `self._gen_memory_chunks` so the caller can persist them on the post
+        and later route user feedback (good/bad) back to those chunks.
         """
         if not self.site:
             return ''
@@ -203,9 +207,27 @@ class ArticleGenerator:
         if not retrieved:
             return ''
 
+        # Capture IDs for the feedback loop. Bounded format_memory_block may
+        # drop the tail, so we record only what actually made it into the
+        # prompt - count tracked via the formatted block length.
+        block = format_memory_block(retrieved, max_chars=4000)
+        # The block omits chunks once it exceeds max_chars; reconstruct which
+        # ones made it by re-running the same accumulation logic. Cheaper than
+        # threading the IDs back through format_memory_block.
+        used_ids = []
+        running = 0
+        for r in retrieved:
+            est = len(r.get('content') or '') + len(r.get('title') or '') + 40
+            if running + est > 4000 and used_ids:
+                break
+            used_ids.append(r['id'])
+            running += est
+        self._gen_memory_chunks = used_ids
+
         self.log(f'[MEM] {len(retrieved)} chunks retrieved '
-                 f'(top score: {retrieved[0].get("score", 0):.2f})')
-        return format_memory_block(retrieved, max_chars=4000)
+                 f'(top score: {retrieved[0].get("score", 0):.2f}, '
+                 f'{len(used_ids)} kept in prompt)')
+        return block
 
     def _brand_block(self):
         """Build the MARQUE DU SITE prompt section from self.site. Returns ''
@@ -468,6 +490,10 @@ class ArticleGenerator:
         self._gen_excerpt = excerpt
         self._gen_tags = tags
         self._gen_cover = cover_image
+        # _gen_memory_chunks was set by _memory_block(); default to [] if
+        # retrieval was skipped (no site, empty index, Voyage down).
+        if not hasattr(self, '_gen_memory_chunks'):
+            self._gen_memory_chunks = []
 
         if dry_run:
             self.log('\n[DRY RUN] Article non sauvegarde')

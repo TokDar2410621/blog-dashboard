@@ -111,3 +111,10 @@ class BlogPostWriteSerializer(serializers.Serializer):
         choices=['fr', 'en', 'es'], required=False, default='fr'
     )
     translation_group = serializers.UUIDField(required=False, allow_null=True)
+    # RAG feedback loop: list of SiteMemory.id that were retrieved by the
+    # generator and injected in the prompt. Passed from generate-inline
+    # through to HostedPost so user feedback (good/bad) can be routed back
+    # to those exact chunks. Empty list for human-written posts.
+    memory_chunks_used = serializers.ListField(
+        child=serializers.IntegerField(), required=False, default=list,
+    )

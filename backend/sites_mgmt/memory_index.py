@@ -136,10 +136,17 @@ def retrieve(
 ) -> list[dict]:
     """Top-k nearest memory chunks to `query` for this site.
 
-    Returns list of dicts: {kind, title, content, source_ref, distance, score}.
-    `score` = 1 - cosine_distance, so higher = more similar (easier to reason
-    about than raw distance).
+    Returns list of dicts: {id, kind, title, content, source_ref, distance,
+    score, feedback_score}. `id` is needed by callers (ArticleGenerator) so
+    they can record which chunks influenced a generation and bump
+    feedback_score later when the user signals good/bad.
+
+    Ranking: pgvector cosine distance, adjusted by feedback_score so chunks
+    that previously helped produce good articles float up. Adjustment is
+    clamped to [-0.5, +0.5] equivalent so a few hot chunks don't dominate
+    semantic relevance.
     """
+    from django.db.models import F, FloatField, ExpressionWrapper
     from pgvector.django import CosineDistance
 
     from .models import SiteMemory
@@ -158,20 +165,29 @@ def retrieve(
     if kinds:
         qs = qs.filter(kind__in=list(kinds))
 
-    qs = (
-        qs.annotate(distance=CosineDistance('embedding', q_embedding))
-        .order_by('distance')[:k]
-    )
+    # adjusted_distance = cosine_distance - clamp(feedback_score * 0.01, -0.5, 0.5)
+    # Lower = better, so we SUBTRACT the boost.
+    qs = qs.annotate(
+        distance=CosineDistance('embedding', q_embedding),
+    ).annotate(
+        adjusted_distance=ExpressionWrapper(
+            F('distance') - F('feedback_score') * 0.01,
+            output_field=FloatField(),
+        ),
+    ).order_by('adjusted_distance')[:k]
 
     out = []
     for m in qs:
+        d = float(m.distance) if m.distance is not None else None
         out.append({
+            'id': m.id,
             'kind': m.kind,
             'title': m.title,
             'content': m.content,
             'source_ref': m.source_ref,
-            'distance': float(m.distance) if m.distance is not None else None,
-            'score': (1.0 - float(m.distance)) if m.distance is not None else None,
+            'distance': d,
+            'score': (1.0 - d) if d is not None else None,
+            'feedback_score': m.feedback_score,
         })
     return out
 

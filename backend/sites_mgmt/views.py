@@ -229,6 +229,8 @@ def _serialize_hosted_post(post, detail=True):
     }
     if detail:
         base['content'] = post.content
+        base['memory_chunks_used'] = post.memory_chunks_used or []
+        base['feedback_rating'] = post.feedback_rating
     return base
 
 
@@ -1349,6 +1351,7 @@ class GenerateInlineView(APIView):
             gen_excerpt = getattr(generator, '_gen_excerpt', '')
             gen_tags = getattr(generator, '_gen_tags', [])
             gen_cover = getattr(generator, '_gen_cover', '')
+            gen_memory_chunks = getattr(generator, '_gen_memory_chunks', [])
 
             return Response({
                 'title': gen_title,
@@ -1357,6 +1360,7 @@ class GenerateInlineView(APIView):
                 'excerpt': gen_excerpt,
                 'tags': gen_tags,
                 'cover_image': gen_cover,
+                'memory_chunks_used': gen_memory_chunks,
             })
 
         except ValueError as e:
@@ -7790,6 +7794,80 @@ class WebflowConnectView(APIView):
             },
             'field_map': field_map,
         }, status=status.HTTP_201_CREATED)
+
+
+class PostFeedbackView(APIView):
+    """Route user feedback on an AI-generated post back to the SiteMemory
+    chunks that contributed to its generation.
+
+    POST /api/sites/<site_id>/posts/<slug>/feedback/
+        Body: {rating: 1 | -1 | 0}
+            1  = "good article, boost these chunks"
+            -1 = "bad article, penalize these chunks"
+            0  = "reset (undo previous rating)"
+
+    Updates SiteMemory.feedback_score by the delta between the post's prior
+    rating and the new rating, on every chunk in HostedPost.memory_chunks_used.
+    Idempotent: clicking thumbs-up twice doesn't double-count.
+
+    Effect: retrieve() subtracts feedback_score*0.01 from cosine distance, so
+    chunks repeatedly involved in "good" articles surface earlier. Effect is
+    capped by retrieve() at ±0.5 equivalent so a few hot chunks can't drown
+    out semantic match.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id, slug):
+        from django.db.models import F
+        from .models import HostedPost, SiteMemory
+
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        post = get_object_or_404(HostedPost, site=site, slug=slug)
+
+        try:
+            new_rating = int(request.data.get('rating', 0))
+        except (TypeError, ValueError):
+            return Response(
+                {'error': 'rating doit etre 1, -1 ou 0'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if new_rating not in (-1, 0, 1):
+            return Response(
+                {'error': 'rating doit etre 1, -1 ou 0'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        chunk_ids = post.memory_chunks_used or []
+        if not chunk_ids:
+            return Response(
+                {'error': "Cet article n'a pas ete genere avec la memoire RAG, "
+                          "aucun chunk a feedback-er."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Apply delta: subtract the OLD rating, then add the NEW one, so the
+        # operation is idempotent and reversible.
+        delta = new_rating - post.feedback_rating
+        if delta == 0:
+            return Response({
+                'rating': new_rating,
+                'chunks_affected': 0,
+                'message': 'Pas de changement (meme rating).',
+            })
+
+        updated = SiteMemory.objects.filter(
+            site=site, id__in=chunk_ids,
+        ).update(feedback_score=F('feedback_score') + delta)
+
+        post.feedback_rating = new_rating
+        post.save(update_fields=['feedback_rating', 'updated_at'])
+
+        return Response({
+            'rating': new_rating,
+            'delta': delta,
+            'chunks_affected': updated,
+            'chunk_ids': chunk_ids,
+        })
 
 
 class SiteMemoryView(APIView):

@@ -4,7 +4,6 @@ from django.db import models
 from django.contrib.auth.models import User
 from pgvector.django import VectorField
 
-
 class UploadedImage(models.Model):
     """Images stockees en base de donnees (pas de filesystem persistant sur Railway)."""
     uid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -312,6 +311,12 @@ class SiteMemory(models.Model):
     content_hash = models.CharField(max_length=64, db_index=True)
     token_count = models.PositiveIntegerField(default=0)
     metadata = models.JSONField(default=dict, blank=True)
+    # Feedback loop: bumped +1 each time this chunk contributed to an article
+    # the user kept ("good"), -1 when regenerated/rejected ("bad"). retrieve()
+    # subtracts feedback_score * 0.01 from cosine distance so positively-rated
+    # chunks float to the top of future retrievals. Capped during retrieval
+    # to ±0.5 distance equivalent so a few votes don't drown out semantic match.
+    feedback_score = models.IntegerField(default=0, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -390,6 +395,15 @@ class HostedPost(models.Model):
     scheduled_at = models.DateTimeField(null=True, blank=True)
     view_count = models.PositiveIntegerField(default=0)
     published_at = models.DateField()
+    # RAG feedback loop: stores list of SiteMemory.id that were retrieved and
+    # injected in the prompt when this article was AI-generated. Lets us bump
+    # feedback_score on those exact chunks when the user signals "good" or
+    # "bad". Empty for human-written posts. Capped at ~20 ids = top retrieval.
+    memory_chunks_used = models.JSONField(default=list, blank=True)
+    feedback_rating = models.SmallIntegerField(
+        default=0,
+        help_text="0 = no feedback yet, 1 = good (boost chunks), -1 = bad (penalize)",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
