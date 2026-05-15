@@ -1452,8 +1452,14 @@ class GenerateImageView(APIView):
                 "or typography on the image."
             )
 
+            # imagen-3.0-generate-002 was deprecated and removed from v1beta in
+            # 2026. Imagen 4 family is the current line. imagen-4.0-fast is the
+            # cheapest tier ($0.02/img) and quality is fine for blog covers.
+            # TODO before 2026-06-24: migrate to Gemini "Nano Banana" image
+            # models (gemini-2.5-flash-image via generate_content) - all Imagen
+            # models will be shut down on that date.
             response = client.models.generate_images(
-                model="imagen-3.0-generate-002",
+                model="imagen-4.0-fast-generate-001",
                 prompt=full_prompt,
                 config=genai.types.GenerateImagesConfig(
                     number_of_images=1,
