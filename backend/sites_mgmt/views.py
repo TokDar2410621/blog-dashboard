@@ -1488,6 +1488,10 @@ class GenerateImageView(APIView):
 
         except Exception as e:
             error_msg = str(e)
+            # Log full traceback so Railway logs show what actually broke.
+            # Without this, Django's request logger only emits "Internal Server
+            # Error: <path>" without context, masking Imagen API errors.
+            logger.exception('Imagen generate_images failed: %s', error_msg)
             if 'RESOURCE_EXHAUSTED' in error_msg or 'quota' in error_msg.lower():
                 return Response(
                     {'error': 'Quota Gemini epuise. Reessayez plus tard.'},
