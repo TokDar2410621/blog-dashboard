@@ -3894,6 +3894,23 @@ class SearchTrendsView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        # pytrends 4.9 hasn't been updated since 2022 and internally constructs
+        # urllib3.Retry(method_whitelist=...), a kwarg that was removed in
+        # urllib3 2.0 (renamed to allowed_methods). Monkey-patch once at the
+        # call site so we don't have to pin urllib3<2 globally (which would
+        # break other libs). Idempotent via a sentinel attribute.
+        from urllib3.util.retry import Retry
+        if not getattr(Retry, '_patched_method_whitelist', False):
+            _orig_init = Retry.__init__
+
+            def _patched_init(self, *args, **kwargs):
+                if 'method_whitelist' in kwargs:
+                    kwargs['allowed_methods'] = kwargs.pop('method_whitelist')
+                return _orig_init(self, *args, **kwargs)
+
+            Retry.__init__ = _patched_init
+            Retry._patched_method_whitelist = True
+
         try:
             pytrends = TrendReq(hl=hl, tz=300, retries=2, backoff_factor=0.5)
             pytrends.build_payload(
