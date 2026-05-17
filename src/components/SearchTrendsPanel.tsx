@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
@@ -52,9 +54,12 @@ export function SearchTrendsPanel({
   defaultKeyword?: string;
 }) {
   const { t } = useTranslation();
-  const [keyword, setKeyword] = useState(defaultKeyword);
-  const [timeframe, setTimeframe] = useState("today 12-m");
-  const [data, setData] = useState<TrendsResult | null>(null);
+  const { siteId } = useParams<{ siteId: string }>();
+  const persistKey = (slot: string) =>
+    `gridar:site:${siteId || "global"}:search-trends:${slot}`;
+  const [keyword, setKeyword] = usePersistedState<string>(persistKey("keyword"), defaultKeyword);
+  const [timeframe, setTimeframe] = usePersistedState<string>(persistKey("timeframe"), "today 12-m");
+  const [data, setData] = usePersistedState<TrendsResult | null>(persistKey("data"), null);
 
   const mutation = useMutation({
     mutationFn: async () => {

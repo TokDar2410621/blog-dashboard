@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,8 +55,9 @@ type BulkResult = {
 export default function BulkAudit() {
   const { t } = useTranslation();
   const { siteId } = useParams<{ siteId: string }>();
-  const [limit, setLimit] = useState("50");
-  const [data, setData] = useState<BulkResult | null>(null);
+  const persistKey = (slot: string) => `gridar:site:${siteId}:bulk-audit:${slot}`;
+  const [limit, setLimit] = usePersistedState<string>(persistKey("limit"), "50");
+  const [data, setData] = usePersistedState<BulkResult | null>(persistKey("data"), null);
   const base = `/dashboard/${siteId}`;
 
   const mutation = useMutation({

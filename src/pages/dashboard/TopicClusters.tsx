@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,8 +50,12 @@ type ClusterResult = {
 export default function TopicClusters() {
   const { t } = useTranslation();
   const { siteId } = useParams<{ siteId: string }>();
-  const [language, setLanguage] = useState("fr");
-  const [data, setData] = useState<ClusterResult | null>(null);
+  // Persisted across navigations - clusters are expensive to recompute
+  // (Serper + Gemini, ~30s + cost). Keeping the result around lets the user
+  // come back and act on suggestions without re-running.
+  const persistKey = (slot: string) => `gridar:site:${siteId}:topic-clusters:${slot}`;
+  const [language, setLanguage] = usePersistedState<string>(persistKey("language"), "fr");
+  const [data, setData] = usePersistedState<ClusterResult | null>(persistKey("data"), null);
   const base = `/dashboard/${siteId}`;
 
   const mutation = useMutation({

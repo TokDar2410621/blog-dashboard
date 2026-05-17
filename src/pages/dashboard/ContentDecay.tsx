@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,8 +62,9 @@ const ACTION_META: Record<
 export default function ContentDecay() {
   const { t } = useTranslation();
   const { siteId } = useParams<{ siteId: string }>();
-  const [days, setDays] = useState("30");
-  const [data, setData] = useState<DecayResult | null>(null);
+  const persistKey = (slot: string) => `gridar:site:${siteId}:content-decay:${slot}`;
+  const [days, setDays] = usePersistedState<string>(persistKey("days"), "30");
+  const [data, setData] = usePersistedState<DecayResult | null>(persistKey("data"), null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const base = `/dashboard/${siteId}`;
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { aiTemplates } from "@/lib/templates";
@@ -49,14 +50,19 @@ export default function AIGenerator() {
       ? ALL_LANGUAGES.filter((l) => currentSite.available_languages!.includes(l.code))
       : ALL_LANGUAGES;
 
-  const [topic, setTopic] = useState("");
-  const [title, setTitle] = useState("");
-  const [searchMethod, setSearchMethod] = useState("serper");
-  const [articleType, setArticleType] = useState("news");
-  const [length, setLength] = useState("medium");
-  const [language, setLanguage] = useState<string>("fr");
-  const [keywords, setKeywords] = useState("");
-  const [dryRun, setDryRun] = useState(false);
+  // Persisted across navigations so the user doesn't lose form values or
+  // the previous generation result when they leave and come back. Scoped by
+  // siteId so switching sites doesn't show another site's form.
+  const persistKey = (slot: string) => `gridar:site:${siteId}:ai-generator:${slot}`;
+  const [topic, setTopic] = usePersistedState<string>(persistKey("topic"), "");
+  const [title, setTitle] = usePersistedState<string>(persistKey("title"), "");
+  const [searchMethod, setSearchMethod] = usePersistedState<string>(persistKey("searchMethod"), "serper");
+  const [articleType, setArticleType] = usePersistedState<string>(persistKey("articleType"), "news");
+  const [length, setLength] = usePersistedState<string>(persistKey("length"), "medium");
+  const [language, setLanguage] = usePersistedState<string>(persistKey("language"), "fr");
+  const [keywords, setKeywords] = usePersistedState<string>(persistKey("keywords"), "");
+  const [dryRun, setDryRun] = usePersistedState<boolean>(persistKey("dryRun"), false);
+  // activeBrief is transient (per-session UI state), don't persist
   const [activeBrief, setActiveBrief] = useState<ContentBrief | null>(null);
 
   // Template + title pre-fill from query params
@@ -99,10 +105,10 @@ export default function AIGenerator() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, title, topic]);
 
-  const [result, setResult] = useState<{
+  const [result, setResult] = usePersistedState<{
     output: string;
     post_count: number;
-  } | null>(null);
+  } | null>(persistKey("result"), null);
 
   // Pre-flight: read user's plan + quota usage + credits to gate the button
   type SubInfo = {
