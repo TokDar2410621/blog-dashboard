@@ -243,7 +243,15 @@ export default function TopicClusters() {
                             )}
                           </div>
                           <Link
-                            to={`${base}/generer?title=${encodeURIComponent(sn.title)}`}
+                            to={
+                              `${base}/generer?` +
+                              [
+                                `title=${encodeURIComponent(sn.title)}`,
+                                `topic=${encodeURIComponent(cluster.theme)}`,
+                                `keywords=${encodeURIComponent(cluster.theme)}`,
+                                `autostart=1`,
+                              ].join("&")
+                            }
                           >
                             <Button size="sm" variant="outline">
                               <Sparkles className="h-3 w-3 mr-1" />

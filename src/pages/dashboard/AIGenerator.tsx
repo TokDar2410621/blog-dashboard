@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { aiTemplates } from "@/lib/templates";
@@ -79,6 +79,25 @@ export default function AIGenerator() {
     if (presetKeywords) setKeywords(presetKeywords);
   }, [searchParams]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Autostart: when arriving from Topic Clusters or any other "one-click
+  // generation" surface with ?autostart=1, fire handleGenerate() once the
+  // preset values have landed in state. Guarded by a ref so it can only
+  // fire ONCE per mount even if state updates re-trigger the effect.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (searchParams.get("autostart") !== "1") return;
+    // Wait for at least one preset to be in state so we don't fire on a
+    // blank form (state setters from the previous effect run synchronously
+    // in React's batch, so title/topic will be set by the time this runs).
+    if (!title && !topic) return;
+    autoStartedRef.current = true;
+    // Defer to next tick so React has finished flushing all state setters.
+    const t = setTimeout(() => handleGenerate(), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, title, topic]);
 
   const [result, setResult] = useState<{
     output: string;
