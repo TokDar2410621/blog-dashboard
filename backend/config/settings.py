@@ -157,7 +157,11 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    # 30 days: keeps the user logged in for a month, matching typical SaaS UX.
+    # ROTATE_REFRESH_TOKENS=True means each successful refresh issues a new
+    # refresh cookie and extends the window, so an active user effectively
+    # stays logged in forever as long as they visit within any 30-day stretch.
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }

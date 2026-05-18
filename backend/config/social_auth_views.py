@@ -32,6 +32,12 @@ from django.views.decorators.csrf import csrf_exempt
 class GoogleLoginView(SocialLoginView):
     adapter_class = GoogleOAuth2Adapter
     client_class = OAuth2Client
+    # CRITICAL: DRF's SessionAuthentication enforces its OWN CSRF check
+    # (independent of Django's CsrfViewMiddleware that csrf_exempt covers).
+    # On a cross-origin SPA POST it raises 'CSRF Failed: CSRF token missing'.
+    # The OAuth `code` itself is the authentication credential here, no
+    # session-tied auth needed - so wipe authentication_classes entirely.
+    authentication_classes = []
 
     @property
     def callback_url(self):
@@ -42,6 +48,7 @@ class GoogleLoginView(SocialLoginView):
 class GitHubLoginView(SocialLoginView):
     adapter_class = GitHubOAuth2Adapter
     client_class = OAuth2Client
+    authentication_classes = []  # see GoogleLoginView for the reason
 
     @property
     def callback_url(self):
