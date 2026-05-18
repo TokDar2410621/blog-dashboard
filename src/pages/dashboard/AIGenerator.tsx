@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { useJobs } from "@/context/JobsContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { aiTemplates } from "@/lib/templates";
@@ -153,6 +154,8 @@ export default function AIGenerator() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const jobs = useJobs();
+
   const handleGenerate = async () => {
     setQuotaError(null);
     const params: Record<string, unknown> = {
@@ -167,27 +170,44 @@ export default function AIGenerator() {
     if (keywords) params.keywords = keywords;
     if (activeBrief) params.brief = activeBrief;
 
-    try {
-      const data = await generateArticle.mutateAsync(params);
-      setResult(data);
-      toast.success(
-        dryRun ? t("ai.previewSuccess") : t("ai.publishSuccess")
-      );
-    } catch (err) {
-      // 402 with quota_exceeded → render an inline upgrade card instead of a
-      // generic toast. The full backend French message lives on err.message.
-      if (
-        err instanceof ApiError &&
-        err.status === 402 &&
-        err.body?.quota_exceeded
-      ) {
-        setQuotaError(err.message);
-        return;
-      }
-      // Other errors keep their existing UX
-      const msg = err instanceof Error ? err.message : "";
-      toast.error(msg || t("ai.error"));
-    }
+    // Register the generation as a global background job so the user can
+    // navigate to other tool pages while it runs. The promise lives in the
+    // JobsProvider (App root), so component unmount doesn't lose it. When the
+    // job finishes, the dock shows it as 'done' and clicking takes the user
+    // back here (where the persisted result is shown).
+    const labelParts = [title, topic].filter(Boolean);
+    const label = labelParts[0] || t("ai.runningLabel") || "Generation article";
+    jobs.start({
+      kind: "article-generation",
+      label,
+      siteId,
+      targetUrl: `/dashboard/${siteId}/generer`,
+      run: async () => {
+        try {
+          const data = await generateArticle.mutateAsync(params);
+          setResult(data);
+          toast.success(
+            dryRun ? t("ai.previewSuccess") : t("ai.publishSuccess")
+          );
+          return data;
+        } catch (err) {
+          if (
+            err instanceof ApiError &&
+            err.status === 402 &&
+            err.body?.quota_exceeded
+          ) {
+            setQuotaError(err.message);
+            // Re-throw so the job is marked as 'error' with the proper message.
+            throw err;
+          }
+          const msg = err instanceof Error ? err.message : "";
+          toast.error(msg || t("ai.error"));
+          throw err;
+        }
+      },
+    });
+
+    toast.info(t("ai.startedInBackground") || "Generation lancee. Tu peux naviguer ailleurs - le dock en bas a droite suit l'avancement.");
   };
 
   return (

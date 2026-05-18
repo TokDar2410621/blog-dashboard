@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AuthProvider } from "@/hooks/useAuth";
+import { JobsProvider } from "@/context/JobsContext";
+import { JobsDock } from "@/components/JobsDock";
 import { Loader2 } from "lucide-react";
 import "@/i18n";
 
@@ -48,6 +50,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          <JobsProvider>
           <div className="dark bg-background text-foreground min-h-screen">
             <Suspense fallback={<Loader />}>
               <Routes>
@@ -112,7 +115,9 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
+            <JobsDock />
           </div>
+          </JobsProvider>
         </BrowserRouter>
         <Toaster />
       </AuthProvider>

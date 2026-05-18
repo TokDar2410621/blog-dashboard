@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { useJobs } from "@/context/JobsContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,6 +59,8 @@ export default function TopicClusters() {
   const [data, setData] = usePersistedState<ClusterResult | null>(persistKey("data"), null);
   const base = `/dashboard/${siteId}`;
 
+  const jobs = useJobs();
+
   const mutation = useMutation({
     mutationFn: async () => {
       const res = await authFetch(`/sites/${siteId}/topic-clusters/`, {
@@ -73,6 +76,18 @@ export default function TopicClusters() {
     onSuccess: (d) => setData(d),
     onError: (err: Error) => toast.error(err.message),
   });
+
+  /** Fires the analysis as a background job so the user can navigate away. */
+  const runClusters = () => {
+    jobs.start({
+      kind: "topic-clusters",
+      label: `Analyse clusters (${language.toUpperCase()})`,
+      siteId,
+      targetUrl: `/dashboard/${siteId}/topic-clusters`,
+      run: () => mutation.mutateAsync(),
+    });
+    toast.info("Analyse clusters lancee. Suis l'avancement dans le dock en bas a droite.");
+  };
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -104,7 +119,7 @@ export default function TopicClusters() {
               </Select>
             </div>
             <Button
-              onClick={() => mutation.mutate()}
+              onClick={runClusters}
               disabled={mutation.isPending}
               size="lg"
             >
