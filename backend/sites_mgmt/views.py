@@ -8756,8 +8756,17 @@ def _normalize_audit_domain(raw: str) -> str | None:
 
 
 def _crawl_homepage(url: str, timeout: int = 8) -> dict:
-    """Fetch a URL once and pull out title + h1 + meta description + a hint of
-    the main keywords. Best-effort: failures return {'error': ...}."""
+    """Fetch a URL once and pull out the SEO signals we need to discover
+    candidate keywords + render the audit result.
+
+    Extracted: title, h1, meta description, list of h2 (capped 10), list of
+    h3 (capped 10), meta keywords (rare in 2026 but still seen), and a clean
+    body-text snippet (~2000 chars, scripts/styles stripped) so the keyword
+    extractor can run n-gram frequency analysis on the actual content.
+
+    Best-effort: any failure returns {'error': ...} and the audit pipeline
+    keeps going with the partial signals it has.
+    """
     import re
     try:
         r = http_requests.get(
@@ -8774,14 +8783,159 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
             r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',
             html, re.IGNORECASE,
         )
+        meta_kw_m = re.search(
+            r'<meta\s+name=["\']keywords["\']\s+content=["\']([^"\']+)',
+            html, re.IGNORECASE,
+        )
+
+        # All h2 and h3 - useful for n-gram extraction.
+        h2_list = [
+            re.sub(r'<[^>]+>', '', m).strip()
+            for m in re.findall(r'<h2[^>]*>(.*?)</h2>', html, re.IGNORECASE | re.DOTALL)
+        ]
+        h3_list = [
+            re.sub(r'<[^>]+>', '', m).strip()
+            for m in re.findall(r'<h3[^>]*>(.*?)</h3>', html, re.IGNORECASE | re.DOTALL)
+        ]
+
+        # Clean body text snippet: strip scripts/styles, drop tags, collapse ws.
+        cleaned = re.sub(r'<script[^>]*>.*?</script>', ' ', html, flags=re.IGNORECASE | re.DOTALL)
+        cleaned = re.sub(r'<style[^>]*>.*?</style>', ' ', cleaned, flags=re.IGNORECASE | re.DOTALL)
+        cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
         return {
             'title': (title_m.group(1).strip() if title_m else '')[:200],
             'h1': (h1_m.group(1).strip() if h1_m else '')[:200],
             'meta_description': (meta_m.group(1).strip() if meta_m else '')[:300],
+            'meta_keywords': (meta_kw_m.group(1).strip() if meta_kw_m else '')[:500],
+            'h2_list': [h[:120] for h in h2_list if h][:10],
+            'h3_list': [h[:120] for h in h3_list if h][:10],
+            'body_snippet': cleaned[:2000],
             'final_url': r.url,
         }
     except Exception as e:
         return {'error': f'Crawl: {str(e)[:80]}'}
+
+
+# Bilingual stopwords (FR + EN) - strip these from candidate keywords so we
+# don't query Serper for "comment", "the", "avec", etc.
+_STOPWORDS = frozenset({
+    # FR
+    'avec', 'sans', 'pour', 'dans', 'cette', 'cette', 'sont', 'tres', 'plus',
+    'mais', 'comme', 'leur', 'leurs', 'votre', 'vos', 'notre', 'nos', 'mon',
+    'mes', 'ton', 'tes', 'son', 'ses', 'les', 'des', 'aux', 'une', 'qui',
+    'que', 'quoi', 'dont', 'tout', 'tous', 'toute', 'toutes', 'peut', 'tres',
+    'bien', 'aussi', 'fait', 'faire', 'faites', 'voir', 'savoir', 'pouvoir',
+    'avoir', 'etre', 'etes', 'sera', 'sont', 'etait', 'comment', 'pourquoi',
+    'quand', 'puis', 'donc', 'alors', 'aussi', 'encore', 'meme', 'memes',
+    'site', 'page', 'pages', 'web', 'ligne', 'click', 'cliquez', 'lire',
+    'plus', 'menu', 'accueil', 'contact', 'contactez',
+    # EN
+    'with', 'without', 'from', 'into', 'about', 'this', 'that', 'these',
+    'those', 'your', 'yours', 'their', 'theirs', 'our', 'ours', 'his',
+    'hers', 'have', 'has', 'had', 'been', 'being', 'will', 'would', 'should',
+    'could', 'might', 'must', 'shall', 'what', 'when', 'where', 'which',
+    'while', 'because', 'before', 'after', 'over', 'under', 'just', 'only',
+    'also', 'than', 'then', 'them', 'they', 'were', 'click', 'read', 'home',
+    'menu', 'contact', 'about', 'page', 'site',
+})
+
+
+def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
+    """Return up to `max_kws` deduplicated candidate keywords from the crawled
+    homepage signals.
+
+    Strategy (in priority order, dedup case-insensitive):
+      1. Comma-separated meta keywords (high signal, near-zero false positive)
+      2. 2-3 word slices of h1 (front of page = top intent)
+      3. 2-3 word slices of title (with brand suffix stripped)
+      4. h2 short phrases (2-3 words)
+      5. Top frequent 2-word phrases in body_snippet (n-gram frequency)
+
+    Filters: drop stopwords, drop tokens shorter than 4 chars, drop pure
+    digits, keep only phrases of 2-3 words, normalize lowercase + accents.
+    """
+    import re
+    import unicodedata
+    from collections import Counter
+
+    def _normalize(s: str) -> str:
+        # Lowercase + strip accents for stopword matching, but keep accents in
+        # the returned phrase since Google ranks them as distinct.
+        return ''.join(
+            c for c in unicodedata.normalize('NFD', s.lower())
+            if unicodedata.category(c) != 'Mn'
+        )
+
+    def _tokenize(s: str) -> list[str]:
+        # Strip common separators that split the title (|, -, ·, etc.)
+        s = re.sub(r'[\|\-·•—–:]', ' ', s)
+        # Keep letters + digits + accents; drop punctuation.
+        words = re.findall(r"[A-Za-zÀ-ÿ0-9]+", s.lower())
+        return [w for w in words if len(w) >= 4 and _normalize(w) not in _STOPWORDS and not w.isdigit()]
+
+    def _phrases_from(s: str, ngram_sizes=(2, 3)) -> list[str]:
+        tokens = _tokenize(s or '')
+        out = []
+        for n in ngram_sizes:
+            for i in range(len(tokens) - n + 1):
+                phrase = ' '.join(tokens[i:i + n])
+                if phrase.strip():
+                    out.append(phrase)
+        return out
+
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    def _push(phrase: str) -> bool:
+        key = _normalize(phrase.strip())
+        if not key or key in seen:
+            return False
+        seen.add(key)
+        candidates.append(phrase.strip())
+        return len(candidates) >= max_kws
+
+    # 1. Meta keywords - already comma-separated, treat each as a candidate.
+    if crawl.get('meta_keywords'):
+        for kw in (crawl['meta_keywords'].split(',') if crawl.get('meta_keywords') else []):
+            kw = kw.strip()
+            if len(kw.split()) <= 4 and len(kw) >= 5:
+                if _push(kw):
+                    return candidates
+
+    # 2. H1 (highest intent signal on the page).
+    for phrase in _phrases_from(crawl.get('h1') or ''):
+        if _push(phrase):
+            return candidates
+
+    # 3. Title (often "Brand - Tagline" pattern, separators normalized above).
+    for phrase in _phrases_from(crawl.get('title') or ''):
+        if _push(phrase):
+            return candidates
+
+    # 4. H2 list - sub-themes the page covers.
+    for h2 in (crawl.get('h2_list') or []):
+        for phrase in _phrases_from(h2):
+            if _push(phrase):
+                return candidates
+
+    # 5. Body n-gram frequency: top bigrams that appear 2+ times in the
+    # body snippet (forces real recurrence, not random word pair).
+    body = crawl.get('body_snippet') or ''
+    if body and len(candidates) < max_kws:
+        tokens = _tokenize(body)
+        bigrams = Counter(
+            f'{tokens[i]} {tokens[i + 1]}'
+            for i in range(len(tokens) - 1)
+        )
+        for phrase, count in bigrams.most_common(20):
+            if count < 2:
+                break
+            if _push(phrase):
+                return candidates
+
+    return candidates
 
 
 class PublicAuditView(APIView):
@@ -8816,7 +8970,9 @@ class PublicAuditView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cache_key = f'public-audit:{domain}'
+        # Cache key includes a version so we invalidate everyone the day we
+        # change the audit shape (e.g. v2 = 7-10 keywords vs old v1 = 1-2).
+        cache_key = f'public-audit:v2:{domain}'
         cached = cache.get(cache_key)
         if cached:
             return Response(cached)
@@ -8870,25 +9026,18 @@ class PublicAuditView(APIView):
         crawl = results.get('crawl', {})
         ps = results.get('pagespeed', {})
 
-        # Extract candidate keywords from the homepage title (first 3 words
-        # of the title typically reveal the niche - this is a heuristic).
-        keywords_to_check = []
-        for source in [crawl.get('h1'), crawl.get('title')]:
-            if source:
-                import re
-                # Strip common separators and brand-name suffixes.
-                cleaned = re.sub(r'[\-\|·•]', ' ', source)
-                words = [w.lower() for w in cleaned.split() if len(w) > 3]
-                if len(words) >= 2:
-                    keywords_to_check.append(' '.join(words[:3]))
-                if len(keywords_to_check) >= 2:
-                    break
+        # Extract 7-10 candidate keywords from all the crawled signals.
+        keywords_to_check = _extract_candidate_keywords(crawl, max_kws=10)
 
-        # Quick Serper position check for each candidate keyword.
+        # Parallel Serper position checks - bounded by the existing
+        # ThreadPoolExecutor pattern. Each call ~1-3s, so 10 sequentially
+        # would blow our timeout. With 8 workers in parallel we get the
+        # full set in ~3s wall-clock.
         positions = []
         serper_key = os.environ.get('SERPER_API_KEY')
         if serper_key and keywords_to_check:
-            for kw in keywords_to_check[:3]:
+
+            def _check_position(kw: str) -> dict:
                 try:
                     r = http_requests.post(
                         'https://google.serper.dev/search',
@@ -8900,18 +9049,23 @@ class PublicAuditView(APIView):
                         timeout=8,
                     )
                     if r.status_code != 200:
-                        continue
+                        return {'keyword': kw, 'position': None}
                     organic = (r.json().get('organic') or [])
                     pos = None
-                    for item in organic:
+                    for idx, item in enumerate(organic):
                         if domain in (item.get('link') or '').lower():
-                            pos = item.get('position') or organic.index(item) + 1
+                            pos = item.get('position') or idx + 1
                             break
-                    positions.append({
-                        'keyword': kw, 'position': pos,
-                    })
+                    return {'keyword': kw, 'position': pos}
                 except Exception:
-                    continue
+                    return {'keyword': kw, 'position': None}
+
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                positions = list(pool.map(_check_position, keywords_to_check))
+
+            # Sort: ranking keywords first (best position first), then
+            # unranked ones at the bottom so the user sees their wins first.
+            positions.sort(key=lambda r: (r['position'] is None, r['position'] or 999))
 
         # Composite score - smaller weight set vs the authenticated audit
         # because we have less data here (no GSC, no backlinks deep).
@@ -8997,7 +9151,7 @@ class PublicLeadCaptureView(APIView):
         # Reach into the cache to grab the composite_score for cohort analysis.
         score = None
         if domain:
-            cached = cache.get(f'public-audit:{domain}')
+            cached = cache.get(f'public-audit:v2:{domain}')
             if cached:
                 score = cached.get('composite_score')
 
