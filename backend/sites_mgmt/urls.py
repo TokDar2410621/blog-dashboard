@@ -22,6 +22,7 @@ from .views import (
     SiteMemoryView, SiteMemoryDetailView, SiteMemoryRebuildView,
     PostFeedbackView, SiteAuditAggregatorView,
     BlogDomainProvisionView, BlogDomainStatusView, BlogDomainRemoveView,
+    PublicAuditView, PublicLeadCaptureView,
     SiteSitemapView, SiteRSSView,
     BillingMeView, BillingCheckoutView, BillingPortalView, BillingWebhookView,
     BillingCreditsView, BillingCreditsCheckoutView,
@@ -111,6 +112,9 @@ urlpatterns = [
     path('sites/<int:site_id>/blog-domain/provision/', BlogDomainProvisionView.as_view(), name='blog-domain-provision'),
     path('sites/<int:site_id>/blog-domain/status/', BlogDomainStatusView.as_view(), name='blog-domain-status'),
     path('sites/<int:site_id>/blog-domain/', BlogDomainRemoveView.as_view(), name='blog-domain-remove'),
+    # Public audit lead magnet (no auth)
+    path('public/audit/', PublicAuditView.as_view(), name='public-audit'),
+    path('public/leads/', PublicLeadCaptureView.as_view(), name='public-lead-capture'),
     path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),
     path('content-brief/', ContentBriefView.as_view(), name='content-brief'),
     path('paa/', PAAView.as_view(), name='paa'),

@@ -21,6 +21,7 @@ const Docs = lazy(() => import("./pages/Docs"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const PublicAudit = lazy(() => import("./pages/PublicAudit"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
@@ -96,6 +97,7 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
+                <Route path="/audit" element={<PublicAudit />} />
                 <Route
                   path="/onboarding/external"
                   element={

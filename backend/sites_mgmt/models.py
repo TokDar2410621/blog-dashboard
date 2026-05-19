@@ -279,6 +279,52 @@ class Site(models.Model):
         return f"{self.name} ({self.domain or 'no domain'})"
 
 
+class Lead(models.Model):
+    """Captured email + context from the public /audit lead-magnet page.
+
+    Created when a visitor enters their email to unlock the full audit report.
+    No user account required - this is a marketing-funnel artifact, not a
+    full account. Sales / onboarding pipeline drives the conversion from here.
+    """
+    email = models.EmailField(db_index=True)
+    domain_audited = models.CharField(max_length=255, blank=True, default='')
+    source = models.CharField(
+        max_length=50, default='public_audit', db_index=True,
+        help_text="Funnel source: 'public_audit', 'wp_plugin', 'newsletter', etc.",
+    )
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True, default='')
+    locale = models.CharField(max_length=10, blank=True, default='', help_text="fr-CA, en-US, etc.")
+    consented_marketing = models.BooleanField(
+        default=False,
+        help_text="Loi 25 / RGPD: explicit opt-in to receive marketing. "
+                  "Without this, can only send transactional emails (e.g. the "
+                  "audit report itself).",
+    )
+    score_at_capture = models.IntegerField(
+        null=True, blank=True,
+        help_text="Composite SEO score at the moment of capture, for cohort analysis.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    converted_to_user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='lead_origins',
+        help_text="Populated when this lead later signs up for a real account.",
+    )
+
+    class Meta:
+        verbose_name = "Lead (audit gratuit)"
+        verbose_name_plural = "Leads (audit gratuit)"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email', '-created_at']),
+            models.Index(fields=['source', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.email} ({self.domain_audited or 'no domain'})"
+
+
 class SiteMemory(models.Model):
     """Per-site RAG store. Each row is one chunk (article paragraph, KB section,
     audit summary, editorial decision, manual note) with its pgvector embedding.

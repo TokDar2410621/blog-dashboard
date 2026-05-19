@@ -20,7 +20,7 @@ from django.db import ProgrammingError
 from django.db.models import Sum
 from django.utils.text import slugify
 from django.core.management import call_command
-from datetime import date
+from datetime import date, datetime
 from io import StringIO
 import requests as http_requests
 
@@ -8727,3 +8727,287 @@ class BlogDomainRemoveView(APIView):
         site.save(update_fields=['public_blog_domain', 'updated_at'])
         cache.delete(f'site-audit:{site.id}')
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ── Phase 3: Public audit page (lead magnet) ────────────────────────────────
+
+
+from rest_framework.throttling import AnonRateThrottle as _AnonRateThrottle
+
+
+class PublicAuditThrottle(_AnonRateThrottle):
+    """6 audits per IP per minute - prevents abuse on the public endpoint
+    while staying generous enough for real users running multiple audits."""
+    rate = '6/min'
+
+
+def _normalize_audit_domain(raw: str) -> str | None:
+    """Accept loose user input ('https://www.foo.com/', 'foo.com', etc.) and
+    return a clean hostname, or None if unparseable."""
+    if not raw:
+        return None
+    raw = raw.strip().lower()
+    raw = raw.replace('https://', '').replace('http://', '')
+    raw = raw.rstrip('/').split('/')[0]
+    raw = raw.replace('www.', '', 1) if raw.startswith('www.') else raw
+    if '.' not in raw or ' ' in raw:
+        return None
+    return raw
+
+
+def _crawl_homepage(url: str, timeout: int = 8) -> dict:
+    """Fetch a URL once and pull out title + h1 + meta description + a hint of
+    the main keywords. Best-effort: failures return {'error': ...}."""
+    import re
+    try:
+        r = http_requests.get(
+            url, timeout=timeout,
+            headers={'User-Agent': 'Mozilla/5.0 GridarAudit/1.0 (+https://gridar.app)'},
+            allow_redirects=True,
+        )
+        if not r.ok:
+            return {'error': f'HTTP {r.status_code}'}
+        html = r.text
+        title_m = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
+        h1_m = re.search(r'<h1[^>]*>([^<]+)</h1>', html, re.IGNORECASE)
+        meta_m = re.search(
+            r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',
+            html, re.IGNORECASE,
+        )
+        return {
+            'title': (title_m.group(1).strip() if title_m else '')[:200],
+            'h1': (h1_m.group(1).strip() if h1_m else '')[:200],
+            'meta_description': (meta_m.group(1).strip() if meta_m else '')[:300],
+            'final_url': r.url,
+        }
+    except Exception as e:
+        return {'error': f'Crawl: {str(e)[:80]}'}
+
+
+class PublicAuditView(APIView):
+    """POST /api/public/audit/ {domain}
+
+    Public lead-magnet endpoint - no auth required. Runs a lightweight audit
+    on the visitor's domain so they see immediate value, then we email-gate
+    the detailed report via the Lead model.
+
+    Returns ALWAYS a partial audit even if some signals fail. Frontend keeps
+    the most engaging signals (score + top keywords + PageSpeed) and gates
+    the full report (competitors + recos + decay) behind the email.
+
+    Cached 1h per domain so repeated visits don't re-spend API budget.
+    """
+    permission_classes = []  # public
+    throttle_classes = [PublicAuditThrottle]
+
+    def post(self, request):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        domain = _normalize_audit_domain(request.data.get('domain') or '')
+        if not domain:
+            return Response(
+                {'error': 'Domaine invalide. Ex: tondomaine.com'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = f'public-audit:{domain}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        homepage_url = f'https://{domain}'
+
+        def task_crawl():
+            return _crawl_homepage(homepage_url)
+
+        def task_pagespeed():
+            api_key = os.environ.get('PAGESPEED_API_KEY')
+            if not api_key:
+                return {'error': 'PAGESPEED_API_KEY non configuree'}
+            try:
+                r = http_requests.get(
+                    'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+                    params={
+                        'url': homepage_url, 'key': api_key,
+                        'strategy': 'mobile',
+                        'category': ['performance', 'seo', 'accessibility'],
+                    },
+                    timeout=25,
+                )
+                if r.status_code != 200:
+                    return {'error': f'PageSpeed {r.status_code}'}
+                cats = r.json().get('lighthouseResult', {}).get('categories', {})
+                perf = int((cats.get('performance', {}).get('score') or 0) * 100)
+                seo = int((cats.get('seo', {}).get('score') or 0) * 100)
+                a11y = int((cats.get('accessibility', {}).get('score') or 0) * 100)
+                return {
+                    'performance': perf, 'seo': seo, 'accessibility': a11y,
+                    'avg': (perf + seo + a11y) // 3,
+                }
+            except Exception as e:
+                return {'error': f'PageSpeed: {str(e)[:80]}'}
+
+        # Run crawl + pagespeed in parallel.
+        results = {}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = {
+                pool.submit(task_crawl): 'crawl',
+                pool.submit(task_pagespeed): 'pagespeed',
+            }
+            for fut in as_completed(futures):
+                key = futures[fut]
+                try:
+                    results[key] = fut.result()
+                except Exception as e:
+                    results[key] = {'error': str(e)[:80]}
+
+        crawl = results.get('crawl', {})
+        ps = results.get('pagespeed', {})
+
+        # Extract candidate keywords from the homepage title (first 3 words
+        # of the title typically reveal the niche - this is a heuristic).
+        keywords_to_check = []
+        for source in [crawl.get('h1'), crawl.get('title')]:
+            if source:
+                import re
+                # Strip common separators and brand-name suffixes.
+                cleaned = re.sub(r'[\-\|·•]', ' ', source)
+                words = [w.lower() for w in cleaned.split() if len(w) > 3]
+                if len(words) >= 2:
+                    keywords_to_check.append(' '.join(words[:3]))
+                if len(keywords_to_check) >= 2:
+                    break
+
+        # Quick Serper position check for each candidate keyword.
+        positions = []
+        serper_key = os.environ.get('SERPER_API_KEY')
+        if serper_key and keywords_to_check:
+            for kw in keywords_to_check[:3]:
+                try:
+                    r = http_requests.post(
+                        'https://google.serper.dev/search',
+                        headers={
+                            'X-API-KEY': serper_key,
+                            'Content-Type': 'application/json',
+                        },
+                        json={'q': kw, 'num': 50, 'hl': 'fr', 'gl': 'ca'},
+                        timeout=8,
+                    )
+                    if r.status_code != 200:
+                        continue
+                    organic = (r.json().get('organic') or [])
+                    pos = None
+                    for item in organic:
+                        if domain in (item.get('link') or '').lower():
+                            pos = item.get('position') or organic.index(item) + 1
+                            break
+                    positions.append({
+                        'keyword': kw, 'position': pos,
+                    })
+                except Exception:
+                    continue
+
+        # Composite score - smaller weight set vs the authenticated audit
+        # because we have less data here (no GSC, no backlinks deep).
+        components = []
+        if 'avg' in ps:
+            components.append(('pagespeed', ps['avg'], 0.60))
+        if positions:
+            top_10 = sum(1 for p in positions if p['position'] and p['position'] <= 10)
+            rank_score = (top_10 / len(positions)) * 100
+            components.append(('rankings', rank_score, 0.40))
+        composite_score = None
+        if components:
+            wsum = sum(w for _, _, w in components)
+            composite_score = round(sum(s * (w / wsum) for _, s, w in components))
+
+        # Build recos (partial set for the public view - rest gated).
+        recos = []
+        if 'avg' in ps and ps['avg'] < 70:
+            recos.append({
+                'severity': 'high' if ps['avg'] < 50 else 'medium',
+                'message': f"Score PageSpeed mobile = {ps['avg']}/100. Vise 80+.",
+            })
+        if positions and all(p['position'] is None for p in positions):
+            recos.append({
+                'severity': 'high',
+                'message': "Aucun de tes mots-cles principaux n'apparait dans le top 50 Google.",
+            })
+        if crawl.get('error'):
+            recos.append({
+                'severity': 'medium',
+                'message': f"Impossible de crawler ton site : {crawl['error']}. Verifie qu'il est en ligne.",
+            })
+
+        payload = {
+            'domain': domain,
+            'audited_at': datetime.utcnow().isoformat(),
+            'composite_score': composite_score,
+            'pagespeed': ps,
+            'crawl': {
+                'title': crawl.get('title'),
+                'h1': crawl.get('h1'),
+                'meta_description': crawl.get('meta_description'),
+                'error': crawl.get('error'),
+            },
+            'top_keywords_estimated': positions,
+            'recos_partial': recos,
+            'full_report_gated': True,
+            # The full report (competitors + decay + backlinks + 10+ recos) is
+            # revealed after the visitor leaves their email.
+        }
+
+        cache.set(cache_key, payload, timeout=3600)
+        return Response(payload)
+
+
+class PublicLeadCaptureView(APIView):
+    """POST /api/public/leads/ {email, domain, consented_marketing?}
+
+    Saves the visitor's email to unlock the full audit report. The "full
+    report" here is just the same audit cached payload - the gating is purely
+    a marketing checkpoint, not a real access control. SPA reads the full
+    payload immediately after capture so the user gets instant value.
+    """
+    permission_classes = []  # public
+    throttle_classes = [PublicAuditThrottle]
+
+    def post(self, request):
+        from .models import Lead
+
+        email = (request.data.get('email') or '').strip().lower()
+        domain = _normalize_audit_domain(request.data.get('domain') or '')
+        consented = bool(request.data.get('consented_marketing'))
+
+        # Basic email shape check.
+        import re
+        if not email or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            return Response(
+                {'error': 'Email invalide.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reach into the cache to grab the composite_score for cohort analysis.
+        score = None
+        if domain:
+            cached = cache.get(f'public-audit:{domain}')
+            if cached:
+                score = cached.get('composite_score')
+
+        Lead.objects.create(
+            email=email,
+            domain_audited=domain or '',
+            source='public_audit',
+            ip=(request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+                or request.META.get('REMOTE_ADDR') or None),
+            user_agent=request.META.get('HTTP_USER_AGENT', '')[:500],
+            locale=request.headers.get('Accept-Language', '')[:10],
+            consented_marketing=consented,
+            score_at_capture=score,
+        )
+
+        return Response({
+            'ok': True,
+            'message': 'Email enregistre. Le rapport complet est maintenant visible.',
+        }, status=status.HTTP_201_CREATED)
+

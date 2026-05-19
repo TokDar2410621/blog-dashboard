@@ -23,6 +23,7 @@ from .models import (
     MonthlyArticleQuota,
     Redirect,
     SerpRank,
+    Lead,
     Site,
     SiteMemory,
     Subscription,
@@ -433,6 +434,16 @@ class HostedTagAdmin(admin.ModelAdmin):
     list_display = ('name', 'site')
     search_fields = ('name',)
     raw_id_fields = ('site',)
+
+
+@admin.register(Lead)
+class LeadAdmin(admin.ModelAdmin):
+    list_display = ('email', 'domain_audited', 'source', 'score_at_capture', 'consented_marketing', 'converted_to_user', 'created_at')
+    list_filter = ('source', 'consented_marketing', 'created_at')
+    search_fields = ('email', 'domain_audited', 'ip')
+    readonly_fields = ('created_at', 'ip', 'user_agent', 'locale', 'score_at_capture')
+    raw_id_fields = ('converted_to_user',)
+    date_hierarchy = 'created_at'
 
 
 @admin.register(SiteMemory)
