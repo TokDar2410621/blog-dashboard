@@ -3,9 +3,6 @@ Salut {{ first_name }},
 Voici le lien vers le rapport SEO complet de {{ domain }} :
 {{ audit_url }}
 
-{% if pdf_url %}Tu peux aussi le telecharger en PDF :
-{{ pdf_url }}
-{% endif %}
 {% if score %}Pour rappel, ton score actuel : {{ score }}/100.
 
 {% endif %}Dans les jours qui viennent, je vais t'envoyer 4 emails ciblees avec :

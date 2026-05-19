@@ -177,3 +177,31 @@
   column-count: 2;
   column-gap: 2rem;
 }
+
+/* Print stylesheet for the public audit page. Browser "Save as PDF" is
+ * our replacement for a server-side PDF renderer - keep only the report
+ * content + force a light background to save ink. */
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+    color-scheme: light !important;
+  }
+  /* Hide nav/header, audit form, footer, email gate, post-capture CTA. */
+  header, footer, .print\:hidden {
+    display: none !important;
+  }
+  /* Force dark cards / muted bg back to white-ish for printing. */
+  .bg-card, .bg-muted\/30, .bg-muted\/20,
+  .bg-primary\/5, .bg-primary\/10,
+  .bg-destructive\/5, .bg-amber-500\/5, .bg-emerald-500\/10 {
+    background: white !important;
+    border-color: #ccc !important;
+  }
+  .text-muted-foreground { color: #555 !important; }
+  /* Suppress the locked-recos backdrop blur - if the visitor prints AFTER
+   * the email gate they see everything; if BEFORE, hide the locked block
+   * entirely so the PDF is clean. */
+  .backdrop-blur-sm { display: none !important; }
+  .opacity-30 { opacity: 1 !important; }
+}

@@ -50,10 +50,6 @@ class StepDef(NamedTuple):
             'score': lead.score_at_capture,
             'audit_url': f'https://gridar.app/audit?domain={lead.domain_audited}',
             'signup_url': 'https://gridar.app/login',
-            'pdf_url': (
-                f'https://gridar.app/api/public/audit/{lead.domain_audited}/pdf/'
-                if lead.domain_audited else None
-            ),
         }
         html = render_to_string(f'emails/{self.template}.html', ctx)
         text = render_to_string(f'emails/{self.template}.txt', ctx)

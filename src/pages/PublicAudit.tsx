@@ -202,7 +202,7 @@ export default function PublicAudit() {
         </div>
 
         {/* Audit form */}
-        <Card className="max-w-2xl mx-auto mb-8">
+        <Card className="max-w-2xl mx-auto mb-8 print:hidden">
           <CardContent className="p-4">
             <form onSubmit={runAudit} className="flex flex-col sm:flex-row gap-2">
               <Input
@@ -272,17 +272,17 @@ export default function PublicAudit() {
                         {result.crawl.meta_description}
                       </p>
                     )}
-                    {/* PDF download - direct anchor since the endpoint
-                        streams the PDF and triggers the download via
-                        Content-Disposition. No JS state needed. */}
-                    <a
-                      href={`${API_BASE}/public/audit/${encodeURIComponent(result.domain)}/pdf/`}
-                      download
-                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mt-2"
+                    {/* "Sauvegarder en PDF" via browser print dialog. Zero
+                        deps server-side, every modern browser ships "Save
+                        as PDF" as a destination in its native print UI. */}
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mt-2 bg-transparent border-0 p-0 cursor-pointer print:hidden"
                     >
                       <Download className="h-3 w-3" />
-                      Telecharger en PDF
-                    </a>
+                      Sauvegarder en PDF (Ctrl+P)
+                    </button>
                     {result.crawl.error && (
                       <p className="text-destructive">{result.crawl.error}</p>
                     )}
@@ -465,7 +465,7 @@ export default function PublicAudit() {
 
             {/* Email gate */}
             {!leadCaptured && (
-              <Card className="border-primary/40 bg-primary/5">
+              <Card className="border-primary/40 bg-primary/5 print:hidden">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Lock className="h-5 w-5 text-primary" />
