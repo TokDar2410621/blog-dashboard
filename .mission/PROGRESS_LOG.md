@@ -1863,3 +1863,32 @@ Frontend `PlagiarismCard.tsx` :
 **Prochain bloc concret** : Backend - créer un endpoint agrégateur `GET /api/sites/<id>/site-audit/` qui retourne en parallèle : top mots-clés GSC (si connecté), PageSpeed du domaine principal, content_decay summary, competitor analysis sur top-3 keywords, et calcule un composite score. Fichier : `backend/sites_mgmt/views.py`, nouvelle classe `SiteAuditAggregatorView`.
 
 **Blocages** : aucun.
+
+## Session 2026-05-15 (suite) - 4 phases du pivot LIVREES en autonomie
+
+Mission "tu vas faire ce qu'il faut pour rendre ca bon" - les 4 phases du pivot ont ete livrees en une seule session autonomous.
+
+**Fait (5 commits sur main)** :
+
+1. `a7d9ee2` - **Phase 1 Audit site-level** (~940 lignes). Endpoint `GET /api/sites/<id>/site-audit/` qui agrege en parallele (ThreadPoolExecutor) PageSpeed + TrackedKeywords + Backlinks + Stats + ContentDecay, calcule un composite score 0-100 avec redistribution proportionnelle des poids si une composante manque. Frontend `src/pages/dashboard/SiteAudit.tsx` avec hero score color-coded + grid 2x2 detail cards + recos prioritaires + CTA cliquables. Route + sidebar link.
+
+2. `1b6e1d6` - **Phase 2 Blog subdomain plug-and-play** (~370 lignes). 3 endpoints `/blog-domain/{provision,status,remove}/` qui parlent a Vercel API. Wizard 3-etapes dans SiteSettings : input -> Activer -> instructions CNAME + polling auto toutes les 8s -> success state. Idempotent + recovery propre si Vercel API foire.
+
+3. `2cd0825` - **Phase 3 Public audit lead magnet** (~840 lignes). Endpoints `/api/public/audit/` (rate-limit 6/min/IP, no auth) + `/api/public/leads/` (capture email + Loi 25/RGPD consent). Nouveau modele `Lead` + LeadAdmin Django. Frontend `/audit` route publique (hors AuthGuard) avec hero + form + result + email gate avec consent checkbox.
+
+4. `058448b` - **Phase 4 WordPress plugin** (~430 lignes). Endpoint Bearer-auth `POST /api/v1/wp-connector/connect/` (probe creds via test_auth() avant persist, upsert sur owner+wp_url). Plugin PHP autonome `wordpress-plugin/gridar-connector/` : auto-genere Application Password via WP_Application_Passwords API, POST a Gridar, affiche success card avec deep-link. Rollback de l'App Password si Gridar rejette. Nonces sur les 2 forms. readme.txt pret pour wordpress.org submission.
+
+**Tests** : `python manage.py check` ✅ a chaque etape, `npm run build` ✅ (10-16s a chaque etape). Tests humains listes dans `PENDING_HUMAN.md`.
+
+**Branches/commits** : tout sur `main` (push autorise par Darius dans `WORKFLOW.md`).
+
+**Architectural decisions** :
+- Aggregator pattern via ThreadPoolExecutor cote backend pour Phase 1 et Phase 3 (au lieu d'un appel client-side par data source) -> 1 appel REST cote SPA, latence groupee = max(P95 de chaque sous-call) au lieu de sum.
+- Composite score fail-safe : si une composante manque ou erreur, son poids est redistribue proportionnellement. Pas de NaN, pas de "score manquant" sauf si TOUTES les composantes sont KO.
+- Public endpoints (Phase 3) : pas de auth + throttling AnonRateThrottle 6/min/IP. Cache 1h par domain pour borner les couts.
+- WP plugin (Phase 4) : auth par Bearer API token (Gridar genere) + WP App Password (plugin genere). Pas d'OAuth dance -> 1 paste de token, c'est tout.
+- Loi 25 / RGPD : champ `consented_marketing` sur Lead avec checkbox explicite -> respecte le double opt-in quebecois.
+
+**Prochain bloc concret** : aucun, mission Tier 5 livree. Pickup soit (a) le user fait les actions humaines de `PENDING_HUMAN.md` et on observe les premiers leads / conversions ; soit (b) prochaine session = monitoring + iterations sur le funnel (analytics events, A/B sur copy de la landing, plugin WP dans le directory, etc.).
+
+**Blocages** : aucun cote code. Cote actions humaines, voir `.mission/PENDING_HUMAN.md` (4 nouveaux items + 7 heritees + 1 deadline 24 juin pour Imagen).

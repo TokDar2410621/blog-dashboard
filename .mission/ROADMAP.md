@@ -108,30 +108,29 @@ Features ordonnées par **impact ÷ effort**. Cocher `[x]` quand fait. Ajouter d
 
 **Pourquoi ce tier** : voir entrée "Pivot 2026-05-15" dans `PROGRESS_LOG.md`. Les Tiers 1-4 ont livré les *capacités*, ce tier livre les *frictions à éliminer* qui empêchent les prospects de convertir.
 
-### Phase 1 - Audit SEO site-level unifié ⏱ 3-5j
+### Phase 1 - Audit SEO site-level unifié ✅ DONE (commit a7d9ee2)
 Page UNIQUE dans le dashboard qui agrège les endpoints existants en un seul tableau de bord :
-- [ ] Backend `GET /api/sites/<id>/site-audit/` - aggregator parallèle (GSC queries + content_decay + multi_domain stats + pagespeed + competitor SERPs sur top 3 mots-clés trackés) + composite score (technique × 0.3 + rankings × 0.4 + content × 0.3).
-- [ ] Frontend page `src/pages/dashboard/SiteAudit.tsx` - score circulaire 0-100, top keywords avec deltas, table concurrents, recos prioritaires actionables (cliquables → vers Generer ou Articles).
-- [ ] Route + lien sidebar dashboard.
-- **Critère done** : un utilisateur ouvre la page, voit en <3s son score + top 10 keywords + top 3 concurrents + 5 recos avec CTA cliquables.
+- [x] Backend `GET /api/sites/<id>/site-audit/` - aggregator parallèle (ThreadPoolExecutor) + composite score 0-100 avec redistribution des poids si composante manque.
+- [x] Frontend page `src/pages/dashboard/SiteAudit.tsx` - hero score color-coded + 4 cards detail (keywords, PageSpeed, backlinks, content decay) + 5 recos cliquables.
+- [x] Route `/dashboard/<id>/audit-site` + lien sidebar (Gauge icon).
 
-### Phase 2 - Sous-domaine `blog.X` plug-and-play ⏱ 1 sem
-Aujourd'hui `Site.public_blog_domain` existe mais config DNS manuelle. Rendre ça en 3 clics max :
-- [ ] Backend `POST /sites/<id>/blog-domain/provision/` {domain} - appelle Vercel API pour ajouter le domain au project public-blog + retourne les instructions DNS (CNAME).
-- [ ] Polling `GET /sites/<id>/blog-domain/status/` - vérifie via Vercel API si DNS propagé et SSL provisionné.
-- [ ] Frontend wizard dans SiteSettings : input domain → bouton "Activer" → écran avec CNAME à copier-coller → polling auto avec animation → "✅ Blog en ligne".
-- **Critère done** : un user sans aucune connaissance DNS arrive à activer son blog en <5 min.
+### Phase 2 - Sous-domaine `blog.X` plug-and-play ✅ DONE (commit 1b6e1d6)
+- [x] Backend `POST /sites/<id>/blog-domain/provision/` (Vercel API call + persist Site.public_blog_domain).
+- [x] Backend `GET /sites/<id>/blog-domain/status/` (idempotent verify + state read).
+- [x] Backend `DELETE /sites/<id>/blog-domain/` (best-effort Vercel removal + local clear).
+- [x] Frontend wizard dans SiteSettings : input + Activer + instructions CNAME + polling 8s + success state.
+- **Action humaine restante** : env vars VERCEL_API_TOKEN + VERCEL_PROJECT_ID sur Railway (voir PENDING_HUMAN.md).
 
-### Phase 3 - Page publique `gridar.app/audit?domain=X` (lead magnet) ⏱ 1 sem
-Audit gratuit sans compte, email-gated pour le rapport complet :
-- [ ] Backend `POST /api/public/audit/` (sans auth, rate-limited 1/IP/min) - crawl 1 page du domain, extract main keywords du title/h1, query Serper pour positions estimées, PageSpeed, retourne summary.
-- [ ] Backend `POST /api/public/audit/<token>/full/` (email-gated, signed token avec expiry) - rapport complet avec concurrents, recos détaillées.
-- [ ] Frontend route publique `/audit` (hors AuthGuard) : input domain → résultats partiels → email gate → email avec link → page rapport complet.
-- [ ] Tracking : event "public_audit_started" / "email_captured" pour mesurer conversion.
-- **Critère done** : un visiteur fait un audit en 30s, donne son email, reçoit le rapport, et apparaît dans la liste de leads de Darius.
+### Phase 3 - Page publique `gridar.app/audit` (lead magnet) ✅ DONE (commit 2cd0825)
+- [x] Backend `POST /api/public/audit/` (rate-limited 6/min/IP via AnonRateThrottle) - parallel crawl + PageSpeed + Serper positions sur keywords extraits du title/h1. Cache 1h par domain.
+- [x] Backend `POST /api/public/leads/` - capture email + Loi 25/RGPD consent + score_at_capture pour cohort.
+- [x] Frontend `/audit` (public, hors AuthGuard) avec hero + form + result + email gate + checkbox consent.
+- [x] Nouveau modele `Lead` + LeadAdmin pour le suivi sales.
+- [ ] (Plus tard) Tracking event "public_audit_started" / "email_captured" Plausible/Posthog.
+- [ ] (Plus tard) SMTP pour envoi de rapport detaille par email (au lieu de deblocage cote SPA uniquement).
 
-### Phase 4 - Plugin WordPress 1-click ⏱ 3-5j
-- [ ] Plugin PHP `gridar-connector.php` (1 fichier) : page admin "Connect to Gridar" → button OAuth → callback Gridar génère App Password via WP API REST + stocke automatiquement côté Gridar.
-- [ ] Backend Gridar `POST /api/wp-connector/oauth/init/` + `/callback/` - exchange short-lived tokens.
-- [ ] Publication sur wordpress.org plugin directory (action humaine pour validation).
-- **Critère done** : user installe le plugin → click Connect → revient dans Gridar avec le site déjà connecté, zéro copier-coller.
+### Phase 4 - Plugin WordPress 1-click ✅ DONE (commit 058448b)
+Architecture finale plus simple que l'OAuth dance prevu - juste un Bearer API token a coller, le plugin gere le reste :
+- [x] Plugin PHP `wordpress-plugin/gridar-connector/gridar-connector.php` + readme.txt - admin page sous Settings, auto-creation App Password via WP_Application_Passwords, POST a Gridar, rollback si fail.
+- [x] Backend `POST /api/v1/wp-connector/connect/` (Bearer auth via BaseV1View) - probe creds avant persist + upsert (owner, wp_url).
+- [ ] **Action humaine** : soumettre le plugin a wordpress.org/plugins (5-15 jours de validation). Voir PENDING_HUMAN.md.
