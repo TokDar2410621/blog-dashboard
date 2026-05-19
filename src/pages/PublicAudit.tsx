@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Users,
   Zap,
+  Download,
 } from "lucide-react";
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
@@ -271,6 +272,17 @@ export default function PublicAudit() {
                         {result.crawl.meta_description}
                       </p>
                     )}
+                    {/* PDF download - direct anchor since the endpoint
+                        streams the PDF and triggers the download via
+                        Content-Disposition. No JS state needed. */}
+                    <a
+                      href={`${API_BASE}/public/audit/${encodeURIComponent(result.domain)}/pdf/`}
+                      download
+                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mt-2"
+                    >
+                      <Download className="h-3 w-3" />
+                      Telecharger en PDF
+                    </a>
                     {result.crawl.error && (
                       <p className="text-destructive">{result.crawl.error}</p>
                     )}
