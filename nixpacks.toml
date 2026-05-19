@@ -1,0 +1,12 @@
+# Railway build config. Tells nixpacks to install Cairo system libraries
+# during the setup phase so `pip install pycairo` (transitive dep of
+# xhtml2pdf -> svglib -> rlpycairo -> pycairo) can compile its C extension.
+#
+# Without this, the build fails with:
+#   Run-time dependency cairo found: NO
+#   ERROR: Dependency "cairo" not found (tried pkg-config and cmake)
+#
+# Cost: ~30 MB extra in the final image, ~20s extra build time. Worth it
+# vs rewriting the audit PDF template against a pure-Python library.
+[phases.setup]
+nixPkgs = ['...', 'cairo', 'pkg-config']
