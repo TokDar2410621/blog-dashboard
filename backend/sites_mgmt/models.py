@@ -325,6 +325,50 @@ class Lead(models.Model):
         return f"{self.email} ({self.domain_audited or 'no domain'})"
 
 
+class LeadEmailSent(models.Model):
+    """Tracking row for each transactional/marketing email we send to a Lead.
+
+    Two purposes:
+      1. **Idempotency** - the daily cron command checks for the (lead, step)
+         pair before sending so a re-run never double-mails the same step.
+      2. **Audit / debug** - if a lead complains they didn't receive the J+3
+         email, we can confirm whether Resend's API accepted it and which
+         provider message_id it got.
+
+    `step` is a short opaque code we control (e.g. 'j0_audit_report',
+    'j1_competitors', 'j3_articles', 'j7_case_study', 'j14_offer'). Steps are
+    declared in the management command, not constrained at the DB level, so
+    we can iterate the funnel without migrations.
+    """
+    lead = models.ForeignKey(
+        'Lead', on_delete=models.CASCADE, related_name='emails_sent',
+    )
+    step = models.CharField(max_length=50, db_index=True)
+    subject = models.CharField(max_length=200, blank=True, default='')
+    provider_message_id = models.CharField(
+        max_length=120, blank=True, default='',
+        help_text="Resend (or other provider) external id, for tracing.",
+    )
+    error = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text="If non-empty, the send failed and we'll retry on the next cron tick.",
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Email envoyé (sequence lead)"
+        verbose_name_plural = "Emails envoyés (sequence lead)"
+        unique_together = [['lead', 'step']]
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['lead', 'step']),
+            models.Index(fields=['-sent_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.lead.email} · {self.step}"
+
+
 class SiteMemory(models.Model):
     """Per-site RAG store. Each row is one chunk (article paragraph, KB section,
     audit summary, editorial decision, manual note) with its pgvector embedding.

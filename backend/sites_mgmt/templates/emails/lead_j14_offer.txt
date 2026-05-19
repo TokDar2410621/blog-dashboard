@@ -1,0 +1,26 @@
+{{ first_name }},
+
+Dernier email de la sequence. Direct au but :
+
+PREMIER MOIS GRIDAR GRATUIT. AUCUNE CARTE DEMANDEE.
+
+Tu testes l'audit continu, la generation d'articles, le suivi de positions, l'integration WordPress / Shopify / Webflow, tout. Pendant 30 jours.
+
+Apres ca, si t'aimes :
+- Solo : 49 $/mois - 1 site, 20 articles/mois
+- Pro : 149 $/mois - 5 sites, 100 articles/mois
+- Agence : 499 $/mois - 50 sites, 1000 articles/mois (white-label)
+
+Tu peux annuler en 1 click si ca ne te convient pas. Pas de bullshit "appelle-nous pour annuler".
+
+ACTIVER MON MOIS GRATUIT : {{ signup_url }}
+
+Si t'as des questions avant de te lancer, repond a cet email - ca arrive directement dans ma boite (pas un chatbot, pas un support tier 1).
+
+Sinon, bonne continuation avec {{ domain }}. Si tu changes d'avis dans 6 mois, l'offre tient.
+
+Darius
+Fondateur, Gridar / Arivex Studio
+
+---
+Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}

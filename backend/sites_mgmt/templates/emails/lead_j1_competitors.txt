@@ -1,0 +1,22 @@
+{{ first_name }},
+
+Hier tu as audite {{ domain }}. Aujourd'hui je veux te montrer un truc plus genant :
+les 3 concurrents qui rankent au-dessus de toi sur tes mots-cles principaux.
+
+Comment je le sais ? Quand tu lances un audit Gridar, on va chercher les SERPs Google de chaque mot-cle qui sort de ton site (titre, h1, body bigrams). On voit qui te depasse, sur quoi, et de combien de positions.
+
+3 trucs que tes concurrents font et qui ranquent (presque toujours) :
+
+1. Articles 1500-2500 mots sur des questions precises de leur niche (vs ta page "Services" qui couvre 10 trucs en 300 mots)
+2. FAQ schema.org en bas de page - Google les pull dans les "People Also Ask"
+3. EEAT : Author bio + LinkedIn + credentials visibles sur chaque article. Google compte ca comme un signal de qualite depuis 2024.
+
+Pour voir lesquels te depassent SPECIFIQUEMENT :
+{{ signup_url }}
+
+Demain je te montre 5 articles concrets a publier pour reprendre du terrain.
+
+Darius
+
+---
+Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}

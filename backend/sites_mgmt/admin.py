@@ -24,6 +24,7 @@ from .models import (
     Redirect,
     SerpRank,
     Lead,
+    LeadEmailSent,
     Site,
     SiteMemory,
     Subscription,
@@ -444,6 +445,21 @@ class LeadAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'ip', 'user_agent', 'locale', 'score_at_capture')
     raw_id_fields = ('converted_to_user',)
     date_hierarchy = 'created_at'
+
+
+@admin.register(LeadEmailSent)
+class LeadEmailSentAdmin(admin.ModelAdmin):
+    list_display = ('lead', 'step', 'subject', 'has_error', 'sent_at')
+    list_filter = ('step', 'sent_at')
+    search_fields = ('lead__email', 'subject', 'provider_message_id', 'error')
+    raw_id_fields = ('lead',)
+    readonly_fields = ('sent_at', 'provider_message_id')
+    date_hierarchy = 'sent_at'
+
+    def has_error(self, obj):
+        return bool(obj.error)
+    has_error.boolean = True
+    has_error.short_description = 'Erreur ?'
 
 
 @admin.register(SiteMemory)

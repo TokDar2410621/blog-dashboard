@@ -1,0 +1,37 @@
+{% extends "emails/_base.html" %}
+{% block title %}5 articles a publier ce mois{% endblock %}
+
+{% block content %}
+<p>{{ first_name }},</p>
+
+<p>Le SEO en 2026 c'est simple : tu publies du contenu utile sur les mots-cles de tes prospects, ou tu disparais des SERPs.</p>
+
+<p>La plupart des PME que je croise pensent qu'il faut publier "tout le temps". Faux. Il faut publier les 5-10 BONS articles par mois. Voici comment je les choisis :</p>
+
+<h3 style="margin-top:24px;">1. Les questions exactes de tes prospects</h3>
+<p>Tape ton domaine dans <a href="https://gridar.app/audit?domain={{ domain }}" style="color:#10b981;">l'audit Gridar</a>. On extrait les mots-cles de tes pages, puis on regarde les "People Also Ask" de Google sur chacun. Chaque PAA = un article qui peut ranker.</p>
+
+<h3>2. Les sujets ou tes concurrents ranquent et pas toi</h3>
+<p>Si Concurrent A ranque #3 sur "automatisation SEO Quebec" et toi #41, c'est un gap. Tu ecris un article 30% meilleur (plus long, plus de FAQ, EEAT solide), et tu te bats pour la position.</p>
+
+<h3>3. Les articles obsoletes qui ont perdu du trafic</h3>
+<p>Google Search Console + comparaison vs 30 jours : si un article a chute de 30% d'impressions, refresh-le. C'est 5x plus rentable que d'en publier un nouveau.</p>
+
+<h3>4. Un article "evergreen pilier"</h3>
+<p>Le guide complet de 3000 mots qui couvre TOUT ton sujet. C'est lui qui va te ramener du trafic constant pendant 2-3 ans.</p>
+
+<h3>5. Un article opinion / take fort</h3>
+<p>"5 raisons pourquoi je deteste Google Ads pour les PME quebecoises". Bonne pour le link building, partage social, et anchor backlink naturel.</p>
+
+<p style="margin-top:24px;">Tout ca, Gridar le genere automatiquement avec ton ton + ta marque + ton lexique FR-CA. 49$ par mois.</p>
+
+<p style="margin:24px 0;">
+  <a href="{{ signup_url }}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+    Generer mes 5 articles dans Gridar
+  </a>
+</p>
+
+<p>Vendredi je te montre comment <a href="#" style="color:#10b981;">SiteX a passe de 47/100 a 78/100 en 90 jours</a> avec exactement cette methode.</p>
+
+<p>Darius</p>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "emails/_base.html" %}
+{% block title %}3 concurrents qui rankent au-dessus de toi{% endblock %}
+
+{% block content %}
+<p>{{ first_name }},</p>
+
+<p>Hier tu as audite {{ domain }}. Aujourd'hui je veux te montrer un truc plus genant : <strong>les 3 concurrents qui rankent au-dessus de toi sur tes mots-cles principaux</strong>.</p>
+
+<p>Comment je le sais ? Quand tu lances un audit Gridar, on va chercher les SERPs Google de chaque mot-cle qui sort de ton site (titre, h1, body bigrams). On voit qui te depasse, sur quoi, et de combien de positions.</p>
+
+<p>3 trucs que tes concurrents font et qui ranquent (presque toujours) :</p>
+
+<ol>
+  <li><strong>Articles 1500-2500 mots</strong> sur des questions precises de leur niche (vs ta page "Services" qui couvre 10 trucs en 300 mots)</li>
+  <li><strong>FAQ schema.org</strong> en bas de page - Google les pull dans les "People Also Ask"</li>
+  <li><strong>EEAT</strong> : Author bio + LinkedIn + credentials visibles sur chaque article. Google compte ca comme un signal de qualite depuis 2024.</li>
+</ol>
+
+<p>Pour voir lesquels te depassent SPECIFIQUEMENT :</p>
+
+<p style="margin:24px 0;">
+  <a href="{{ signup_url }}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+    Voir mes concurrents dans Gridar
+  </a>
+</p>
+
+<p>Demain je te montre 5 articles concrets a publier pour reprendre du terrain.</p>
+
+<p>Darius</p>
+{% endblock %}

@@ -1,0 +1,33 @@
+{{ first_name }},
+
+Le SEO en 2026 c'est simple : tu publies du contenu utile sur les mots-cles de tes prospects, ou tu disparais des SERPs.
+
+La plupart des PME que je croise pensent qu'il faut publier "tout le temps". Faux. Il faut publier les 5-10 BONS articles par mois.
+
+Voici comment je les choisis :
+
+1. LES QUESTIONS EXACTES DE TES PROSPECTS
+Tape ton domaine dans l'audit Gridar. On extrait les mots-cles de tes pages, puis on regarde les "People Also Ask" de Google sur chacun. Chaque PAA = un article qui peut ranker.
+
+2. LES SUJETS OU TES CONCURRENTS RANQUENT ET PAS TOI
+Si Concurrent A ranque #3 sur "automatisation SEO Quebec" et toi #41, c'est un gap. Tu ecris un article 30% meilleur (plus long, plus de FAQ, EEAT solide), et tu te bats pour la position.
+
+3. LES ARTICLES OBSOLETES QUI ONT PERDU DU TRAFIC
+Google Search Console + comparaison vs 30 jours : si un article a chute de 30% d'impressions, refresh-le. C'est 5x plus rentable que d'en publier un nouveau.
+
+4. UN ARTICLE EVERGREEN PILIER
+Le guide complet de 3000 mots qui couvre TOUT ton sujet. C'est lui qui va te ramener du trafic constant pendant 2-3 ans.
+
+5. UN ARTICLE OPINION / TAKE FORT
+"5 raisons pourquoi je deteste Google Ads pour les PME quebecoises". Bonne pour le link building, partage social, et anchor backlink naturel.
+
+Tout ca, Gridar le genere automatiquement avec ton ton + ta marque + ton lexique FR-CA. 49 $ par mois.
+
+{{ signup_url }}
+
+Vendredi je te montre comment SiteX a passe de 47/100 a 78/100 en 90 jours avec exactement cette methode.
+
+Darius
+
+---
+Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}

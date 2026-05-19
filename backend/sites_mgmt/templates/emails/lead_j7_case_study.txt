@@ -1,0 +1,40 @@
+{{ first_name }},
+
+Promis a la fin de l'email precedent. Voici un cas reel.
+
+SiteX (cabinet conseil PME Saint-Hyacinthe, je peux pas balancer le nom). Etat initial :
+- Score Gridar : 47/100
+- 1 article publie en 2024, 0 en debut 2025
+- 3 mots-cles cibles, tous hors top 50
+- PageSpeed mobile : 51/100
+- 0 backlinks identifiables
+
+Ce qu'on a fait en 90 jours :
+
+Semaine 1-2 : audit complet, identification de 8 mots-cles cibles realistes (volume 100-500/mois, difficulte moyenne). Refresh de 3 articles obsoletes.
+
+Semaine 3-6 : 12 articles generes via Gridar (3/semaine), un par mot-cle cible. Tous avec FAQ schema + author bio + 1500-2500 mots.
+
+Semaine 7-10 : optimisation PageSpeed (next-gen images, lazy loading), schema LocalBusiness sur l'accueil, internal linking entre les 12 articles via Gridar's link graph.
+
+Semaine 11-12 : suivi positions hebdomadaire, refresh des 2 articles qui n'ont pas decolle.
+
+RESULTAT A J+90 :
+- Score Gridar : 78/100 (+31)
+- 5 mots-cles cibles en top 10 (vs 0)
+- +340% d'impressions GSC vs T-90j
+- PageSpeed mobile : 89/100
+- 14 leads qualifies via le formulaire de contact (vs 1-2 avant)
+
+Tout ca pour 49 $ par mois de Gridar + ~3h par semaine de validation/relecture cote client.
+
+Si t'as un site qui stagne, t'as exactement les memes leviers a disposition. La difference c'est juste de s'y mettre.
+
+{{ signup_url }}
+
+La semaine prochaine je te fais une offre - premier mois gratuit, no card. Stay tuned.
+
+Darius
+
+---
+Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}

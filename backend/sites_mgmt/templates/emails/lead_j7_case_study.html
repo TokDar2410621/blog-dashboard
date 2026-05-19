@@ -1,0 +1,52 @@
+{% extends "emails/_base.html" %}
+{% block title %}De 47/100 a 78/100 en 90 jours{% endblock %}
+
+{% block content %}
+<p>{{ first_name }},</p>
+
+<p>Promis a la fin de l'email precedent. Voici un cas reel.</p>
+
+<p><strong>SiteX</strong> (cabinet conseil PME Saint-Hyacinthe, je peux pas balancer le nom). Etat initial :</p>
+
+<ul>
+  <li>Score Gridar : 47/100</li>
+  <li>1 article publie en 2024, 0 en debut 2025</li>
+  <li>3 mots-cles cibles, tous hors top 50</li>
+  <li>PageSpeed mobile : 51/100</li>
+  <li>0 backlinks identifiables</li>
+</ul>
+
+<p>Ce qu'on a fait en 90 jours :</p>
+
+<p><strong>Semaine 1-2</strong> : audit complet, identification de 8 mots-cles cibles realistes (volume 100-500/mois, difficulte moyenne). Refresh de 3 articles obsoletes.</p>
+
+<p><strong>Semaine 3-6</strong> : 12 articles generes via Gridar (3/semaine), un par mot-cle cible. Tous avec FAQ schema + author bio + 1500-2500 mots.</p>
+
+<p><strong>Semaine 7-10</strong> : optimisation PageSpeed (next-gen images, lazy loading), schema LocalBusiness sur l'accueil, internal linking entre les 12 articles via Gridar's link graph.</p>
+
+<p><strong>Semaine 11-12</strong> : suivi positions hebdomadaire, refresh des 2 articles qui n'ont pas decolle.</p>
+
+<h3 style="margin-top:24px;">Resultat a J+90 :</h3>
+
+<ul>
+  <li>Score Gridar : <strong>78/100</strong> (+31)</li>
+  <li>5 mots-cles cibles en top 10 (vs 0)</li>
+  <li>+340% d'impressions GSC vs T-90j</li>
+  <li>PageSpeed mobile : 89/100</li>
+  <li>14 leads qualifies via le formulaire de contact (vs 1-2 avant)</li>
+</ul>
+
+<p>Tout ca pour 49 $ par mois de Gridar + ~3h par semaine de validation/relecture cote client.</p>
+
+<p>Si t'as un site qui stagne, t'as exactement les memes leviers a disposition. La difference c'est juste de s'y mettre.</p>
+
+<p style="margin:24px 0;">
+  <a href="{{ signup_url }}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+    Commencer comme SiteX
+  </a>
+</p>
+
+<p>La semaine prochaine je te fais une offre - premier mois gratuit, no card. Stay tuned.</p>
+
+<p>Darius</p>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "emails/_base.html" %}
+{% block title %}Ton rapport SEO complet{% endblock %}
+{% block unsubscribe %}<a href="https://gridar.app/unsubscribe?email={{ lead.email }}" style="color:#888;text-decoration:underline;">Se desinscrire</a> · Email transactionnel (rapport demande){% endblock %}
+
+{% block content %}
+<p>Salut {{ first_name }},</p>
+
+<p>Voici le lien vers le rapport SEO complet de <strong>{{ domain }}</strong> :</p>
+
+<p style="margin:24px 0;">
+  <a href="{{ audit_url }}" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">
+    Voir le rapport complet
+  </a>
+</p>
+
+{% if pdf_url %}
+<p>Tu peux aussi le <a href="{{ pdf_url }}" style="color:#10b981;">telecharger en PDF</a> pour le partager avec ton equipe.</p>
+{% endif %}
+
+{% if score %}
+<p>Pour rappel, ton score actuel : <strong>{{ score }}/100</strong>. Dans les jours qui viennent, je vais t'envoyer 4 emails ciblees avec :</p>
+{% else %}
+<p>Dans les jours qui viennent, je vais t'envoyer 4 emails ciblees avec :</p>
+{% endif %}
+
+<ul>
+  <li>Tes 3 principaux concurrents et ce qu'ils font de mieux</li>
+  <li>5 articles que tu pourrais publier ce mois pour reprendre du terrain</li>
+  <li>Une etude de cas detaillee d'un site qui a redresse ses positions en 90 jours</li>
+  <li>Une offre - premier mois gratuit chez Gridar, sans carte</li>
+</ul>
+
+<p>Pas spammeur, pas d'autorepondeur 12 etapes. Du concret, court, action-able. Si ca te saoule, le lien "Se desinscrire" en bas marche en 1 click.</p>
+
+<p>A demain,<br>
+Darius<br>
+<span style="color:#888;font-size:13px;">Fondateur, Gridar</span></p>
+{% endblock %}

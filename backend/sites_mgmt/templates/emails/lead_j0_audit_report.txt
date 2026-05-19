@@ -1,0 +1,22 @@
+Salut {{ first_name }},
+
+Voici le lien vers le rapport SEO complet de {{ domain }} :
+{{ audit_url }}
+
+{% if pdf_url %}Tu peux aussi le telecharger en PDF :
+{{ pdf_url }}
+{% endif %}
+{% if score %}Pour rappel, ton score actuel : {{ score }}/100.
+
+{% endif %}Dans les jours qui viennent, je vais t'envoyer 4 emails ciblees avec :
+- Tes 3 principaux concurrents et ce qu'ils font de mieux
+- 5 articles que tu pourrais publier ce mois pour reprendre du terrain
+- Une etude de cas detaillee d'un site qui a redresse ses positions en 90 jours
+- Une offre - premier mois gratuit chez Gridar, sans carte
+
+Pas spammeur, pas d'autorepondeur 12 etapes. Du concret, court, action-able.
+Si ca te saoule, ce lien marche en 1 click :
+https://gridar.app/unsubscribe?email={{ lead.email }}
+
+A demain,
+Darius - Fondateur, Gridar

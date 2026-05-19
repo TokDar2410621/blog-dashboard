@@ -9155,7 +9155,7 @@ class PublicLeadCaptureView(APIView):
             if cached:
                 score = cached.get('composite_score')
 
-        Lead.objects.create(
+        lead = Lead.objects.create(
             email=email,
             domain_audited=domain or '',
             source='public_audit',
@@ -9166,6 +9166,19 @@ class PublicLeadCaptureView(APIView):
             consented_marketing=consented,
             score_at_capture=score,
         )
+
+        # Fire the transactional J+0 ("here's your full report") email
+        # synchronously - it's the only step that's not gated by marketing
+        # consent (Resend categorizes it as transactional). Failure here is
+        # logged but doesn't break the SPA flow - the marketing sequence
+        # cron will retry on its next tick.
+        try:
+            from .email_service import SEQUENCE_STEPS, send_lead_step
+            j0 = next((s for s in SEQUENCE_STEPS if s.code == 'j0_audit_report'), None)
+            if j0:
+                send_lead_step(lead, j0)
+        except Exception as e:
+            logger.warning('J+0 send failed for lead %s: %s', lead.id, e)
 
         return Response({
             'ok': True,

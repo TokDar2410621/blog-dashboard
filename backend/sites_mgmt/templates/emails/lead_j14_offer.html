@@ -1,0 +1,35 @@
+{% extends "emails/_base.html" %}
+{% block title %}Premier mois gratuit sur Gridar{% endblock %}
+
+{% block content %}
+<p>{{ first_name }},</p>
+
+<p>Dernier email de la sequence. Direct au but :</p>
+
+<p><strong>Premier mois Gridar gratuit. Aucune carte demandee.</strong></p>
+
+<p>Tu testes l'audit continu, la generation d'articles, le suivi de positions, l'integration WordPress / Shopify / Webflow, tout. Pendant 30 jours.</p>
+
+<p>Apres ca, si t'aimes :</p>
+
+<ul>
+  <li><strong>Solo</strong> 49 $/mois - 1 site, 20 articles/mois</li>
+  <li><strong>Pro</strong> 149 $/mois - 5 sites, 100 articles/mois</li>
+  <li><strong>Agence</strong> 499 $/mois - 50 sites, 1000 articles/mois (white-label)</li>
+</ul>
+
+<p>Tu peux annuler en 1 click si ca ne te convient pas. Pas de bullshit "appelle-nous pour annuler".</p>
+
+<p style="margin:32px 0;">
+  <a href="{{ signup_url }}" style="display:inline-block;background:#10b981;color:#ffffff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">
+    Activer mon mois gratuit
+  </a>
+</p>
+
+<p>Si t'as des questions avant de te lancer, repond a cet email - ca arrive directement dans ma boite (pas un chatbot, pas un support tier 1).</p>
+
+<p>Sinon, bonne continuation avec {{ domain }}. Si tu changes d'avis dans 6 mois, l'offre tient.</p>
+
+<p>Darius<br>
+<span style="color:#888;font-size:13px;">Fondateur, Gridar / Arivex Studio</span></p>
+{% endblock %}
