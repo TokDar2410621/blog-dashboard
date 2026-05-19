@@ -12,7 +12,7 @@
  * For V1 the "full report" reveal is purely cosmetic - we already returned
  * everything to the browser. The email is captured for marketing follow-up.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,9 @@ import {
   Sparkles,
   Loader2,
   ArrowRight,
+  ShieldCheck,
+  Users,
+  Zap,
 } from "lucide-react";
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
@@ -80,6 +83,23 @@ export default function PublicAudit() {
   const [consented, setConsented] = useState(false);
   const [submittingLead, setSubmittingLead] = useState(false);
   const [leadCaptured, setLeadCaptured] = useState(false);
+
+  // Live social-proof stats - loaded once on mount.
+  type Stats = {
+    audits_this_month: number;
+    leads_this_month: number;
+    leads_this_week: number;
+    total_leads: number;
+  };
+  const [stats, setStats] = useState<Stats | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/public/audit-stats/`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setStats(d))
+      .catch(() => {
+        /* social proof is nice-to-have, ignore failures */
+      });
+  }, []);
 
   const runAudit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,10 +176,28 @@ export default function PublicAudit() {
           <h1 className="text-3xl md:text-4xl font-bold mb-3">
             Audit SEO gratuit de ton site en 30 secondes
           </h1>
-          <p className="text-muted-foreground text-base md:text-lg">
+          <p className="text-muted-foreground text-base md:text-lg mb-4">
             Entre ton domaine, decouvre ton score SEO, tes positions sur Google et
             les principaux points a fixer. Sans inscription.
           </p>
+          {/* Social proof + trust row */}
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
+            {stats && (
+              <span className="flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-primary" />
+                <strong className="text-foreground">{stats.audits_this_month}</strong>
+                {" "}audits ce mois-ci
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <Zap className="h-3.5 w-3.5 text-primary" />
+              Resultat en {"<"} 30s
+            </span>
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+              Conforme Loi 25 (QC) + RGPD
+            </span>
+          </div>
         </div>
 
         {/* Audit form */}
@@ -329,40 +367,89 @@ export default function PublicAudit() {
               </Card>
             </div>
 
-            {/* Recos */}
-            {result.recos_partial.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    Recommandations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {result.recos_partial.map((reco, i) => (
-                    <div
-                      key={i}
-                      className={`border rounded p-2 flex items-center gap-2 text-sm ${
+            {/* Recos - top 3 always visible, rest blurred until email captured */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Recommandations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {result.recos_partial.map((reco, i) => (
+                  <div
+                    key={i}
+                    className={`border rounded p-2 flex items-center gap-2 text-sm ${
+                      reco.severity === "high"
+                        ? "border-destructive/40 bg-destructive/5"
+                        : reco.severity === "medium"
+                        ? "border-amber-500/40 bg-amber-500/5"
+                        : "border-muted bg-muted/20"
+                    }`}
+                  >
+                    <AlertTriangle
+                      className={`h-4 w-4 shrink-0 ${
                         reco.severity === "high"
-                          ? "border-destructive/40 bg-destructive/5"
-                          : reco.severity === "medium"
-                          ? "border-amber-500/40 bg-amber-500/5"
-                          : "border-muted bg-muted/20"
+                          ? "text-destructive"
+                          : "text-amber-500"
                       }`}
-                    >
-                      <AlertTriangle
-                        className={`h-4 w-4 shrink-0 ${
-                          reco.severity === "high"
-                            ? "text-destructive"
-                            : "text-amber-500"
-                        }`}
-                      />
-                      <span>{reco.message}</span>
+                    />
+                    <span>{reco.message}</span>
+                  </div>
+                ))}
+
+                {/* Locked teasers - revealed when leadCaptured = true. The
+                    labels are real marketing copy, not fake data. After
+                    capture, the user creates an account to see the real
+                    numbers behind each label. */}
+                <div className="relative pt-2">
+                  {!leadCaptured && (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-sm bg-background/40 rounded">
+                      <Lock className="h-6 w-6 text-primary" />
+                      <p className="text-sm font-medium">
+                        7 autres recos a debloquer
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Entre ton email plus bas pour les voir
+                      </p>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+                  )}
+                  <div className={!leadCaptured ? "opacity-30 select-none" : ""}>
+                    {[
+                      { label: "Analyse de tes 3 principaux concurrents sur Google", sev: "medium" as const },
+                      { label: "Liste des articles obsoletes a refresh en priorite", sev: "high" as const },
+                      { label: "10 mots-cles cibles que tu ne touches pas encore", sev: "medium" as const },
+                      { label: "Backlinks: domaines referrents + opportunites", sev: "low" as const },
+                      { label: "Plan de generation d'articles pour les 30 prochains jours", sev: "medium" as const },
+                      { label: "Schema.org + JSON-LD manquants sur tes pages cles", sev: "low" as const },
+                      { label: "Comparatif Core Web Vitals desktop vs mobile", sev: "low" as const },
+                    ].map((teaser, i) => (
+                      <div
+                        key={i}
+                        className={`border rounded p-2 flex items-center gap-2 text-sm mb-2 ${
+                          teaser.sev === "high"
+                            ? "border-destructive/40 bg-destructive/5"
+                            : teaser.sev === "medium"
+                            ? "border-amber-500/40 bg-amber-500/5"
+                            : "border-muted bg-muted/20"
+                        }`}
+                      >
+                        <AlertTriangle
+                          className={`h-4 w-4 shrink-0 ${
+                            teaser.sev === "high"
+                              ? "text-destructive"
+                              : teaser.sev === "medium"
+                              ? "text-amber-500"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                        <span>{teaser.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Email gate */}
             {!leadCaptured && (

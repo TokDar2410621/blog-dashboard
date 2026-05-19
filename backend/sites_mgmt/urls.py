@@ -22,7 +22,7 @@ from .views import (
     SiteMemoryView, SiteMemoryDetailView, SiteMemoryRebuildView,
     PostFeedbackView, SiteAuditAggregatorView,
     BlogDomainProvisionView, BlogDomainStatusView, BlogDomainRemoveView,
-    PublicAuditView, PublicLeadCaptureView, WPConnectorView,
+    PublicAuditView, PublicLeadCaptureView, PublicAuditStatsView, WPConnectorView,
     SiteSitemapView, SiteRSSView,
     BillingMeView, BillingCheckoutView, BillingPortalView, BillingWebhookView,
     BillingCreditsView, BillingCreditsCheckoutView,
@@ -115,6 +115,7 @@ urlpatterns = [
     # Public audit lead magnet (no auth)
     path('public/audit/', PublicAuditView.as_view(), name='public-audit'),
     path('public/leads/', PublicLeadCaptureView.as_view(), name='public-lead-capture'),
+    path('public/audit-stats/', PublicAuditStatsView.as_view(), name='public-audit-stats'),
     # WordPress plugin 1-click connector
     path('v1/wp-connector/connect/', WPConnectorView.as_view(), name='v1-wp-connector-connect'),
     path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),
