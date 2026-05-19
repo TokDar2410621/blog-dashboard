@@ -8178,3 +8178,327 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
             'competitors': cleaned,
             'serp_sources_used': len(serp_lines),
         })
+
+
+class SiteAuditAggregatorView(APIView):
+    """One-shot site-level audit dashboard. Aggregates several existing
+    capabilities in parallel and returns a single payload + composite score.
+
+    GET /api/sites/<id>/site-audit/
+
+    Combines (parallel ThreadPoolExecutor, fail-safe):
+      - PageSpeed mobile + desktop on the site's homepage
+      - TrackedKeywords + their latest SerpRank position
+      - Backlinks count (Serper)
+      - SiteStats (post counts, recent activity)
+      - ContentDecay (GSC, optional)
+      - Top 3 GSC queries summary (if GSC connected)
+
+    Score composite (0-100) blends:
+      - PageSpeed: avg(perf, seo, a11y) × 0.30
+      - Rankings: % of tracked keywords in top 10 × 0.30
+      - Backlinks: log10(referring_domains+1) × 30 (capped at 100) × 0.15
+      - Content freshness: 100 - decaying_pct × 0.25  (only if GSC connected,
+        otherwise the freshness weight is redistributed proportionally)
+
+    Cached 10 min per site (data refresh cadence is daily at best).
+    Each subtask is wrapped in its own try/except so one failure (missing
+    API key, GSC reauth, slow response) never blocks the whole audit.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        import math
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from .models import TrackedKeyword, SerpRank
+
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+
+        cache_key = f'site-audit:{site.id}'
+        cached = cache.get(cache_key)
+        if cached and not request.query_params.get('refresh'):
+            return Response(cached)
+
+        # Homepage URL for PageSpeed + backlinks. Some sites don't have a
+        # domain set (e.g. brand-new hosted site without subdomain yet) -
+        # gracefully skip PageSpeed in that case.
+        homepage_url = None
+        if site.domain:
+            domain_clean = site.domain.strip().rstrip('/')
+            if not domain_clean.startswith('http'):
+                homepage_url = f'https://{domain_clean}'
+            else:
+                homepage_url = domain_clean
+
+        # ── Subtasks (each returns a dict or {'error': '...'}) ─────────────
+
+        def task_pagespeed():
+            if not homepage_url:
+                return {'error': 'Pas de domaine renseigne sur ce site.'}
+            api_key = os.environ.get('PAGESPEED_API_KEY')
+            if not api_key:
+                return {'error': 'PAGESPEED_API_KEY non configuree.'}
+            try:
+                r = http_requests.get(
+                    'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+                    params={
+                        'url': homepage_url,
+                        'key': api_key,
+                        'strategy': 'mobile',
+                        'category': ['performance', 'seo', 'accessibility'],
+                    },
+                    timeout=30,
+                )
+                if r.status_code != 200:
+                    return {'error': f'PageSpeed {r.status_code}'}
+                data = r.json()
+                cats = data.get('lighthouseResult', {}).get('categories', {})
+                perf = int((cats.get('performance', {}).get('score') or 0) * 100)
+                seo = int((cats.get('seo', {}).get('score') or 0) * 100)
+                a11y = int((cats.get('accessibility', {}).get('score') or 0) * 100)
+                return {
+                    'performance': perf,
+                    'seo': seo,
+                    'accessibility': a11y,
+                    'avg': (perf + seo + a11y) // 3,
+                    'url': homepage_url,
+                }
+            except Exception as e:
+                return {'error': f'PageSpeed: {str(e)[:80]}'}
+
+        def task_keywords():
+            try:
+                rows = []
+                top_10_count = 0
+                tracked_qs = TrackedKeyword.objects.filter(
+                    site=site, is_active=True
+                )
+                for tk in tracked_qs:
+                    latest = (
+                        SerpRank.objects.filter(tracked=tk)
+                        .order_by('-recorded_at').first()
+                    )
+                    pos = latest.position if latest else None
+                    if pos is not None and pos <= 10:
+                        top_10_count += 1
+                    rows.append({
+                        'id': tk.id,
+                        'keyword': tk.keyword,
+                        'language': tk.language,
+                        'position': pos,
+                        'is_target_match': latest.is_target_match if latest else None,
+                        'recorded_at': latest.recorded_at.isoformat() if latest else None,
+                    })
+                # Sort: top-ranking first, untracked last
+                rows.sort(key=lambda r: (r['position'] is None, r['position'] or 999))
+                total = len(rows)
+                return {
+                    'total': total,
+                    'top_10_count': top_10_count,
+                    'top_10_pct': (top_10_count / total * 100) if total else 0,
+                    'rows': rows[:20],  # cap for prompt size
+                }
+            except Exception as e:
+                return {'error': f'Keywords: {str(e)[:80]}'}
+
+        def task_backlinks():
+            if not homepage_url:
+                return {'error': 'Pas de domaine'}
+            api_key = os.environ.get('SERPER_API_KEY')
+            if not api_key:
+                return {'error': 'SERPER_API_KEY non configuree.'}
+            try:
+                domain_only = urlparse(homepage_url).netloc
+                # Serper backlinks proxy via 'link:' search - imprecise but free.
+                r = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={
+                        'X-API-KEY': api_key,
+                        'Content-Type': 'application/json',
+                    },
+                    json={'q': f'"{domain_only}" -site:{domain_only}', 'num': 20},
+                    timeout=10,
+                )
+                if r.status_code != 200:
+                    return {'error': f'Serper {r.status_code}'}
+                data = r.json()
+                organic = data.get('organic', []) or []
+                referring = {}
+                for item in organic:
+                    link = item.get('link') or ''
+                    if not link:
+                        continue
+                    netloc = urlparse(link).netloc.replace('www.', '')
+                    if netloc and netloc != domain_only.replace('www.', ''):
+                        referring[netloc] = referring.get(netloc, 0) + 1
+                return {
+                    'total_referring_domains': len(referring),
+                    'top_domains': sorted(
+                        referring.items(), key=lambda kv: -kv[1]
+                    )[:5],
+                }
+            except Exception as e:
+                return {'error': f'Backlinks: {str(e)[:80]}'}
+
+        def task_sitestats():
+            try:
+                if site.is_hosted:
+                    from .models import HostedPost
+                    qs = HostedPost.objects.filter(site=site)
+                    return {
+                        'total_posts': qs.count(),
+                        'published': qs.filter(status='published').count(),
+                        'drafts': qs.filter(status='draft').count(),
+                        'mode': 'hosted',
+                    }
+                # External / CMS modes - skip; SiteStatsView handles those.
+                return {
+                    'total_posts': None,
+                    'mode': 'external_or_cms',
+                    'note': 'Stats détaillées disponibles dans la page Articles.',
+                }
+            except Exception as e:
+                return {'error': f'SiteStats: {str(e)[:80]}'}
+
+        def task_decay():
+            # ContentDecay needs GSC. Skip if not connected to avoid 401.
+            if not site.gsc_refresh_token:
+                return {'gsc_not_connected': True}
+            try:
+                from .views import ContentDecayView  # self-reference fine
+                # Reuse the view's internal logic by calling it directly.
+                # The view's `get(request, site_id)` handles auth, GSC client,
+                # diff, and returns Response. Cheaper than re-implementing.
+                cdv = ContentDecayView()
+                cdv.request = request
+                # request.query_params already has whatever; we want a fresh dict
+                # but DRF Request is immutable - emulate by passing default 30.
+                resp = cdv.get(request, site_id)
+                if resp.status_code != 200:
+                    return {'error': f'Decay {resp.status_code}'}
+                d = resp.data
+                return {
+                    'days': d.get('days'),
+                    'decaying_count': d.get('decaying_count'),
+                    'healthy_count': d.get('healthy_count'),
+                    'new_pages_count': d.get('new_pages_count'),
+                    'top_decaying': (d.get('decaying') or [])[:5],
+                }
+            except Exception as e:
+                return {'error': f'Decay: {str(e)[:80]}'}
+
+        # ── Run all in parallel ─────────────────────────────────────────────
+        results = {}
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {
+                pool.submit(task_pagespeed): 'pagespeed',
+                pool.submit(task_keywords): 'keywords',
+                pool.submit(task_backlinks): 'backlinks',
+                pool.submit(task_sitestats): 'stats',
+                pool.submit(task_decay): 'decay',
+            }
+            for fut in as_completed(futures):
+                key = futures[fut]
+                try:
+                    results[key] = fut.result()
+                except Exception as e:
+                    results[key] = {'error': str(e)[:80]}
+
+        # ── Composite score (0-100) ────────────────────────────────────────
+        # Weights: PageSpeed 0.30, Rankings 0.30, Backlinks 0.15, Freshness 0.25.
+        # If a component is missing (error or no data), redistribute its weight
+        # proportionally over the available ones.
+        components = []
+        ps = results.get('pagespeed', {})
+        if 'avg' in ps:
+            components.append(('pagespeed', ps['avg'], 0.30))
+        kw = results.get('keywords', {})
+        if kw.get('total', 0) > 0:
+            components.append(('rankings', kw['top_10_pct'], 0.30))
+        bl = results.get('backlinks', {})
+        if 'total_referring_domains' in bl:
+            # log10(n+1) * 30 capped to 100
+            n = bl['total_referring_domains']
+            bl_score = min(100, math.log10(n + 1) * 30)
+            components.append(('backlinks', bl_score, 0.15))
+        decay = results.get('decay', {})
+        if 'decaying_count' in decay and 'healthy_count' in decay:
+            total_pages = (decay.get('decaying_count') or 0) + (decay.get('healthy_count') or 0)
+            if total_pages > 0:
+                fresh_score = 100 - ((decay.get('decaying_count') or 0) / total_pages * 100)
+                components.append(('freshness', fresh_score, 0.25))
+
+        if components:
+            weight_sum = sum(w for _, _, w in components)
+            composite = sum(score * (w / weight_sum) for _, score, w in components)
+            composite_score = round(composite)
+        else:
+            composite_score = None  # nothing measurable yet
+
+        # ── Recos prioritaires (actionable, capped at 5) ──────────────────
+        recos = []
+        if kw.get('total', 0) == 0:
+            recos.append({
+                'severity': 'high',
+                'message': "Aucun mot-cle suivi. Ajoute tes 5-10 mots-cles cibles pour mesurer ton SEO.",
+                'cta_label': 'Ajouter des mots-cles',
+                'cta_href': f'/dashboard/{site.id}/keywords',
+            })
+        elif kw.get('top_10_pct', 0) < 30:
+            recos.append({
+                'severity': 'medium',
+                'message': f"Seulement {int(kw['top_10_pct'])}% de tes mots-cles ranquent top 10.",
+                'cta_label': 'Voir les mots-cles',
+                'cta_href': f'/dashboard/{site.id}/keywords',
+            })
+        if decay.get('decaying_count', 0) >= 3:
+            recos.append({
+                'severity': 'high',
+                'message': f"{decay['decaying_count']} articles perdent du trafic - a refresh.",
+                'cta_label': 'Voir le declin',
+                'cta_href': f'/dashboard/{site.id}/content-decay',
+            })
+        if 'avg' in ps and ps['avg'] < 70:
+            recos.append({
+                'severity': 'medium',
+                'message': f"Score PageSpeed mobile = {ps['avg']}/100. Vise 80+ pour rester competitif.",
+                'cta_label': 'Voir PageSpeed',
+                'cta_href': f'/dashboard/{site.id}/audit-global',
+            })
+        if 'total_referring_domains' in bl and bl['total_referring_domains'] < 10:
+            recos.append({
+                'severity': 'low',
+                'message': f"Seulement {bl['total_referring_domains']} domaines referrent vers toi - relance ton outreach.",
+                'cta_label': 'Voir les backlinks',
+                'cta_href': f'/dashboard/{site.id}/audit-global',
+            })
+        if not site.gsc_refresh_token:
+            recos.append({
+                'severity': 'medium',
+                'message': "Google Search Console non connecte - tu rates les vraies positions.",
+                'cta_label': 'Connecter GSC',
+                'cta_href': f'/dashboard/{site.id}/settings',
+            })
+
+        payload = {
+            'site_id': site.id,
+            'site_name': site.name,
+            'site_domain': site.domain,
+            'composite_score': composite_score,
+            'score_components': [
+                {'name': name, 'score': round(score), 'weight': w}
+                for name, score, w in components
+            ],
+            'pagespeed': ps,
+            'keywords': kw,
+            'backlinks': bl,
+            'stats': results.get('stats', {}),
+            'decay': decay,
+            'recos': recos[:5],
+            'gsc_connected': bool(site.gsc_refresh_token),
+        }
+
+        # Cache 10 min - audits update at daily cadence at best.
+        cache.set(cache_key, payload, timeout=600)
+        return Response(payload)

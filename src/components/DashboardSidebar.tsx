@@ -19,6 +19,7 @@ import { authFetch } from "@/lib/api-client";
 import { GridarMark } from "@/components/GridarMark";
 import {
   LayoutDashboard,
+  Gauge,
   FileText,
   Sparkles,
   Image,
@@ -47,6 +48,7 @@ export function DashboardSidebar() {
 
   const navItems = [
     { label: t("sidebar.dashboard"), icon: LayoutDashboard, href: base },
+    { label: t("sidebar.siteAudit") || "Audit du site", icon: Gauge, href: `${base}/audit-site` },
     { label: t("sidebar.articles"), icon: FileText, href: `${base}/articles` },
     { label: t("sidebar.generate"), icon: Sparkles, href: `${base}/generer` },
     { label: t("sidebar.bulkAudit"), icon: TrendingUp, href: `${base}/audit-global` },

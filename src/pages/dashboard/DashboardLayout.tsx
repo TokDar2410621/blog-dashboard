@@ -8,6 +8,7 @@ import { GridarMark } from "@/components/GridarMark";
 
 // Lazy-load every dashboard page so they ship as their own chunks.
 const Overview = lazy(() => import("./Overview"));
+const SiteAudit = lazy(() => import("./SiteAudit"));
 const PostList = lazy(() => import("./PostList"));
 const PostEditor = lazy(() => import("./PostEditor"));
 const AIGenerator = lazy(() => import("./AIGenerator"));
@@ -46,6 +47,7 @@ export default function DashboardLayout() {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                   <Route index element={<Overview />} />
+                  <Route path="audit-site" element={<SiteAudit />} />
                   <Route path="articles" element={<PostList />} />
                   <Route path="articles/nouveau" element={<PostEditor />} />
                   <Route path="articles/:slug" element={<PostEditor />} />

@@ -1818,4 +1818,48 @@ Frontend `PlagiarismCard.tsx` :
 4. **Vercel project public-blog** : import repo + root `public-blog/`.
 5. **Validation terrain** : tester sur Arivex/LocaSur/TokamDarius + signer 1-3 premiers clients PME.
 
-**La portion technique de la mission est terminée. Reste validation humaine.**
+**La portion technique de la mission ORIGINALE est terminée. Reste validation humaine.**
+
+---
+
+## Pivot 2026-05-15 - "Rendre Gridar bon" : audit site-level + onboarding wedge
+
+**Verbatim de Darius (2026-05-15)** : "tu vas faire ce qu'il faut pour rendre ça bon je te laisse le faire tu as le droit a dautre dossier faire des recherches web et crrer des sous agent tu peux partir sur plus de 2 semaines de prod lance et ne t'arrete pas"
+
+**Pourquoi le pivot** : la mission originale (Tier 1-4 SEO features) était axée *capacités produit*. Le pivot identifié par Darius après dogfooding et discussions prospects : Gridar a 95% des capacités mais 3 frictions tuent la conversion :
+
+1. **Onboarding trop technique** (App Password WP, tokens Shopify/Webflow, DATABASE_URL Postgres) - 4 prospects sur 5 décrochent au 1er clic.
+2. **Pas de blog du tout** sur le site (Wix, Squarespace, HTML statique) = mur infranchissable.
+3. **Value prop trop étroite** : les prospects veulent *un audit SEO de leur SITE entier*, pas juste *un générateur d'articles*. L'audit doit devenir le lead magnet, la génération devient l'upsell.
+
+**Référence détaillée** : `~/.claude/projects/c--Users-Darius-Desktop-blog-dashboard/memory/project_pivot_site_audit.md`
+
+**4 phases** ordonnées par impact ÷ effort :
+
+- **Phase 1** : Audit site-level unifié dans le dashboard (page qui agrège GSC + Serper + PageSpeed + CompetitorAnalysis + ContentDecay + composite score 0-100 en UN seul écran). Effort 3-5j, débloque la value prop "Gridar = outil d'audit qui génère aussi".
+- **Phase 2** : Sous-domaine `blog.X` plug-and-play via API Vercel (création DNS auto, SSL auto). Effort 1 sem, débloque le segment "pas de blog".
+- **Phase 3** : Page publique `gridar.app/audit?domain=X` email-gated comme lead magnet. Effort 1 sem, fait entrer les prospects dans le funnel sans inscription.
+- **Phase 4** : Plugin WordPress 1-click. Effort 3-5j (PHP + REST), enlève le copier-coller App Password sur 60-70% du marché web QC.
+
+**Travaux faits aujourd'hui (2026-05-15) en parallèle du pivot** (détail dans auto-memory `progress_log.md`) :
+- Brand context + competitors field + suggest-IA endpoint
+- RAG complet (pgvector + Voyage AI) avec feedback loop thumbs up/down
+- Persistance d'état tool pages via sessionStorage
+- Jobs system avec dock flottant pour tâches background
+- Fix Stripe webhook + Imagen 4 migration + pytrends urllib3 compat
+- Onboarding 1-click depuis Topic Clusters vers AIGenerator
+
+## Session 2026-05-15 - Bootstrap pivot Phase 1 : audit site-level
+
+**Fait** :
+- Documenté le pivot dans ce log + créé `project_pivot_site_audit.md` en auto-memory
+- Mis à jour `ROADMAP.md` avec Tier 5 (4 phases pivot)
+- Lu l'inventaire des endpoints existants utilisables pour agrégation (GSC, Serper, PageSpeed, etc.)
+
+**Tests** : N/A (cadrage)
+
+**Branches/commits** : pas encore committé (on ouvre la session pivot)
+
+**Prochain bloc concret** : Backend - créer un endpoint agrégateur `GET /api/sites/<id>/site-audit/` qui retourne en parallèle : top mots-clés GSC (si connecté), PageSpeed du domaine principal, content_decay summary, competitor analysis sur top-3 keywords, et calcule un composite score. Fichier : `backend/sites_mgmt/views.py`, nouvelle classe `SiteAuditAggregatorView`.
+
+**Blocages** : aucun.
