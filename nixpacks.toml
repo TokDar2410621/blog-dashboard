@@ -6,7 +6,12 @@
 #   Run-time dependency cairo found: NO
 #   ERROR: Dependency "cairo" not found (tried pkg-config and cmake)
 #
-# Cost: ~30 MB extra in the final image, ~20s extra build time. Worth it
-# vs rewriting the audit PDF template against a pure-Python library.
+# nixPkgs alone doesn't ship the .pc pkg-config file that pycairo's meson
+# build looks for. The reliable fix is the Debian dev packages installed
+# via apt (which DOES register .pc files in /usr/lib/x86_64-linux-gnu/
+# pkgconfig/). Both nixPkgs and aptPkgs are listed so the env has all
+# expected names in pkg-config's path regardless of which path nixpacks
+# resolves first.
 [phases.setup]
 nixPkgs = ['...', 'cairo', 'pkg-config']
+aptPkgs = ['libcairo2-dev', 'pkg-config', 'python3-dev']
