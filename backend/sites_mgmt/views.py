@@ -8797,6 +8797,12 @@ class PublicAuditView(APIView):
 
     Cached 1h per domain so repeated visits don't re-spend API budget.
     """
+    # authentication_classes = [] kills DRF SessionAuthentication which would
+    # otherwise enforce its own CSRF check on this POST (independent of
+    # Django's CsrfViewMiddleware) and return 403 "CSRF Failed: CSRF token
+    # missing" for unauthenticated visitors. Same bug we fixed on the OAuth
+    # views - see commit 4c31b82.
+    authentication_classes = []
     permission_classes = []  # public
     throttle_classes = [PublicAuditThrottle]
 
@@ -8969,6 +8975,7 @@ class PublicLeadCaptureView(APIView):
     a marketing checkpoint, not a real access control. SPA reads the full
     payload immediately after capture so the user gets instant value.
     """
+    authentication_classes = []  # see PublicAuditView for the reason
     permission_classes = []  # public
     throttle_classes = [PublicAuditThrottle]
 
