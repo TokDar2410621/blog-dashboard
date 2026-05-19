@@ -113,6 +113,79 @@ export default function SiteSettings() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Phase 2 - Blog subdomain plug-and-play via Vercel API.
+  type ProvisionResult = {
+    domain: string;
+    verified: boolean;
+    cname_target: string;
+    next_step: string;
+  };
+  const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
+  const [domainVerified, setDomainVerified] = useState<boolean>(false);
+
+  const provisionDomain = useMutation({
+    mutationFn: async (domain: string) => {
+      const res = await authFetch(`/sites/${siteId}/blog-domain/provision/`, {
+        method: "POST",
+        body: JSON.stringify({ domain }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur provision");
+      }
+      return res.json() as Promise<ProvisionResult>;
+    },
+    onSuccess: (data) => {
+      setProvisionResult(data);
+      setDomainVerified(data.verified);
+      toast.success(
+        data.verified
+          ? "Domaine deja verifie - blog en ligne."
+          : "Domaine enregistre. Suis les instructions DNS ci-dessous."
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Poll the verify endpoint every 8s while we have a provisioned but
+  // unverified domain. Stops when verified or when the user navigates away.
+  useEffect(() => {
+    if (!provisionResult || domainVerified) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`/sites/${siteId}/blog-domain/status/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.verified) {
+          setDomainVerified(true);
+          toast.success(`Blog en ligne sur ${data.domain}`);
+          clearInterval(interval);
+        }
+      } catch {
+        // Network blip, skip this tick.
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [provisionResult, domainVerified, siteId]);
+
+  const removeDomain = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/blog-domain/`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error("Erreur retrait");
+      }
+    },
+    onSuccess: () => {
+      setProvisionResult(null);
+      setDomainVerified(false);
+      setPublicBlogDomain("");
+      toast.success("Domaine retire");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const suggestCompetitors = useMutation({
     mutationFn: async () => {
       const res = await authFetch(`/sites/${siteId}/suggest-competitors/`, {
@@ -693,38 +766,82 @@ export default function SiteSettings() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label className="text-sm">Domaine du blog public</Label>
-            <Input
-              value={publicBlogDomain}
-              onChange={(e) => setPublicBlogDomain(e.target.value)}
-              placeholder="blog.restaurant.ca"
-              type="text"
-            />
+            <div className="flex gap-2">
+              <Input
+                value={publicBlogDomain}
+                onChange={(e) => setPublicBlogDomain(e.target.value)}
+                placeholder="blog.restaurant.ca"
+                type="text"
+                className="flex-1"
+              />
+              {!provisionResult && publicBlogDomain.trim() && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => provisionDomain.mutate(publicBlogDomain.trim())}
+                  disabled={provisionDomain.isPending}
+                >
+                  {provisionDomain.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Globe className="h-4 w-4 mr-2" />
+                  )}
+                  Activer
+                </Button>
+              )}
+              {provisionResult && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => removeDomain.mutate()}
+                  disabled={removeDomain.isPending}
+                >
+                  Retirer
+                </Button>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Le hostname où le blog est servi. C&apos;est ce que le frontend Next.js lit dans le header <code>Host</code> pour t&apos;identifier.
+              On enregistre automatiquement le domaine sur Vercel et on te donne
+              le CNAME a coller chez ton registrar. SSL auto en moins de 5 min.
             </p>
           </div>
 
-          {publicBlogDomain && (
+          {/* Wizard step 2 : show DNS instructions + status polling */}
+          {provisionResult && !domainVerified && (
             <div className="rounded border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-2">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <strong>Étape DNS - chez ton registrar :</strong>
-                  <p>
-                    Ajoute un <strong>CNAME</strong> :{" "}
-                    <code className="px-1 rounded bg-muted font-mono">
-                      {publicBlogDomain.split(".")[0] || "blog"}
-                    </code>{" "}
-                    →{" "}
-                    <code className="px-1 rounded bg-muted font-mono">
-                      cname.vercel-dns.com
-                    </code>
-                  </p>
-                  <p>
-                    Puis ajoute le domaine <code>{publicBlogDomain}</code> dans le projet Vercel <code>blog-dashboard-public</code> (ou demande à Darius de le faire).
+                <Loader2 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 animate-spin" />
+                <div className="space-y-2 flex-1">
+                  <strong>Etape DNS - colle ces valeurs chez ton registrar :</strong>
+                  <div className="font-mono bg-background border rounded p-2 space-y-1">
+                    <div><span className="text-muted-foreground">Type :</span> CNAME</div>
+                    <div><span className="text-muted-foreground">Nom :</span> {provisionResult.domain.split(".")[0] || "blog"}</div>
+                    <div><span className="text-muted-foreground">Valeur :</span> {provisionResult.cname_target}</div>
+                  </div>
+                  <p>{provisionResult.next_step}</p>
+                  <p className="italic">
+                    On verifie automatiquement toutes les 8 secondes. Cette page se mettra a jour quand le DNS aura propage.
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Wizard step 3 : success */}
+          {provisionResult && domainVerified && (
+            <div className="rounded border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm flex items-center gap-2">
+              <Check className="h-4 w-4 text-emerald-500" />
+              <span>Blog en ligne sur</span>
+              <a
+                href={`https://${provisionResult.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-primary hover:underline"
+              >
+                {provisionResult.domain}
+              </a>
+              <ExternalLink className="h-3 w-3 text-primary" />
             </div>
           )}
 

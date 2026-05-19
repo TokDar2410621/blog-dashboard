@@ -8502,3 +8502,228 @@ class SiteAuditAggregatorView(APIView):
         # Cache 10 min - audits update at daily cadence at best.
         cache.set(cache_key, payload, timeout=600)
         return Response(payload)
+
+
+# ── Phase 2: Blog subdomain plug-and-play via Vercel API ────────────────────
+
+
+def _vercel_headers():
+    token = os.environ.get('VERCEL_API_TOKEN')
+    if not token:
+        return None
+    return {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json',
+    }
+
+
+def _vercel_url(path):
+    """Build a Vercel API URL with optional teamId query param."""
+    team_id = os.environ.get('VERCEL_TEAM_ID')
+    url = f'https://api.vercel.com{path}'
+    if team_id:
+        sep = '&' if '?' in path else '?'
+        url = f'{url}{sep}teamId={team_id}'
+    return url
+
+
+class BlogDomainProvisionView(APIView):
+    """POST /api/sites/<id>/blog-domain/provision/
+
+    Adds the user's chosen subdomain (e.g. `blog.tondomaine.com`) to the
+    public-blog Vercel project. Returns DNS instructions (CNAME target) the
+    user copies into their DNS provider. SSL is auto-provisioned by Vercel
+    once the DNS resolves.
+
+    Body: {domain: str}
+    Response: {
+        domain, verified: bool, cname_target: str,
+        verification: [...optional records...], next_step: str
+    }
+
+    Requires env vars VERCEL_API_TOKEN and VERCEL_PROJECT_ID (the project that
+    hosts the public blog frontend). VERCEL_TEAM_ID is optional.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        raw = (request.data.get('domain') or '').strip().lower()
+        # Strip scheme + trailing slash if user paste it sloppy.
+        raw = raw.replace('https://', '').replace('http://', '').rstrip('/')
+        if not raw or '.' not in raw or ' ' in raw:
+            return Response(
+                {'error': 'Domaine invalide. Ex: blog.tondomaine.com'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        headers = _vercel_headers()
+        project_id = os.environ.get('VERCEL_PROJECT_ID')
+        if not headers or not project_id:
+            return Response(
+                {'error': 'VERCEL_API_TOKEN ou VERCEL_PROJECT_ID non configure '
+                          'sur le serveur. Contacte le support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        url = _vercel_url(f'/v10/projects/{project_id}/domains')
+        try:
+            r = http_requests.post(
+                url, headers=headers, json={'name': raw}, timeout=15,
+            )
+        except http_requests.RequestException as e:
+            return Response(
+                {'error': f'Vercel API injoignable: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Vercel returns 200/201 on success, 409 if domain already attached.
+        if r.status_code in (200, 201, 409):
+            data = r.json() if r.text else {}
+            verified = bool(data.get('verified', False))
+            # On 409 the response has a different shape - fetch the domain to
+            # get verification records.
+            if r.status_code == 409:
+                check = http_requests.get(
+                    _vercel_url(f'/v9/projects/{project_id}/domains/{raw}'),
+                    headers=headers, timeout=10,
+                )
+                if check.status_code == 200:
+                    data = check.json()
+                    verified = bool(data.get('verified', False))
+
+            # Persist the chosen subdomain so we know it later.
+            site.public_blog_domain = raw
+            site.save(update_fields=['public_blog_domain', 'updated_at'])
+            # Bust the audit cache so the user sees the change immediately.
+            cache.delete(f'site-audit:{site.id}')
+
+            return Response({
+                'domain': raw,
+                'verified': verified,
+                'cname_target': 'cname.vercel-dns.com',
+                'verification': data.get('verification') or [],
+                'next_step': (
+                    'Cree un enregistrement CNAME chez ton registrar pointant '
+                    f'{raw} vers cname.vercel-dns.com. La propagation prend '
+                    '5 a 30 min. Le SSL est genere automatiquement.'
+                ),
+            })
+
+        # Other error - surface message from Vercel for debugging.
+        try:
+            body = r.json()
+            msg = (body.get('error') or {}).get('message') or r.text[:200]
+        except Exception:
+            msg = r.text[:200]
+        return Response(
+            {'error': f'Vercel {r.status_code}: {msg}'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+
+class BlogDomainStatusView(APIView):
+    """GET /api/sites/<id>/blog-domain/status/
+
+    Polls Vercel to check whether the subdomain DNS has propagated and SSL
+    is provisioned. Frontend polls this every 5-10s while showing a spinner
+    until verified=true.
+
+    Response: {domain, verified, ssl_ready, message}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        domain = site.public_blog_domain
+        if not domain:
+            return Response(
+                {'error': 'Pas de domaine de blog configure pour ce site.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        headers = _vercel_headers()
+        project_id = os.environ.get('VERCEL_PROJECT_ID')
+        if not headers or not project_id:
+            return Response(
+                {'error': 'Vercel API non configure cote serveur.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # First, ask Vercel to verify (idempotent - just re-checks DNS).
+        try:
+            v = http_requests.post(
+                _vercel_url(f'/v9/projects/{project_id}/domains/{domain}/verify'),
+                headers=headers, timeout=10,
+            )
+        except http_requests.RequestException:
+            v = None
+
+        # Then read full state.
+        try:
+            r = http_requests.get(
+                _vercel_url(f'/v9/projects/{project_id}/domains/{domain}'),
+                headers=headers, timeout=10,
+            )
+        except http_requests.RequestException as e:
+            return Response(
+                {'error': f'Vercel API injoignable: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if r.status_code != 200:
+            return Response(
+                {'error': f'Vercel {r.status_code}', 'verified': False},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        data = r.json()
+        verified = bool(data.get('verified', False))
+        # Vercel auto-provisions SSL once verified. We treat "verified" as
+        # "ready to serve" since SSL follows within seconds.
+        return Response({
+            'domain': domain,
+            'verified': verified,
+            'ssl_ready': verified,
+            'verification': data.get('verification') or [],
+            'message': (
+                f'Blog en ligne sur https://{domain}'
+                if verified
+                else 'DNS pas encore propage. Patiente 5-30 min apres avoir '
+                     'ajoute le CNAME chez ton registrar.'
+            ),
+        })
+
+
+class BlogDomainRemoveView(APIView):
+    """DELETE /api/sites/<id>/blog-domain/
+
+    Removes the subdomain from the Vercel project (free-up for re-use) and
+    clears Site.public_blog_domain. Used when the user wants to switch
+    to a different domain or stop hosting.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, site_id):
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        domain = site.public_blog_domain
+        if not domain:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        headers = _vercel_headers()
+        project_id = os.environ.get('VERCEL_PROJECT_ID')
+        # Best-effort: even if Vercel API is misconfigured, we still clear the
+        # local field so the user can retry the wizard with a new domain.
+        if headers and project_id:
+            try:
+                http_requests.delete(
+                    _vercel_url(f'/v9/projects/{project_id}/domains/{domain}'),
+                    headers=headers, timeout=10,
+                )
+            except http_requests.RequestException:
+                pass  # swallow - local clear is what matters
+
+        site.public_blog_domain = ''
+        site.save(update_fields=['public_blog_domain', 'updated_at'])
+        cache.delete(f'site-audit:{site.id}')
+        return Response(status=status.HTTP_204_NO_CONTENT)
