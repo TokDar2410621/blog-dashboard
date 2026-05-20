@@ -14,7 +14,11 @@
  */
 
 const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:8888/api";
-const BLOG_SITE_ID = Number(import.meta.env.VITE_GRIDAR_BLOG_SITE_ID || 1);
+// Default = 6 (Gridar marketing blog, hosted mode, 12 published articles).
+// Site #1 belongs to a different project (LocaSur) and would surface the wrong
+// content if a Vercel env var override was missing. Override via
+// VITE_GRIDAR_BLOG_SITE_ID if you ever fork Gridar to host a different blog.
+const BLOG_SITE_ID = Number(import.meta.env.VITE_GRIDAR_BLOG_SITE_ID || 6);
 
 export type BlogPost = {
   slug: string;
