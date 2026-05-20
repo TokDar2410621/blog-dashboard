@@ -76,6 +76,7 @@
     "siteLabel": "Site #{{id}}",
     "nav": "Navigation",
     "dashboard": "Tableau de bord",
+    "siteAudit": "Audit du site",
     "articles": "Articles",
     "generate": "Generer un article",
     "bulkAudit": "Audit global SEO",

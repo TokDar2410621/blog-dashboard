@@ -8443,14 +8443,14 @@ class SiteAuditAggregatorView(APIView):
                 'severity': 'high',
                 'message': "Aucun mot-cle suivi. Ajoute tes 5-10 mots-cles cibles pour mesurer ton SEO.",
                 'cta_label': 'Ajouter des mots-cles',
-                'cta_href': f'/dashboard/{site.id}/keywords',
+                'cta_href': f'/dashboard/{site.id}/positions',
             })
         elif kw.get('top_10_pct', 0) < 30:
             recos.append({
                 'severity': 'medium',
                 'message': f"Seulement {int(kw['top_10_pct'])}% de tes mots-cles ranquent top 10.",
                 'cta_label': 'Voir les mots-cles',
-                'cta_href': f'/dashboard/{site.id}/keywords',
+                'cta_href': f'/dashboard/{site.id}/positions',
             })
         if decay.get('decaying_count', 0) >= 3:
             recos.append({
