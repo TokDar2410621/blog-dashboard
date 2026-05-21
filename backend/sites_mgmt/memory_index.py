@@ -209,9 +209,17 @@ def format_memory_block(retrieved: list[dict], max_chars: int = 4000) -> str:
         'manual': 'Note manuelle',
     }
 
+    # Instructional kinds float to the top so Claude reads them first and
+    # treats them with higher priority. The intro text below tells Claude
+    # explicitly that these carry instruction weight, not just context.
+    instructional_kinds = {'manual', 'decision'}
+    instructional = [r for r in retrieved if r['kind'] in instructional_kinds]
+    contextual = [r for r in retrieved if r['kind'] not in instructional_kinds]
+    ordered = instructional + contextual
+
     lines: list[str] = []
     total = 0
-    for r in retrieved:
+    for r in ordered:
         label = label_map.get(r['kind'], r['kind'])
         title = r['title'] or '(sans titre)'
         body = r['content'].strip()
@@ -225,8 +233,15 @@ def format_memory_block(retrieved: list[dict], max_chars: int = 4000) -> str:
         return ''
 
     return (
-        "## MEMOIRE DU SITE (extraits pertinents tires d'articles passes, KB, "
-        "audits et notes manuelles - utilise pour rester coherent avec ce qui "
-        "a deja ete publie et la voix etablie)\n\n"
+        "## MEMOIRE DU SITE\n"
+        "Extraits pertinents tires d'articles publies, KB, audits, decisions "
+        "et notes manuelles.\n\n"
+        "**Important** :\n"
+        "- Les entries `[Note manuelle]` et `[Decision editoriale]` ont "
+        "**force d'instruction** : applique-les explicitement dans ton "
+        "article (mention de marque, ton, regle editoriale, etc.).\n"
+        "- Les autres (`[Article publie]`, `[Knowledge base]`, `[Audit SEO]`) "
+        "sont du contexte pour rester coherent avec ce qui a deja ete publie "
+        "et la voix etablie.\n\n"
         + '\n'.join(lines)
     )
