@@ -7004,6 +7004,11 @@ class GSCOAuthUrlView(APIView):
             )
 
         try:
+            # See GSCOAuthCallbackView for why this is set - same reasoning
+            # applies here so the auth URL phase doesn't trip on the same
+            # check if oauthlib decides to peek at it.
+            os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
+
             flow = Flow.from_client_config(
                 config,
                 scopes=GSC_SCOPES,
@@ -7067,6 +7072,16 @@ class GSCOAuthCallbackView(APIView):
             )
 
         try:
+            # When the GSC OAuth client is the same as the Google login
+            # client (recommended setup), Google returns the union of all
+            # scopes already granted to the user (openid + profile + email
+            # from login PLUS webmasters.readonly we just requested).
+            # oauthlib's strict scope-equality check rejects this. Telling
+            # oauthlib to relax via env flag is the supported workaround -
+            # the granted-scope set is still validated by Google itself on
+            # subsequent API calls, so we don't lose security.
+            os.environ.setdefault('OAUTHLIB_RELAX_TOKEN_SCOPE', '1')
+
             flow = Flow.from_client_config(
                 config,
                 scopes=GSC_SCOPES,
