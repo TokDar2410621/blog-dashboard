@@ -3450,19 +3450,22 @@ class BulkSEOAuditView(APIView):
                 'audited_articles': [],
             })
 
-        per_article = []
-        cache_hits = 0
-        for art in articles:
+        # Audit each article in parallel - serial Gemini calls would blow
+        # gunicorn's 30s timeout at ~5-8s per article (so anything past 4-5
+        # articles hangs the worker). With max_workers=5 a batch of 10 takes
+        # ~max(latency) instead of sum(latency). Cached articles (same content
+        # hash) skip the API call entirely so re-runs are essentially free.
+        from concurrent.futures import ThreadPoolExecutor
+
+        def _audit_one(art):
             if not art['title'] or not art['content']:
-                continue
+                return None
             try:
                 result, from_cache = _run_seo_audit(
                     art['title'], art['excerpt'], art['content'],
                     keyword='', language=art['language'], api_key=api_key,
                 )
-                if from_cache:
-                    cache_hits += 1
-                per_article.append({
+                return {
                     'slug': art['slug'],
                     'title': art['title'],
                     'language': art['language'],
@@ -3470,16 +3473,27 @@ class BulkSEOAuditView(APIView):
                     'verdict': result['verdict'],
                     'weaknesses': result['weaknesses'],
                     'actions': result['actions'],
-                })
+                    '_from_cache': from_cache,
+                }
             except Exception as e:
                 logger.warning('Bulk audit failed for %s: %s', art['slug'], e)
-                per_article.append({
+                return {
                     'slug': art['slug'],
                     'title': art['title'],
                     'language': art['language'],
                     'score': None,
                     'error': str(e),
-                })
+                }
+
+        per_article = []
+        cache_hits = 0
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            for entry in pool.map(_audit_one, articles):
+                if entry is None:
+                    continue
+                if entry.pop('_from_cache', False):
+                    cache_hits += 1
+                per_article.append(entry)
 
         scored = [a for a in per_article if a.get('score') is not None]
         failed = len(per_article) - len(scored)
