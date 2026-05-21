@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles, Brain, RefreshCw, Trash2, Plus } from "lucide-react";
+import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles, Brain, RefreshCw, Trash2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SiteSettings() {
@@ -267,6 +267,7 @@ export default function SiteSettings() {
   const [knowledgeBase, setKnowledgeBase] = useState("");
   const [competitors, setCompetitors] = useState("");
   const [vercelDeployHook, setVercelDeployHook] = useState("");
+  const [gscPropertyUrl, setGscPropertyUrl] = useState("");
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [ogImageUrl, setOgImageUrl] = useState("");
@@ -332,6 +333,7 @@ export default function SiteSettings() {
       setKnowledgeBase(site.knowledge_base || "");
       setCompetitors(site.competitors || "");
       setVercelDeployHook(site.vercel_deploy_hook || "");
+      setGscPropertyUrl(site.gsc_property_url || "");
       setAvailableLanguages(site.available_languages || []);
       setDescription(site.description || "");
       setOgImageUrl(site.og_image_url || "");
@@ -367,6 +369,7 @@ export default function SiteSettings() {
         knowledge_base: knowledgeBase,
         competitors,
         vercel_deploy_hook: vercelDeployHook,
+        gsc_property_url: gscPropertyUrl,
         available_languages: availableLanguages,
         description,
         og_image_url: ogImageUrl,
@@ -528,6 +531,55 @@ export default function SiteSettings() {
             placeholder="https://api.vercel.com/v1/integrations/deploy/prj_.../..."
             type="url"
           />
+        </CardContent>
+      </Card>
+
+      {/* Google Search Console - property URL only. OAuth connect happens
+          from inside an article's SEO tab (see SEOAnalyzer). */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Google Search Console
+          </CardTitle>
+          <CardDescription>
+            URL exacte de ta property GSC (avec le slash final). Etape requise
+            avant de pouvoir voir les positions reelles de tes articles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-sm">Property URL</Label>
+            <Input
+              value={gscPropertyUrl}
+              onChange={(e) => setGscPropertyUrl(e.target.value)}
+              placeholder="https://tonsite.com/"
+              type="url"
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Copie-colle l&apos;URL exacte affichee dans Search Console (Settings -&gt;
+              Ownership verification). Le slash final est important.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/50 bg-muted/30 p-3 text-xs space-y-2">
+            <p className="font-semibold">Etapes une-fois :</p>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>
+                <a
+                  href="https://search.google.com/search-console/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  search.google.com/search-console
+                </a>{" "}
+                -&gt; Add property -&gt; URL prefix -&gt; <code>https://{domain || "tonsite.com"}/</code>
+              </li>
+              <li>Verify ownership (DNS TXT, balise HTML ou Google Analytics)</li>
+              <li>Copie l&apos;URL exacte ci-dessus, sauvegarde, puis va dans un article -&gt; SEO -&gt; &laquo; Connecter Google Search Console &raquo; pour le OAuth.</li>
+            </ol>
+          </div>
         </CardContent>
       </Card>
 
