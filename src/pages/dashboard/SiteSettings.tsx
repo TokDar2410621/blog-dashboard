@@ -1091,13 +1091,20 @@ export default function SiteSettings() {
                 <Input
                   value={gscPropertyUrl}
                   onChange={(e) => setGscPropertyUrl(e.target.value)}
-                  placeholder="https://tonsite.com/"
-                  type="url"
+                  placeholder="https://tonsite.com/  ou  sc-domain:tonsite.com"
+                  type="text"
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Copie-colle l&apos;URL exacte affichee dans Search Console (Settings -&gt;
-                  Ownership verification). Le slash final est important.
+                  Deux formats supportes :
+                  <br />
+                  - <strong>URL prefix</strong> (couvre exactement un sous-domaine + protocole) :{" "}
+                  <code className="text-foreground">https://tonsite.com/</code> (slash final)
+                  <br />
+                  - <strong>Domain</strong> (couvre tous les sous-domaines + http/https) :{" "}
+                  <code className="text-foreground">sc-domain:tonsite.com</code>
+                  <br />
+                  Copie-colle l&apos;URL exacte affichee dans Search Console.
                 </p>
               </div>
 

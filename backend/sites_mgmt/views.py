@@ -6070,8 +6070,11 @@ class ContentDecayView(APIView):
         cur_data = _index(cur_resp)
         prev_data = _index(prev_resp)
 
-        # Resolve slug from URL by stripping the property URL prefix
-        property_prefix = site.gsc_property_url.rstrip('/') + '/'
+        # Resolve slug from URL by stripping the canonical site URL prefix.
+        # _gsc_canonical_site_url handles both URL-prefix properties (uses
+        # the property as-is) and Domain properties (sc-domain:...) where
+        # we fall back to Site.domain to build the real URL.
+        property_prefix = _gsc_canonical_site_url(site)
 
         def _slug_from_url(url):
             if url.startswith(property_prefix):
@@ -6960,6 +6963,35 @@ def _gsc_client_config():
     }
 
 
+def _gsc_canonical_site_url(site):
+    """Return the canonical https URL prefix used to BUILD page URLs and
+    extract slugs from rows GSC returns.
+
+    Search Console supports two property types we need to handle:
+      - URL prefix property: e.g. `https://gridar.app/`. The property string
+        IS the page URL prefix - we can use it directly.
+      - Domain property: e.g. `sc-domain:gridar.app`. This covers all
+        subdomains and both http/https. The property string is NOT a real
+        URL, so we fall back to `Site.domain` (just the hostname) wrapped
+        as `https://<host>/` to build page-URL filters.
+
+    `siteUrl` parameter sent to the Google API is always `gsc_property_url`
+    as-is (the API accepts both formats). Only the page URL filter and the
+    slug-extraction prefix need this canonical form.
+    """
+    prop = (site.gsc_property_url or '').strip()
+    if prop.startswith('sc-domain:'):
+        host = (site.domain or '').strip()
+        # Strip leading scheme + trailing slash if user pasted them
+        host = host.replace('https://', '').replace('http://', '').rstrip('/')
+        if not host:
+            # No domain set on the Site - fall back to the bare host from the
+            # sc-domain property so we at least try to build a URL.
+            host = prop[len('sc-domain:'):]
+        return f'https://{host}/'
+    return prop.rstrip('/') + '/' if prop else ''
+
+
 def _gsc_encode_state(site_id):
     """Encode the site_id in a URL-safe base64 token."""
     raw = str(site_id).encode('utf-8')
@@ -7169,10 +7201,16 @@ class GSCQueriesView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        # Build a full page URL = property + slug/
-        property_url = site.gsc_property_url
-        if not property_url.endswith('/'):
-            property_url += '/'
+        # Build a full page URL = canonical site URL + slug/
+        # For URL-prefix properties: uses the property URL directly.
+        # For Domain properties (sc-domain:...): uses Site.domain to build a
+        # real https://... URL since `sc-domain:...` isn't a valid page URL.
+        property_url = _gsc_canonical_site_url(site)
+        if not property_url:
+            return Response(
+                {'error': 'gsc_property_url ou Site.domain manquant.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         page_url = property_url + slug.strip('/') + '/'
 
         end = _date.today()
