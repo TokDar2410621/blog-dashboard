@@ -151,10 +151,6 @@ export default function Landing() {
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-24 md:pt-32 pb-20">
         <RadialGlow />
         <div className="max-w-4xl mx-auto text-center">
-          <div className="hero-fade-1 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-8">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Bilingue FR-CA · IA Claude · Conçu au Québec
-          </div>
           <h1 className="hero-fade-2 text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tighter">
             Le SEO en français qui comprend{" "}
             <span className="bg-gradient-to-br from-emerald-300 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">
