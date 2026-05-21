@@ -7015,6 +7015,14 @@ class GSCOAuthUrlView(APIView):
                 prompt='consent',
                 state=_gsc_encode_state(site.id),
             )
+            # oauthlib 3.3+ auto-generates a PKCE code_verifier. We MUST replay
+            # it in the callback fetch_token call or Google returns
+            # 'invalid_grant: Missing code verifier'. Persist on the Site row
+            # (DB) rather than cache so it survives across gunicorn workers
+            # (LocMemCache is per-worker on Railway).
+            if getattr(flow, 'code_verifier', None):
+                site.gsc_oauth_verifier_pending = flow.code_verifier
+                site.save(update_fields=['gsc_oauth_verifier_pending'])
             return Response({'url': auth_url})
         except Exception as e:
             logger.exception("GSC oauth-url failed")
@@ -7064,17 +7072,32 @@ class GSCOAuthCallbackView(APIView):
                 scopes=GSC_SCOPES,
                 redirect_uri=config['web']['redirect_uris'][0],
             )
+            # Replay the PKCE code_verifier we generated when building the
+            # auth URL. Without this Google returns
+            # 'invalid_grant: Missing code verifier' on the token exchange.
+            if site.gsc_oauth_verifier_pending:
+                flow.code_verifier = site.gsc_oauth_verifier_pending
             flow.fetch_token(code=code)
             creds = flow.credentials
             if not creds.refresh_token:
+                # Clear the verifier even on this controlled failure so the
+                # next attempt starts clean.
+                site.gsc_oauth_verifier_pending = ''
+                site.save(update_fields=['gsc_oauth_verifier_pending'])
                 return Response(
                     {'error': 'No refresh token returned. Revoke app access on Google and retry.'},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             site.gsc_refresh_token = creds.refresh_token
-            site.save(update_fields=['gsc_refresh_token'])
+            site.gsc_oauth_verifier_pending = ''
+            site.save(update_fields=['gsc_refresh_token', 'gsc_oauth_verifier_pending'])
             return Response({'success': True})
         except Exception as e:
+            # Clear the verifier on failure so the next attempt gets a fresh
+            # one (the existing verifier is now associated with a consumed or
+            # invalid code).
+            site.gsc_oauth_verifier_pending = ''
+            site.save(update_fields=['gsc_oauth_verifier_pending'])
             logger.exception("GSC oauth-callback failed")
             return Response(
                 {'error': f'Token exchange failed: {e}'},

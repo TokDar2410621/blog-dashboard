@@ -196,6 +196,16 @@ class Site(models.Model):
         verbose_name="Search Console - refresh token",
         help_text="OAuth2 refresh token (sensible - ne pas exposer côté frontend)"
     )
+    gsc_oauth_verifier_pending = models.CharField(
+        max_length=128, blank=True, default='',
+        verbose_name="GSC OAuth - PKCE verifier en cours",
+        help_text=(
+            "Verifier PKCE genere lors du build de l'auth URL, replay au callback "
+            "pour le fetch_token. Survit a un OAuth roundtrip via DB plutot que "
+            "cache memoire (les workers gunicorn ne partagent pas LocMemCache). "
+            "Efface apres succes ou echec - jamais sensitif tout seul."
+        )
+    )
 
     # ── API publique ──────────────────────────────────────────────────
     api_key = models.CharField(
