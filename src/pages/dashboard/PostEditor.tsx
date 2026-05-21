@@ -13,6 +13,7 @@ import { SEOAnalyzer } from "@/components/SEOAnalyzer";
 import { ReadabilityCard } from "@/components/ReadabilityCard";
 import { LexiconCard } from "@/components/LexiconCard";
 import { PlagiarismCard } from "@/components/PlagiarismCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -757,41 +758,57 @@ export default function PostEditor() {
         {/* SEO view */}
         {view === "seo" && (
           <div className="h-full overflow-y-auto pt-4">
-            <div className="max-w-2xl space-y-6">
-              <ReadabilityCard content={content} language={language} />
-              <LexiconCard content={content} language={language} />
-              <PlagiarismCard title={title} content={content} language={language} />
-              <SEOAnalyzer
-                title={title}
-                excerpt={excerpt}
-                content={content}
-                slug={postSlug}
-                coverImage={coverImage}
-                keyword={tagsInput.split(",")[0]?.trim() || ""}
-                siteId={siteId ? Number(siteId) : undefined}
-                currentSlug={postSlug}
-                articleUrl={
-                  currentSite?.domain && postSlug
-                    ? `https://${currentSite.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}/blog/${postSlug}`
-                    : undefined
-                }
-                author={currentSite?.name || "Admin"}
-                publishedAt={new Date().toISOString()}
-                siteDomain={currentSite?.domain || ""}
-                language={language}
-                onApplyFix={(fixes) => {
-                  if (fixes.title) setTitle(fixes.title);
-                  if (fixes.excerpt) setExcerpt(fixes.excerpt);
-                  if (fixes.content) setContent(fixes.content);
-                }}
-              />
-              <SEOPreview
-                title={title}
-                slug={postSlug}
-                description={excerpt}
-                coverImage={coverImage}
-                siteUrl={currentSite?.domain || ""}
-              />
+            <div className="max-w-2xl">
+              <Tabs defaultValue="audit">
+                <TabsList className="w-full">
+                  <TabsTrigger value="audit" className="flex-1">Audit</TabsTrigger>
+                  <TabsTrigger value="readability" className="flex-1">Lisibilite</TabsTrigger>
+                  <TabsTrigger value="preview" className="flex-1">Apercu Google</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="audit" className="mt-4">
+                  <SEOAnalyzer
+                    title={title}
+                    excerpt={excerpt}
+                    content={content}
+                    slug={postSlug}
+                    coverImage={coverImage}
+                    keyword={tagsInput.split(",")[0]?.trim() || ""}
+                    siteId={siteId ? Number(siteId) : undefined}
+                    currentSlug={postSlug}
+                    articleUrl={
+                      currentSite?.domain && postSlug
+                        ? `https://${currentSite.domain.replace(/^https?:\/\//, "").replace(/\/$/, "")}/blog/${postSlug}`
+                        : undefined
+                    }
+                    author={currentSite?.name || "Admin"}
+                    publishedAt={new Date().toISOString()}
+                    siteDomain={currentSite?.domain || ""}
+                    language={language}
+                    onApplyFix={(fixes) => {
+                      if (fixes.title) setTitle(fixes.title);
+                      if (fixes.excerpt) setExcerpt(fixes.excerpt);
+                      if (fixes.content) setContent(fixes.content);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="readability" className="mt-4 space-y-6">
+                  <ReadabilityCard content={content} language={language} />
+                  <LexiconCard content={content} language={language} />
+                  <PlagiarismCard title={title} content={content} language={language} />
+                </TabsContent>
+
+                <TabsContent value="preview" className="mt-4">
+                  <SEOPreview
+                    title={title}
+                    slug={postSlug}
+                    description={excerpt}
+                    coverImage={coverImage}
+                    siteUrl={currentSite?.domain || ""}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         )}

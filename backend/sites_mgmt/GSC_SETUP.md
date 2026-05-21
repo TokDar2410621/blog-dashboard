@@ -4,42 +4,51 @@ This document explains how to wire the dashboard to Google Search Console so
 each article can display real impressions / clicks / CTR / position per query,
 and how to boost the SEO score based on actual performance.
 
-## 1. Create a Google Cloud OAuth client
+## 1. Minimal setup (recommended) - reuse the existing Google login client
 
-1. Open the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create a new project (or select an existing one), e.g. `blog-dashboard-gsc`.
-3. Enable the **Search Console API** for that project:
+If you already have Google login configured for Gridar (env vars
+`GOOGLE_OAUTH_CLIENT_ID` + `GOOGLE_OAUTH_CLIENT_SECRET`), GSC can piggy-back
+on the **same** Google Cloud OAuth client. There are **zero new env vars** to
+set. Just update the existing client in Google Cloud Console:
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) and
+   select the project that holds the OAuth client used for Google login.
+2. Enable the **Search Console API** for that project:
    `APIs & Services` -> `Library` -> search `Search Console API` -> `Enable`.
-4. Configure the OAuth consent screen:
-   - `APIs & Services` -> `OAuth consent screen`.
-   - User type: **External** (or Internal if you use Google Workspace).
-   - App name, support email, developer contact: fill in.
-   - Scopes: add
-     `https://www.googleapis.com/auth/webmasters.readonly`.
-   - Add yourself (and any other owner) as a **test user** while the app is in
-     `Testing` mode.
-5. Create OAuth2 credentials:
-   - `APIs & Services` -> `Credentials` -> `Create credentials` -> `OAuth client ID`.
-   - Application type: **Web application**.
-   - Authorized redirect URIs: add the URL the dashboard will use to receive
-     the OAuth `code`. Example for local dev:
-     `http://localhost:5173/gsc/callback`.
-     For production, use the deployed dashboard URL, e.g.
-     `https://dashboard.tokamdarius.ca/gsc/callback`.
-6. Copy the **Client ID** and **Client secret**.
+3. Go to `APIs & Services` -> `OAuth consent screen` and **add the scope**
+   `https://www.googleapis.com/auth/webmasters.readonly`
+   to the list of scopes the app requests.
+   While the app is in `Testing` mode, add yourself (and any other owner) as
+   a **test user**.
+4. Go to `APIs & Services` -> `Credentials`, open the existing OAuth client
+   (the one used for login), and under **Authorized redirect URIs** add the
+   GSC callback URL for each environment you run:
+   - Production: `https://gridar.app/gsc/callback`
+   - Local dev:  `http://localhost:5173/gsc/callback`
 
-## 2. Set backend environment variables
+That's it. The backend will reuse `GOOGLE_OAUTH_CLIENT_ID` /
+`GOOGLE_OAUTH_CLIENT_SECRET` and derive the redirect URI from
+`GOOGLE_OAUTH_CALLBACK_URL` by swapping `/auth/google/callback` for
+`/gsc/callback`.
 
-Add these to your `.env` (or Railway / deployment environment):
+## 2. Advanced setup (optional) - separate OAuth client just for GSC
+
+Use this if you want isolation between login and Search Console (different
+test users, different consent screen, etc.). Create a dedicated OAuth client
+following the standard Google Cloud flow (Web application type, enable the
+Search Console API, add the `webmasters.readonly` scope, add a redirect URI
+ending in `/gsc/callback`), then override with these env vars:
 
 ```
 GSC_CLIENT_ID=xxxxxxxxxxxx.apps.googleusercontent.com
 GSC_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxxx
-GSC_REDIRECT_URI=http://localhost:5173/gsc/callback
+GSC_REDIRECT_URI=https://your-dashboard.example.com/gsc/callback
 ```
 
-`GSC_REDIRECT_URI` **must exactly match** one of the authorized redirect URIs
-configured in the Google Cloud console.
+When set, these take precedence over the login client. `GSC_REDIRECT_URI`
+**must exactly match** one of the authorized redirect URIs configured on
+that client in Google Cloud Console. All three vars are optional - leave
+them unset to fall back to the minimal-setup path above.
 
 ## 3. Verify your site in Search Console
 

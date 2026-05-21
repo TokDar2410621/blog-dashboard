@@ -6887,26 +6887,66 @@ class PublicCategoriesView(APIView):
 #
 # These views let a user link a Site to a Google Search Console property via
 # OAuth2 and then pull real impressions/clicks/CTR/position per query for any
-# article slug. The OAuth client is configured via environment variables:
+# article slug.
 #
-#   GSC_CLIENT_ID       Google Cloud OAuth2 client ID
+# Minimal setup (reuses the existing Google login OAuth client):
+#   - In Google Cloud Console, add the scope
+#     `https://www.googleapis.com/auth/webmasters.readonly` to the OAuth
+#     consent screen of the SAME client used for Google login.
+#   - Add `<frontend_origin>/gsc/callback` to its Authorized Redirect URIs.
+#   - No new env vars are needed: GSC will reuse GOOGLE_OAUTH_CLIENT_ID /
+#     GOOGLE_OAUTH_CLIENT_SECRET, and derive the redirect URI from
+#     settings.GOOGLE_OAUTH_CALLBACK_URL by swapping the path segment.
+#
+# Advanced setup (separate OAuth client just for GSC) - optional override:
+#   GSC_CLIENT_ID       Google Cloud OAuth2 client ID (overrides login client)
 #   GSC_CLIENT_SECRET   Google Cloud OAuth2 client secret
-#   GSC_REDIRECT_URI    Must match an authorized redirect URI configured in
-#                       the Google Cloud console (ex: the frontend callback
-#                       page that POSTs {code, state} to /oauth-callback/).
+#   GSC_REDIRECT_URI    Must match an authorized redirect URI on that client.
 #
-# See backend/sites_mgmt/GSC_SETUP.md for setup instructions.
+# See backend/sites_mgmt/GSC_SETUP.md for full setup instructions.
 
 GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
 GSC_TOKEN_URI = 'https://oauth2.googleapis.com/token'
 GSC_AUTH_URI = 'https://accounts.google.com/o/oauth2/auth'
 
 
+def _gsc_default_redirect_uri():
+    """Derive the GSC redirect URI from the Google login callback URL.
+
+    Replaces the trailing `/auth/google/callback` segment with `/gsc/callback`
+    so the SPA route stays consistent across environments. Returns '' if the
+    login callback isn't configured.
+    """
+    login_cb = getattr(settings, 'GOOGLE_OAUTH_CALLBACK_URL', '') or ''
+    if not login_cb:
+        return ''
+    if login_cb.endswith('/auth/google/callback'):
+        return login_cb[: -len('/auth/google/callback')] + '/gsc/callback'
+    # Fallback: best-effort substitution if the path differs.
+    return login_cb.replace('/auth/google/callback', '/gsc/callback')
+
+
 def _gsc_client_config():
-    """Return the OAuth2 client config dict from env vars, or None if missing."""
-    client_id = os.environ.get('GSC_CLIENT_ID', '').strip()
-    client_secret = os.environ.get('GSC_CLIENT_SECRET', '').strip()
-    redirect_uri = os.environ.get('GSC_REDIRECT_URI', '').strip()
+    """Return the OAuth2 client config dict, or None if not configured.
+
+    Reads dedicated GSC_* env vars first (advanced override). Falls back to
+    the existing Google-login client (GOOGLE_OAUTH_CLIENT_ID /
+    GOOGLE_OAUTH_CLIENT_SECRET) and a redirect URI derived from
+    settings.GOOGLE_OAUTH_CALLBACK_URL. This means an existing Google-login
+    deployment works for GSC with zero new env vars.
+    """
+    client_id = (
+        os.environ.get('GSC_CLIENT_ID', '').strip()
+        or os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+    )
+    client_secret = (
+        os.environ.get('GSC_CLIENT_SECRET', '').strip()
+        or os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
+    )
+    redirect_uri = (
+        os.environ.get('GSC_REDIRECT_URI', '').strip()
+        or _gsc_default_redirect_uri()
+    )
     if not (client_id and client_secret and redirect_uri):
         return None
     return {

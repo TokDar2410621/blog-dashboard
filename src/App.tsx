@@ -21,6 +21,7 @@ const Docs = lazy(() => import("./pages/Docs"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const GSCCallback = lazy(() => import("./pages/GSCCallback"));
 const PublicAudit = lazy(() => import("./pages/PublicAudit"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Blog = lazy(() => import("./pages/Blog"));
@@ -94,6 +95,14 @@ function App() {
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/auth/:provider/callback" element={<AuthCallback />} />
+                <Route
+                  path="/gsc/callback"
+                  element={
+                    <AuthGuard>
+                      <GSCCallback />
+                    </AuthGuard>
+                  }
+                />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
