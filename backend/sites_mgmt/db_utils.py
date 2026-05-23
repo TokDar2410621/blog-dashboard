@@ -18,7 +18,17 @@ def ensure_site_connection(site):
     """
     Register a dynamic database connection for the given site.
     Returns the database alias to use with .using(alias).
+
+    Raises ValueError if the site has no database_url set - calling this on
+    a hosted-mode or CMS-mode site is a bug (those sites don't have an
+    external Postgres). Callers should gate via `if site.is_hosted or
+    site.is_wordpress or site.is_shopify or site.is_webflow: alias = None`.
     """
+    if not (site.database_url or '').strip():
+        raise ValueError(
+            f'Site #{site.id} ({site.name}) has no database_url set. '
+            f'ensure_site_connection should not be called on hosted/CMS-mode sites.'
+        )
     alias = get_site_db_alias(site.id)
     if alias not in connections.databases:
         config = dj_database_url.parse(site.database_url)
