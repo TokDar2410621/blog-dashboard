@@ -435,8 +435,14 @@ class ArticleGenerator:
         # 2.5 Cannibalization guard: refuse to generate a near-duplicate of
         # an existing article (unless the user forced the title explicitly).
         if not self.forced_title:
-            if self.wp_site is not None or self.shopify_site is not None or self.webflow_site is not None:
-                # Fetch existing titles via the CMS adapter
+            if (
+                self.wp_site is not None
+                or self.shopify_site is not None
+                or self.webflow_site is not None
+                or (self.site is not None and self.site.is_hosted)
+            ):
+                # Hosted / CMS modes: route via _get_existing_articles which
+                # has dedicated branches for each storage backend.
                 existing_titles = [a['title'] for a in self._get_existing_articles()][:60]
             else:
                 existing_titles = list(
@@ -660,10 +666,20 @@ Sois factuel et precis.'''}]}],
     def analyze_and_pick_topic(self, search_results):
         self.log('[ANALYSIS] Analyse des resultats...')
 
-        # Get existing titles to avoid duplicates (from the site's DB)
-        existing_titles = list(
-            BlogPost.objects.using(self.alias).values_list('title', flat=True)[:30]
-        )
+        # Get existing titles to avoid duplicates (from the site's storage).
+        # Hosted/CMS sites route via _get_existing_articles which has
+        # per-backend branches (HostedPost / WP API / Shopify API / Webflow).
+        if (
+            self.wp_site is not None
+            or self.shopify_site is not None
+            or self.webflow_site is not None
+            or (self.site is not None and self.site.is_hosted)
+        ):
+            existing_titles = [a['title'] for a in self._get_existing_articles()][:30]
+        else:
+            existing_titles = list(
+                BlogPost.objects.using(self.alias).values_list('title', flat=True)[:30]
+            )
         existing_str = '\n'.join(f'- {t}' for t in existing_titles) if existing_titles else 'Aucun article existant'
 
         _lang_map = {'fr': 'français', 'en': 'English', 'es': 'español'}
@@ -1147,7 +1163,12 @@ NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le fra
         if not matches:
             return content, []
 
-        if self.wp_site is not None or self.shopify_site is not None or self.webflow_site is not None:
+        if (
+            self.wp_site is not None
+            or self.shopify_site is not None
+            or self.webflow_site is not None
+            or (self.site is not None and self.site.is_hosted)
+        ):
             existing_slugs = {a['slug'] for a in self._get_existing_articles()}
         else:
             existing_slugs = set(
@@ -1322,6 +1343,26 @@ Reponds UNIQUEMENT avec la meta description.'''
             except WebflowError:
                 return []
 
+        # Hosted mode: fetch HostedPost rows from the default DB. Site is
+        # required here - we filter by site to avoid leaking content across
+        # tenants. Capped at 60 for prompt-size safety.
+        if self.site is not None and self.site.is_hosted:
+            from .models import HostedPost
+            hosted = (
+                HostedPost.objects.filter(site=self.site, status='published')
+                .values('title', 'slug', 'excerpt', 'category__name')[:60]
+            )
+            return [
+                {
+                    'title': h['title'],
+                    'slug': h['slug'],
+                    'url': f"/blog/{h['slug']}",
+                    'excerpt': (h['excerpt'] or '')[:100],
+                    'category': h['category__name'] or '',
+                }
+                for h in hosted
+            ]
+
         articles = (
             BlogPost.objects.using(self.alias)
             .all()
@@ -1454,7 +1495,53 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
                 self.log(f'[ERROR] Shopify save failed: {e}')
                 raise
 
-        # Check for duplicate slug
+        # Hosted mode: write to HostedPost on the default DB. Required for
+        # the Gridar dogfood site and any other "Gridar-as-the-host" setup
+        # where the user doesn't have their own external Postgres.
+        if self.site is not None and self.site.is_hosted:
+            from .models import HostedPost, HostedCategory, HostedTag
+
+            # De-dup slug on conflict (same site, same slug, same language).
+            if HostedPost.objects.filter(
+                site=self.site, slug=slug,
+                language=getattr(self, 'language', 'fr'),
+            ).exists():
+                slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
+
+            # "A lire aussi" section (hosted-mode aware, see _get_related_articles).
+            content = self._add_related_articles_section(content, category_name, tags, slug)
+
+            hosted_category = None
+            if category_name:
+                hosted_category, _ = HostedCategory.objects.get_or_create(
+                    site=self.site,
+                    slug=slugify(category_name),
+                    defaults={'name': category_name},
+                )
+
+            post = HostedPost.objects.create(
+                site=self.site,
+                title=title[:200],
+                slug=slug,
+                excerpt=excerpt,
+                content=content,
+                author=getattr(self.site, 'default_author', '') or 'Admin',
+                category=hosted_category,
+                cover_image=cover_image or '',
+                reading_time=reading_time,
+                featured=False,
+                status='published',
+                published_at=date.today(),
+                language=getattr(self, 'language', 'fr'),
+            )
+            for tag_name in tags:
+                t, _ = HostedTag.objects.get_or_create(site=self.site, name=tag_name)
+                post.tags.add(t)
+
+            self.log(f'[OK] Article sauvegarde (HostedPost #{post.id})')
+            return post
+
+        # Check for duplicate slug (external Postgres mode)
         if BlogPost.objects.using(self.alias).filter(slug=slug).exists():
             slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
 
@@ -1507,6 +1594,18 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
         # since we'd need remote API category/tag matching, overkill for MVP.
         if self.wp_site is not None or self.shopify_site is not None or self.webflow_site is not None:
             return []
+
+        # Hosted mode: pull from HostedPost in the default DB, scoped to site.
+        # Returns objects with .title/.slug attrs so the caller's f-string
+        # `[{post.title}](/blog/{post.slug})` continues to work unchanged.
+        if self.site is not None and self.site.is_hosted:
+            from .models import HostedPost
+            qs = HostedPost.objects.filter(
+                site=self.site, status='published'
+            ).exclude(slug=exclude_slug)
+            if category_name:
+                qs = qs.filter(category__name__icontains=category_name.split('&')[0].strip())
+            return list(qs.order_by('-published_at')[:limit])
 
         related = []
 
