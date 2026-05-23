@@ -12,9 +12,14 @@ from .auth_views import (
     RegisterView,
 )
 from .social_auth_views import GoogleLoginView, GitHubLoginView
+from sites_mgmt.views import MarketingSitemapView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Top-level sitemap for gridar.app marketing surface. Vercel rewrites
+    # /sitemap.xml -> api.gridar.app/sitemap.xml so Googlebot reaches this
+    # view without hitting the SPA fallback.
+    path('sitemap.xml', MarketingSitemapView.as_view(), name='marketing_sitemap'),
     # Username/password login (existing flow, unchanged)
     path('api/auth/token/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),

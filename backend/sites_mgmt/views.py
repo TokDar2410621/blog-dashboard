@@ -7680,6 +7680,111 @@ class SiteRSSView(APIView):
         return resp
 
 
+class MarketingSitemapView(APIView):
+    """Public sitemap for gridar.app itself (marketing surface).
+
+    Aggregates 3 sources:
+      - Hard-coded static routes (/, /blog, /docs, /api-docs, /privacy, /terms)
+      - HostedPost rows for the Gridar marketing site (status=published)
+      - docs/*.md files walked from the repo root
+
+    Served at GET /sitemap.xml (top-level, not under /api/). Vercel rewrites
+    the same path to api.gridar.app/sitemap.xml so Googlebot reaches Django
+    directly without hitting the SPA fallback.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    SITE = 'https://gridar.app'
+    STATIC_ROUTES = [
+        ('/', 'weekly', '1.0'),
+        ('/blog', 'daily', '0.9'),
+        ('/docs', 'weekly', '0.9'),
+        ('/api-docs', 'monthly', '0.7'),
+        ('/privacy', 'yearly', '0.3'),
+        ('/terms', 'yearly', '0.3'),
+    ]
+
+    def get(self, request):
+        import os
+        from pathlib import Path
+        from django.conf import settings
+        from django.http import HttpResponse
+
+        urls = []
+
+        for path, changefreq, priority in self.STATIC_ROUTES:
+            urls.append(self._url_block(
+                f'{self.SITE}{path}',
+                changefreq=changefreq,
+                priority=priority,
+            ))
+
+        marketing_site_id = int(os.environ.get('MARKETING_SITE_ID', '6'))
+        try:
+            from .models import HostedPost
+            posts = HostedPost.objects.filter(
+                site_id=marketing_site_id,
+                status='published',
+            ).values('slug', 'updated_at', 'published_at')[:1000]
+            for p in posts:
+                slug = (p.get('slug') or '').strip()
+                if not slug:
+                    continue
+                lm = p.get('updated_at') or p.get('published_at')
+                lastmod = lm.date().isoformat() if lm else None
+                urls.append(self._url_block(
+                    f'{self.SITE}/blog/{slug}',
+                    lastmod=lastmod,
+                    changefreq='monthly',
+                    priority='0.7',
+                ))
+        except Exception:
+            logger.exception('MarketingSitemapView: HostedPost fetch failed')
+
+        try:
+            docs_dir = Path(settings.BASE_DIR).parent / 'docs'
+            if docs_dir.is_dir():
+                for md in sorted(docs_dir.rglob('*.md')):
+                    rel = md.relative_to(docs_dir).as_posix()
+                    slug = rel[:-3]
+                    if slug.endswith('/README'):
+                        slug = slug[:-len('/README')]
+                    elif slug == 'README':
+                        slug = ''
+                    loc = f'{self.SITE}/docs/{slug}' if slug else f'{self.SITE}/docs'
+                    if loc == f'{self.SITE}/docs':
+                        continue
+                    urls.append(self._url_block(
+                        loc,
+                        changefreq='monthly',
+                        priority='0.6',
+                    ))
+        except Exception:
+            logger.exception('MarketingSitemapView: docs walk failed')
+
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            + '\n'.join(urls)
+            + '\n</urlset>\n'
+        )
+        resp = HttpResponse(body, content_type='application/xml; charset=utf-8')
+        resp['Cache-Control'] = 'public, max-age=3600, s-maxage=3600'
+        return resp
+
+    @staticmethod
+    def _url_block(loc, lastmod=None, changefreq=None, priority=None):
+        parts = [f'    <loc>{_xml_escape(loc)}</loc>']
+        if lastmod:
+            parts.append(f'    <lastmod>{_xml_escape(lastmod)}</lastmod>')
+        if changefreq:
+            parts.append(f'    <changefreq>{_xml_escape(changefreq)}</changefreq>')
+        if priority:
+            parts.append(f'    <priority>{_xml_escape(priority)}</priority>')
+        return '  <url>\n' + '\n'.join(parts) + '\n  </url>'
+
+
 # ============================================================================
 # Branding extractor - scan a domain and return colors/logo/fonts
 # ============================================================================

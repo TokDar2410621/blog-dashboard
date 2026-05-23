@@ -7,6 +7,7 @@
     { "source": "/api/(.*)", "destination": "https://api.gridar.app/api/$1" },
     { "source": "/admin/(.*)", "destination": "https://api.gridar.app/admin/$1" },
     { "source": "/accounts/(.*)", "destination": "https://api.gridar.app/accounts/$1" },
+    { "source": "/sitemap.xml", "destination": "https://api.gridar.app/sitemap.xml" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ],
   "headers": [
