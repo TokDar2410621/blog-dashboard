@@ -520,7 +520,11 @@ class HostedPost(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='published')
     scheduled_at = models.DateTimeField(null=True, blank=True)
     view_count = models.PositiveIntegerField(default=0)
-    published_at = models.DateField()
+    published_at = models.DateField(
+        null=True, blank=True,
+        help_text="Set when status becomes 'published'. Drafts and "
+                  "scheduled-but-not-yet-fired posts have null here."
+    )
     # RAG feedback loop: stores list of SiteMemory.id that were retrieved and
     # injected in the prompt when this article was AI-generated. Lets us bump
     # feedback_score on those exact chunks when the user signals "good" or
