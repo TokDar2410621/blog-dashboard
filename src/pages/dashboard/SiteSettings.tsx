@@ -41,6 +41,7 @@ export default function SiteSettings() {
   type MemoriesResponse = {
     memories: MemoryRow[];
     counts_by_kind: Record<string, number>;
+    sources_by_kind?: Record<string, number>;
     total: number;
   };
   const memoriesQuery = useQuery<MemoriesResponse>({
@@ -1243,25 +1244,38 @@ export default function SiteSettings() {
               {memoriesQuery.isLoading ? (
                 <p className="text-xs text-muted-foreground">Chargement...</p>
               ) : memoriesQuery.data ? (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  {(["article", "kb", "audit", "decision", "manual"] as const).map((k) => (
-                    <div
-                      key={k}
-                      className="rounded-md border bg-muted/30 p-2 text-center"
-                    >
-                      <div className="text-xl font-bold">
-                        {memoriesQuery.data.counts_by_kind?.[k] || 0}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {k === "article" ? "Articles"
-                          : k === "kb" ? "KB"
-                          : k === "audit" ? "Audits"
-                          : k === "decision" ? "Decisions"
-                          : "Notes"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {(["article", "kb", "audit", "decision", "manual"] as const).map((k) => {
+                      const chunks = memoriesQuery.data!.counts_by_kind?.[k] || 0;
+                      const sources = memoriesQuery.data!.sources_by_kind?.[k] || 0;
+                      const showSources = chunks > 0 && sources > 0 && sources !== chunks;
+                      return (
+                        <div
+                          key={k}
+                          className="rounded-md border bg-muted/30 p-2 text-center"
+                        >
+                          <div className="text-xl font-bold">{chunks}</div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {k === "article" ? "Extraits"
+                              : k === "kb" ? "Extraits KB"
+                              : k === "audit" ? "Audits"
+                              : k === "decision" ? "Decisions"
+                              : "Notes"}
+                          </div>
+                          {showSources && (
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              de {sources} source{sources > 1 ? "s" : ""}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground -mt-2">
+                    Chaque article publie est decoupe en plusieurs extraits (chunks) pour la recherche semantique. 1 article ~ 6-10 extraits selon sa longueur.
+                  </p>
+                </>
               ) : null}
 
               <div className="space-y-2 border-t pt-4">

@@ -8245,7 +8245,16 @@ class SiteMemoryView(APIView):
         from collections import Counter
 
         qs = SiteMemory.objects.filter(site=site).order_by('-updated_at')
-        counts = dict(Counter(qs.values_list('kind', flat=True)))
+        # counts_by_kind = number of chunks (rows) per kind.
+        # sources_by_kind = number of distinct source_ref per kind (e.g. 1
+        # HostedPost = 1 source = N chunks). This separation matters in the
+        # UI so users don't think "101 articles" = 101 distinct posts.
+        all_pairs = list(qs.values_list('kind', 'source_ref'))
+        counts = dict(Counter(k for k, _ in all_pairs))
+        seen_sources = {}
+        for k, sref in all_pairs:
+            seen_sources.setdefault(k, set()).add(sref or '')
+        sources = {k: len(v) for k, v in seen_sources.items()}
         if kind:
             qs = qs.filter(kind=kind)
 
@@ -8264,6 +8273,7 @@ class SiteMemoryView(APIView):
         return Response({
             'memories': rows,
             'counts_by_kind': counts,
+            'sources_by_kind': sources,
             'total': sum(counts.values()),
         })
 
