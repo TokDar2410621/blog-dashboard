@@ -8519,20 +8519,100 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
         })
 
 
+def _fetch_homepage_meta(domain):
+    """GET the site's homepage and pull title + meta description + first H1/H2s.
+
+    Returns {'title', 'description', 'headings', 'body_excerpt'} or {} on
+    any failure. Used as anchoring context for keyword suggestions so Claude
+    doesn't guess the site's niche from the brand name alone.
+    """
+    import re
+    from urllib.parse import urlparse
+
+    if not domain:
+        return {}
+    domain = domain.strip().rstrip('/')
+    if not domain.startswith('http'):
+        domain = f'https://{domain}'
+    parsed = urlparse(domain)
+    if not parsed.netloc:
+        return {}
+
+    try:
+        resp = http_requests.get(
+            domain,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; GridarBot/1.0; +https://gridar.app)',
+                'Accept': 'text/html,*/*;q=0.8',
+            },
+            timeout=8,
+            allow_redirects=True,
+        )
+        if not resp.ok:
+            return {}
+        html = resp.text or ''
+    except Exception:
+        return {}
+
+    def _strip_tags(s):
+        s = re.sub(r'<script[^>]*>.*?</script>', '', s, flags=re.DOTALL | re.IGNORECASE)
+        s = re.sub(r'<style[^>]*>.*?</style>', '', s, flags=re.DOTALL | re.IGNORECASE)
+        s = re.sub(r'<[^>]+>', ' ', s)
+        return re.sub(r'\s+', ' ', s).strip()
+
+    title_m = re.search(r'<title[^>]*>(.*?)</title>', html, flags=re.DOTALL | re.IGNORECASE)
+    title = _strip_tags(title_m.group(1)) if title_m else ''
+
+    desc_m = re.search(
+        r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
+        html, flags=re.IGNORECASE,
+    )
+    if not desc_m:
+        desc_m = re.search(
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']description["\']',
+            html, flags=re.IGNORECASE,
+        )
+    description = _strip_tags(desc_m.group(1)) if desc_m else ''
+
+    headings = []
+    for tag in ('h1', 'h2'):
+        for m in re.finditer(fr'<{tag}[^>]*>(.*?)</{tag}>', html, flags=re.DOTALL | re.IGNORECASE):
+            txt = _strip_tags(m.group(1))
+            if txt and txt not in headings:
+                headings.append(txt)
+            if len(headings) >= 8:
+                break
+        if len(headings) >= 8:
+            break
+
+    body_excerpt = _strip_tags(html)[:1200]
+
+    return {
+        'title': title[:200],
+        'description': description[:400],
+        'headings': headings[:8],
+        'body_excerpt': body_excerpt,
+    }
+
+
 class SuggestKeywordsView(APIView):
-    """Suggest tracked keywords for a Site via IA.
+    """Suggest tracked keywords for a Site via IA, anchored on real context.
 
-    Pipeline (same Serper+Claude pattern as SuggestCompetitorsView):
-    - Serper SERP scrape on the site's brand + description-derived seed
-      queries, harvesting `organic` titles and `relatedSearches`.
-    - Claude shrinks the noisy SERP signal into 12-20 keyword candidates
-      tailored to the site's niche, language, and geo. Each candidate
-      comes with an `intent` label (info/commercial/transactional/local)
-      so the frontend can show the mix.
-    - Existing TrackedKeyword keywords for this site are excluded server-
-      side - no need for the user to dedupe.
+    Pipeline:
+    1. Pull top-8 RAG chunks from SiteMemory (article excerpts, KB, manual
+       notes) using semantic search on the site's brand+description query.
+    2. Fetch the site's homepage and extract <title>, meta description, H1/H2.
+    3. Serper SERP scrape on brand + description-derived seeds (max 3),
+       harvesting organic titles + relatedSearches.
+    4. Claude shrinks all of that into 12-18 keyword candidates with intent
+       labels (info/commercial/transactional/local). The prompt explicitly
+       tells Claude to ignore the brand name and anchor on the context, since
+       brand names alone are ambiguous (Gridar -> "grid AR" hallucination).
+    5. Existing TrackedKeyword keywords for this site are excluded server-
+       side - no need for the user to dedupe.
 
-    Output: {keywords: [{keyword, language, intent, why}], serp_sources_used: int}
+    Output: {keywords: [{keyword, language, intent, why}], serp_sources_used,
+    rag_chunks_used, homepage_fetched}
     """
     permission_classes = [IsAuthenticated]
     throttle_classes = [UserRateThrottle]
@@ -8638,37 +8718,97 @@ class SuggestKeywordsView(APIView):
         ][:8]
         competitors_block = '\n'.join(f'- {c}' for c in competitors_lines) or '(non renseignes)'
 
+        # 1) RAG: pull representative chunks of what this site is actually about
+        #    (published articles, manual notes, KB). Anchors the suggestion in
+        #    real content instead of guessing from the brand name.
+        from .memory_index import retrieve, format_memory_block
+        rag_query = (site.description or site.knowledge_base or site.name or site.domain or '').strip()
+        rag_chunks = []
+        if rag_query:
+            try:
+                rag_chunks = retrieve(site, query=rag_query, k=8)
+            except Exception:
+                logger.exception('SuggestKeywords: RAG retrieve failed for site %s', site.id)
+        rag_block = format_memory_block(rag_chunks, max_chars=3500) if rag_chunks else ''
+
+        # 2) Homepage fetch: real meta from the live site (title, description,
+        #    headings). Often filled in even when site.description is empty.
+        homepage = _fetch_homepage_meta(site.domain) if site.domain else {}
+        homepage_block = ''
+        if homepage:
+            headings_str = '\n'.join(f'  - {h}' for h in homepage.get('headings', []))
+            homepage_block = (
+                f"## PAGE D'ACCUEIL (scrappee live)\n"
+                f"- <title>: {homepage.get('title', '') or '(vide)'}\n"
+                f"- <meta description>: {homepage.get('description', '') or '(vide)'}\n"
+                f"- H1/H2 visibles:\n{headings_str or '  (aucune)'}\n"
+                f"- Extrait du body (premiers 1200 caracteres):\n  {homepage.get('body_excerpt', '')[:1200]}\n"
+            )
+
+        # Visible warning to Claude when context is empty so it doesn't
+        # hallucinate a niche from the brand name.
+        context_thin = (
+            not (site.description or '').strip()
+            and not (site.knowledge_base or '').strip()
+            and not rag_chunks
+            and not homepage_block
+        )
+
+        # Build optional fallback blocks outside the f-string (Python forbids
+        # backslashes inside f-string expression parts).
+        rag_section = rag_block or "## MEMOIRE DU SITE\n(aucun contenu indexe pour le moment)"
+        homepage_section = homepage_block or "## PAGE D-ACCUEIL\n(impossible de scraper - domaine inaccessible ou non renseigne)"
+        thin_warning = (
+            "ATTENTION : aucun contexte exploitable (description vide, RAG vide, homepage inaccessible). "
+            "Renvoie une liste VIDE: {\"keywords\": []} et c-est tout."
+            if context_thin else ""
+        )
+
         prompt = f"""Tu es un expert SEO {language.upper()}. Propose des mots-cles que ce site devrait tracker dans Google Search Console.
 
-SITE:
+## REGLE CRITIQUE
+Le NOM de marque seul est ambigu et peut induire en erreur (ex: "Gridar" pourrait sonner comme "grid AR" mais c'est faux). Tu DOIS deduire la niche depuis le CONTEXTE ci-dessous (memoire du site, page d'accueil, description, knowledge base). N'utilise JAMAIS la consonance du nom pour deviner ce que fait le produit. Si le contexte est vide, dis-le dans `why` plutot que d'inventer.
+
+## SITE
 - Nom: {site.name or '(non renseigne)'}
 - Domaine: {site.domain or '(non renseigne)'}
-- Description: {site.description or '(non renseignee)'}
-- Knowledge base: {(site.knowledge_base or '')[:400]}
+- Description (champ Site): {site.description or '(non renseignee)'}
+- Knowledge base (champ Site): {(site.knowledge_base or '')[:400] or '(vide)'}
 - Langue cible: {language}
 - Pays cible (Google): {gl.upper()}
 
-CONCURRENTS DECLARES:
+## CONCURRENTS DECLARES
 {competitors_block}
 
-MOTS-CLES DEJA TRACKES (ne PAS reproposer):
+{rag_section}
+
+{homepage_section}
+
+## MOTS-CLES DEJA TRACKES (ne PAS reproposer)
 {existing_block}
 
-SERP TITLES (Google {hl}/{gl}) sur les seeds {seeds[:3]}:
+## SIGNAL SERP (Google {hl}/{gl}) - peut etre bruite, utiliser avec prudence
+Seeds utilisees: {seeds[:3]}
+
+SERP titles:
 {serp_block}
 
-RELATED SEARCHES:
+Related searches:
 {related_block}
 
-Ta tache: propose 12 a 18 mots-cles a tracker, soigneusement choisis pour ce site:
+## TA TACHE
+Propose 12 a 18 mots-cles a tracker, alignes avec ce que fait *reellement* ce site (lis le contexte ci-dessus AVANT d'ecrire):
 - Mix d'intents: informationnel (questions, "comment", "qu'est-ce que"), commercial ("meilleur X", comparaisons), transactionnel ("acheter X", "prix X"), local ("X {gl.upper()}" si pertinent).
 - Realistes (longue-traine privilegiee, evite les ultra-competitifs sans angle local).
 - 100% dans la langue {language}.
 - Eviter le nom de la marque seule (ce n'est pas un mot-cle a tracker).
 - Eviter les doublons et les variantes triviales.
+- Si le contexte est trop maigre pour decider, propose MOINS de mots-cles plutot que d'inventer.
+
+{thin_warning}
 
 Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
-{{"keywords": [{{"keyword": "<mot-cle>", "intent": "info|commercial|transactional|local", "why": "<1 phrase courte de justification>"}}]}}
+{{"keywords": [{{"keyword": "<mot-cle>", "intent": "info|commercial|transactional|local", "why": "<1 phrase courte qui cite le contexte utilise>"}}]}}
 """
 
         try:
@@ -8738,6 +8878,9 @@ Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
             'keywords': cleaned,
             'serp_sources_used': len(serp_titles),
             'related_searches_used': len(related_queries),
+            'rag_chunks_used': len(rag_chunks),
+            'homepage_fetched': bool(homepage_block),
+            'context_thin': context_thin,
         })
 
 

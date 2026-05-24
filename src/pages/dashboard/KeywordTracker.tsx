@@ -109,6 +109,12 @@ export default function KeywordTracker() {
   const [targetUrl, setTargetUrl] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [suggestionMeta, setSuggestionMeta] = useState<{
+    rag_chunks_used: number;
+    homepage_fetched: boolean;
+    context_thin: boolean;
+    serp_sources_used: number;
+  } | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
 
   const list = useQuery({
@@ -199,12 +205,28 @@ export default function KeywordTracker() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Erreur suggestion IA");
       }
-      return res.json() as Promise<{ keywords: Suggestion[]; serp_sources_used: number }>;
+      return res.json() as Promise<{
+        keywords: Suggestion[];
+        serp_sources_used: number;
+        rag_chunks_used: number;
+        homepage_fetched: boolean;
+        context_thin: boolean;
+      }>;
     },
     onSuccess: (d) => {
       setSuggestions(d.keywords);
+      setSuggestionMeta({
+        rag_chunks_used: d.rag_chunks_used,
+        homepage_fetched: d.homepage_fetched,
+        context_thin: d.context_thin,
+        serp_sources_used: d.serp_sources_used,
+      });
       setSelectedSuggestions(new Set(d.keywords.map((k) => k.keyword)));
-      if (!d.keywords.length) {
+      if (d.context_thin) {
+        toast.warning(
+          "Contexte trop maigre : remplis la description du site ou publie quelques articles pour des suggestions pertinentes."
+        );
+      } else if (!d.keywords.length) {
         toast.info("Aucune suggestion. Verifie que le site a un nom + description.");
       }
     },
@@ -230,6 +252,7 @@ export default function KeywordTracker() {
       if (failed === 0) toast.success(`${added} mot(s)-cle(s) ajoute(s)`);
       else toast.warning(`${added} ajoutes, ${failed} en echec (quota ou doublon ?)`);
       setSuggestions(null);
+      setSuggestionMeta(null);
       setSelectedSuggestions(new Set());
     },
     onError: () => toast.error("Erreur ajout en masse"),
@@ -346,6 +369,25 @@ export default function KeywordTracker() {
             <p className="text-sm text-muted-foreground">
               Coche celles que tu veux tracker, puis clique "Ajouter la selection".
             </p>
+            {suggestionMeta && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
+                <span className="text-muted-foreground">Contexte utilise :</span>
+                <span className={`px-2 py-0.5 rounded ${suggestionMeta.rag_chunks_used > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  RAG : {suggestionMeta.rag_chunks_used} chunk{suggestionMeta.rag_chunks_used > 1 ? "s" : ""}
+                </span>
+                <span className={`px-2 py-0.5 rounded ${suggestionMeta.homepage_fetched ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  Homepage : {suggestionMeta.homepage_fetched ? "scrappee" : "non dispo"}
+                </span>
+                <span className={`px-2 py-0.5 rounded ${suggestionMeta.serp_sources_used > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
+                  SERP : {suggestionMeta.serp_sources_used} titres
+                </span>
+                {suggestionMeta.context_thin && (
+                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    Contexte maigre - resultats potentiellement bruites
+                  </span>
+                )}
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-2">
             {suggestions.map((s) => {
