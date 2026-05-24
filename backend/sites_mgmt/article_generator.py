@@ -41,9 +41,9 @@ AI_LOGOS = {
 }
 
 LENGTH_CONFIG = {
-    'short': {'words': '800-1200', 'images': 2, 'sections': '2-3', 'tokens': 4000},
-    'medium': {'words': '1500-2000', 'images': 3, 'sections': '3-4', 'tokens': 6000},
-    'long': {'words': '2500-3500', 'images': 5, 'sections': '5-7', 'tokens': 10000},
+    'short': {'words': '800-1200', 'images': 3, 'sections': '2-3', 'tokens': 4000},
+    'medium': {'words': '1500-2000', 'images': 5, 'sections': '3-4', 'tokens': 6000},
+    'long': {'words': '2500-3500', 'images': 7, 'sections': '5-7', 'tokens': 10000},
 }
 
 # Evergreen topics for auto-selection

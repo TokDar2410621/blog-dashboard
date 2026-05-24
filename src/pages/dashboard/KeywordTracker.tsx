@@ -54,10 +54,13 @@ type Latest = {
   recorded_at: string;
 } | null;
 
+type Intent = "info" | "commercial" | "transactional" | "local";
+
 type Tracked = {
   id: number;
   keyword: string;
   language: string;
+  intent: Intent;
   target_url: string;
   is_active: boolean;
   created_at: string;
@@ -89,11 +92,18 @@ type History = {
 type Suggestion = {
   keyword: string;
   language: string;
-  intent: "info" | "commercial" | "transactional" | "local";
+  intent: Intent;
   why: string;
 };
 
-const INTENT_COLORS: Record<Suggestion["intent"], string> = {
+const INTENT_LABELS: Record<Intent, string> = {
+  info: "info",
+  commercial: "commercial",
+  transactional: "transac.",
+  local: "local",
+};
+
+const INTENT_COLORS: Record<Intent, string> = {
   info: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
   commercial: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   transactional: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
@@ -239,7 +249,11 @@ export default function KeywordTracker() {
         toAdd.map((s) =>
           authFetch(`/sites/${siteId}/keywords/`, {
             method: "POST",
-            body: JSON.stringify({ keyword: s.keyword, language: s.language }),
+            body: JSON.stringify({
+              keyword: s.keyword,
+              language: s.language,
+              intent: s.intent,
+            }),
           }).then((r) => (r.ok ? r : Promise.reject(r)))
         )
       );
@@ -256,6 +270,44 @@ export default function KeywordTracker() {
       setSelectedSuggestions(new Set());
     },
     onError: () => toast.error("Erreur ajout en masse"),
+  });
+
+  const reclassify = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/keywords/reclassify/`, {
+        method: "POST",
+        body: JSON.stringify({ only_default: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur reclassification");
+      }
+      return res.json() as Promise<{ updated_count: number; total_processed: number }>;
+    },
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
+      toast.success(
+        d.updated_count > 0
+          ? `${d.updated_count}/${d.total_processed} mot(s)-cle(s) reclasse(s)`
+          : "Aucun changement (tout etait deja bien classe)"
+      );
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const patchIntent = useMutation({
+    mutationFn: async ({ id, intent }: { id: number; intent: Intent }) => {
+      const res = await authFetch(`/sites/${siteId}/keywords/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ intent }),
+      });
+      if (!res.ok) throw new Error("Erreur mise a jour intent");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
+    },
+    onError: () => toast.error("Erreur mise a jour intent"),
   });
 
   const history = useQuery<History>({
@@ -461,30 +513,52 @@ export default function KeywordTracker() {
         </Card>
       )}
 
-      {/* Snapshot button */}
-      <div className="flex items-center justify-between">
+      {/* Snapshot + reclassify buttons */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">
           {list.data
             ? t("keywords.tracked", { count: list.data.length })
             : ""}
         </p>
-        <Button
-          onClick={() => snapshot.mutate()}
-          disabled={snapshot.isPending || !list.data?.length}
-          variant="outline"
-        >
-          {snapshot.isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              {t("keywords.snapshotting")}
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              {t("keywords.snapshotNow")}
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => reclassify.mutate()}
+            disabled={reclassify.isPending || !list.data?.length}
+            variant="outline"
+            size="sm"
+            title="Re-classer les mots-cles encore en 'info' via Claude (~$0.02)"
+          >
+            {reclassify.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Reclassification...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Reclasser avec l'IA
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={() => snapshot.mutate()}
+            disabled={snapshot.isPending || !list.data?.length}
+            variant="outline"
+            size="sm"
+          >
+            {snapshot.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {t("keywords.snapshotting")}
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {t("keywords.snapshotNow")}
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -506,6 +580,7 @@ export default function KeywordTracker() {
               <TableHeader>
                 <TableRow>
                   <TableHead>{t("keywords.keyword")}</TableHead>
+                  <TableHead className="w-24">Intent</TableHead>
                   <TableHead className="w-16">{t("keywords.language")}</TableHead>
                   <TableHead className="w-24 text-center">{t("keywords.position")}</TableHead>
                   <TableHead>{t("keywords.lastSnapshot")}</TableHead>
@@ -531,6 +606,26 @@ export default function KeywordTracker() {
                             )}
                             {k.keyword}
                           </div>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={k.intent || "info"}
+                            onValueChange={(v) =>
+                              patchIntent.mutate({ id: k.id, intent: v as Intent })
+                            }
+                          >
+                            <SelectTrigger
+                              className={`h-7 px-2 text-[10px] uppercase font-semibold border-0 ${INTENT_COLORS[k.intent || "info"]}`}
+                            >
+                              <SelectValue>{INTENT_LABELS[k.intent || "info"]}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="info">Info</SelectItem>
+                              <SelectItem value="commercial">Commercial</SelectItem>
+                              <SelectItem value="transactional">Transactionnel</SelectItem>
+                              <SelectItem value="local">Local</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell>
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono uppercase">
@@ -586,7 +681,7 @@ export default function KeywordTracker() {
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${k.id}-history`}>
-                          <TableCell colSpan={5} className="bg-muted/30">
+                          <TableCell colSpan={6} className="bg-muted/30">
                             {history.isLoading ? (
                               <Skeleton className="h-20" />
                             ) : history.data ? (

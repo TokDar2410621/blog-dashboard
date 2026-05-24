@@ -6260,6 +6260,7 @@ def _serialize_tracked_keyword(tk, latest=None):
         'id': tk.id,
         'keyword': tk.keyword,
         'language': tk.language,
+        'intent': tk.intent,
         'target_url': tk.target_url,
         'is_active': tk.is_active,
         'created_at': tk.created_at.isoformat(),
@@ -6304,10 +6305,21 @@ class TrackedKeywordsView(APIView):
         })
 
     def post(self, request, site_id):
+        from .keyword_intent import classify_intent_heuristic
+
         site = get_site_for_user(request, site_id)
         keyword = (request.data.get('keyword') or '').strip()
         language = (request.data.get('language') or site.default_language or 'fr').lower()
         target_url = (request.data.get('target_url') or '').strip()
+        # Intent can be provided explicitly (e.g. bulk-add from IA suggestions
+        # already knows the label) or omitted (manual add via the form) - in
+        # which case the regex heuristic guesses it. 'info' is the safest
+        # fallback when nothing matches.
+        raw_intent = (request.data.get('intent') or '').strip().lower()
+        if raw_intent in ('info', 'commercial', 'transactional', 'local'):
+            intent = raw_intent
+        else:
+            intent = classify_intent_heuristic(keyword)
 
         if not keyword:
             return Response(
@@ -6338,10 +6350,11 @@ class TrackedKeywordsView(APIView):
 
         tk, created = TrackedKeyword.objects.get_or_create(
             site=site, keyword=keyword, language=language,
-            defaults={'target_url': target_url, 'is_active': True},
+            defaults={'target_url': target_url, 'is_active': True, 'intent': intent},
         )
         if not created:
-            # Reactivate / update target if existed
+            # Reactivate / update target if existed. Don't overwrite the
+            # stored intent silently - the user may have edited it.
             tk.is_active = True
             if target_url:
                 tk.target_url = target_url
@@ -6353,8 +6366,43 @@ class TrackedKeywordsView(APIView):
 
 
 class TrackedKeywordDetailView(APIView):
-    """Delete a tracked keyword."""
+    """Update or delete a tracked keyword.
+
+    PATCH lets the user edit intent inline from the table (badge click);
+    other writable fields could be added here later (target_url, is_active).
+    """
     permission_classes = [IsAuthenticated]
+
+    def patch(self, request, site_id, pk):
+        site = get_site_for_user(request, site_id)
+        try:
+            tk = TrackedKeyword.objects.get(site=site, id=pk)
+        except TrackedKeyword.DoesNotExist:
+            return Response(
+                {'error': 'Mot-cle introuvable'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        updated = []
+        if 'intent' in request.data:
+            new_intent = (request.data.get('intent') or '').strip().lower()
+            if new_intent not in ('info', 'commercial', 'transactional', 'local'):
+                return Response(
+                    {'error': 'Intent invalide (info, commercial, transactional, local)'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            tk.intent = new_intent
+            updated.append('intent')
+        if 'target_url' in request.data:
+            tk.target_url = (request.data.get('target_url') or '').strip()
+            updated.append('target_url')
+        if 'is_active' in request.data:
+            tk.is_active = bool(request.data.get('is_active'))
+            updated.append('is_active')
+
+        if updated:
+            tk.save(update_fields=updated)
+        return Response(_serialize_tracked_keyword(tk))
 
     def delete(self, request, site_id, pk):
         site = get_site_for_user(request, site_id)
@@ -6367,6 +6415,124 @@ class TrackedKeywordDetailView(APIView):
             )
         tk.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TrackedKeywordReclassifyView(APIView):
+    """Re-classify all tracked keywords of a site via Claude in a single batch.
+
+    POST /api/sites/<id>/keywords/reclassify/
+    Body: {only_default?: bool}  - if true (default), only reclass keywords
+    that still have intent='info' (the migration's safe fallback). False =
+    reclass everything, overwriting prior values.
+
+    One Claude call total per site (~$0.02-0.05 depending on keyword count).
+    Returns the updated keyword list so the frontend can refresh in one shot.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        import json as _json
+        import re
+
+        site = get_site_for_user(request, site_id)
+        only_default = request.data.get('only_default', True)
+
+        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not anthropic_key:
+            return Response(
+                {'error': 'ANTHROPIC_API_KEY non configuree.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        qs = TrackedKeyword.objects.filter(site=site, is_active=True)
+        if only_default:
+            qs = qs.filter(intent='info')
+        keywords = list(qs.only('id', 'keyword', 'intent'))
+        if not keywords:
+            return Response({'updated_count': 0, 'message': 'Rien a reclasser'})
+
+        kw_block = '\n'.join(f'- [{tk.id}] {tk.keyword}' for tk in keywords[:200])
+
+        prompt = f"""Tu es un expert SEO. Classifie l'intent de chaque mot-cle.
+
+Labels possibles (un seul par mot-cle):
+- info: question, definition, comment faire, guide
+- commercial: comparaison, "meilleur X", "vs", avis pour informer un achat
+- transactional: pret a acheter ("acheter X", "prix X", "X pas cher")
+- local: ancre geographiquement (ville, "pres de moi")
+
+MOTS-CLES A CLASSER:
+{kw_block}
+
+Reponds UNIQUEMENT en JSON, schema strict, dans le meme ordre que la liste:
+{{"classifications": [{{"id": <id>, "intent": "info|commercial|transactional|local"}}]}}
+"""
+
+        try:
+            resp = http_requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={
+                    'x-api-key': anthropic_key,
+                    'anthropic-version': '2023-06-01',
+                    'content-type': 'application/json',
+                },
+                json={
+                    'model': 'claude-sonnet-4-20250514',
+                    'max_tokens': 2000,
+                    'messages': [{'role': 'user', 'content': prompt}],
+                },
+                timeout=45,
+            )
+            resp.raise_for_status()
+            text = resp.json()['content'][0]['text']
+        except http_requests.RequestException as e:
+            return Response(
+                {'error': f'Erreur Claude: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return Response(
+                {'error': 'Reponse Claude non parsable', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        try:
+            parsed = _json.loads(match.group())
+        except _json.JSONDecodeError:
+            return Response(
+                {'error': 'JSON Claude invalide', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        valid_intents = {'info', 'commercial', 'transactional', 'local'}
+        by_id = {tk.id: tk for tk in keywords}
+        updates = []
+        for item in (parsed.get('classifications') or []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                kid = int(item.get('id'))
+            except (TypeError, ValueError):
+                continue
+            new_intent = (item.get('intent') or '').strip().lower()
+            if new_intent not in valid_intents:
+                continue
+            tk = by_id.get(kid)
+            if not tk or tk.intent == new_intent:
+                continue
+            tk.intent = new_intent
+            updates.append(tk)
+
+        if updates:
+            TrackedKeyword.objects.bulk_update(updates, ['intent'], batch_size=200)
+
+        return Response({
+            'updated_count': len(updates),
+            'total_processed': len(keywords),
+        })
 
 
 class RankSnapshotView(APIView):
@@ -7872,6 +8038,8 @@ class AutopilotRunView(APIView):
                 'keyword_id': result.keyword_id,
                 'post_id': result.post_id,
                 'post_title': result.post_title,
+                'article_type': result.article_type,
+                'length': result.length,
             })
 
         status_code = status.HTTP_400_BAD_REQUEST

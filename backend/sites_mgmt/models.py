@@ -740,12 +740,23 @@ class Redirect(models.Model):
 class TrackedKeyword(models.Model):
     """Keywords whose Google SERP position the user wants to track over time."""
     LANGUAGE_CHOICES = Site.LANGUAGE_CHOICES
+    INTENT_CHOICES = [
+        ('info', 'Informationnel'),
+        ('commercial', 'Commercial'),
+        ('transactional', 'Transactionnel'),
+        ('local', 'Local'),
+    ]
 
     site = models.ForeignKey(
         Site, on_delete=models.CASCADE, related_name='tracked_keywords'
     )
     keyword = models.CharField(max_length=255)
     language = models.CharField(max_length=2, choices=LANGUAGE_CHOICES, default='fr')
+    intent = models.CharField(
+        max_length=20, choices=INTENT_CHOICES, default='info', db_index=True,
+        help_text="Classification d'intent. Determine le type d'article que "
+                  "l'autopilote generera (guide / comparison / review / local)."
+    )
     target_url = models.URLField(
         max_length=500, blank=True, default='',
         help_text="Optional. The article URL we expect to rank - used to highlight if the page actually ranks."

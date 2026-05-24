@@ -30,6 +30,8 @@ class RunResult:
     keyword_id: Optional[int] = None
     post_id: Optional[int] = None
     post_title: Optional[str] = None
+    article_type: Optional[str] = None
+    length: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -139,18 +141,34 @@ def run_one(site: Site, *, force: bool = False, user=None) -> RunResult:
         keyword_id=keyword.id,
         post_id=result.get('post_id'),
         post_title=result.get('title'),
+        article_type=result.get('article_type'),
+        length=result.get('length'),
     )
 
 
 def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
-    """Thin wrapper around ArticleGenerator that mirrors GenerateArticleView."""
+    """Thin wrapper around ArticleGenerator that mirrors GenerateArticleView.
+
+    The article type and length are derived from the keyword's stored intent
+    (set by IA suggestions or the regex fallback), not hardcoded. See
+    keyword_intent.map_intent_to_article_type and pick_length.
+    """
     from .article_generator import ArticleGenerator
     from .db_utils import ensure_site_connection
+    from .keyword_intent import map_intent_to_article_type, pick_length
 
     if site.is_hosted or site.is_wordpress or site.is_shopify or site.is_webflow:
         alias = None
     else:
         alias = ensure_site_connection(site)
+
+    article_type = map_intent_to_article_type(keyword.intent, keyword.keyword)
+    length = pick_length(keyword.intent, keyword.keyword)
+
+    logger.info(
+        'Autopilot site=%s keyword=%r intent=%s -> type=%s length=%s',
+        site.id, keyword.keyword, keyword.intent, article_type, length,
+    )
 
     generator = ArticleGenerator(
         alias,
@@ -165,8 +183,8 @@ def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
         search_method='serper',
         topic=keyword.keyword,
         title=None,
-        article_type='guide',
-        length='medium',
+        article_type=article_type,
+        length=length,
         keywords=keyword.keyword,
         dry_run=False,
         language=keyword.language or 'fr',
@@ -189,7 +207,12 @@ def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
         if latest:
             post_id = latest['id']
             post_title = latest['title']
-    return {'post_id': post_id, 'title': post_title}
+    return {
+        'post_id': post_id,
+        'title': post_title,
+        'article_type': article_type,
+        'length': length,
+    }
 
 
 def due_sites(now=None):
