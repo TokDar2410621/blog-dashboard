@@ -149,7 +149,7 @@ class ArticleGenerator:
     """Generates articles for a specific site using dynamic DB connections."""
 
     def __init__(self, alias, knowledge_base='', wp_site=None, shopify_site=None,
-                 webflow_site=None, site=None):
+                 webflow_site=None, site=None, default_status='published'):
         """alias: Django DB alias for external Postgres mode (None for WP/hosted/Shopify/Webflow).
         wp_site: Site model instance when the site is in WordPress mode.
         shopify_site: Site model instance when the site is in Shopify mode.
@@ -158,6 +158,8 @@ class ArticleGenerator:
             description, competitors to avoid) into the generation prompt so the
             article anchors to the client's brand instead of citing generic
             competitors without self-reference.
+        default_status: 'published' (default) or 'draft'. Autopilot passes
+            'draft' so the user reviews before publishing.
         """
         self.alias = alias
         self.knowledge_base = knowledge_base
@@ -165,6 +167,7 @@ class ArticleGenerator:
         self.shopify_site = shopify_site  # if set → save via Shopify Admin API
         self.webflow_site = webflow_site  # if set → save via Webflow CMS API
         self.site = site or wp_site or shopify_site or webflow_site
+        self.default_status = default_status if default_status in ('draft', 'published') else 'published'
         self.serper_images = []
         self.logs = []
 
@@ -1530,8 +1533,8 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
                 cover_image=cover_image or '',
                 reading_time=reading_time,
                 featured=False,
-                status='published',
-                published_at=date.today(),
+                status=self.default_status,
+                published_at=date.today() if self.default_status == 'published' else None,
                 language=getattr(self, 'language', 'fr'),
             )
             for tag_name in tags:

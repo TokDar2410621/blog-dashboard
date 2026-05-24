@@ -32,6 +32,7 @@ from .views import (
     PublicSiteView, PublicSiteByDomainView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
     GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
+    AutopilotConfigView, AutopilotRunView,
 )
 from .api_v1 import (
     V1MeView, V1SitesView, V1ArticlesView, V1ArticleDetailView, V1GenerateView,
@@ -126,6 +127,9 @@ urlpatterns = [
     path('page-speed/', PageSpeedView.as_view(), name='page-speed'),
     path('backlinks/', BacklinksView.as_view(), name='backlinks'),
     path('seo-schema/', SEOSchemaView.as_view(), name='seo-schema'),
+    # Autopilot mode (scheduled hands-off generation)
+    path('sites/<int:site_id>/autopilot/', AutopilotConfigView.as_view(), name='site-autopilot-config'),
+    path('sites/<int:site_id>/autopilot/run/', AutopilotRunView.as_view(), name='site-autopilot-run'),
     # Google Search Console integration
     path('sites/<int:site_id>/gsc/oauth-url/', GSCOAuthUrlView.as_view(), name='gsc-oauth-url'),
     path('sites/<int:site_id>/gsc/oauth-callback/', GSCOAuthCallbackView.as_view(), name='gsc-oauth-callback'),

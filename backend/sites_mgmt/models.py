@@ -214,6 +214,32 @@ class Site(models.Model):
         help_text="Utilisée comme header X-Api-Key pour les endpoints publics. Auto-générée."
     )
 
+    # ── Mode autopilote ───────────────────────────────────────────────
+    # Quand activé, le management command `run_autopilot` (cron horaire) génère
+    # autopilot_weekly_count articles par semaine en piochant les sujets parmi
+    # les TrackedKeyword du site qui n'ont pas encore d'article. Les articles
+    # générés restent en statut 'draft' - le user décide quand publier.
+    autopilot_enabled = models.BooleanField(
+        default=False, db_index=True,
+        verbose_name="Mode autopilote",
+        help_text="Si actif, Gridar génère automatiquement des articles selon la cadence configurée"
+    )
+    autopilot_weekly_count = models.PositiveSmallIntegerField(
+        default=2,
+        verbose_name="Articles par semaine",
+        help_text="Nombre d'articles que l'autopilote doit générer chaque semaine (1-7)"
+    )
+    autopilot_last_run_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Dernier run autopilote",
+        help_text="Datetime du dernier article généré par l'autopilote (succès)"
+    )
+    autopilot_last_error = models.TextField(
+        blank=True, default='',
+        verbose_name="Dernière erreur autopilote",
+        help_text="Stack trace ou message si le dernier run a échoué (vidé au prochain succès)"
+    )
+
     # ── Méta ──────────────────────────────────────────────────────────
     is_active = models.BooleanField(
         default=True, db_index=True,

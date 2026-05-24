@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/tabs";
 import { Settings, Save, Loader2, BookOpen, Rocket, Code, Copy, Languages, Palette, User as UserIcon, ImageIcon, Award, Linkedin, Twitter, Globe, MapPin, Check, AlertCircle, ExternalLink, Sparkles, Brain, RefreshCw, Trash2, Plus, Search, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import { AutopilotCard } from "@/components/AutopilotCard";
 
 export default function SiteSettings() {
   const { t } = useTranslation();
@@ -449,6 +450,7 @@ export default function SiteSettings() {
           <TabsTrigger value="author">Auteur (EEAT)</TabsTrigger>
           <TabsTrigger value="local">Local SEO</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="autopilot">Autopilote</TabsTrigger>
           <TabsTrigger value="advanced">Avance</TabsTrigger>
         </TabsList>
 
@@ -1324,6 +1326,11 @@ export default function SiteSettings() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ===================== AUTOPILOT ===================== */}
+        <TabsContent value="autopilot" className="space-y-6 mt-4">
+          {siteId && <AutopilotCard siteId={siteId} />}
         </TabsContent>
 
         {/* ===================== ADVANCED ===================== */}

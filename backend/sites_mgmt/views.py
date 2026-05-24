@@ -7786,6 +7786,107 @@ class MarketingSitemapView(APIView):
 
 
 # ============================================================================
+# Autopilot - scheduled hands-off article generation per site
+# ============================================================================
+
+class AutopilotConfigView(APIView):
+    """GET / PUT the autopilot config for a site.
+
+    Body shape: {enabled: bool, weekly_count: int}. weekly_count is clamped
+    to [1, 7]. The response also exposes computed read-only fields so the UI
+    can show "Prochain run prevu: X" and the last error without a separate
+    endpoint.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        return Response(self._serialize(site))
+
+    def put(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        data = request.data or {}
+
+        if 'enabled' in data:
+            site.autopilot_enabled = bool(data.get('enabled'))
+        if 'weekly_count' in data:
+            try:
+                wc = int(data.get('weekly_count'))
+            except (TypeError, ValueError):
+                wc = 2
+            site.autopilot_weekly_count = max(1, min(7, wc))
+
+        site.save(update_fields=['autopilot_enabled', 'autopilot_weekly_count'])
+        return Response(self._serialize(site))
+
+    @staticmethod
+    def _serialize(site):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .autopilot import is_due
+        from .models import TrackedKeyword
+
+        next_run_at = None
+        if site.autopilot_enabled and site.autopilot_last_run_at:
+            weekly = max(1, int(site.autopilot_weekly_count or 1))
+            gap = timedelta(days=7) / weekly
+            next_run_at = site.autopilot_last_run_at + gap
+        elif site.autopilot_enabled:
+            next_run_at = timezone.now()
+
+        kw_count = TrackedKeyword.objects.filter(site=site, is_active=True).count()
+
+        return {
+            'enabled': site.autopilot_enabled,
+            'weekly_count': site.autopilot_weekly_count,
+            'last_run_at': site.autopilot_last_run_at.isoformat() if site.autopilot_last_run_at else None,
+            'last_error': site.autopilot_last_error or '',
+            'next_run_at': next_run_at.isoformat() if next_run_at else None,
+            'is_due': is_due(site),
+            'tracked_keywords_count': kw_count,
+            'ready_to_run': site.autopilot_enabled and kw_count > 0,
+        }
+
+
+class AutopilotRunView(APIView):
+    """POST to trigger one autopilot run NOW for this site (force=True).
+
+    Used by the "Lancer maintenant" button in the dashboard so the user can
+    test the autopilot without waiting for the cron interval. Also bypasses
+    the user's monthly article quota (autopilot is intentionally separate
+    from manual generation accounting).
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        from .autopilot import run_one
+        result = run_one(site, force=True, user=request.user)
+
+        if result.ok:
+            return Response({
+                'ok': True,
+                'topic': result.topic,
+                'keyword_id': result.keyword_id,
+                'post_id': result.post_id,
+                'post_title': result.post_title,
+            })
+
+        status_code = status.HTTP_400_BAD_REQUEST
+        if result.skipped_reason == 'no_keyword':
+            status_code = status.HTTP_409_CONFLICT
+        elif result.error:
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return Response({
+            'ok': False,
+            'skipped_reason': result.skipped_reason,
+            'error': result.error,
+        }, status=status_code)
+
+
+# ============================================================================
 # Branding extractor - scan a domain and return colors/logo/fonts
 # ============================================================================
 
