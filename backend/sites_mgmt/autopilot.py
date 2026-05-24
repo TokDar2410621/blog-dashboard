@@ -167,7 +167,7 @@ def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
         title=None,
         article_type='guide',
         length='medium',
-        keywords=[keyword.keyword],
+        keywords=keyword.keyword,
         dry_run=False,
         language=keyword.language or 'fr',
         brief=None,

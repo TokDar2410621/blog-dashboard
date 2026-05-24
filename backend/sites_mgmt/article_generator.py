@@ -405,7 +405,14 @@ class ArticleGenerator:
         self.article_type = article_type
         self.custom_topic = topic
         self.language = language if language in ('fr', 'en', 'es') else 'fr'
-        self.seo_keywords = [k.strip() for k in keywords.split(',')] if keywords else []
+        # Accept either a comma-separated string (legacy: from views) or a
+        # list of strings (from autopilot). Anything else -> empty list.
+        if isinstance(keywords, str):
+            self.seo_keywords = [k.strip() for k in keywords.split(',') if k.strip()]
+        elif isinstance(keywords, (list, tuple)):
+            self.seo_keywords = [str(k).strip() for k in keywords if str(k).strip()]
+        else:
+            self.seo_keywords = []
         self.brief = brief if isinstance(brief, dict) else None
 
         config = LENGTH_CONFIG[length]
