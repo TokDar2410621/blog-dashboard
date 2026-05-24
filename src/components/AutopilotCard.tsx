@@ -171,7 +171,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
                 Aucun mot-cle tracke
               </p>
               <p className="text-amber-800 dark:text-amber-300 mt-0.5">
-                Ajoute des mots-cles dans <Link to={`/dashboard/sites/${siteId}/positions`} className="underline">Positions</Link> avant d'activer l'autopilote.
+                Ajoute des mots-cles dans <Link to={`/dashboard/${siteId}/positions`} className="underline">Positions</Link> avant d'activer l'autopilote.
               </p>
             </div>
           </div>
