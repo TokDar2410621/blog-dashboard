@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Rocket, Loader2, AlertCircle, Play, Clock, KeyRound } from "lucide-react";
+import { Rocket, Loader2, AlertCircle, Play, Clock, KeyRound, Info } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
@@ -254,6 +254,21 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
           <p className="text-xs text-muted-foreground mt-2">
             Utile pour tester. Le sujet est pioche au hasard parmi les mots-cles trackes sans article existant.
           </p>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs dark:border-blue-900 dark:bg-blue-950">
+          <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-600" />
+          <div className="flex-1 space-y-1">
+            <p className="font-medium text-blue-900 dark:text-blue-200">
+              Declenchement automatique
+            </p>
+            <p className="text-blue-800 dark:text-blue-300">
+              L'autopilote tourne automatiquement chaque heure via un cron Railway. Si tes drafts n'apparaissent pas, c'est probablement que le service cron `run_autopilot` n'a pas ete cree sur Railway. Voir `backend/SCHEDULED_JOBS.md` pour la procedure (5 minutes, ~$1-3/mois).
+            </p>
+            <p className="text-blue-800 dark:text-blue-300">
+              En attendant, le bouton "Lancer maintenant" ci-dessus marche toujours.
+            </p>
+          </div>
         </div>
       </CardContent>
     </Card>

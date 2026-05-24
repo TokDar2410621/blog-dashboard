@@ -7953,7 +7953,11 @@ class MarketingSitemapView(APIView):
 
 # ============================================================================
 # Autopilot - scheduled hands-off article generation per site
+# Scheduling: Railway native cron service runs `python manage.py run_autopilot`
+# hourly. No HTTP tick endpoint - the management command is called directly
+# by Railway's cron infra. See SCHEDULED_JOBS.md for the full setup.
 # ============================================================================
+
 
 class AutopilotConfigView(APIView):
     """GET / PUT the autopilot config for a site.
