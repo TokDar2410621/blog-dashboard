@@ -31,6 +31,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Sparkles,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -84,6 +86,20 @@ type History = {
   decay_alert: DecayAlert | null;
 };
 
+type Suggestion = {
+  keyword: string;
+  language: string;
+  intent: "info" | "commercial" | "transactional" | "local";
+  why: string;
+};
+
+const INTENT_COLORS: Record<Suggestion["intent"], string> = {
+  info: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  commercial: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  transactional: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  local: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+};
+
 export default function KeywordTracker() {
   const { t } = useTranslation();
   const { siteId } = useParams<{ siteId: string }>();
@@ -92,6 +108,8 @@ export default function KeywordTracker() {
   const [language, setLanguage] = useState("fr");
   const [targetUrl, setTargetUrl] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
 
   const list = useQuery({
     queryKey: ["tracked-keywords", siteId],
@@ -171,6 +189,52 @@ export default function KeywordTracker() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/suggest-keywords/`, {
+        method: "POST",
+        body: JSON.stringify({ language }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur suggestion IA");
+      }
+      return res.json() as Promise<{ keywords: Suggestion[]; serp_sources_used: number }>;
+    },
+    onSuccess: (d) => {
+      setSuggestions(d.keywords);
+      setSelectedSuggestions(new Set(d.keywords.map((k) => k.keyword)));
+      if (!d.keywords.length) {
+        toast.info("Aucune suggestion. Verifie que le site a un nom + description.");
+      }
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const bulkAdd = useMutation({
+    mutationFn: async (toAdd: Suggestion[]) => {
+      const results = await Promise.allSettled(
+        toAdd.map((s) =>
+          authFetch(`/sites/${siteId}/keywords/`, {
+            method: "POST",
+            body: JSON.stringify({ keyword: s.keyword, language: s.language }),
+          }).then((r) => (r.ok ? r : Promise.reject(r)))
+        )
+      );
+      const added = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - added;
+      return { added, failed };
+    },
+    onSuccess: ({ added, failed }) => {
+      qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
+      if (failed === 0) toast.success(`${added} mot(s)-cle(s) ajoute(s)`);
+      else toast.warning(`${added} ajoutes, ${failed} en echec (quota ou doublon ?)`);
+      setSuggestions(null);
+      setSelectedSuggestions(new Set());
+    },
+    onError: () => toast.error("Erreur ajout en masse"),
+  });
+
   const history = useQuery<History>({
     queryKey: ["rank-history", siteId, expandedId],
     queryFn: async () => {
@@ -243,8 +307,117 @@ export default function KeywordTracker() {
               )}
             </Button>
           </div>
+
+          <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              Pas d'idees ? Laisse l'IA proposer des mots-cles basee sur ton site (nom, description, SERP Google).
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => suggest.mutate()}
+              disabled={suggest.isPending}
+            >
+              {suggest.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyse IA (~20s)...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Suggerer avec l'IA
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {/* IA suggestions panel */}
+      {suggestions && suggestions.length > 0 && (
+        <Card className="border-primary/40">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Suggestions IA ({suggestions.length})
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Coche celles que tu veux tracker, puis clique "Ajouter la selection".
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {suggestions.map((s) => {
+              const checked = selectedSuggestions.has(s.keyword);
+              return (
+                <label
+                  key={s.keyword}
+                  className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/40 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = new Set(selectedSuggestions);
+                      if (checked) next.delete(s.keyword);
+                      else next.add(s.keyword);
+                      setSelectedSuggestions(next);
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">{s.keyword}</span>
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded font-semibold ${INTENT_COLORS[s.intent]}`}>
+                        {s.intent}
+                      </span>
+                    </div>
+                    {s.why && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{s.why}</p>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t">
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:underline"
+                onClick={() => {
+                  setSuggestions(null);
+                  setSelectedSuggestions(new Set());
+                }}
+              >
+                Fermer
+              </button>
+              <Button
+                onClick={() => {
+                  const toAdd = suggestions.filter((s) => selectedSuggestions.has(s.keyword));
+                  if (toAdd.length === 0) {
+                    toast.info("Aucune suggestion selectionnee");
+                    return;
+                  }
+                  bulkAdd.mutate(toAdd);
+                }}
+                disabled={bulkAdd.isPending || selectedSuggestions.size === 0}
+              >
+                {bulkAdd.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Ajout...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Ajouter la selection ({selectedSuggestions.size})
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Snapshot button */}
       <div className="flex items-center justify-between">

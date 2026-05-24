@@ -8519,6 +8519,228 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
         })
 
 
+class SuggestKeywordsView(APIView):
+    """Suggest tracked keywords for a Site via IA.
+
+    Pipeline (same Serper+Claude pattern as SuggestCompetitorsView):
+    - Serper SERP scrape on the site's brand + description-derived seed
+      queries, harvesting `organic` titles and `relatedSearches`.
+    - Claude shrinks the noisy SERP signal into 12-20 keyword candidates
+      tailored to the site's niche, language, and geo. Each candidate
+      comes with an `intent` label (info/commercial/transactional/local)
+      so the frontend can show the mix.
+    - Existing TrackedKeyword keywords for this site are excluded server-
+      side - no need for the user to dedupe.
+
+    Output: {keywords: [{keyword, language, intent, why}], serp_sources_used: int}
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]
+    throttle_scope = 'ai_generate'
+
+    def post(self, request, site_id):
+        import json as _json
+        import re
+
+        site = get_object_or_404(Site, pk=site_id, owner=request.user)
+        if not site.name and not site.domain:
+            return Response(
+                {'error': "Le site doit avoir un nom ou un domaine pour suggerer des mots-cles."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not anthropic_key:
+            return Response(
+                {'error': 'ANTHROPIC_API_KEY non configuree.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        language = (request.data.get('language') or site.default_language or 'fr').lower()
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
+
+        # Default geo from locale (e.g. fr-CA -> CA) else fallback by language.
+        locale = (getattr(site, 'locale', '') or '').lower()
+        gl = 'ca'
+        if '-' in locale:
+            gl = locale.split('-', 1)[1][:2]
+        elif language == 'es':
+            gl = 'es'
+        elif language == 'en':
+            gl = 'us'
+        hl = language
+
+        # Seed queries: brand + first 2 noun-phrases from description.
+        seeds = []
+        if site.name:
+            seeds.append(site.name)
+        desc = (site.description or '').strip()
+        if desc:
+            tokens = re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-']{3,}", desc)
+            seen_t = set()
+            chunk = []
+            for tok in tokens:
+                k = tok.lower()
+                if k in seen_t:
+                    continue
+                seen_t.add(k)
+                chunk.append(tok)
+                if len(chunk) == 3:
+                    seeds.append(' '.join(chunk))
+                    chunk = []
+                if len(seeds) >= 3:
+                    break
+
+        # Existing keywords - shown to Claude so it picks fresh ones.
+        existing_kw = list(
+            TrackedKeyword.objects.filter(site=site, is_active=True)
+            .values_list('keyword', flat=True)[:50]
+        )
+
+        own_domain = (site.domain or '').lower().strip().rstrip('/')
+
+        serper_key = os.environ.get('SERPER_API_KEY')
+        serp_titles = []
+        related_queries = []
+        if serper_key and seeds:
+            for q in seeds[:3]:
+                try:
+                    r = http_requests.post(
+                        'https://google.serper.dev/search',
+                        headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
+                        json={'q': q, 'num': 10, 'hl': hl, 'gl': gl},
+                        timeout=10,
+                    )
+                    if r.status_code != 200:
+                        continue
+                    payload = r.json()
+                    for item in (payload.get('organic') or [])[:8]:
+                        link = (item.get('link') or '').lower()
+                        if own_domain and own_domain in link:
+                            continue
+                        title = (item.get('title') or '').strip()
+                        if title:
+                            serp_titles.append(title)
+                    for rel in (payload.get('relatedSearches') or [])[:8]:
+                        q_rel = (rel.get('query') or '').strip()
+                        if q_rel:
+                            related_queries.append(q_rel)
+                except Exception:
+                    pass
+
+        serp_block = '\n'.join(f'- {t}' for t in serp_titles[:30]) or '(pas de donnees SERP)'
+        related_block = '\n'.join(f'- {q}' for q in related_queries[:20]) or '(pas de related searches)'
+        existing_block = '\n'.join(f'- {k}' for k in existing_kw) or '(aucun)'
+
+        competitors_lines = [
+            l.strip() for l in (site.competitors or '').splitlines() if l.strip()
+        ][:8]
+        competitors_block = '\n'.join(f'- {c}' for c in competitors_lines) or '(non renseignes)'
+
+        prompt = f"""Tu es un expert SEO {language.upper()}. Propose des mots-cles que ce site devrait tracker dans Google Search Console.
+
+SITE:
+- Nom: {site.name or '(non renseigne)'}
+- Domaine: {site.domain or '(non renseigne)'}
+- Description: {site.description or '(non renseignee)'}
+- Knowledge base: {(site.knowledge_base or '')[:400]}
+- Langue cible: {language}
+- Pays cible (Google): {gl.upper()}
+
+CONCURRENTS DECLARES:
+{competitors_block}
+
+MOTS-CLES DEJA TRACKES (ne PAS reproposer):
+{existing_block}
+
+SERP TITLES (Google {hl}/{gl}) sur les seeds {seeds[:3]}:
+{serp_block}
+
+RELATED SEARCHES:
+{related_block}
+
+Ta tache: propose 12 a 18 mots-cles a tracker, soigneusement choisis pour ce site:
+- Mix d'intents: informationnel (questions, "comment", "qu'est-ce que"), commercial ("meilleur X", comparaisons), transactionnel ("acheter X", "prix X"), local ("X {gl.upper()}" si pertinent).
+- Realistes (longue-traine privilegiee, evite les ultra-competitifs sans angle local).
+- 100% dans la langue {language}.
+- Eviter le nom de la marque seule (ce n'est pas un mot-cle a tracker).
+- Eviter les doublons et les variantes triviales.
+
+Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
+{{"keywords": [{{"keyword": "<mot-cle>", "intent": "info|commercial|transactional|local", "why": "<1 phrase courte de justification>"}}]}}
+"""
+
+        try:
+            resp = http_requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={
+                    'x-api-key': anthropic_key,
+                    'anthropic-version': '2023-06-01',
+                    'content-type': 'application/json',
+                },
+                json={
+                    'model': 'claude-sonnet-4-20250514',
+                    'max_tokens': 1500,
+                    'messages': [{'role': 'user', 'content': prompt}],
+                },
+                timeout=45,
+            )
+            resp.raise_for_status()
+            text = resp.json()['content'][0]['text']
+        except http_requests.RequestException as e:
+            return Response(
+                {'error': f'Erreur Claude: {e}'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return Response(
+                {'error': 'Reponse Claude non parsable', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        try:
+            parsed = _json.loads(match.group())
+        except _json.JSONDecodeError:
+            return Response(
+                {'error': 'JSON Claude invalide', 'raw': text[:500]},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        raw_list = parsed.get('keywords') or []
+        existing_lower = {k.lower() for k in existing_kw}
+        seen = set()
+        cleaned = []
+        for item in raw_list:
+            if not isinstance(item, dict):
+                continue
+            kw = (item.get('keyword') or '').strip()
+            if not kw:
+                continue
+            key = kw.lower()
+            if key in seen or key in existing_lower:
+                continue
+            seen.add(key)
+            intent = (item.get('intent') or '').strip().lower()
+            if intent not in ('info', 'commercial', 'transactional', 'local'):
+                intent = 'info'
+            cleaned.append({
+                'keyword': kw,
+                'language': language,
+                'intent': intent,
+                'why': (item.get('why') or '').strip()[:200],
+            })
+            if len(cleaned) >= 20:
+                break
+
+        return Response({
+            'keywords': cleaned,
+            'serp_sources_used': len(serp_titles),
+            'related_searches_used': len(related_queries),
+        })
+
+
 class SiteAuditAggregatorView(APIView):
     """One-shot site-level audit dashboard. Aggregates several existing
     capabilities in parallel and returns a single payload + composite score.
