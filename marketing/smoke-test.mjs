@@ -24,6 +24,8 @@ const PAGES = [
   { path: "/login", name: "login" },
   { path: "/sites", name: "sites-protected" },
   { path: "/dashboard/1", name: "dashboard-protected" },
+  { path: "/dashboard/1/articles", name: "articles-protected" },
+  { path: "/dashboard/1/positions", name: "positions-protected" },
 ];
 
 async function main() {
@@ -51,7 +53,9 @@ async function main() {
     let status = null;
     let finalUrl = null;
     try {
-      const resp = await page.goto(url, { waitUntil: "networkidle", timeout: 20000 });
+      const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+      // Give the page a moment to settle (auth redirects, react-query, etc.)
+      await page.waitForTimeout(1500);
       status = resp?.status() ?? null;
       finalUrl = page.url();
       await page.screenshot({
