@@ -26,6 +26,8 @@ const PAGES = [
   { path: "/dashboard/1", name: "dashboard-protected" },
   { path: "/dashboard/1/articles", name: "articles-protected" },
   { path: "/dashboard/1/positions", name: "positions-protected" },
+  { path: "/dashboard/1/generer", name: "generer-protected" },
+  { path: "/dashboard/1/parametres", name: "parametres-protected" },
 ];
 
 async function main() {
