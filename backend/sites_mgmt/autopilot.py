@@ -5,8 +5,9 @@ The user toggles `Site.autopilot_enabled` and picks a weekly cadence
 hourly; this module decides whether each site is due for a new article and
 generates one by picking a topic from the site's TrackedKeyword list.
 
-Generated articles always land as **draft** in this slice - the user reviews
-before publishing. Auto-publish is a follow-up feature.
+Generated articles land as **draft** by default. The site owner can opt-in
+to auto-publish via `Site.autopilot_auto_publish`, in which case articles
+are published directly and a Vercel redeploy is triggered if configured.
 """
 import logging
 import random
@@ -135,6 +136,10 @@ def run_one(site: Site, *, force: bool = False, user=None) -> RunResult:
     site.autopilot_last_error = ''
     site.save(update_fields=['autopilot_last_run_at', 'autopilot_last_error'])
 
+    if site.autopilot_auto_publish and result.get('post_id'):
+        from .views import trigger_vercel_deploy
+        trigger_vercel_deploy(site)
+
     return RunResult(
         ok=True,
         topic=keyword.keyword,
@@ -164,10 +169,11 @@ def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
 
     article_type = map_intent_to_article_type(keyword.intent, keyword.keyword)
     length = pick_length(keyword.intent, keyword.keyword)
+    default_status = 'published' if site.autopilot_auto_publish else 'draft'
 
     logger.info(
-        'Autopilot site=%s keyword=%r intent=%s -> type=%s length=%s',
-        site.id, keyword.keyword, keyword.intent, article_type, length,
+        'Autopilot site=%s keyword=%r intent=%s -> type=%s length=%s status=%s',
+        site.id, keyword.keyword, keyword.intent, article_type, length, default_status,
     )
 
     generator = ArticleGenerator(
@@ -177,7 +183,7 @@ def _generate_article(site: Site, keyword: TrackedKeyword) -> dict:
         shopify_site=site if site.is_shopify else None,
         webflow_site=site if site.is_webflow else None,
         site=site,
-        default_status='draft',
+        default_status=default_status,
     )
     out = generator.generate(
         search_method='serper',

@@ -7977,16 +7977,23 @@ class AutopilotConfigView(APIView):
         site = get_site_for_user(request, site_id)
         data = request.data or {}
 
+        update_fields = []
         if 'enabled' in data:
             site.autopilot_enabled = bool(data.get('enabled'))
+            update_fields.append('autopilot_enabled')
         if 'weekly_count' in data:
             try:
                 wc = int(data.get('weekly_count'))
             except (TypeError, ValueError):
                 wc = 2
             site.autopilot_weekly_count = max(1, min(7, wc))
+            update_fields.append('autopilot_weekly_count')
+        if 'auto_publish' in data:
+            site.autopilot_auto_publish = bool(data.get('auto_publish'))
+            update_fields.append('autopilot_auto_publish')
 
-        site.save(update_fields=['autopilot_enabled', 'autopilot_weekly_count'])
+        if update_fields:
+            site.save(update_fields=update_fields)
         return Response(self._serialize(site))
 
     @staticmethod
@@ -8009,6 +8016,7 @@ class AutopilotConfigView(APIView):
         return {
             'enabled': site.autopilot_enabled,
             'weekly_count': site.autopilot_weekly_count,
+            'auto_publish': site.autopilot_auto_publish,
             'last_run_at': site.autopilot_last_run_at.isoformat() if site.autopilot_last_run_at else None,
             'last_error': site.autopilot_last_error or '',
             'next_run_at': next_run_at.isoformat() if next_run_at else None,

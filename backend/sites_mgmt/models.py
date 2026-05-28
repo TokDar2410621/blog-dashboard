@@ -239,6 +239,11 @@ class Site(models.Model):
         verbose_name="Dernière erreur autopilote",
         help_text="Stack trace ou message si le dernier run a échoué (vidé au prochain succès)"
     )
+    autopilot_auto_publish = models.BooleanField(
+        default=False,
+        verbose_name="Publication automatique",
+        help_text="Si actif, les articles générés par l'autopilote sont publiés directement (sans passer par draft). Désactivé par défaut pour garder une étape de review."
+    )
 
     # ── Méta ──────────────────────────────────────────────────────────
     is_active = models.BooleanField(

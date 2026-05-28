@@ -1,0 +1,84 @@
+"""Single cron entry point that dispatches all 4 scheduled jobs.
+
+Instead of creating 4 separate Railway cron services (one per command),
+deploy ONE service with schedule `*/5 * * * *` and start command
+`python manage.py cron_dispatcher`. This file decides which jobs are
+due to run based on the current UTC time.
+
+Time-based routing (UTC):
+
+- run_autopilot       : minute == 0       (hourly)
+- publish_scheduled   : minute % 15 == 0  (every 15 min)
+- rank_snapshot       : hour == 6, minute == 0  (daily 6am UTC = 2am Quebec)
+- send_lead_sequence  : weekday == 0 (Mon), hour == 14, minute == 0
+
+Why the < 5 buffer: the cron service fires at minute 0, 5, 10, ... but
+might be delayed by a couple seconds. Using `minute < 5` as the "is this
+the firing for that interval?" guard catches the right tick exactly once
+per interval without missing it if delayed.
+"""
+import logging
+
+from django.core.management import call_command
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+
+class Command(BaseCommand):
+    help = (
+        "Dispatch all due scheduled jobs in a single cron tick. "
+        "Schedule this command on Railway with `*/5 * * * *` instead of "
+        "running 4 separate cron services."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run', action='store_true',
+            help='Print which jobs would run, do not actually call them.'
+        )
+        parser.add_argument(
+            '--force', choices=['autopilot', 'publish', 'rank', 'leads', 'all'],
+            help='Bypass time gates and run a specific job (or all). For local testing.'
+        )
+
+    def handle(self, *args, **opts):
+        now = timezone.now()
+        dry = opts.get('dry_run', False)
+        force = opts.get('force')
+
+        jobs = []
+        if force == 'all' or force == 'autopilot' or (force is None and now.minute < 5):
+            jobs.append(('run_autopilot', 'hourly'))
+        if force == 'all' or force == 'publish' or (force is None and now.minute % 15 < 5):
+            jobs.append(('publish_scheduled', 'every 15 min'))
+        if force == 'all' or force == 'rank' or (
+            force is None and now.hour == 6 and now.minute < 5
+        ):
+            jobs.append(('rank_snapshot', 'daily 6am UTC'))
+        if force == 'all' or force == 'leads' or (
+            force is None and now.weekday() == 0 and now.hour == 14 and now.minute < 5
+        ):
+            jobs.append(('send_lead_sequence', 'Mondays 2pm UTC'))
+
+        if not jobs:
+            self.stdout.write(f'[{now.isoformat()}] No jobs due. Skipping.')
+            return
+
+        self.stdout.write(
+            f'[{now.isoformat()}] Dispatching {len(jobs)} job(s): '
+            + ', '.join(name for name, _ in jobs)
+        )
+
+        for name, cadence in jobs:
+            if dry:
+                self.stdout.write(f'  [dry-run] would run: {name} ({cadence})')
+                continue
+            try:
+                self.stdout.write(self.style.SUCCESS(f'  --> {name} ({cadence})'))
+                call_command(name)
+            except Exception as e:
+                # Don't let one job kill the others - log and keep going.
+                logger.exception('cron_dispatcher: %s failed', name)
+                self.stderr.write(self.style.ERROR(f'  [err] {name}: {type(e).__name__}: {e}'))
