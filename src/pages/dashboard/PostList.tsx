@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useAllPosts, useDeletePost } from "@/hooks/useDashboard";
 import { PostStatusBadge } from "@/components/PostStatusBadge";
+import { ProofBadge } from "@/components/ProofBadge";
 import { TemplateSelector } from "@/components/TemplateSelector";
+import { fetchProofAttribution, type ProofAttribution } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -51,6 +54,24 @@ export default function PostList() {
   const totalCount = data?.count ?? posts.length;
   const hasNext = !!data?.next;
   const hasPrev = page > 1;
+
+  const attributionQuery = useQuery({
+    queryKey: ["proof-attribution-list", siteId],
+    queryFn: () => fetchProofAttribution(Number(siteId)),
+    enabled: !!siteId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const attributionBySlug = useMemo(() => {
+    const map = new Map<string, ProofAttribution>();
+    for (const a of attributionQuery.data?.attributions ?? []) {
+      const existing = map.get(a.post_slug);
+      if (!existing || a.days_since_publish > existing.days_since_publish) {
+        map.set(a.post_slug, a);
+      }
+    }
+    return map;
+  }, [attributionQuery.data]);
 
   const filteredPosts = search
     ? posts.filter((p: { title: string }) =>
@@ -104,6 +125,7 @@ export default function PostList() {
                   <TableHead>{t("posts.tableStatus")}</TableHead>
                   <TableHead>{t("posts.tableCategory")}</TableHead>
                   <TableHead className="text-right">{t("posts.tableViews")}</TableHead>
+                  <TableHead className="text-right">{t("posts.tableProof", "Preuve")}</TableHead>
                   <TableHead>{t("posts.tableDate")}</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -112,7 +134,7 @@ export default function PostList() {
                 {filteredPosts.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
                       {t("posts.empty")}
@@ -159,6 +181,12 @@ export default function PostList() {
                             <Eye className="h-3 w-3" />
                             {post.view_count ?? 0}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <ProofBadge
+                            attribution={attributionBySlug.get(post.slug) ?? null}
+                            publishedAt={post.created_at}
+                          />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {new Date(post.created_at).toLocaleDateString(

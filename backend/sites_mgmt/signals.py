@@ -62,6 +62,8 @@ def unindex_hosted_post(sender, instance: HostedPost, **kwargs):
 
 # Track if knowledge_base actually changed before triggering a re-index.
 _kb_cache = {}
+# Track GSC connect state to fire a baseline capture exactly once per transition.
+_gsc_cache = {}
 
 
 @receiver(pre_save, sender=Site)
@@ -69,21 +71,44 @@ def cache_old_kb(sender, instance: Site, **kwargs):
     if not instance.pk:
         return
     try:
-        old = Site.objects.only('knowledge_base').get(pk=instance.pk)
+        old = Site.objects.only('knowledge_base', 'gsc_refresh_token').get(pk=instance.pk)
         _kb_cache[instance.pk] = old.knowledge_base
+        _gsc_cache[instance.pk] = bool(old.gsc_refresh_token)
     except Site.DoesNotExist:
         _kb_cache[instance.pk] = ''
+        _gsc_cache[instance.pk] = False
 
 
 @receiver(post_save, sender=Site)
 def index_site_kb(sender, instance: Site, created, **kwargs):
     old_kb = _kb_cache.pop(instance.pk, None)
     new_kb = instance.knowledge_base or ''
-    if not created and old_kb == new_kb:
-        return  # No change, skip re-index.
-    if created and not new_kb.strip():
-        return  # New site with no KB yet, nothing to index.
-    _safe_index(
-        site=instance, kind='kb', content=new_kb,
-        source_ref='site-kb', title='Knowledge base',
-    )
+    if created or old_kb != new_kb:
+        if not (created and not new_kb.strip()):
+            _safe_index(
+                site=instance, kind='kb', content=new_kb,
+                source_ref='site-kb', title='Knowledge base',
+            )
+
+
+@receiver(post_save, sender=Site)
+def capture_baseline_on_gsc_connect(sender, instance: Site, created, **kwargs):
+    """Fire baseline capture once when GSC transitions disconnected -> connected.
+
+    Runs in a daemon thread so the save() returns immediately. Failure is
+    swallowed; the daily baseline_capture cron will catch up.
+    """
+    was_connected = _gsc_cache.pop(instance.pk, False)
+    is_connected = bool(instance.gsc_refresh_token and instance.gsc_property_url)
+    just_connected = (created and is_connected) or (not was_connected and is_connected)
+    if not just_connected:
+        return
+
+    def _work():
+        try:
+            from . import proof_loop
+            proof_loop.capture_baseline(instance)
+        except Exception as e:
+            logger.warning('Baseline auto-capture failed (site=%s): %s', instance.id, e)
+
+    threading.Thread(target=_work, daemon=True).start()

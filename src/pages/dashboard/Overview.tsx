@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, Eye, PenLine, Clock, Sparkles, ArrowRight, Search, BarChart3, Settings } from "lucide-react";
 import { HreflangCard } from "@/components/HreflangCard";
+import { ProofCard } from "@/components/ProofCard";
 
 export default function Overview() {
   const { t, i18n } = useTranslation();
@@ -167,6 +168,9 @@ export default function Overview() {
           icon={Clock}
         />
       </div>
+
+      {/* Proof of value (GSC baseline + attribution) */}
+      {siteId && !isFirstRun && <ProofCard siteId={siteId} />}
 
       {/* Hreflang health */}
       {siteId && <HreflangCard siteId={siteId} />}

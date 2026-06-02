@@ -811,3 +811,128 @@ class SerpRank(models.Model):
 
     def __str__(self):
         return f"{self.tracked.keyword} #{self.position} ({self.recorded_at.date()})"
+
+
+class ArticleBaseline(models.Model):
+    """Snapshot of a HostedPost's GSC metrics at a fixed reference date.
+
+    Two creation paths:
+      1. At GSC-connect time, we snapshot the N most recent published posts
+         to anchor "before Gridar" -> `is_pre_gridar=True`, post optional.
+      2. At publish time of an AI-generated article, we record day-0 metrics
+         (0 impressions, 0 clicks) so the J+30/60/90 attributions have a
+         monotonic baseline to compute deltas against -> `is_pre_gridar=False`,
+         post mandatory.
+
+    Idempotency: at most ONE baseline per (site, post). Recapture only happens
+    if `captured_at` is older than `BASELINE_REFRESH_DAYS` (default 30).
+    """
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='baselines'
+    )
+    post = models.ForeignKey(
+        HostedPost, on_delete=models.CASCADE,
+        related_name='baselines', null=True, blank=True,
+        help_text="Null when the baseline is a pre-Gridar site-level anchor.",
+    )
+    captured_at = models.DateTimeField(auto_now_add=True)
+    period_start = models.DateField(
+        help_text="GSC window start used for impressions/clicks/position."
+    )
+    period_end = models.DateField(
+        help_text="GSC window end (inclusive)."
+    )
+    impressions = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    avg_position = models.FloatField(null=True, blank=True)
+    top_queries = models.JSONField(
+        default=list, blank=True,
+        help_text='[{"query": str, "impressions": int, "clicks": int, "position": float}, ...]',
+    )
+    is_pre_gridar = models.BooleanField(
+        default=False,
+        help_text="True for the historical anchor captured at GSC-connect time.",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['site', '-captured_at']),
+            models.Index(fields=['post']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['site', 'post'],
+                condition=models.Q(post__isnull=False),
+                name='uniq_baseline_per_post',
+            ),
+        ]
+
+    def __str__(self):
+        suffix = 'pre-gridar' if self.is_pre_gridar else (self.post.slug if self.post else 'site')
+        return f"Baseline {self.site.name}/{suffix} ({self.captured_at.date()})"
+
+
+class ArticleAttribution(models.Model):
+    """One GSC snapshot of a HostedPost at a fixed horizon from publish.
+
+    Horizons we capture: 30, 60, 90 days after `post.published_at`. The
+    `attribution_snapshot_run` cron walks posts whose published_at is exactly
+    today - horizon and inserts the row idempotently (unique_together).
+    """
+    HORIZON_CHOICES = [(30, '30d'), (60, '60d'), (90, '90d')]
+
+    post = models.ForeignKey(
+        HostedPost, on_delete=models.CASCADE, related_name='attributions'
+    )
+    days_since_publish = models.PositiveSmallIntegerField(choices=HORIZON_CHOICES)
+    captured_at = models.DateTimeField(auto_now_add=True)
+    period_start = models.DateField(
+        help_text="GSC window start. Usually published_at, capped at 16 months for GSC."
+    )
+    period_end = models.DateField(
+        help_text="GSC window end. Usually today (captured_at date)."
+    )
+    indexed = models.BooleanField(
+        default=False,
+        help_text="True if GSC returned any query rows for this page URL.",
+    )
+    impressions = models.PositiveIntegerField(default=0)
+    clicks = models.PositiveIntegerField(default=0)
+    avg_position = models.FloatField(null=True, blank=True)
+    top_queries = models.JSONField(default=list, blank=True)
+    delta_vs_baseline = models.JSONField(
+        default=dict, blank=True,
+        help_text='{"impressions": int, "clicks": int, "avg_position": float|null}',
+    )
+
+    class Meta:
+        unique_together = [('post', 'days_since_publish')]
+        indexes = [
+            models.Index(fields=['post', 'days_since_publish']),
+            models.Index(fields=['-captured_at']),
+        ]
+
+    def __str__(self):
+        return f"Attribution {self.post.slug} J+{self.days_since_publish}"
+
+
+class ProofShareToken(models.Model):
+    """Public read-only access token to a site's proof summary page.
+
+    One token per site (OneToOne). When `enabled=True`, GET /api/public/proof/<token>/
+    returns the site-level before/after summary. Setting enabled=False or
+    revoking the token kills the public page immediately.
+    """
+    site = models.OneToOneField(
+        Site, on_delete=models.CASCADE, related_name='proof_token'
+    )
+    token = models.CharField(
+        max_length=48, unique=True, db_index=True,
+        help_text="URL-safe random token. Rotated on revoke.",
+    )
+    enabled = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"ProofToken {self.site.name} ({'on' if self.enabled else 'off'})"

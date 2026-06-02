@@ -7,10 +7,12 @@ due to run based on the current UTC time.
 
 Time-based routing (UTC):
 
-- run_autopilot       : minute == 0       (hourly)
-- publish_scheduled   : minute % 15 == 0  (every 15 min)
-- rank_snapshot       : hour == 6, minute == 0  (daily 6am UTC = 2am Quebec)
-- send_lead_sequence  : weekday == 0 (Mon), hour == 14, minute == 0
+- run_autopilot         : minute == 0       (hourly)
+- publish_scheduled     : minute % 15 == 0  (every 15 min)
+- rank_snapshot         : hour == 6, minute == 0  (daily 6am UTC = 2am Quebec)
+- attribution_snapshot  : hour == 7, minute == 0  (daily 7am UTC = 3am Quebec)
+- baseline_capture      : hour == 8, minute == 0  (daily 8am UTC = 4am Quebec)
+- send_lead_sequence    : weekday == 0 (Mon), hour == 14, minute == 0
 
 Why the < 5 buffer: the cron service fires at minute 0, 5, 10, ... but
 might be delayed by a couple seconds. Using `minute < 5` as the "is this
@@ -39,7 +41,8 @@ class Command(BaseCommand):
             help='Print which jobs would run, do not actually call them.'
         )
         parser.add_argument(
-            '--force', choices=['autopilot', 'publish', 'rank', 'leads', 'all'],
+            '--force', choices=['autopilot', 'publish', 'rank', 'attribution',
+                                'baseline', 'leads', 'all'],
             help='Bypass time gates and run a specific job (or all). For local testing.'
         )
 
@@ -57,6 +60,14 @@ class Command(BaseCommand):
             force is None and now.hour == 6 and now.minute < 5
         ):
             jobs.append(('rank_snapshot', 'daily 6am UTC'))
+        if force == 'all' or force == 'attribution' or (
+            force is None and now.hour == 7 and now.minute < 5
+        ):
+            jobs.append(('attribution_snapshot', 'daily 7am UTC'))
+        if force == 'all' or force == 'baseline' or (
+            force is None and now.hour == 8 and now.minute < 5
+        ):
+            jobs.append(('baseline_capture', 'daily 8am UTC'))
         if force == 'all' or force == 'leads' or (
             force is None and now.weekday() == 0 and now.hour == 14 and now.minute < 5
         ):

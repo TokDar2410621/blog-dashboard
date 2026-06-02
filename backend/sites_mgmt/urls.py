@@ -40,6 +40,10 @@ from .api_v1 import (
     V1AuditView, V1BriefView, V1KeywordsView, V1RankSnapshotView,
     V1DigestView, TokenManagementView, TokenRevokeView,
 )
+from .views_proof import (
+    ProofBaselineView, ProofAttributionView, ProofSummaryView,
+    ProofShareView, PublicProofView,
+)
 
 router = DefaultRouter()
 router.register(r'sites', SiteViewSet, basename='site')
@@ -137,6 +141,12 @@ urlpatterns = [
     path('sites/<int:site_id>/gsc/oauth-url/', GSCOAuthUrlView.as_view(), name='gsc-oauth-url'),
     path('sites/<int:site_id>/gsc/oauth-callback/', GSCOAuthCallbackView.as_view(), name='gsc-oauth-callback'),
     path('sites/<int:site_id>/gsc/queries/', GSCQueriesView.as_view(), name='gsc-queries'),
+    # Proof loop (baseline + attribution)
+    path('sites/<int:site_id>/proof/baseline/', ProofBaselineView.as_view(), name='site-proof-baseline'),
+    path('sites/<int:site_id>/proof/attribution/', ProofAttributionView.as_view(), name='site-proof-attribution'),
+    path('sites/<int:site_id>/proof/summary/', ProofSummaryView.as_view(), name='site-proof-summary'),
+    path('sites/<int:site_id>/proof/share/', ProofShareView.as_view(), name='site-proof-share'),
+    path('public/proof/<str:token>/', PublicProofView.as_view(), name='public-proof'),
     # Public API - for site frontends
     path('public/site-by-domain/', PublicSiteByDomainView.as_view(), name='public-site-by-domain'),
     path('public/sites/<int:site_id>/', PublicSiteView.as_view(), name='public-site'),

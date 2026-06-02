@@ -581,3 +581,103 @@ export async function uploadInlineImage(file: File): Promise<{ url: string }> {
   }
   return res.json();
 }
+
+// ---- Proof loop (baseline + attribution) ----
+
+export type ProofQueryRow = {
+  query: string;
+  impressions: number;
+  clicks: number;
+  position: number | null;
+};
+
+export type ProofAttribution = {
+  id: number;
+  post_id: number;
+  post_slug: string;
+  post_title: string;
+  days_since_publish: 30 | 60 | 90;
+  captured_at: string;
+  period_start: string;
+  period_end: string;
+  indexed: boolean;
+  impressions: number;
+  clicks: number;
+  avg_position: number | null;
+  top_queries: ProofQueryRow[];
+  delta_vs_baseline: {
+    impressions: number;
+    clicks: number;
+    avg_position: number | null;
+  };
+};
+
+export type ProofTopGainer = {
+  post_id: number;
+  title: string;
+  slug: string;
+  horizon: 30 | 60 | 90;
+  impressions_gained: number;
+  clicks_gained: number;
+  top_queries: ProofQueryRow[];
+};
+
+export type ProofSummary = {
+  site_id: number;
+  site_name: string;
+  domain?: string;
+  posts_with_attribution: number;
+  total_impressions_gained: number;
+  total_clicks_gained: number;
+  top_gainers: ProofTopGainer[];
+};
+
+export type ProofShareState = {
+  enabled: boolean;
+  token: string | null;
+  public_url: string | null;
+  created_at?: string;
+  revoked_at?: string | null;
+  rotated?: boolean;
+};
+
+export async function fetchProofSummary(siteId: number): Promise<ProofSummary> {
+  const res = await authFetch(`/sites/${siteId}/proof/summary/`);
+  if (!res.ok) throw new ApiError("Proof summary failed", res.status);
+  return res.json();
+}
+
+export async function fetchProofAttribution(
+  siteId: number,
+  postId?: number,
+): Promise<{ attributions: ProofAttribution[] }> {
+  const q = postId ? `?post=${postId}` : "";
+  const res = await authFetch(`/sites/${siteId}/proof/attribution/${q}`);
+  if (!res.ok) throw new ApiError("Proof attribution failed", res.status);
+  return res.json();
+}
+
+export async function fetchProofShareState(siteId: number): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`);
+  if (!res.ok) throw new ApiError("Proof share state failed", res.status);
+  return res.json();
+}
+
+export async function enableProofShare(
+  siteId: number,
+  opts?: { rotate?: boolean },
+): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rotate: !!opts?.rotate }),
+  });
+  if (!res.ok) throw new ApiError("Enable share failed", res.status);
+  return res.json();
+}
+
+export async function revokeProofShare(siteId: number): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`, { method: "DELETE" });
+  if (!res.ok) throw new ApiError("Revoke share failed", res.status);
+  return res.json();
+}
