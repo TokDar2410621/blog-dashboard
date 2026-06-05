@@ -567,3 +567,449 @@ class TokenRevokeView(APIView):
         tok.revoked_at = timezone.now()
         tok.save(update_fields=['revoked_at'])
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --------------------------------------------------------------------------
+# Extended v1 endpoints (added 2026-06-02 for the @gridar/mcp-server 0.2)
+# --------------------------------------------------------------------------
+
+class V1SiteDetailView(BaseV1View):
+    """GET /api/v1/sites/<id>/ - full site config + integration status."""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        return Response({
+            'id': s.id, 'name': s.name, 'domain': s.domain,
+            'is_hosted': s.is_hosted, 'is_wordpress': s.is_wordpress,
+            'is_shopify': s.is_shopify, 'is_webflow': s.is_webflow,
+            'default_language': s.default_language,
+            'available_languages': s.effective_languages,
+            'public_blog_domain': s.public_blog_domain,
+            'description': getattr(s, 'description', ''),
+            'knowledge_base': s.knowledge_base or '',
+            'competitors': getattr(s, 'competitors', '') or '',
+            'gsc_connected': bool(s.gsc_property_url and s.gsc_refresh_token),
+            'gsc_property_url': s.gsc_property_url or '',
+            'autopilot_enabled': bool(getattr(s, 'autopilot_enabled', False)),
+            'author_bio': getattr(s, 'author_bio', '') or '',
+            'author_credentials': getattr(s, 'author_credentials', '') or '',
+        })
+
+
+class V1SiteUpdateView(BaseV1View):
+    """PATCH /api/v1/sites/<id>/ - update editable site fields.
+
+    Whitelisted fields only: name, description, knowledge_base, competitors,
+    default_language, author_bio, author_credentials, public_blog_domain.
+    """
+    EDITABLE = {
+        'name', 'description', 'knowledge_base', 'competitors',
+        'default_language', 'author_bio', 'author_credentials',
+        'public_blog_domain',
+    }
+
+    def patch(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        updated = []
+        for field, value in (request.data or {}).items():
+            if field not in self.EDITABLE:
+                continue
+            if hasattr(s, field):
+                setattr(s, field, value)
+                updated.append(field)
+        if updated:
+            s.save(update_fields=updated)
+        return Response({'updated_fields': updated, 'site_id': s.id})
+
+
+class V1ArticleCreateView(BaseV1View):
+    """POST /api/v1/sites/<id>/articles/manual/ - create a manual (non-AI) article."""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        if not s.is_hosted:
+            return Response(
+                {'error': 'Manual article creation is only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from django.utils.text import slugify
+        data = request.data or {}
+        title = (data.get('title') or '').strip()
+        content = data.get('content') or ''
+        if not title or not content:
+            return Response(
+                {'error': 'title and content are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        slug = (data.get('slug') or slugify(title))[:200]
+        if HostedPost.objects.filter(site=s, slug=slug).exists():
+            return Response(
+                {'error': f'Slug "{slug}" already exists on this site.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        from datetime import date as _date
+        status_val = (data.get('status') or 'draft').lower()
+        if status_val not in ('draft', 'published', 'scheduled'):
+            status_val = 'draft'
+        post = HostedPost.objects.create(
+            site=s,
+            title=title[:200],
+            slug=slug,
+            excerpt=(data.get('excerpt') or '')[:500],
+            content=content,
+            author=(data.get('author') or 'API')[:100],
+            language=(data.get('language') or s.default_language or 'fr')[:2],
+            status=status_val,
+            cover_image=(data.get('cover_image') or '')[:500],
+            published_at=_date.today() if status_val == 'published' else None,
+        )
+        return Response(
+            {'slug': post.slug, 'id': post.id, 'status': post.status},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class V1ArticleMutateView(BaseV1View):
+    """PATCH/DELETE /api/v1/sites/<id>/articles/<slug>/manual/.
+
+    PATCH: partial update (title, excerpt, content, status, cover_image, slug).
+    DELETE: delete the article.
+    Both are hosted-only.
+    """
+    UPDATABLE = {'title', 'excerpt', 'content', 'status',
+                 'cover_image', 'slug', 'author'}
+
+    def _get_hosted(self, request, site_id, slug):
+        site = self.get_user_site(request, site_id)
+        if not site.is_hosted:
+            return None, Response(
+                {'error': 'Manual edits are only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            post = HostedPost.objects.get(site=site, slug=slug)
+        except HostedPost.DoesNotExist:
+            return None, Response({'error': 'Article introuvable.'},
+                                  status=status.HTTP_404_NOT_FOUND)
+        return post, None
+
+    def patch(self, request, site_id, slug):
+        post, err = self._get_hosted(request, site_id, slug)
+        if err:
+            return err
+        updated = []
+        for field, value in (request.data or {}).items():
+            if field not in self.UPDATABLE:
+                continue
+            if field == 'status' and value not in ('draft', 'published', 'scheduled'):
+                continue
+            setattr(post, field, value)
+            updated.append(field)
+        if 'status' in updated and post.status == 'published' and not post.published_at:
+            from datetime import date as _date
+            post.published_at = _date.today()
+            updated.append('published_at')
+        if updated:
+            post.save(update_fields=updated)
+        return Response({'updated_fields': updated, 'slug': post.slug})
+
+    def delete(self, request, site_id, slug):
+        post, err = self._get_hosted(request, site_id, slug)
+        if err:
+            return err
+        post.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class V1KeywordTrackView(BaseV1View):
+    """POST /api/v1/sites/<id>/keywords/ - track a new keyword.
+
+    DELETE /api/v1/sites/<id>/keywords/<pk>/ - untrack (soft via is_active=False).
+    """
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        data = request.data or {}
+        keyword = (data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        language = (data.get('language') or s.default_language or 'fr')[:2]
+        target_url = (data.get('target_url') or '')[:500]
+        from .quota import check_keyword_quota
+        try:
+            check_keyword_quota(request.user)
+        except exceptions.PermissionDenied as e:
+            return Response({'error': str(e), 'limit_exceeded': True},
+                            status=status.HTTP_402_PAYMENT_REQUIRED)
+        existing = TrackedKeyword.objects.filter(
+            site=s, keyword=keyword, language=language
+        ).first()
+        if existing:
+            if not existing.is_active:
+                existing.is_active = True
+                existing.save(update_fields=['is_active'])
+            return Response(
+                {'id': existing.id, 'keyword': existing.keyword,
+                 'language': existing.language, 'reactivated': not existing.is_active},
+            )
+        tk = TrackedKeyword.objects.create(
+            site=s, keyword=keyword, language=language,
+            target_url=target_url, is_active=True,
+        )
+        return Response(
+            {'id': tk.id, 'keyword': tk.keyword, 'language': tk.language},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class V1KeywordUntrackView(BaseV1View):
+    """DELETE /api/v1/sites/<id>/keywords/<pk>/"""
+
+    def delete(self, request, site_id, pk):
+        s = self.get_user_site(request, site_id)
+        try:
+            tk = TrackedKeyword.objects.get(site=s, id=pk)
+        except TrackedKeyword.DoesNotExist:
+            return Response({'error': 'Keyword introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        tk.is_active = False
+        tk.save(update_fields=['is_active'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _delegate(dashboard_view_cls, request, **kwargs):
+    """Instantiate a dashboard APIView and call its handler with the v1 request."""
+    view = dashboard_view_cls()
+    view.request = request
+    view.kwargs = kwargs
+    method = request.method.lower()
+    handler = getattr(view, method, None)
+    if not handler:
+        return Response({'error': f'Method {request.method} not allowed.'},
+                        status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    return handler(request, **kwargs)
+
+
+class V1CompetitorsAnalyzeView(BaseV1View):
+    """POST /api/v1/competitors/ {keyword, language} - analyze SERP top 10."""
+
+    def post(self, request):
+        from .views import CompetitorAnalysisView
+        return _delegate(CompetitorAnalysisView, request)
+
+
+class V1ContentDecayView(BaseV1View):
+    """GET /api/v1/sites/<id>/content-decay/?days=30"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import ContentDecayView
+        return _delegate(ContentDecayView, request, site_id=s.id)
+
+
+class V1BrokenLinksView(BaseV1View):
+    """GET /api/v1/sites/<id>/broken-links/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import BrokenLinksView
+        return _delegate(BrokenLinksView, request, site_id=s.id)
+
+
+class V1HreflangCheckView(BaseV1View):
+    """POST /api/v1/hreflang-check/"""
+
+    def post(self, request):
+        from .views import HreflangCheckView
+        return _delegate(HreflangCheckView, request)
+
+
+class V1CannibalizationView(BaseV1View):
+    """GET /api/v1/sites/<id>/cannibalization/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SiteCannibalizationView
+        return _delegate(SiteCannibalizationView, request, site_id=s.id)
+
+
+class V1LinkSuggestionsView(BaseV1View):
+    """POST /api/v1/sites/<id>/link-suggestions/"""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import LinkSuggestionsView
+        return _delegate(LinkSuggestionsView, request, site_id=s.id)
+
+
+class V1BulkAuditView(BaseV1View):
+    """GET /api/v1/sites/<id>/audit-all/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import BulkSEOAuditView
+        return _delegate(BulkSEOAuditView, request, site_id=s.id)
+
+
+class V1ReadabilityView(BaseV1View):
+    """POST /api/v1/readability/ {content, language}"""
+
+    def post(self, request):
+        from .views import ReadabilityView
+        return _delegate(ReadabilityView, request)
+
+
+class V1PlagiarismView(BaseV1View):
+    """POST /api/v1/plagiarism/ {content}"""
+
+    def post(self, request):
+        from .views import PlagiarismCheckView
+        return _delegate(PlagiarismCheckView, request)
+
+
+class V1GSCQueriesView(BaseV1View):
+    """GET /api/v1/sites/<id>/gsc/queries/?days=28&limit=50"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import GSCQueriesView
+        return _delegate(GSCQueriesView, request, site_id=s.id)
+
+
+class V1AutopilotConfigView(BaseV1View):
+    """GET/POST /api/v1/sites/<id>/autopilot/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import AutopilotConfigView
+        return _delegate(AutopilotConfigView, request, site_id=s.id)
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import AutopilotConfigView
+        return _delegate(AutopilotConfigView, request, site_id=s.id)
+
+
+class V1AutopilotRunView(BaseV1View):
+    """POST /api/v1/sites/<id>/autopilot/run/ - manual trigger."""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import AutopilotRunView
+        return _delegate(AutopilotRunView, request, site_id=s.id)
+
+
+class V1MemoriesListView(BaseV1View):
+    """GET/POST /api/v1/sites/<id>/memories/
+
+    GET: list site memories.
+    POST {content, title?, kind='manual'}: add a manual note.
+    """
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SiteMemoryView
+        return _delegate(SiteMemoryView, request, site_id=s.id)
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SiteMemoryView
+        return _delegate(SiteMemoryView, request, site_id=s.id)
+
+
+class V1MemoryDetailView(BaseV1View):
+    """DELETE /api/v1/sites/<id>/memories/<pk>/"""
+
+    def delete(self, request, site_id, pk):
+        s = self.get_user_site(request, site_id)
+        from .views import SiteMemoryDetailView
+        return _delegate(SiteMemoryDetailView, request, site_id=s.id, pk=pk)
+
+
+class V1MemoryRebuildView(BaseV1View):
+    """POST /api/v1/sites/<id>/memories/rebuild/"""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SiteMemoryRebuildView
+        return _delegate(SiteMemoryRebuildView, request, site_id=s.id)
+
+
+class V1ProofSummaryView(BaseV1View):
+    """GET /api/v1/sites/<id>/proof/summary/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views_proof import ProofSummaryView
+        return _delegate(ProofSummaryView, request, site_id=s.id)
+
+
+class V1ProofAttributionView(BaseV1View):
+    """GET /api/v1/sites/<id>/proof/attribution/?post=<pk>"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views_proof import ProofAttributionView
+        return _delegate(ProofAttributionView, request, site_id=s.id)
+
+
+class V1ProofShareView(BaseV1View):
+    """GET/POST/DELETE /api/v1/sites/<id>/proof/share/"""
+
+    def get(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views_proof import ProofShareView
+        return _delegate(ProofShareView, request, site_id=s.id)
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views_proof import ProofShareView
+        return _delegate(ProofShareView, request, site_id=s.id)
+
+    def delete(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views_proof import ProofShareView
+        return _delegate(ProofShareView, request, site_id=s.id)
+
+
+class V1SuggestKeywordsView(BaseV1View):
+    """POST /api/v1/sites/<id>/suggest-keywords/"""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SuggestKeywordsView
+        return _delegate(SuggestKeywordsView, request, site_id=s.id)
+
+
+class V1SuggestCompetitorsView(BaseV1View):
+    """POST /api/v1/sites/<id>/suggest-competitors/"""
+
+    def post(self, request, site_id):
+        s = self.get_user_site(request, site_id)
+        from .views import SuggestCompetitorsView
+        return _delegate(SuggestCompetitorsView, request, site_id=s.id)
+
+
+class V1KeywordResearchView(BaseV1View):
+    """POST /api/v1/keyword-research/"""
+
+    def post(self, request):
+        from .views import KeywordResearchView
+        return _delegate(KeywordResearchView, request)
+
+
+class V1PageSpeedView(BaseV1View):
+    """POST /api/v1/page-speed/"""
+
+    def post(self, request):
+        from .views import PageSpeedView
+        return _delegate(PageSpeedView, request)
+
+
+class V1PAAView(BaseV1View):
+    """POST /api/v1/paa/ - People Also Ask harvest."""
+
+    def post(self, request):
+        from .views import PAAView
+        return _delegate(PAAView, request)

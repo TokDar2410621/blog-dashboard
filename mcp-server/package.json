@@ -1,7 +1,7 @@
 {
   "name": "@gridar/mcp-server",
-  "version": "0.1.0",
-  "description": "Model Context Protocol server for Gridar - generate, audit, and publish SEO articles from Claude Code, Cursor, or any MCP-compatible client.",
+  "version": "0.2.0",
+  "description": "Model Context Protocol server for Gridar - 40 tools to manage sites, generate / edit / publish articles, track keywords, audit SEO, run autopilot and surface GSC proof of value from Claude Code, Cursor, Codex, or any MCP-compatible client.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/TokDar2410621/blog-dashboard",

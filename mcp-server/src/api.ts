@@ -35,7 +35,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${TOKEN}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.1.0",
+    "User-Agent": "@gridar/mcp-server/0.2.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 
@@ -189,4 +189,258 @@ export async function getWeeklyDigest(siteId: number) {
     period_end: string;
     summary: Record<string, unknown>;
   }>(`/sites/${siteId}/digest/weekly/`);
+}
+
+// ---------------------------------------------------------------------------
+// Extended wrappers (0.2 / proof loop + full surface)
+// ---------------------------------------------------------------------------
+
+export async function getSiteDetail(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/detail/`);
+}
+
+export async function updateSite(siteId: number, fields: Record<string, unknown>) {
+  return request<{ updated_fields: string[]; site_id: number }>(
+    `/sites/${siteId}/update/`,
+    { method: "PATCH", body: JSON.stringify(fields) },
+  );
+}
+
+export async function createManualArticle(
+  siteId: number,
+  body: {
+    title: string;
+    content: string;
+    excerpt?: string;
+    slug?: string;
+    status?: "draft" | "published" | "scheduled";
+    author?: string;
+    language?: "fr" | "en" | "es";
+    cover_image?: string;
+  },
+) {
+  return request<{ slug: string; id: number; status: string }>(
+    `/sites/${siteId}/articles/manual/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function updateArticle(
+  siteId: number,
+  slug: string,
+  fields: Record<string, unknown>,
+) {
+  return request<{ updated_fields: string[]; slug: string }>(
+    `/sites/${siteId}/articles/${encodeURIComponent(slug)}/manual/`,
+    { method: "PATCH", body: JSON.stringify(fields) },
+  );
+}
+
+export async function deleteArticle(siteId: number, slug: string) {
+  return request<void>(
+    `/sites/${siteId}/articles/${encodeURIComponent(slug)}/manual/`,
+    { method: "DELETE" },
+  );
+}
+
+export async function trackKeyword(
+  siteId: number,
+  body: { keyword: string; language?: "fr" | "en" | "es"; target_url?: string },
+) {
+  return request<{ id: number; keyword: string; language: string; reactivated?: boolean }>(
+    `/sites/${siteId}/keywords/track/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function untrackKeyword(siteId: number, keywordId: number) {
+  return request<void>(
+    `/sites/${siteId}/keywords/${keywordId}/untrack/`,
+    { method: "DELETE" },
+  );
+}
+
+export async function analyzeCompetitors(body: {
+  keyword: string;
+  language?: "fr" | "en" | "es";
+}) {
+  return request<Record<string, unknown>>(`/competitors/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getContentDecay(siteId: number, days = 30) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/content-decay/?days=${days}`,
+  );
+}
+
+export async function getBrokenLinks(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/broken-links/`);
+}
+
+export async function checkHreflang(body: { site_id?: number; html?: string }) {
+  return request<Record<string, unknown>>(`/hreflang-check/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function detectCannibalization(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/cannibalization/`);
+}
+
+export async function suggestInternalLinks(
+  siteId: number,
+  body: { article_slug?: string; content?: string; keyword?: string },
+) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/link-suggestions/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function bulkAudit(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/audit-all/`);
+}
+
+export async function checkReadability(body: { content: string; language?: string }) {
+  return request<Record<string, unknown>>(`/readability/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function checkPlagiarism(body: { content: string }) {
+  return request<Record<string, unknown>>(`/plagiarism/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getGscQueries(siteId: number, days = 28, limit = 50) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/gsc-queries/?days=${days}&limit=${limit}`,
+  );
+}
+
+export async function getAutopilotConfig(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/autopilot/`);
+}
+
+export async function setAutopilotConfig(
+  siteId: number,
+  body: {
+    enabled?: boolean;
+    weekly_count?: number;
+    auto_publish?: boolean;
+  },
+) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/autopilot/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function runAutopilotNow(siteId: number) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/autopilot/run/`,
+    { method: "POST" },
+  );
+}
+
+export async function listMemories(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/memories/`);
+}
+
+export async function addMemory(
+  siteId: number,
+  body: { content: string; title?: string; kind?: string },
+) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/memories/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteMemory(siteId: number, memoryId: number) {
+  return request<void>(
+    `/sites/${siteId}/memories/${memoryId}/`,
+    { method: "DELETE" },
+  );
+}
+
+export async function rebuildMemory(siteId: number) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/memories/rebuild/`,
+    { method: "POST" },
+  );
+}
+
+export async function getProofSummary(siteId: number) {
+  return request<Record<string, unknown>>(`/sites/${siteId}/proof/summary/`);
+}
+
+export async function getProofAttribution(siteId: number, postId?: number) {
+  const q = postId ? `?post=${postId}` : "";
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/proof/attribution/${q}`,
+  );
+}
+
+export async function enableProofShare(siteId: number, rotate = false) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/proof/share/`,
+    { method: "POST", body: JSON.stringify({ rotate }) },
+  );
+}
+
+export async function revokeProofShare(siteId: number) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/proof/share/`,
+    { method: "DELETE" },
+  );
+}
+
+export async function suggestKeywords(siteId: number, body?: Record<string, unknown>) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/suggest-keywords/`,
+    { method: "POST", body: JSON.stringify(body ?? {}) },
+  );
+}
+
+export async function suggestCompetitors(siteId: number, body?: Record<string, unknown>) {
+  return request<Record<string, unknown>>(
+    `/sites/${siteId}/suggest-competitors/`,
+    { method: "POST", body: JSON.stringify(body ?? {}) },
+  );
+}
+
+export async function keywordResearch(body: {
+  seed?: string;
+  language?: "fr" | "en" | "es";
+  country?: string;
+}) {
+  return request<Record<string, unknown>>(`/keyword-research/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function pageSpeed(body: { url: string; strategy?: "mobile" | "desktop" }) {
+  return request<Record<string, unknown>>(`/page-speed/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function peopleAlsoAsk(body: {
+  keyword: string;
+  language?: "fr" | "en" | "es";
+}) {
+  return request<Record<string, unknown>>(`/paa/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
