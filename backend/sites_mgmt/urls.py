@@ -169,6 +169,10 @@ urlpatterns = [
     path('v1/me/', V1MeView.as_view(), name='v1-me'),
     path('v1/sites/', V1SitesView.as_view(), name='v1-sites'),
     path('v1/sites/<int:site_id>/articles/', V1ArticlesView.as_view(), name='v1-articles'),
+    # Must come BEFORE the catch-all <slug:slug>/ pattern below (else "manual"
+    # is consumed as a slug).
+    path('v1/sites/<int:site_id>/articles/manual/', V1ArticleCreateView.as_view(), name='v1-article-create'),
+    path('v1/sites/<int:site_id>/articles/<slug:slug>/manual/', V1ArticleMutateView.as_view(), name='v1-article-mutate'),
     path('v1/sites/<int:site_id>/articles/<slug:slug>/', V1ArticleDetailView.as_view(), name='v1-article-detail'),
     path('v1/sites/<int:site_id>/generate/', V1GenerateView.as_view(), name='v1-generate'),
     path('v1/audit/', V1AuditView.as_view(), name='v1-audit'),
@@ -182,8 +186,6 @@ urlpatterns = [
     # Extended public API v1 (Bearer ApiToken) - 0.2 / mcp-server expansion
     path('v1/sites/<int:site_id>/detail/', V1SiteDetailView.as_view(), name='v1-site-detail'),
     path('v1/sites/<int:site_id>/update/', V1SiteUpdateView.as_view(), name='v1-site-update'),
-    path('v1/sites/<int:site_id>/articles/manual/', V1ArticleCreateView.as_view(), name='v1-article-create'),
-    path('v1/sites/<int:site_id>/articles/<slug:slug>/manual/', V1ArticleMutateView.as_view(), name='v1-article-mutate'),
     path('v1/sites/<int:site_id>/keywords/track/', V1KeywordTrackView.as_view(), name='v1-keyword-track'),
     path('v1/sites/<int:site_id>/keywords/<int:pk>/untrack/', V1KeywordUntrackView.as_view(), name='v1-keyword-untrack'),
     path('v1/competitors/', V1CompetitorsAnalyzeView.as_view(), name='v1-competitors'),
