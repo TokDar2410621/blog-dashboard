@@ -51,6 +51,17 @@ const GRIDAR_BASE = (
 ).replace(/\/$/, "");
 const OAUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// Static OAuth client credentials. MCP clients that auto-register via RFC 7591
+// receive these (always the same pair). Claude Code stores them in its
+// keychain and uses them on subsequent /token requests. PKCE still protects
+// the authorization code; the client_secret is purely a "this is a registered
+// client" signal that some clients (Claude Code in particular) refuse to
+// proceed without. Reference: obsidian-mcp does the same.
+const OAUTH_CLIENT_ID =
+  process.env.OAUTH_CLIENT_ID ?? "gridar-mcp-public";
+const OAUTH_CLIENT_SECRET =
+  process.env.OAUTH_CLIENT_SECRET ?? "gridar-mcp-public-secret";
+
 const app = express();
 app.use(express.json({ limit: "4mb" }));
 
@@ -84,7 +95,7 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     name: "gridar-mcp",
-    version: "0.4.1",
+    version: "0.4.2",
     transport: "streamable-http",
     oauth: true,
   });
@@ -166,18 +177,20 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256", "plain"],
-    token_endpoint_auth_methods_supported: ["none"],
+    // Both methods supported. client_secret_post matches what Claude Code
+    // expects (obsidian-mcp uses the same), while `none` keeps PKCE-only
+    // public clients (Continue.dev, MCP Inspector, ...) working.
+    token_endpoint_auth_methods_supported: ["client_secret_post", "none"],
     scopes_supported: ["mcp:full"],
     service_documentation: "https://gridar.app/docs/integrations",
   });
 });
 
-// 5.1b - Dynamic Client Registration (RFC 7591). Lets MCP clients
-// (Claude Code, Claude Desktop, Cursor) register themselves on-the-fly
-// without us pre-creating an OAuth app per client. The "client" here is
-// purely a label - we don't authenticate the client at /token because
-// PKCE protects against authorization code interception, so any
-// localhost redirect_uri is acceptable.
+// 5.1b - Dynamic Client Registration (RFC 7591). Returns the static
+// OAuth_CLIENT_ID / OAUTH_CLIENT_SECRET pair so MCP clients (Claude Code,
+// Cursor, Codex) can complete their OAuth handshake. Same pattern as
+// obsidian-mcp: the DCR ritual is observed but the credentials are static.
+// The real security is the user-side consent + PKCE, not per-client secrets.
 app.post("/register", express.json(), (req, res) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const redirect_uris = Array.isArray(body.redirect_uris)
@@ -185,18 +198,26 @@ app.post("/register", express.json(), (req, res) => {
         (u) => typeof u === "string" && u.length > 0,
       )
     : [];
+  if (!redirect_uris.length) {
+    res.status(400).json({
+      error: "invalid_client_metadata",
+      error_description:
+        "redirect_uris must be provided as a non-empty array of strings",
+    });
+    return;
+  }
   const client_name =
     (typeof body.client_name === "string" && body.client_name) || "MCP client";
 
-  const client_id = `mcp-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
   res.status(201).json({
-    client_id,
+    client_id: OAUTH_CLIENT_ID,
+    client_secret: OAUTH_CLIENT_SECRET,
     client_id_issued_at: Math.floor(Date.now() / 1000),
     client_name,
     redirect_uris,
     grant_types: ["authorization_code"],
     response_types: ["code"],
-    token_endpoint_auth_method: "none",
+    token_endpoint_auth_method: "client_secret_post",
     scope: "mcp:full",
   });
 });
@@ -299,6 +320,9 @@ app.get("/callback", (req, res) => {
 });
 
 // 5.5 - /token: exchange code (+ PKCE verifier) for the access token.
+// Accepts both client_secret_post (validates the static secret if present)
+// and `none` (PKCE-only). PKCE itself is always required and is the actual
+// security barrier.
 app.post(
   "/token",
   express.urlencoded({ extended: false }),
@@ -311,6 +335,7 @@ app.post(
       redirect_uri,
       code_verifier,
       client_id,
+      client_secret,
     } = body;
 
     if (grant_type !== "authorization_code") {
@@ -319,6 +344,21 @@ app.post(
     }
     if (!code || !code_verifier) {
       res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    // If the client sent a secret, it must match the static one we issued
+    // at /register. If it didn't, we accept (public client, PKCE-only path).
+    if (client_secret !== undefined && client_secret !== OAUTH_CLIENT_SECRET) {
+      res.status(401).json({
+        error: "invalid_client",
+        error_description: "client_secret does not match",
+      });
+      return;
+    }
+    if (client_id && client_id !== OAUTH_CLIENT_ID) {
+      // Only check static match if the client identified itself. Don't reject
+      // public clients that omit client_id (legacy MCP clients).
+      res.status(400).json({ error: "invalid_client" });
       return;
     }
     const entry = issuedCodes.get(code);
@@ -333,10 +373,6 @@ app.post(
     }
     if (entry.redirect_uri !== redirect_uri) {
       res.status(400).json({ error: "invalid_grant", error_description: "redirect_uri mismatch" });
-      return;
-    }
-    if (client_id && entry.client_id !== client_id) {
-      res.status(400).json({ error: "invalid_client" });
       return;
     }
     if (!verifyPkce(code_verifier, entry.code_challenge, entry.code_challenge_method)) {
