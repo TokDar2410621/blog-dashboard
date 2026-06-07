@@ -1,18 +1,37 @@
-/** Thin HTTP client for the Gridar REST API. */
+/** Thin HTTP client for the Gridar REST API.
+ *
+ * Two transport modes feed into this client:
+ *  - stdio: BLOG_DASHBOARD_TOKEN env var is read once at boot, used for every
+ *    request. The legacy single-user pattern.
+ *  - http : the token is provided per-request via AsyncLocalStorage by the
+ *    HTTP server's auth middleware. Lets one hosted process serve many users.
+ *
+ * The env var stays as a fallback so stdio installs keep working unchanged.
+ */
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const API_BASE =
   process.env.BLOG_DASHBOARD_API_BASE || "https://api.gridar.app/api/v1";
 
-const TOKEN = process.env.BLOG_DASHBOARD_TOKEN;
+const ENV_TOKEN = process.env.BLOG_DASHBOARD_TOKEN;
 
-if (!TOKEN) {
-  // eslint-disable-next-line no-console
-  console.error(
-    "[gridar-mcp] BLOG_DASHBOARD_TOKEN env var is required.\n" +
-      "Generate one at https://blog-dashboard-ebon.vercel.app/account/api-keys " +
-      "and pass it via your MCP client config (e.g. Claude Desktop config.json)."
+type RequestCtx = { token: string };
+const requestStorage = new AsyncLocalStorage<RequestCtx>();
+
+/** Run `fn` with a per-request token in scope. Used by the HTTP server. */
+export function withRequestToken<T>(token: string, fn: () => T | Promise<T>): T | Promise<T> {
+  return requestStorage.run({ token }, fn);
+}
+
+function getToken(): string {
+  const stored = requestStorage.getStore()?.token;
+  if (stored) return stored;
+  if (ENV_TOKEN) return ENV_TOKEN;
+  throw new ApiError(
+    "Missing Bearer token. Set BLOG_DASHBOARD_TOKEN env var (stdio) or " +
+      "pass Authorization: Bearer btb_xxx on the HTTP request.",
+    401,
   );
-  process.exit(1);
 }
 
 export class ApiError extends Error {
@@ -32,10 +51,10 @@ async function request<T = unknown>(
 ): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
   const headers = {
-    Authorization: `Bearer ${TOKEN}`,
+    Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.2.0",
+    "User-Agent": "@gridar/mcp-server/0.3.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 

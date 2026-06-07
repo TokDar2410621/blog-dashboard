@@ -117,13 +117,53 @@ Once installed, your AI client gets **43 tools** covering the dashboard surface.
 
 ---
 
+## Two ways to run
+
+| Transport | Use when | Performance |
+|---|---|---|
+| **Hosted HTTP** (`https://mcp.gridar.app/mcp`) | You just want it to work. No npm, no node, no token wrangling in client config. The server runs 24/7 on Gridar's infra. | Single TCP roundtrip per call, no cold start. |
+| **Stdio (local npm)** | You want full isolation, self-hosting, or you're on an air-gapped machine. | Process respawned per MCP client session. Can be flaky if your client kills/restarts MCP processes often. |
+
+If you're not sure: use the hosted HTTP transport.
+
 ## Installation
 
 ### 1. Get an API token
 
 Sign in at https://gridar.app and visit **Account -> API keys** to create a personal token. Tokens look like `btb_xxxxxxxx` and are shown once. **Requires Pro or Agency plan** (`free` and `solo` are blocked).
 
-### 2. Wire it into your MCP client
+### 2a. Hosted HTTP transport (recommended)
+
+The server is reachable at `https://mcp.gridar.app/mcp`. Auth is per-request via `Authorization: Bearer <your_token>`.
+
+#### Claude Code
+
+```bash
+claude mcp add gridar --transport http https://mcp.gridar.app/mcp \
+  --header "Authorization: Bearer btb_your_token_here"
+```
+
+#### Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "gridar": {
+      "transport": "streamable-http",
+      "url": "https://mcp.gridar.app/mcp",
+      "headers": {
+        "Authorization": "Bearer btb_your_token_here"
+      }
+    }
+  }
+}
+```
+
+#### Codex CLI / Cursor / any HTTP-aware MCP client
+
+Same shape: URL + Authorization header. Refer to your client's MCP HTTP transport docs.
+
+### 2b. Stdio (local npm)
 
 #### Claude Desktop
 
@@ -190,10 +230,30 @@ BLOG_DASHBOARD_TOKEN=btb_xxx npx -y @gridar/mcp-server
 
 ## Configuration
 
+### Stdio mode (local npm)
+
 | Env var | Default | Description |
 |---|---|---|
 | `BLOG_DASHBOARD_TOKEN` | required | Bearer ApiToken (`btb_...`) |
 | `BLOG_DASHBOARD_API_BASE` | `https://api.gridar.app/api/v1` | Override for self-hosted backends |
+
+### HTTP mode (self-hosting `gridar-mcp-http`)
+
+| Env var | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | Bound by the platform (Railway, Fly, ...) |
+| `BLOG_DASHBOARD_API_BASE` | `https://api.gridar.app/api/v1` | Where this hosted MCP forwards calls |
+| `MCP_REQUIRE_AUTH` | `true` | Set to `false` to disable Bearer enforcement (dev only) |
+| `MCP_ALLOWED_ORIGINS` | `*` | CSV of allowed Origins for browser clients |
+
+Auth is per-request: every `POST /mcp` must carry `Authorization: Bearer btb_xxx`. The token is propagated to the Gridar REST API for that single request via Node `AsyncLocalStorage`, so a single hosted process safely serves many users without cross-contamination.
+
+Endpoints:
+
+- `POST /mcp` - MCP Streamable HTTP (initialize + tool calls)
+- `GET  /mcp` - SSE notifications stream
+- `DELETE /mcp` - explicit session teardown
+- `GET  /health` - healthcheck JSON `{ status, name, version, transport }`
 
 ## Costs & quotas
 

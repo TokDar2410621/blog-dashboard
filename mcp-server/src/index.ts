@@ -790,85 +790,105 @@ function zodFieldToJsonSchema(field: z.ZodTypeAny): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Server wiring
+// Server factory (exported so the HTTP transport in src/http.ts can reuse it)
 // ---------------------------------------------------------------------------
 
-const server = new Server(
-  {
-    name: "gridar-mcp",
-    version: "0.2.0",
-  },
-  {
-    capabilities: { tools: {} },
-  },
-);
+export { tools, toolToJsonSchema };
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: toolToJsonSchema(t.schema),
-  })),
-}));
+/** Build a fresh MCP Server wired with the Gridar tools. */
+export function createMcpServer(): Server {
+  const server = new Server(
+    {
+      name: "gridar-mcp",
+      version: "0.3.0",
+    },
+    {
+      capabilities: { tools: {} },
+    },
+  );
 
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const tool = tools.find((t) => t.name === req.params.name);
-  if (!tool) {
-    return {
-      content: [
-        { type: "text", text: `Unknown tool: ${req.params.name}` },
-      ],
-      isError: true,
-    };
-  }
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: toolToJsonSchema(t.schema),
+    })),
+  }));
 
-  const parsed = tool.schema.safeParse(req.params.arguments ?? {});
-  if (!parsed.success) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Invalid arguments for ${tool.name}:\n${parsed.error.issues
-            .map((i) => `- ${i.path.join(".") || "(root)"}: ${i.message}`)
-            .join("\n")}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const tool = tools.find((t) => t.name === req.params.name);
+    if (!tool) {
+      return {
+        content: [
+          { type: "text", text: `Unknown tool: ${req.params.name}` },
+        ],
+        isError: true,
+      };
+    }
 
-  try {
-    const result = await tool.handler(parsed.data);
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(result, null, 2),
-        },
-      ],
-    };
-  } catch (err) {
-    if (err instanceof ApiError) {
+    const parsed = tool.schema.safeParse(req.params.arguments ?? {});
+    if (!parsed.success) {
       return {
         content: [
           {
             type: "text",
-            text: `Gridar API error (HTTP ${err.status}): ${err.message}\n\n${JSON.stringify(err.body ?? {}, null, 2)}`,
+            text: `Invalid arguments for ${tool.name}:\n${parsed.error.issues
+              .map((i) => `- ${i.path.join(".") || "(root)"}: ${i.message}`)
+              .join("\n")}`,
           },
         ],
         isError: true,
       };
     }
-    const message = err instanceof Error ? err.message : String(err);
-    return {
-      content: [{ type: "text", text: `Unexpected error: ${message}` }],
-      isError: true,
-    };
-  }
-});
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+    try {
+      const result = await tool.handler(parsed.data);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Gridar API error (HTTP ${err.status}): ${err.message}\n\n${JSON.stringify(err.body ?? {}, null, 2)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `Unexpected error: ${message}` }],
+        isError: true,
+      };
+    }
+  });
 
-// eslint-disable-next-line no-console
-console.error("[gridar-mcp] connected (stdio)");
+  return server;
+}
+
+// ---------------------------------------------------------------------------
+// Stdio entry: runs when this file is invoked directly (npx, node dist/index.js).
+// Guarded so http.ts can `import` from this module without triggering stdio.
+// ---------------------------------------------------------------------------
+const invokedPath = (process.argv[1] ?? "").replace(/\\/g, "/");
+const isStdioEntry =
+  invokedPath.endsWith("/dist/index.js") ||
+  invokedPath.endsWith("/src/index.ts") ||
+  invokedPath.endsWith("/gridar-mcp") ||
+  invokedPath.endsWith("\\gridar-mcp");
+
+if (isStdioEntry) {
+  const server = createMcpServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  // eslint-disable-next-line no-console
+  console.error("[gridar-mcp] connected (stdio)");
+}
