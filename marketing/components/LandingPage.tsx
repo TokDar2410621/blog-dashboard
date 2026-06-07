@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import ProductMockup3D from "@/components/ProductMockup3D";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
@@ -84,6 +85,14 @@ function Reveal({
 }
 
 export default function LandingPage() {
+  // Auth-aware CTAs: if the visitor already has a valid session, every
+  // "Connexion" / "Commencer" link points to /sites (site selector) instead
+  // of /login. isLoading guards the SSR/hydration mismatch flash.
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const authedHref = isAuthenticated ? "/sites" : "/login";
+  const primaryCtaLabel = isAuthenticated ? "Tableau de bord" : "Commencer";
+  const headerCtaLabel = isAuthenticated ? "Tableau de bord" : "Connexion";
+  const hideLoginAffordance = authLoading;
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       {/* Global animation keyframes used across the page. */}
@@ -139,10 +148,14 @@ export default function LandingPage() {
             <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
             <Link href="/blog" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Blog</Link>
             <Link href="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
-            <Link href="/login" className="text-sm text-zinc-400 hover:text-white">Connexion</Link>
-            <Link href="/login">
+            {!hideLoginAffordance && (
+              <Link href={authedHref} className="text-sm text-zinc-400 hover:text-white">
+                {headerCtaLabel}
+              </Link>
+            )}
+            <Link href={authedHref}>
               <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200">
-                Commencer
+                {primaryCtaLabel}
               </Button>
             </Link>
           </nav>
@@ -165,10 +178,10 @@ export default function LandingPage() {
             Gridar redige tes articles en quebecois et les passe en audit SEO avant publication.
           </p>
           <div className="hero-fade-4 mt-12 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href="/login">
+            <Link href={authedHref}>
               <Button size="lg" className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-6 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Connecter mon WordPress
+                {isAuthenticated ? "Aller au tableau de bord" : "Connecter mon WordPress"}
               </Button>
             </Link>
             <a href="#features">
@@ -646,10 +659,10 @@ export default function LandingPage() {
             corriger ligne par ligne. 10 minutes par article.
           </p>
           <div className="mt-12">
-            <Link href="/login">
+            <Link href={authedHref}>
               <Button size="lg" className="bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-8 text-base motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02]">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Commencer gratuitement
+                {isAuthenticated ? "Aller au tableau de bord" : "Commencer gratuitement"}
               </Button>
             </Link>
           </div>
@@ -676,7 +689,7 @@ export default function LandingPage() {
               <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
               <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
               <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
-              <Link href="/login" className="hover:text-zinc-100">Connexion</Link>
+              <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
               <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
               <a
                 href="https://github.com/TokDar2410621/blog-dashboard"
@@ -1344,6 +1357,8 @@ function PriceCard({
   highlight?: boolean;
   sites?: number;
 }) {
+  const { isAuthenticated } = useAuth();
+  const ctaHref = isAuthenticated ? "/sites" : "/login";
   return (
     <div
       className={`relative rounded-2xl p-6 motion-safe:transition-all motion-safe:duration-300 motion-safe:hover:-translate-y-1 ${
@@ -1382,7 +1397,7 @@ function PriceCard({
           </li>
         ))}
       </ul>
-      <Link href="/login">
+      <Link href={ctaHref}>
         <Button
           className={`w-full mt-8 ${
             highlight
