@@ -54,7 +54,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.3.2",
+    "User-Agent": "@gridar/mcp-server/0.4.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 

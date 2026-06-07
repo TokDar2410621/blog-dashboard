@@ -38,7 +38,7 @@ from .views import (
 from .api_v1 import (
     V1MeView, V1SitesView, V1ArticlesView, V1ArticleDetailView, V1GenerateView,
     V1AuditView, V1BriefView, V1KeywordsView, V1RankSnapshotView,
-    V1DigestView, TokenManagementView, TokenRevokeView,
+    V1DigestView, TokenManagementView, TokenRevokeView, IssueMcpTokenView,
     V1SiteDetailView, V1SiteUpdateView,
     V1ArticleCreateView, V1ArticleMutateView,
     V1KeywordTrackView, V1KeywordUntrackView,
@@ -183,6 +183,8 @@ urlpatterns = [
     # Account-level token management (JWT auth)
     path('account/api-tokens/', TokenManagementView.as_view(), name='api-tokens'),
     path('account/api-tokens/<int:pk>/', TokenRevokeView.as_view(), name='api-token-revoke'),
+    # MCP OAuth token issuance bridge (called from /oauth/mcp-authorize page)
+    path('auth/issue-mcp-token/', IssueMcpTokenView.as_view(), name='auth-issue-mcp-token'),
     # Extended public API v1 (Bearer ApiToken) - 0.2 / mcp-server expansion
     path('v1/sites/<int:site_id>/detail/', V1SiteDetailView.as_view(), name='v1-site-detail'),
     path('v1/sites/<int:site_id>/update/', V1SiteUpdateView.as_view(), name='v1-site-update'),

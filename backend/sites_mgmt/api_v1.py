@@ -570,6 +570,48 @@ class TokenRevokeView(APIView):
 
 
 # --------------------------------------------------------------------------
+# OAuth-MCP token issuance (2026-06-07)
+# --------------------------------------------------------------------------
+# Used by the gridar.app /oauth/mcp-authorize bridge page:
+# the user is logged in (JWT cookie), this endpoint mints an ApiToken on
+# their behalf, named after the requesting client (Claude Desktop /
+# Code / Cursor / ...). The plain token is then returned to the MCP
+# Streamable HTTP server's callback so it can complete the OAuth flow
+# with the MCP client.
+
+class IssueMcpTokenView(APIView):
+    """POST /api/auth/issue-mcp-token/
+
+    Body: {"client_name": "Claude Desktop", "scope": "mcp:full"}
+    Auth: JWT cookie (user logged in via the dashboard).
+    Returns: {"access_token": "btb_xxx", "token_type": "Bearer", "name": "..."}
+    """
+    permission_classes = [IsAuthenticated]
+    plan_gated = False  # explicit: do NOT enforce the v1 plan gate here
+
+    def post(self, request):
+        client_name = (request.data.get('client_name') or 'MCP client').strip()[:60]
+        scope = (request.data.get('scope') or 'mcp:full').strip()[:40]
+        token_name = f"MCP - {client_name}"
+
+        plain, key_hash, prefix = generate_api_token()
+        tok = ApiToken.objects.create(
+            user=request.user,
+            name=token_name[:100],
+            key_hash=key_hash,
+            key_prefix=prefix,
+        )
+        return Response({
+            'access_token': plain,
+            'token_type': 'Bearer',
+            'name': tok.name,
+            'prefix': tok.key_prefix,
+            'scope': scope,
+            'created_at': tok.created_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
+
+
+# --------------------------------------------------------------------------
 # Extended v1 endpoints (added 2026-06-02 for the @gridar/mcp-server 0.2)
 # --------------------------------------------------------------------------
 

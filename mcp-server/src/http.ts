@@ -27,7 +27,7 @@
  *   MCP_REQUIRE_AUTH=false     skip Bearer enforcement (dev only)
  *   MCP_ALLOWED_ORIGINS=*      CSV of allowed origins for CORS
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import express, { type Request, type Response } from "express";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -40,6 +40,16 @@ const ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS ?? "*")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+// OAuth configuration. Public base = the URL clients hit. Gridar base = the
+// dashboard that owns the user accounts.
+const PUBLIC_BASE = (
+  process.env.MCP_PUBLIC_BASE ?? `http://localhost:${PORT}`
+).replace(/\/$/, "");
+const GRIDAR_BASE = (
+  process.env.GRIDAR_BASE ?? "https://gridar.app"
+).replace(/\/$/, "");
+const OAUTH_CODE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const app = express();
 app.use(express.json({ limit: "4mb" }));
@@ -74,10 +84,243 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     name: "gridar-mcp",
-    version: "0.3.2",
+    version: "0.4.0",
     transport: "streamable-http",
+    oauth: true,
   });
 });
+
+// ---------------------------------------------------------------------------
+// OAuth 2.1 (PKCE) - MCP authorization flow
+// ---------------------------------------------------------------------------
+//
+// Flow:
+//   1. MCP client (Claude Desktop / Code / Cursor) discovers the OAuth metadata
+//      via GET /.well-known/oauth-authorization-server.
+//   2. Client opens GET /authorize?response_type=code&client_id=...&
+//      redirect_uri=...&code_challenge=...&state=... in the user's browser.
+//   3. We register a "pending grant" keyed by an opaque session_id and redirect
+//      the user to gridar.app/oauth/mcp-authorize?session_id=...&return_to=...
+//   4. The Gridar dashboard authenticates the user (JWT cookie), mints a
+//      Bearer ApiToken via POST /api/auth/issue-mcp-token/, and redirects back
+//      to OUR /callback?session_id=...&access_token=btb_xxx.
+//   5. /callback looks up the pending grant, mints an opaque auth code, stores
+//      `code -> { access_token, code_challenge, ... }`, and redirects the
+//      user's browser to the MCP client's original redirect_uri with
+//      ?code=...&state=...
+//   6. The MCP client POSTs /token with the code + PKCE verifier. We verify
+//      the verifier matches the original challenge, return the access_token
+//      as a standard OAuth response, and discard the code.
+//
+// Storage is in-memory (Map). On Railway with a single replica that's fine.
+// If we ever scale horizontally, swap for Redis with a 5min TTL.
+
+type PendingGrant = {
+  client_id: string;
+  redirect_uri: string;
+  code_challenge: string;
+  code_challenge_method: "S256" | "plain";
+  state: string;
+  scope?: string;
+  client_name: string;
+  created_at: number;
+};
+
+type IssuedCode = {
+  access_token: string;
+  code_challenge: string;
+  code_challenge_method: "S256" | "plain";
+  redirect_uri: string;
+  client_id: string;
+  expires_at: number;
+};
+
+const pendingGrants = new Map<string, PendingGrant>();
+const issuedCodes = new Map<string, IssuedCode>();
+
+function verifyPkce(verifier: string, challenge: string, method: "S256" | "plain"): boolean {
+  if (method === "plain") return verifier === challenge;
+  const expected = createHash("sha256")
+    .update(verifier)
+    .digest("base64url");
+  return expected === challenge;
+}
+
+function gcExpired() {
+  const now = Date.now();
+  for (const [k, v] of pendingGrants) {
+    if (v.created_at + OAUTH_CODE_TTL_MS < now) pendingGrants.delete(k);
+  }
+  for (const [k, v] of issuedCodes) {
+    if (v.expires_at < now) issuedCodes.delete(k);
+  }
+}
+
+// 5.1 - Authorization server metadata (RFC 8414)
+app.get("/.well-known/oauth-authorization-server", (_req, res) => {
+  res.json({
+    issuer: PUBLIC_BASE,
+    authorization_endpoint: `${PUBLIC_BASE}/authorize`,
+    token_endpoint: `${PUBLIC_BASE}/token`,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    code_challenge_methods_supported: ["S256", "plain"],
+    token_endpoint_auth_methods_supported: ["none"],
+    scopes_supported: ["mcp:full"],
+    service_documentation: "https://gridar.app/docs/integrations",
+  });
+});
+
+// 5.2 - Protected resource metadata (RFC 9728)
+app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+  res.json({
+    resource: PUBLIC_BASE,
+    authorization_servers: [PUBLIC_BASE],
+    scopes_supported: ["mcp:full"],
+    bearer_methods_supported: ["header"],
+  });
+});
+
+// 5.3 - /authorize: redirect the user to gridar.app for login
+app.get("/authorize", (req, res) => {
+  gcExpired();
+  const {
+    response_type,
+    client_id,
+    redirect_uri,
+    code_challenge,
+    code_challenge_method = "S256",
+    state = "",
+    scope = "mcp:full",
+  } = req.query as Record<string, string>;
+
+  if (response_type !== "code") {
+    res.status(400).send("unsupported_response_type");
+    return;
+  }
+  if (!redirect_uri || !code_challenge) {
+    res.status(400).send("invalid_request: redirect_uri and code_challenge required");
+    return;
+  }
+  if (code_challenge_method !== "S256" && code_challenge_method !== "plain") {
+    res.status(400).send("invalid_request: code_challenge_method must be S256 or plain");
+    return;
+  }
+
+  // Try to infer a friendly client name from the user-agent or query.
+  const ua = (req.header("user-agent") ?? "").toLowerCase();
+  let client_name = (req.query.client_name as string) || "MCP client";
+  if (!req.query.client_name) {
+    if (ua.includes("claude") && ua.includes("desktop")) client_name = "Claude Desktop";
+    else if (ua.includes("claude")) client_name = "Claude Code";
+    else if (ua.includes("cursor")) client_name = "Cursor";
+    else if (ua.includes("codex")) client_name = "Codex CLI";
+  }
+
+  const session_id = randomUUID();
+  pendingGrants.set(session_id, {
+    client_id: client_id ?? "mcp-public",
+    redirect_uri,
+    code_challenge,
+    code_challenge_method: code_challenge_method as "S256" | "plain",
+    state,
+    scope,
+    client_name,
+    created_at: Date.now(),
+  });
+
+  const returnTo = encodeURIComponent(`${PUBLIC_BASE}/callback`);
+  const url = `${GRIDAR_BASE}/oauth/mcp-authorize?session_id=${session_id}&client_name=${encodeURIComponent(client_name)}&return_to=${returnTo}`;
+  res.redirect(url);
+});
+
+// 5.4 - /callback: Gridar bridge redirects here with the freshly issued
+//        ApiToken. We mint an OAuth code mapped to that token and redirect
+//        the user's browser back to the MCP client's redirect_uri.
+app.get("/callback", (req, res) => {
+  gcExpired();
+  const session_id = (req.query.session_id as string) ?? "";
+  const access_token = (req.query.access_token as string) ?? "";
+  const pending = session_id ? pendingGrants.get(session_id) : undefined;
+  if (!pending) {
+    res.status(400).send("invalid_or_expired_session");
+    return;
+  }
+  if (!access_token.startsWith("btb_")) {
+    res.status(400).send("invalid_access_token_format");
+    return;
+  }
+  pendingGrants.delete(session_id);
+
+  const code = randomUUID().replace(/-/g, "");
+  issuedCodes.set(code, {
+    access_token,
+    code_challenge: pending.code_challenge,
+    code_challenge_method: pending.code_challenge_method,
+    redirect_uri: pending.redirect_uri,
+    client_id: pending.client_id,
+    expires_at: Date.now() + OAUTH_CODE_TTL_MS,
+  });
+
+  const target = new URL(pending.redirect_uri);
+  target.searchParams.set("code", code);
+  if (pending.state) target.searchParams.set("state", pending.state);
+  res.redirect(target.toString());
+});
+
+// 5.5 - /token: exchange code (+ PKCE verifier) for the access token.
+app.post(
+  "/token",
+  express.urlencoded({ extended: false }),
+  (req, res) => {
+    gcExpired();
+    const body = (req.body ?? {}) as Record<string, string>;
+    const {
+      grant_type,
+      code,
+      redirect_uri,
+      code_verifier,
+      client_id,
+    } = body;
+
+    if (grant_type !== "authorization_code") {
+      res.status(400).json({ error: "unsupported_grant_type" });
+      return;
+    }
+    if (!code || !code_verifier) {
+      res.status(400).json({ error: "invalid_request" });
+      return;
+    }
+    const entry = issuedCodes.get(code);
+    if (!entry) {
+      res.status(400).json({ error: "invalid_grant" });
+      return;
+    }
+    issuedCodes.delete(code);
+    if (entry.expires_at < Date.now()) {
+      res.status(400).json({ error: "invalid_grant", error_description: "code expired" });
+      return;
+    }
+    if (entry.redirect_uri !== redirect_uri) {
+      res.status(400).json({ error: "invalid_grant", error_description: "redirect_uri mismatch" });
+      return;
+    }
+    if (client_id && entry.client_id !== client_id) {
+      res.status(400).json({ error: "invalid_client" });
+      return;
+    }
+    if (!verifyPkce(code_verifier, entry.code_challenge, entry.code_challenge_method)) {
+      res.status(400).json({ error: "invalid_grant", error_description: "PKCE verification failed" });
+      return;
+    }
+
+    res.json({
+      access_token: entry.access_token,
+      token_type: "Bearer",
+      scope: "mcp:full",
+    });
+  },
+);
 
 // Per-session transports. Streamable HTTP is stateful: the client gets a
 // session ID at initialize, then includes it on every subsequent request.
@@ -97,12 +340,19 @@ async function dispatch(
 ): Promise<void> {
   const token = extractBearer(req);
   if (REQUIRE_AUTH && !token) {
+    // MCP clients discover OAuth via the WWW-Authenticate challenge.
+    res.setHeader(
+      "WWW-Authenticate",
+      `Bearer realm="gridar-mcp", resource_metadata="${PUBLIC_BASE}/.well-known/oauth-protected-resource"`,
+    );
     res.status(401).json({
       jsonrpc: "2.0",
       error: {
         code: -32001,
         message:
-          "Unauthorized: missing Bearer token. Pass Authorization: Bearer btb_xxx (your Gridar API token).",
+          "Unauthorized: missing Bearer token. Either pass Authorization: Bearer btb_xxx, or let your MCP client perform the OAuth flow at " +
+          PUBLIC_BASE +
+          "/authorize",
       },
       id: null,
     });

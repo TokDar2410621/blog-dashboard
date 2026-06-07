@@ -26,6 +26,7 @@ const PublicAudit = lazy(() => import("./pages/PublicAudit"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
+const McpAuthorize = lazy(() => import("./pages/McpAuthorize"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -107,6 +108,7 @@ function App() {
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/blog/:slug" element={<BlogPost />} />
                 <Route path="/audit" element={<PublicAudit />} />
+                <Route path="/oauth/mcp-authorize" element={<McpAuthorize />} />
                 <Route
                   path="/onboarding/external"
                   element={
