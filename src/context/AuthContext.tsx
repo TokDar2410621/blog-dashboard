@@ -8,8 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getToken, clearTokens } from "@/lib/sites";
-import { backendLogout, fetchCurrentUser } from "@/lib/api-client";
+import { clearTokens } from "@/lib/sites";
+import { ApiError, backendLogout, fetchCurrentUser } from "@/lib/api-client";
 import type { User } from "@/lib/schemas";
 
 type AuthContextValue = {
@@ -28,21 +28,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
-    if (!getToken()) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
+    // Always probe /auth/me/. sessionStorage may be empty (tab suspended in
+    // background, cross-tab restore, fresh page open) while the httpOnly
+    // access_token cookie (2h) or refresh_token cookie (30d) is still valid.
+    // authFetch will silently refresh on 401 using the cookie, so the
+    // session is restored without bouncing the user to /login.
     setIsLoading(true);
     try {
       const userData = await fetchCurrentUser();
       setUser(userData);
     } catch (err) {
-      console.warn(
-        "[Auth] Session check failed:",
-        err instanceof Error ? err.message : err
-      );
-      clearTokens();
+      // Real expiry: both access AND refresh cookies are gone/invalid.
+      // Anything else (network, CORS) -> stay silent, don't wipe storage.
+      const expired = err instanceof ApiError && err.code === "SESSION_EXPIRED";
+      if (expired) {
+        clearTokens();
+      } else {
+        console.warn(
+          "[Auth] Session check failed:",
+          err instanceof Error ? err.message : err
+        );
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
