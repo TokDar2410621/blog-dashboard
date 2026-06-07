@@ -84,7 +84,7 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     name: "gridar-mcp",
-    version: "0.4.0",
+    version: "0.4.1",
     transport: "streamable-http",
     oauth: true,
   });
@@ -162,12 +162,42 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
     issuer: PUBLIC_BASE,
     authorization_endpoint: `${PUBLIC_BASE}/authorize`,
     token_endpoint: `${PUBLIC_BASE}/token`,
+    registration_endpoint: `${PUBLIC_BASE}/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
     code_challenge_methods_supported: ["S256", "plain"],
     token_endpoint_auth_methods_supported: ["none"],
     scopes_supported: ["mcp:full"],
     service_documentation: "https://gridar.app/docs/integrations",
+  });
+});
+
+// 5.1b - Dynamic Client Registration (RFC 7591). Lets MCP clients
+// (Claude Code, Claude Desktop, Cursor) register themselves on-the-fly
+// without us pre-creating an OAuth app per client. The "client" here is
+// purely a label - we don't authenticate the client at /token because
+// PKCE protects against authorization code interception, so any
+// localhost redirect_uri is acceptable.
+app.post("/register", express.json(), (req, res) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const redirect_uris = Array.isArray(body.redirect_uris)
+    ? (body.redirect_uris as string[]).filter(
+        (u) => typeof u === "string" && u.length > 0,
+      )
+    : [];
+  const client_name =
+    (typeof body.client_name === "string" && body.client_name) || "MCP client";
+
+  const client_id = `mcp-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  res.status(201).json({
+    client_id,
+    client_id_issued_at: Math.floor(Date.now() / 1000),
+    client_name,
+    redirect_uris,
+    grant_types: ["authorization_code"],
+    response_types: ["code"],
+    token_endpoint_auth_method: "none",
+    scope: "mcp:full",
   });
 });
 
