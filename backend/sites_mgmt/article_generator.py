@@ -232,6 +232,18 @@ class ArticleGenerator:
                  f'{len(used_ids)} kept in prompt)')
         return block
 
+    def _stop_slop_block(self, language='fr'):
+        """Return the anti-AI-slop rules block for the article prompt.
+
+        Cuts the predictable AI tells (throat-clearing openers, em-dashes,
+        binary contrasts, empty adverbs, false agency, narrator-from-a-
+        distance voice, vague declaratives). FR/EN/ES versions live in
+        sites_mgmt.stop_slop. Loaded lazily so callers that don't write
+        articles don't pay the import cost.
+        """
+        from .stop_slop import get_stop_slop_block
+        return get_stop_slop_block(language or 'fr')
+
     def _brand_block(self):
         """Build the MARQUE DU SITE prompt section from self.site. Returns ''
         if no Site is available (back-compat with old callers)."""
@@ -918,6 +930,7 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
 
         brand_block = self._brand_block()
         memory_block = self._memory_block(topic_analysis)
+        stop_slop_block = self._stop_slop_block(self.language)
 
         if self.article_type == 'local':
             prompt = f'''Tu ecris un article ANNUAIRE/GUIDE listant les entreprises d'une region.
@@ -928,6 +941,8 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
 {brand_block}
 
 {memory_block}
+
+{stop_slop_block}
 
 {TYPE_INSTRUCTIONS.get('local')}
 
@@ -981,6 +996,8 @@ NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le fra
 {brand_block}
 
 {memory_block}
+
+{stop_slop_block}
 
 {kb_context}
 
