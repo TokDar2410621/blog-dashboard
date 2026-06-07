@@ -480,7 +480,7 @@ const tools: ToolDef[] = [
   {
     name: "gridar_update_article",
     description:
-      "Patch fields of an existing hosted article (title, content, excerpt, status, cover_image, author, slug). Status=published auto-sets published_at.",
+      "Patch fields of an existing article (title, content, excerpt, status, cover_image, author, slug). Works on all site modes: hosted, external (Postgres), WordPress, Shopify, and Webflow. The CMS adapter is selected automatically from the site's mode. Status=published auto-sets published_at on hosted/external; CMS-specific status mapping happens for WP/Shopify/Webflow.",
     schema: UpdateArticleArgs,
     handler: (input) => {
       const { site_id, slug, ...fields } = input;
@@ -490,7 +490,7 @@ const tools: ToolDef[] = [
   {
     name: "gridar_delete_article",
     description:
-      "DESTRUCTIVE: permanently delete a hosted article. Cascades attribution rows.",
+      "DESTRUCTIVE: permanently delete an article. Works on all site modes: hosted, external, WordPress, Shopify, and Webflow. CMS-side deletes are forced (no trash). Cascades attribution rows on hosted.",
     schema: SlugRefArgs,
     handler: (input) => deleteArticle(input.site_id, input.slug),
   },

@@ -674,50 +674,166 @@ class V1ArticleMutateView(BaseV1View):
 
     PATCH: partial update (title, excerpt, content, status, cover_image, slug).
     DELETE: delete the article.
-    Both are hosted-only.
+
+    Cross-mode: works on hosted (HostedPost), external (BlogPost via alias),
+    WordPress, Shopify, and Webflow sites. The adapter is selected from
+    the site's mode flag; if the underlying CMS rejects the change a 502
+    Bad Gateway is returned with the upstream error message.
     """
     UPDATABLE = {'title', 'excerpt', 'content', 'status',
                  'cover_image', 'slug', 'author'}
 
-    def _get_hosted(self, request, site_id, slug):
+    def _collect_fields(self, data):
+        fields = {}
+        for key, value in (data or {}).items():
+            if key not in self.UPDATABLE:
+                continue
+            if key == 'status' and value not in ('draft', 'published', 'scheduled'):
+                continue
+            fields[key] = value
+        return fields
+
+    # ── Adapter dispatch (PATCH) ────────────────────────────────────────
+
+    def patch(self, request, site_id, slug):
         site = self.get_user_site(request, site_id)
-        if not site.is_hosted:
-            return None, Response(
-                {'error': 'Manual edits are only available on hosted sites.'},
-                status=status.HTTP_400_BAD_REQUEST,
+        fields = self._collect_fields(request.data)
+        if not fields:
+            return Response({'updated_fields': [], 'slug': slug})
+
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            return self._patch_via_adapter(
+                WordPressClient(site), WordPressError, slug, fields,
             )
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            return self._patch_via_adapter(
+                ShopifyClient(site), ShopifyError, slug, fields,
+            )
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            return self._patch_via_adapter(
+                WebflowClient(site), WebflowError, slug, fields,
+            )
+        if site.is_hosted:
+            return self._patch_hosted(site, slug, fields)
+        return self._patch_external(site, slug, fields)
+
+    def _patch_hosted(self, site, slug, fields):
         try:
             post = HostedPost.objects.get(site=site, slug=slug)
         except HostedPost.DoesNotExist:
-            return None, Response({'error': 'Article introuvable.'},
-                                  status=status.HTTP_404_NOT_FOUND)
-        return post, None
-
-    def patch(self, request, site_id, slug):
-        post, err = self._get_hosted(request, site_id, slug)
-        if err:
-            return err
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
         updated = []
-        for field, value in (request.data or {}).items():
-            if field not in self.UPDATABLE:
-                continue
-            if field == 'status' and value not in ('draft', 'published', 'scheduled'):
-                continue
-            setattr(post, field, value)
-            updated.append(field)
+        for key, value in fields.items():
+            setattr(post, key, value)
+            updated.append(key)
         if 'status' in updated and post.status == 'published' and not post.published_at:
             from datetime import date as _date
             post.published_at = _date.today()
             updated.append('published_at')
-        if updated:
-            post.save(update_fields=updated)
+        post.save(update_fields=updated)
         return Response({'updated_fields': updated, 'slug': post.slug})
 
+    def _patch_external(self, site, slug, fields):
+        from .db_utils import ensure_site_connection
+        alias = ensure_site_connection(site)
+        try:
+            post = BlogPost.objects.using(alias).get(slug=slug)
+        except BlogPost.DoesNotExist:
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        updated = []
+        for key, value in fields.items():
+            if not hasattr(post, key):
+                continue
+            setattr(post, key, value)
+            updated.append(key)
+        if updated:
+            post.save(using=alias, update_fields=updated)
+        return Response({'updated_fields': updated, 'slug': post.slug})
+
+    def _patch_via_adapter(self, client, error_cls, slug, fields):
+        """Lookup the post by slug, then PATCH via the CMS adapter."""
+        try:
+            current = client.get_post(slug)
+        except error_cls as e:
+            return Response({'error': str(e)},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        if not current:
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        post_id = current.get('id') or current.get('post_id')
+        if not post_id:
+            return Response(
+                {'error': 'Adapter did not return a post id.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        try:
+            updated_post = client.update_post(post_id, **fields)
+        except error_cls as e:
+            return Response({'error': str(e)},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        return Response({
+            'updated_fields': list(fields.keys()),
+            'slug': updated_post.get('slug', slug),
+        })
+
+    # ── Adapter dispatch (DELETE) ───────────────────────────────────────
+
     def delete(self, request, site_id, slug):
-        post, err = self._get_hosted(request, site_id, slug)
-        if err:
-            return err
-        post.delete()
+        site = self.get_user_site(request, site_id)
+
+        if site.is_wordpress:
+            from .wordpress_adapter import WordPressClient, WordPressError
+            return self._delete_via_adapter(WordPressClient(site), WordPressError, slug)
+        if site.is_shopify:
+            from .shopify_adapter import ShopifyClient, ShopifyError
+            return self._delete_via_adapter(ShopifyClient(site), ShopifyError, slug)
+        if site.is_webflow:
+            from .webflow_adapter import WebflowClient, WebflowError
+            return self._delete_via_adapter(WebflowClient(site), WebflowError, slug)
+        if site.is_hosted:
+            try:
+                post = HostedPost.objects.get(site=site, slug=slug)
+            except HostedPost.DoesNotExist:
+                return Response({'error': 'Article introuvable.'},
+                                status=status.HTTP_404_NOT_FOUND)
+            post.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        # External
+        from .db_utils import ensure_site_connection
+        alias = ensure_site_connection(site)
+        try:
+            post = BlogPost.objects.using(alias).get(slug=slug)
+        except BlogPost.DoesNotExist:
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        post.delete(using=alias)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def _delete_via_adapter(self, client, error_cls, slug):
+        try:
+            current = client.get_post(slug)
+        except error_cls as e:
+            return Response({'error': str(e)},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        if not current:
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        post_id = current.get('id') or current.get('post_id')
+        if not post_id:
+            return Response(
+                {'error': 'Adapter did not return a post id.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        try:
+            client.delete_post(post_id, force=True)
+        except error_cls as e:
+            return Response({'error': str(e)},
+                            status=status.HTTP_502_BAD_GATEWAY)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
