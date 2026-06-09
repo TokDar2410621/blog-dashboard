@@ -25,7 +25,9 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
+// Empty base = same-origin via Next.js rewrites (see next.config.ts).
+// Keeps auth cookies on gridar.app so logged-in visitors hit /api/public/* without a cross-origin hop.
+const API_BASE = "";
 
 type AuditResult = {
   domain: string;

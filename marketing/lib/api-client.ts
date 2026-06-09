@@ -26,7 +26,11 @@ import {
   type PexelsResponse,
 } from "./schemas";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL + "/api" : "http://localhost:8888/api";
+// Same-origin path served by the Next.js rewrites in next.config.ts.
+// In the browser, requests go to gridar.app/api/* and the rewrite forwards
+// them to the Django backend. This keeps the auth cookie on the gridar.app
+// origin so the AuthContext sees the same session the dashboard opened.
+const BACKEND_URL = "/api";
 
 export class ApiError extends Error {
   status: number;
