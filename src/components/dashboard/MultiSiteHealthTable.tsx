@@ -31,6 +31,10 @@ type SeoScoreResponse = {
 type DecayResponse = {
   declining?: Array<Record<string, unknown>>;
   count?: number;
+  /** Sentinel set by the queryFn when GSC isn't configured (400) or the
+   * refresh token expired (401). Lets the cell render a "GSC requis" hint
+   * instead of pretending we have zero decay. */
+  unavailable?: "gsc_not_configured" | "gsc_reauth_required";
 };
 
 /**
@@ -103,12 +107,27 @@ export function MultiSiteHealthTable({
     })),
   });
 
-  // Fetch decay count (number of declining posts over 30 days). Endpoint already shipped.
+  // Fetch decay count (number of declining posts over 30 days).
+  //
+  // The endpoint returns 400 when GSC isn't configured and 401 when the
+  // refresh token expired. Both are expected states for sites that haven't
+  // been through GSC onboarding - they were flooding the dev console with
+  // "Failed to load resource: 400/401" lines and lighting the React Query
+  // cards in error state. Treat them as a known sentinel instead of throwing,
+  // and skip the request entirely when the site has no gsc_property_url so
+  // the browser doesn't even hit the network for those sites.
   const decayQueries = useQueries({
     queries: sites.map((site) => ({
       queryKey: ["site-content-decay", site.id, 30],
+      enabled: !!site.gsc_property_url,
       queryFn: async (): Promise<DecayResponse> => {
         const res = await authFetch(`/sites/${site.id}/content-decay/?days=30`);
+        if (res.status === 400) {
+          return { unavailable: "gsc_not_configured" };
+        }
+        if (res.status === 401) {
+          return { unavailable: "gsc_reauth_required" };
+        }
         if (!res.ok) throw new Error(`decay ${res.status}`);
         return res.json();
       },
@@ -127,7 +146,9 @@ export function MultiSiteHealthTable({
       const decayCount = Array.isArray(declining)
         ? declining.length
         : (decay?.data?.count ?? 0);
-      const decayLoading = !!decay?.isLoading;
+      const decayLoading = !!decay?.isLoading && !!site.gsc_property_url;
+      const decayUnavailable: DecayResponse["unavailable"] | undefined =
+        !site.gsc_property_url ? "gsc_not_configured" : decay?.data?.unavailable;
 
       // V1 mocks - clearly labeled with "NEW" / mock badges in the cells.
       const aiVisibility = Math.round(mulberry32(site.id) * 100);
@@ -140,6 +161,7 @@ export function MultiSiteHealthTable({
         seoLoading,
         decayCount,
         decayLoading,
+        decayUnavailable,
         aiVisibility,
         organicTraffic,
         alertsCount,
@@ -191,6 +213,7 @@ export function MultiSiteHealthTable({
                   seoLoading,
                   decayCount,
                   decayLoading,
+                  decayUnavailable,
                   aiVisibility,
                   organicTraffic,
                   alertsCount,
@@ -239,6 +262,21 @@ export function MultiSiteHealthTable({
                     <TableCell>
                       {decayLoading ? (
                         <Skeleton className="h-4 w-10" />
+                      ) : decayUnavailable ? (
+                        <Link
+                          to={`/dashboard/${site.id}/parametres/gsc`}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary underline-offset-2 hover:underline"
+                          title={
+                            decayUnavailable === "gsc_reauth_required"
+                              ? "Le token GSC est expiré, reconnecte le site."
+                              : "Connecte Google Search Console pour suivre le decay."
+                          }
+                        >
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          {decayUnavailable === "gsc_reauth_required"
+                            ? "Reconnecter GSC"
+                            : "GSC requis"}
+                        </Link>
                       ) : (
                         <span
                           className={cn(

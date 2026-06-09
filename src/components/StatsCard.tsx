@@ -102,8 +102,15 @@ export function StatsCard({
           )}
         </div>
         {hasSparkline && (
-          <div className="mt-2 h-9 -mx-1">
-            <ResponsiveContainer width="100%" height="100%">
+          // min-w-0 stops the sparkline from inheriting an intrinsic width of
+          // 0 inside flex parents (cards in a `flex gap-4` row). Without it,
+          // ResponsiveContainer measures the parent at 0px on the first paint
+          // and logs `width(-1) and height(-1) of chart should be greater
+          // than 0` to the console. minWidth/minHeight on ResponsiveContainer
+          // itself is the recharts-blessed escape hatch when the parent might
+          // briefly be zero.
+          <div className="mt-2 h-9 -mx-1 min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <AreaChart data={chartData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id={`spark-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
