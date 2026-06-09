@@ -312,28 +312,51 @@ def build_strategic_prompt(
     )
 
 
+ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
+# Matches landing_generator + article_generator. Sonnet is plenty for the
+# structured-JSON task here and keeps the per-refresh cost predictable.
+STRATEGIC_MODEL = 'claude-sonnet-4-20250514'
+
+
 def call_claude_for_opportunity(prompt: str) -> Optional[dict]:
-    """Run the strategic prompt against Claude. Returns the parsed JSON dict
-    or None on any failure (no key, API error, malformed JSON)."""
+    """Run the strategic prompt against the Anthropic Messages API.
+
+    Returns the parsed JSON dict or None on any failure (no key, API error,
+    malformed JSON). Mirrors LandingGenerator._call_claude on purpose so we
+    don't depend on the anthropic Python SDK (it's not in requirements.txt).
+    """
     api_key = os.environ.get('ANTHROPIC_API_KEY')
     if not api_key:
-        return None
-    try:
-        from anthropic import Anthropic
-    except ImportError:
+        logger.warning('Strategic opportunity: ANTHROPIC_API_KEY missing.')
         return None
 
     try:
-        client = Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model='claude-opus-4-7',
-            max_tokens=900,
-            messages=[{'role': 'user', 'content': prompt}],
+        import requests
+        resp = requests.post(
+            ANTHROPIC_API_URL,
+            headers={
+                'x-api-key': api_key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            },
+            json={
+                'model': STRATEGIC_MODEL,
+                'max_tokens': 1200,
+                'messages': [{'role': 'user', 'content': prompt}],
+            },
+            timeout=90,
         )
+        if not resp.ok:
+            logger.warning(
+                'Strategic Claude call HTTP %s: %s',
+                resp.status_code, resp.text[:300],
+            )
+            return None
+        data = resp.json()
         text = ''
-        for block in msg.content:
-            if getattr(block, 'type', None) == 'text':
-                text += block.text
+        for block in (data.get('content') or []):
+            if block.get('type') == 'text':
+                text += block.get('text') or ''
         text = text.strip()
         # Strip accidental markdown fencing in case the model adds it.
         if text.startswith('```'):
