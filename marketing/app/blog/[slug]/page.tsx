@@ -329,10 +329,10 @@ export default async function BlogPostPage({ params }: PageProps) {
             />
             <div className="relative">
               <h2 className="text-2xl font-bold tracking-tight mb-2">
-                Tu veux generer ce genre d&apos;article sur ton site ?
+                Tu veux générer ce genre d&apos;article sur ton site ?
               </h2>
               <p className="text-zinc-400 mb-6">
-                Gridar le fait pour toi. Du brief a la publication sur
+                Gridar le fait pour toi. Du brief à la publication sur
                 WordPress, Shopify ou Webflow.
               </p>
               <Link href="/login">

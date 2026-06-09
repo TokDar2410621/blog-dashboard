@@ -62,6 +62,7 @@
     "added": "Site added!",
     "addError": "Error adding site.",
     "deleteConfirm": "Delete this site?",
+    "deleteConfirmDesc": "This action is irreversible. All associated data will be lost.",
     "testSuccess": "Connection successful!",
     "testFail": "Failed: ",
     "testError": "Error during test",
@@ -90,7 +91,9 @@
     "images": "Images",
     "settings": "Settings",
     "switchSite": "Switch site",
-    "logout": "Logout"
+    "logout": "Logout",
+    "insights": "Insights",
+    "serpAnalyzer": "SERP analyzer"
   },
 
   "digest": {
@@ -229,6 +232,7 @@
     "deleted": "Redirect deleted",
     "deleteError": "Delete error",
     "confirmDelete": "Delete this redirect?",
+    "confirmDeleteDesc": "This action is irreversible. The redirect will be removed immediately.",
     "empty": "No redirects. One is auto-created when you change an article slug.",
     "autoHint": "Tip: when you change an article's slug via the editor, a redirect is auto-created. You can also add some manually here.",
     "updated": "Updated"
@@ -364,6 +368,7 @@
     "deleted": "Keyword removed",
     "deleteError": "Error removing keyword",
     "confirmDelete": "Stop tracking \"{{keyword}}\"?",
+    "confirmDeleteDesc": "Past ranking history will be kept but no new snapshots will be recorded.",
     "history90": "History 90 days",
     "noSnapshots": "No snapshots recorded.",
     "previousMedian": "Previous median"
@@ -419,6 +424,7 @@
     "viewOnSite": "View on site",
     "delete": "Delete",
     "deleteConfirm": "Delete \"{{title}}\"?",
+    "deleteConfirmDesc": "This action is irreversible. The article will be permanently removed from the site.",
     "deleted": "Article deleted",
     "deleteError": "Error deleting article",
     "articleCount": "{{count}} article",

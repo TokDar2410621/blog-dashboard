@@ -859,3 +859,173 @@ export async function linkPagesV1(
   if (!res.ok) throw new ApiError("Link insertion failed", res.status);
   return res.json();
 }
+
+// SERP Analyzer (2026-06-08) - Surfer-style top-10 benchmark
+export type SerpAnalyzeResult = {
+  position: number;
+  url: string;
+  domain: string;
+  title: string;
+  snippet: string;
+  word_count: number | null;
+  headings_count: number | null;
+  has_faq: boolean;
+  has_video: boolean;
+  fetch_error: boolean;
+};
+
+export type SerpAnalyzeResponse = {
+  keyword: string;
+  language: string;
+  top_10: SerpAnalyzeResult[];
+  averages: {
+    word_count_avg: number;
+    headings_avg: number;
+    faq_pct: number;
+    video_pct: number;
+  };
+};
+
+export async function serpAnalyze(
+  siteId: number,
+  body: { keyword: string; language?: "fr" | "en" | "es" },
+): Promise<SerpAnalyzeResponse> {
+  const res = await authFetch(`/v1/sites/${siteId}/serp-analyze/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "SERP analyze failed",
+      res.status,
+      "SERP_ANALYZE_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// AI Visibility tracking (2026-06-08)
+// ---------------------------------------------------------------------------
+
+export type AiVisibilityEngine =
+  | "chatgpt"
+  | "perplexity"
+  | "gemini"
+  | "searchgpt"
+  | "claude";
+
+export type AiVisibilityEngineBreakdown = {
+  total_checks: number;
+  cited_count: number;
+  cite_rate: number;
+};
+
+export type AiVisibilitySummary = {
+  score: number;
+  total_mentions: number;
+  cited_pages_count: number;
+  total_checks: number;
+  total_prompts: number;
+  breakdown_by_engine: Record<AiVisibilityEngine, AiVisibilityEngineBreakdown>;
+  delta_7d: number;
+};
+
+export type AiVisibilityPrompt = {
+  id: number;
+  prompt: string;
+  target_intent: string | null;
+  language: string;
+  created_at: string;
+  total_checks: number;
+  citation_count: number;
+  engines_mentioning: AiVisibilityEngine[];
+  last_checked_at: string | null;
+};
+
+export type AiVisibilityRunResult = {
+  id: number;
+  prompt_id: number;
+  engine: AiVisibilityEngine;
+  is_cited: boolean;
+  citation_url: string | null;
+  citation_rank: number | null;
+  checked_at: string;
+};
+
+export type AiVisibilityRunResponse = {
+  checks_run: number;
+  prompts_checked: number;
+  engines_per_prompt: number;
+  results: AiVisibilityRunResult[];
+  mocked: boolean;
+  note: string;
+};
+
+export async function aiVisibilitySummary(
+  siteId: number,
+): Promise<AiVisibilitySummary> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/summary/`);
+  if (!res.ok) throw new ApiError("AI visibility summary failed", res.status);
+  return res.json();
+}
+
+export async function listAiVisibilityPrompts(
+  siteId: number,
+): Promise<{ results: AiVisibilityPrompt[]; count: number }> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/prompts/`);
+  if (!res.ok) throw new ApiError("AI visibility prompts failed", res.status);
+  return res.json();
+}
+
+export async function createAiVisibilityPrompt(
+  siteId: number,
+  body: {
+    prompt: string;
+    target_intent?: string | null;
+    language?: "fr" | "en" | "es";
+  },
+): Promise<{
+  id: number;
+  prompt: string;
+  target_intent: string | null;
+  language: string;
+  created_at: string;
+}> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/prompts/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "AI prompt creation failed",
+      res.status,
+      "AI_PROMPT_CREATE_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+export async function runAiVisibility(
+  siteId: number,
+  body: { prompt_id?: number } = {},
+): Promise<AiVisibilityRunResponse> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/run/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "AI visibility run failed",
+      res.status,
+      "AI_VIS_RUN_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}

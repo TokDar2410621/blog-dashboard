@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import ProductMockup3D from "@/components/ProductMockup3D";
@@ -174,29 +175,34 @@ export default function LandingPage() {
             .
           </h1>
           <p className="hero-fade-3 mt-8 text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Ahrefs te facture 200&nbsp;US$ pour ecrire "shopping" a tes lecteurs quebecois.
-            Gridar redige tes articles en quebecois et les passe en audit SEO avant publication.
+            Entre ton URL. En 60 secondes, on te sort exactement ce qui t'empêche de ranker sur Google au Québec : tags, schema, vitesse, mots-clés, contenu manquant.
           </p>
-          <div className="hero-fade-4 mt-12 flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="hero-fade-4 mt-10 max-w-xl mx-auto">
+            <HeroAuditInput authedHref={authedHref} />
+          </div>
+          <div className="hero-fade-4 mt-6 flex flex-col sm:flex-row gap-3 justify-center">
             <Link href={authedHref}>
-              <Button size="lg" className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-6 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5">
-                <Sparkles className="h-4 w-4 mr-2" />
-                {isAuthenticated ? "Aller au tableau de bord" : "Connecter mon WordPress"}
-              </Button>
-            </Link>
-            <a href="#features">
               <Button
                 size="lg"
                 variant="outline"
                 className="w-full sm:w-auto h-12 px-6 bg-transparent border-white/15 hover:bg-white/5 text-zinc-100 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
               >
-                Voir comment ça marche
+                {isAuthenticated ? "Tableau de bord" : "Créer un compte gratuit"}
                 <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+            <a href="#features">
+              <Button
+                size="lg"
+                variant="ghost"
+                className="w-full sm:w-auto h-12 px-6 text-zinc-300 hover:bg-white/5 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
+              >
+                Voir comment ça marche
               </Button>
             </a>
           </div>
           <p className="hero-fade-5 mt-5 text-xs text-zinc-500">
-            Sans carte · Annule en 1 clic
+            Sans carte · Audit complet en 60 secondes · 100% confidentiel
           </p>
         </div>
 
@@ -247,12 +253,12 @@ export default function LandingPage() {
               Le flow complet
             </p>
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              Du sujet a
+              Du sujet à
               <br />
-              <span className="text-emerald-400">l'article publie.</span>
+              <span className="text-emerald-400">l'article publié.</span>
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto">
-              Tu donnes un mot-cle. 90 secondes plus tard, l'article est sur ton domaine, audite et indexe.
+              Tu donnes un mot-clé. 90 secondes plus tard, l'article est sur ton domaine, audité et indexé.
             </p>
           </Reveal>
           <Reveal delay={150}>
@@ -299,7 +305,7 @@ export default function LandingPage() {
               icon={Globe}
               title="WordPress"
               tag="60% des PME québécoises"
-              body="Application Password native WP 5.6+, aucun plugin a installer. Gridar synchronise tes articles existants et publie les nouveaux sur ton WordPress."
+              body="Application Password native WP 5.6+, aucun plugin à installer. Gridar synchronise tes articles existants et publie les nouveaux sur ton WordPress."
             />
           </Reveal>
           <Reveal delay={120}>
@@ -307,7 +313,7 @@ export default function LandingPage() {
               icon={Newspaper}
               title="Pas encore de blog"
               tag="On t'en bâtit un"
-              body="On heberge un blog Next.js sur ton sous-domaine blog.tonsite.ca. Schema FR-CA, sitemap, robots.txt, Core Web Vitals : tout est deja configure."
+              body="On héberge un blog Next.js sur ton sous-domaine blog.tonsite.ca. Schema FR-CA, sitemap, robots.txt, Core Web Vitals : tout est déjà configuré."
             />
           </Reveal>
           <Reveal delay={240}>
@@ -315,7 +321,7 @@ export default function LandingPage() {
               icon={Zap}
               title="Site existant non-WP"
               tag="Wix, Shopify, custom"
-              body="Cloudflare Worker, Vercel rewrites ou Nginx. On donne le snippet a coller chez ton hebergeur pour que /blog pointe vers Gridar."
+              body="Cloudflare Worker, Vercel rewrites ou Nginx. On donne le snippet à coller chez ton hébergeur pour que /blog pointe vers Gridar."
             />
           </Reveal>
         </div>
@@ -328,12 +334,12 @@ export default function LandingPage() {
             Le parcours SEO complet
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Brief, ecriture, audit, suivi.
+            Brief, écriture, audit, suivi.
             <br />
             Un seul outil.
           </h2>
           <p className="mt-6 text-zinc-400 max-w-2xl mx-auto">
-            24 outils dans un seul dashboard. Tu n&apos;achetes plus Ahrefs, Surfer et Frase a part.
+            24 outils dans un seul dashboard. Tu n&apos;achètes plus Ahrefs, Surfer et Frase à part.
           </p>
         </Reveal>
 
@@ -342,7 +348,7 @@ export default function LandingPage() {
           phase="01"
           icon={Search}
           title="Recherche stratégique"
-          subtitle="Avant d'ecrire, tu vois la structure, les FAQ, les entites et le word count des articles qui rankent deja sur ta requete."
+          subtitle="Avant d'écrire, tu vois la structure, les FAQ, les entités et le word count des articles qui rankent déjà sur ta requête."
           features={[
             "Brief de contenu (intent + outline + FAQ + entités + EEAT)",
             "People Also Ask + schema FAQPage prêt à coller",
@@ -358,7 +364,7 @@ export default function LandingPage() {
           phase="02"
           icon={PenLine}
           title="Génération en lexique québécois"
-          subtitle="Claude redige sur ton outline, avec ta voix et tes anecdotes. L'article sait que tu existes."
+          subtitle="Claude rédige sur ton outline, avec ta voix et tes anecdotes. L'article sait que tu existes."
           features={[
             "Article complet généré sur ton outline",
             "Knowledge base personnelle (ta voix, tes anecdotes)",
@@ -375,7 +381,7 @@ export default function LandingPage() {
           phase="03"
           icon={BarChart3}
           title="Suivi & optimisation continue"
-          subtitle="Apres publication, Gridar suit tes positions Google chaque jour et te previent quand un article commence a glisser."
+          subtitle="Après publication, Gridar suit tes positions Google chaque jour et te prévient quand un article commence à glisser."
           features={[
             "Audit IA (per-article + bulk site-wide)",
             "Suivi positions Google quotidien (graphe 90 j)",
@@ -404,7 +410,7 @@ export default function LandingPage() {
                 Surfer te sort un article avec "shopping" et "week-end" partout.
                 Tes lecteurs lisent <em className="text-emerald-300 not-italic">magasinage</em> et{" "}
                 <em className="text-emerald-300 not-italic">fin de semaine</em> au quotidien.
-                Gridar ecrit dans leur vocabulaire, pas celui d'un traducteur Parisien.
+                Gridar écrit dans leur vocabulaire, pas celui d'un traducteur Parisien.
               </p>
               <ul className="mt-8 space-y-4">
                 {[
@@ -438,7 +444,7 @@ export default function LandingPage() {
               Tarifs en CAD · sans lock-in
             </p>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-              Tarifs en CAD. Pas de piege SaaS.
+              Tarifs en CAD. Pas de piège SaaS.
             </h2>
           </Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
@@ -654,7 +660,7 @@ export default function LandingPage() {
             Tes concurrents écrivent encore dans Word.
           </h2>
           <p className="mt-6 text-lg text-zinc-400">
-            Toi tu auras un brief aligne sur le top 10 SERP, un article redige
+            Toi tu auras un brief aligné sur le top 10 SERP, un article rédigé
             dans le vocabulaire de tes lecteurs, et un audit qui pointe quoi
             corriger ligne par ligne. 10 minutes par article.
           </p>
@@ -718,6 +724,55 @@ export default function LandingPage() {
 // =========================================================================
 // Sub-components
 // =========================================================================
+
+function HeroAuditInput({ authedHref }: { authedHref: string }) {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const [domain, setDomain] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = domain.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+    if (!clean) return;
+    if (isAuthenticated) {
+      router.push(authedHref);
+      return;
+    }
+    setSubmitting(true);
+    router.push(`/audit?domain=${encodeURIComponent(clean)}&autorun=1`);
+  };
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="relative flex flex-col sm:flex-row gap-2 p-1.5 rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl shadow-[0_0_60px_-10px_rgba(16,185,129,0.25)] motion-safe:transition-shadow motion-safe:focus-within:shadow-[0_0_60px_-5px_rgba(16,185,129,0.45)]"
+    >
+      <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-emerald-500/30 via-cyan-500/20 to-emerald-500/30 opacity-60 blur-xl pointer-events-none -z-10" />
+      <input
+        type="text"
+        inputMode="url"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="tondomaine.ca"
+        value={domain}
+        onChange={(e) => setDomain(e.target.value)}
+        disabled={submitting}
+        className="flex-1 bg-transparent px-4 py-3 text-base text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+        aria-label="Domaine à auditer"
+      />
+      <Button
+        type="submit"
+        size="lg"
+        disabled={submitting || !domain.trim()}
+        className="h-12 px-6 bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-zinc-950 font-semibold motion-safe:transition-all motion-safe:hover:-translate-y-0.5 disabled:opacity-60"
+      >
+        <Sparkles className="h-4 w-4 mr-2" />
+        {submitting ? "Audit en cours..." : "Audite mon site"}
+      </Button>
+    </form>
+  );
+}
 
 function BackgroundGrid() {
   return (
@@ -1450,7 +1505,7 @@ const FAQS = [
   },
   {
     q: "Combien d'articles puis-je générer par mois ?",
-    a: "Plan Essai : 1/mois. Solo : 8/mois. Pro : 60/mois. Agence : 200/mois. Au-dela, tu achetes des credits a la piece (5$ pour 5 articles).",
+    a: "Plan Essai : 1/mois. Solo : 8/mois. Pro : 60/mois. Agence : 200/mois. Au-delà, tu achètes des crédits à la pièce (5$ pour 5 articles).",
   },
   {
     q: "Et si je veux annuler ?",

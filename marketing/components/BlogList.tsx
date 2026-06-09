@@ -54,7 +54,7 @@ export function BlogList({ posts }: { posts: BlogPost[] }) {
       <p className="text-zinc-500 text-center py-16">
         {activeTag
           ? "Aucun article pour ce filtre."
-          : "Aucun article publie pour l'instant. Reviens bientot."}
+          : "Aucun article publié pour l'instant. Reviens bientôt."}
       </p>
     );
   }
@@ -106,7 +106,7 @@ export function BlogList({ posts }: { posts: BlogPost[] }) {
                 <GridarMark className="h-32 w-32" />
               </div>
               <span className="absolute top-4 left-4 text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-black/60 backdrop-blur border border-white/10 text-emerald-300 font-mono">
-                A la une
+                À la une
               </span>
             </div>
             <div className="p-8 md:p-10 flex flex-col justify-center">

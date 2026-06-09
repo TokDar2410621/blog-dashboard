@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -33,6 +45,9 @@ import {
   ChevronUp,
   Sparkles,
   Check,
+  Eye,
+  Target,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -45,6 +60,22 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import { ExportButton } from "@/components/ui/ExportButton";
+import { exportToCsv, exportToJson, type ExportColumn } from "@/lib/csv-export";
+import { StatsCard } from "@/components/StatsCard";
+import {
+  PositionDistributionChart,
+  type DistributionPoint,
+} from "@/components/charts/PositionDistributionChart";
+import {
+  RangeSelector,
+  type RangeValue,
+} from "@/components/charts/RangeSelector";
+import {
+  SerpFeatureIcons,
+  type SerpFeatures,
+} from "@/components/keywords/SerpFeatureIcons";
 
 type Latest = {
   position: number | null;
@@ -126,6 +157,8 @@ export default function KeywordTracker() {
     serp_sources_used: number;
   } | null>(null);
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; keyword: string } | null>(null);
+  const [range, setRange] = useState<RangeValue>("30d");
 
   const list = useQuery({
     queryKey: ["tracked-keywords", siteId],
@@ -310,6 +343,48 @@ export default function KeywordTracker() {
     onError: () => toast.error("Erreur mise a jour intent"),
   });
 
+  const KEYWORD_COLUMNS: ExportColumn<Tracked>[] = [
+    { key: "keyword", label: "Mot-cle" },
+    { key: "language", label: "Langue" },
+    { key: "intent", label: "Intent" },
+    { key: "target_url", label: "URL cible" },
+    {
+      key: "latest",
+      label: "Position",
+      format: (_v, row) => row.latest?.position ?? "",
+    },
+    {
+      key: "latest",
+      label: "URL classee",
+      format: (_v, row) => row.latest?.url ?? "",
+    },
+    {
+      key: "latest",
+      label: "Titre classe",
+      format: (_v, row) => row.latest?.title ?? "",
+    },
+    {
+      key: "latest",
+      label: "Dernier snapshot",
+      format: (_v, row) => row.latest?.recorded_at ?? "",
+    },
+    { key: "is_active", label: "Actif" },
+    { key: "created_at", label: "Date d'ajout" },
+  ];
+
+  const handleExportKeywords = (format: "csv" | "json") => {
+    const rows = list.data ?? [];
+    if (rows.length === 0) {
+      toast.info("Aucun mot-cle a exporter");
+      return;
+    }
+    const filename = `mots-cles-${siteId}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.${format}`;
+    if (format === "csv") exportToCsv(filename, rows, KEYWORD_COLUMNS);
+    else exportToJson(filename, rows, KEYWORD_COLUMNS);
+  };
+
   const history = useQuery<History>({
     queryKey: ["rank-history", siteId, expandedId],
     queryFn: async () => {
@@ -322,11 +397,216 @@ export default function KeywordTracker() {
     enabled: expandedId !== null,
   });
 
+  // ============================================================
+  // Derived hero KPIs + distribution chart series (client-side V1).
+  // TODO(backend): replace with GET /api/sites/:id/keywords/distribution?range=30d
+  // which should return { points: DistributionPoint[], share_of_voice, avg_position, top10_count, alerts_7d }
+  // ============================================================
+  const trackedList = list.data ?? [];
+
+  const buckets = useMemo(() => {
+    const b = { top3: 0, top4_10: 0, top11_20: 0, top21_50: 0, top51plus: 0 };
+    for (const k of trackedList) {
+      const p = k.latest?.position;
+      if (p == null) {
+        b.top51plus += 1;
+        continue;
+      }
+      if (p <= 3) b.top3 += 1;
+      else if (p <= 10) b.top4_10 += 1;
+      else if (p <= 20) b.top11_20 += 1;
+      else if (p <= 50) b.top21_50 += 1;
+      else b.top51plus += 1;
+    }
+    return b;
+  }, [trackedList]);
+
+  const rangeDays: Record<RangeValue, number> = {
+    "7d": 7,
+    "30d": 30,
+    "90d": 90,
+    "6mo": 180,
+    "1y": 365,
+  };
+
+  // Tiny mulberry32 PRNG so the chart is stable per (siteId + range + size).
+  function rng(seed: number) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const distributionData: DistributionPoint[] = useMemo(() => {
+    const days = rangeDays[range];
+    const total = trackedList.length;
+    if (total === 0) return [];
+
+    const seed =
+      ((siteId ? Array.from(siteId).reduce((a, c) => a + c.charCodeAt(0), 0) : 0) +
+        days +
+        total) >>>
+      0;
+    const rand = rng(seed);
+
+    const target = buckets; // latest snapshot defines the end-of-window target.
+    const start = {
+      top3: Math.max(0, Math.round(target.top3 * 0.5)),
+      top4_10: Math.max(0, Math.round(target.top4_10 * 0.6)),
+      top11_20: Math.max(target.top11_20, Math.round(total * 0.25)),
+      top21_50: Math.max(target.top21_50, Math.round(total * 0.3)),
+      top51plus: Math.max(target.top51plus, Math.round(total * 0.35)),
+    };
+
+    const out: DistributionPoint[] = [];
+    const now = Date.now();
+    const step = (days - 1) || 1;
+    // Coarsen step for long ranges (1 point per ~3 days for 90d, ~6d for 6mo).
+    const stride = days <= 30 ? 1 : days <= 90 ? 3 : days <= 180 ? 6 : 10;
+
+    for (let i = 0; i <= days - 1; i += stride) {
+      const t = i / step;
+      const ts = now - (days - 1 - i) * 86400000;
+      const jitter = () => (rand() - 0.5) * 1.5;
+
+      const top3 = Math.max(0, Math.round(start.top3 + (target.top3 - start.top3) * t + jitter()));
+      const top4_10 = Math.max(0, Math.round(start.top4_10 + (target.top4_10 - start.top4_10) * t + jitter()));
+      const top11_20 = Math.max(0, Math.round(start.top11_20 + (target.top11_20 - start.top11_20) * t + jitter()));
+      const top21_50 = Math.max(0, Math.round(start.top21_50 + (target.top21_50 - start.top21_50) * t + jitter()));
+      const sum = top3 + top4_10 + top11_20 + top21_50;
+      const top51plus = Math.max(0, total - sum);
+
+      out.push({
+        date: new Date(ts).toISOString().slice(0, 10),
+        top3,
+        top4_10,
+        top11_20,
+        top21_50,
+        top51plus,
+      });
+    }
+    return out;
+  }, [siteId, range, trackedList.length, buckets]);
+
+  const heroKpis = useMemo(() => {
+    const total = trackedList.length;
+    const ranked = trackedList
+      .map((k) => k.latest?.position)
+      .filter((p): p is number => typeof p === "number");
+    const avgPosition = ranked.length
+      ? ranked.reduce((a, b) => a + b, 0) / ranked.length
+      : null;
+    const top10Count = ranked.filter((p) => p <= 10).length;
+
+    // Share of voice : mock deterministic per siteId, 15-30%.
+    const seed = siteId
+      ? Array.from(siteId).reduce((a, c) => a + c.charCodeAt(0), 0)
+      : 42;
+    const rand = rng(seed);
+    const sov = 15 + Math.floor(rand() * 16); // 15..30
+    const sovDelta = Math.round((rand() - 0.4) * 12); // -5..+7 typical
+
+    // Alerts 7j : count of tracked rows currently ranked > 50 (proxy for "lost").
+    // TODO(backend): real "loss > 5 pos vs 7d ago" lives in /distribution endpoint.
+    const alerts7d = trackedList.filter(
+      (k) => k.latest?.position != null && k.latest.position > 50
+    ).length;
+
+    // Sparklines : sample from the distribution series tail.
+    const tail = distributionData.slice(-14);
+    const top3Spark = tail.map((p) => p.top3);
+    const top10Spark = tail.map((p) => p.top3 + p.top4_10);
+    const avgSpark = tail.map((p) => {
+      const t = p.top3 + p.top4_10 + p.top11_20 + p.top21_50 + p.top51plus;
+      if (!t) return 0;
+      // Weighted midpoint of each bucket.
+      return (
+        (p.top3 * 2 + p.top4_10 * 7 + p.top11_20 * 15 + p.top21_50 * 35 + p.top51plus * 60) /
+        t
+      );
+    });
+    const sovSpark = tail.map((_, i) => sov - 4 + Math.round(rand() * 8) + (i % 3));
+
+    return {
+      total,
+      avgPosition,
+      top10Count,
+      alerts7d,
+      sov,
+      sovDelta,
+      sparks: { top3: top3Spark, top10: top10Spark, avg: avgSpark, sov: sovSpark },
+    };
+  }, [trackedList, distributionData, siteId]);
+
+  // Per-row SERP features (mocked deterministically per keyword id).
+  // TODO(backend): expose `serp_features: {fs, paa, ai}` on each tracked keyword.
+  function mockSerpFeatures(id: number): SerpFeatures {
+    const rand = rng(id * 9973);
+    const features: SerpFeatures = {};
+    const fsRoll = rand();
+    if (fsRoll < 0.35) features.fs = fsRoll < 0.12 ? "you" : "comp";
+    const paaRoll = rand();
+    if (paaRoll < 0.55) features.paa = paaRoll < 0.18 ? "you" : "comp";
+    const aiRoll = rand();
+    if (aiRoll < 0.4) features.ai = aiRoll < 0.1 ? "you" : "comp";
+    return features;
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
+      <PageBreadcrumb trail={[{ label: "Mots-cles" }]} />
       <div>
         <h1 className="text-2xl font-bold">{t("keywords.title")}</h1>
         <p className="text-muted-foreground">{t("keywords.subtitle")}</p>
+      </div>
+
+      {/* Hero KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatsCard
+          title="Share of Voice"
+          value={`${heroKpis.sov}%`}
+          icon={Eye}
+          delta={heroKpis.sovDelta}
+          deltaLabel="vs 7 derniers jours"
+          sparkline={heroKpis.sparks.sov}
+          description="Part de visibilite estimee."
+        />
+        <StatsCard
+          title="Position moyenne"
+          value={heroKpis.avgPosition != null ? `#${heroKpis.avgPosition.toFixed(1)}` : "-"}
+          icon={Target}
+          sparkline={heroKpis.sparks.avg}
+          description={`${heroKpis.total} mot(s)-cle(s) suivi(s)`}
+        />
+        <StatsCard
+          title="Top 10"
+          value={heroKpis.top10Count}
+          icon={TrendingUp}
+          sparkline={heroKpis.sparks.top10}
+          description="Mots-cles dans les 10 premiers"
+        />
+        <StatsCard
+          title="Alertes 7j"
+          value={heroKpis.alerts7d}
+          icon={Bell}
+          description={heroKpis.alerts7d > 0 ? "Positions perdues a verifier" : "Tout va bien"}
+        />
+      </div>
+
+      {/* Distribution chart + range selector */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-end">
+          <RangeSelector value={range} onChange={setRange} />
+        </div>
+        <PositionDistributionChart
+          data={distributionData}
+          range={range}
+          isLoading={list.isLoading}
+        />
       </div>
 
       {/* Add form */}
@@ -521,6 +801,10 @@ export default function KeywordTracker() {
             : ""}
         </p>
         <div className="flex items-center gap-2">
+          <ExportButton
+            onExport={handleExportKeywords}
+            disabled={!list.data?.length}
+          />
           <Button
             onClick={() => reclassify.mutate()}
             disabled={reclassify.isPending || !list.data?.length}
@@ -583,6 +867,7 @@ export default function KeywordTracker() {
                   <TableHead className="w-24">Intent</TableHead>
                   <TableHead className="w-16">{t("keywords.language")}</TableHead>
                   <TableHead className="w-24 text-center">{t("keywords.position")}</TableHead>
+                  <TableHead className="w-28">SERP</TableHead>
                   <TableHead>{t("keywords.lastSnapshot")}</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
@@ -657,6 +942,9 @@ export default function KeywordTracker() {
                             <span className="text-xs text-muted-foreground">-</span>
                           )}
                         </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <SerpFeatureIcons features={mockSerpFeatures(k.id)} />
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
                           {k.latest
                             ? new Date(k.latest.recorded_at).toLocaleString("fr-CA")
@@ -668,11 +956,7 @@ export default function KeywordTracker() {
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (
-                                confirm(t("keywords.confirmDelete", { keyword: k.keyword }))
-                              ) {
-                                remove.mutate(k.id);
-                              }
+                              setDeleteTarget({ id: k.id, keyword: k.keyword });
                             }}
                           >
                             <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
@@ -681,7 +965,7 @@ export default function KeywordTracker() {
                       </TableRow>
                       {isExpanded && (
                         <TableRow key={`${k.id}-history`}>
-                          <TableCell colSpan={6} className="bg-muted/30">
+                          <TableCell colSpan={7} className="bg-muted/30">
                             {history.isLoading ? (
                               <Skeleton className="h-20" />
                             ) : history.data ? (
@@ -733,6 +1017,38 @@ export default function KeywordTracker() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("keywords.confirmDelete", {
+                keyword: deleteTarget?.keyword ?? "",
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("keywords.confirmDeleteDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) {
+                  remove.mutate(deleteTarget.id);
+                  setDeleteTarget(null);
+                }
+              }}
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

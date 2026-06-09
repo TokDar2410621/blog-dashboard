@@ -58,9 +58,9 @@ function scoreColor(s: number | null | undefined) {
 function scoreLabel(s: number | null | undefined) {
   if (s == null) return "-";
   if (s >= 90) return "Excellent";
-  if (s >= 80) return "Tres bon";
+  if (s >= 80) return "Très bon";
   if (s >= 60) return "Correct";
-  if (s >= 40) return "A ameliorer";
+  if (s >= 40) return "À améliorer";
   return "Critique";
 }
 
@@ -131,7 +131,7 @@ export function PublicAuditPage() {
         throw new Error(err.error || "Erreur");
       }
       setLeadCaptured(true);
-      toast.success("Rapport complet debloque.");
+      toast.success("Rapport complet débloqué.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erreur");
     } finally {
@@ -161,8 +161,8 @@ export function PublicAuditPage() {
             Audit SEO gratuit de ton site en 30 secondes
           </h1>
           <p className="text-muted-foreground text-base md:text-lg mb-4">
-            Entre ton domaine, decouvre ton score SEO, tes positions sur Google et
-            les principaux points a fixer. Sans inscription.
+            Entre ton domaine, découvre ton score SEO, tes positions sur Google et
+            les principaux points à fixer. Sans inscription.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
             {stats && (
@@ -174,7 +174,7 @@ export function PublicAuditPage() {
             )}
             <span className="flex items-center gap-1.5">
               <Zap className="h-3.5 w-3.5 text-primary" />
-              Resultat en {"<"} 30s
+              Résultat en {"<"} 30s
             </span>
             <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-primary" />
@@ -211,7 +211,7 @@ export function PublicAuditPage() {
             </form>
             {auditing && (
               <p className="text-xs text-muted-foreground mt-3 text-center">
-                On crawle ton site, on check ta vitesse mobile, on regarde ou tu ranques. ~20s.
+                On crawle ton site, on check ta vitesse mobile, on regarde où tu ranques. ~20s.
               </p>
             )}
           </CardContent>
@@ -305,7 +305,7 @@ export function PublicAuditPage() {
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Pas de donnees</p>
+                    <p className="text-sm text-muted-foreground">Pas de données</p>
                   )}
                 </CardContent>
               </Card>
@@ -314,13 +314,13 @@ export function PublicAuditPage() {
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
-                    Mots-cles principaux (estimes)
+                    Mots-clés principaux (estimés)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {result.top_keywords_estimated.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      Pas reussi a extraire des mots-cles du site.
+                      Pas réussi à extraire des mots-clés du site.
                     </p>
                   ) : (
                     <div className="space-y-1">
@@ -388,7 +388,7 @@ export function PublicAuditPage() {
                     <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-sm bg-background/40 rounded">
                       <Lock className="h-6 w-6 text-primary" />
                       <p className="text-sm font-medium">
-                        7 autres recos a debloquer
+                        7 autres recos à débloquer
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Entre ton email plus bas pour les voir
@@ -398,11 +398,11 @@ export function PublicAuditPage() {
                   <div className={!leadCaptured ? "opacity-30 select-none" : ""}>
                     {[
                       { label: "Analyse de tes 3 principaux concurrents sur Google", sev: "medium" as const },
-                      { label: "Liste des articles obsoletes a refresh en priorite", sev: "high" as const },
-                      { label: "10 mots-cles cibles que tu ne touches pas encore", sev: "medium" as const },
-                      { label: "Backlinks: domaines referrents + opportunites", sev: "low" as const },
-                      { label: "Plan de generation d'articles pour les 30 prochains jours", sev: "medium" as const },
-                      { label: "Schema.org + JSON-LD manquants sur tes pages cles", sev: "low" as const },
+                      { label: "Liste des articles obsolètes à refresh en priorité", sev: "high" as const },
+                      { label: "10 mots-clés ciblés que tu ne touches pas encore", sev: "medium" as const },
+                      { label: "Backlinks: domaines référents + opportunités", sev: "low" as const },
+                      { label: "Plan de génération d'articles pour les 30 prochains jours", sev: "medium" as const },
+                      { label: "Schema.org + JSON-LD manquants sur tes pages clés", sev: "low" as const },
                       { label: "Comparatif Core Web Vitals desktop vs mobile", sev: "low" as const },
                     ].map((teaser, i) => (
                       <div
@@ -437,12 +437,12 @@ export function PublicAuditPage() {
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Lock className="h-5 w-5 text-primary" />
-                    Debloque le rapport complet
+                    Débloque le rapport complet
                   </CardTitle>
                   <CardDescription>
-                    Concurrents, articles obsoletes, top mots-cles a viser,
-                    rapport detaille avec 15+ actions concretes. Laisse ton
-                    email pour acceder a tout.
+                    Concurrents, articles obsolètes, top mots-clés à viser,
+                    rapport détaillé avec 15+ actions concrètes. Laisse ton
+                    email pour accéder à tout.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -467,8 +467,8 @@ export function PublicAuditPage() {
                       />
                       <span>
                         J&apos;accepte de recevoir des conseils SEO gratuits par
-                        email. Tu peux te desinscrire en 1 clic. Conforme Loi 25
-                        (Quebec) et RGPD.
+                        email. Tu peux te désinscrire en 1 clic. Conforme Loi 25
+                        (Québec) et RGPD.
                       </span>
                     </label>
                     <Button
@@ -481,7 +481,7 @@ export function PublicAuditPage() {
                       ) : (
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                       )}
-                      Acceder au rapport complet
+                      Accéder au rapport complet
                     </Button>
                   </form>
                 </CardContent>
@@ -492,15 +492,15 @@ export function PublicAuditPage() {
               <Card className="border-emerald-500/40 bg-emerald-500/10">
                 <CardContent className="p-6 text-center space-y-3">
                   <CheckCircle2 className="h-10 w-10 mx-auto text-emerald-500" />
-                  <h3 className="font-semibold">Rapport debloque</h3>
+                  <h3 className="font-semibold">Rapport débloqué</h3>
                   <p className="text-sm text-muted-foreground">
-                    Pour aller plus loin, cree un compte Gridar et connecte ton
+                    Pour aller plus loin, crée un compte Gridar et connecte ton
                     Google Search Console. On saura mesurer tes vraies
-                    positions et generer les articles qui manquent.
+                    positions et générer les articles qui manquent.
                   </p>
                   <Link href="/login">
                     <Button>
-                      Creer mon compte
+                      Créer mon compte
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
@@ -513,7 +513,7 @@ export function PublicAuditPage() {
 
       <footer className="mt-16 border-t border-border/40 py-6">
         <div className="max-w-5xl mx-auto px-4 text-center text-xs text-muted-foreground">
-          Gridar, audit SEO + generation d&apos;articles FR-CA pour PME quebecoises
+          Gridar, audit SEO + génération d&apos;articles FR-CA pour PME québécoises
         </div>
       </footer>
     </div>

@@ -148,7 +148,7 @@ export function HreflangCard({ siteId }: { siteId: string }) {
 
             {data.orphan_count > 0 && (
               <div className="text-xs text-muted-foreground border-t pt-3">
-                {data.orphan_count} articles publies dans une seule langue (orphelins potentiels a traduire).
+                {data.orphan_count} articles publiés dans une seule langue (orphelins potentiels à traduire).
               </div>
             )}
           </>

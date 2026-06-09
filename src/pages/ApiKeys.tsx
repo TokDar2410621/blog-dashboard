@@ -3,9 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   Key,
@@ -37,6 +48,7 @@ export default function ApiKeys() {
   const [name, setName] = useState("");
   const [revealed, setRevealed] = useState<CreatedToken | null>(null);
   const [copied, setCopied] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<Token | null>(null);
 
   const { data: tokens, isLoading } = useQuery<{ results: Token[] }>({
     queryKey: ["api-tokens"],
@@ -267,15 +279,7 @@ export default function ApiKeys() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          if (
-                            confirm(
-                              `Révoquer "${t.name}" ? Toute requête utilisant ce token échouera immédiatement.`,
-                            )
-                          ) {
-                            revoke.mutate(t.id);
-                          }
-                        }}
+                        onClick={() => setRevokeTarget(t)}
                         disabled={revoke.isPending}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
@@ -289,6 +293,37 @@ export default function ApiKeys() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog
+        open={revokeTarget !== null}
+        onOpenChange={(o) => !o && setRevokeTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Révoquer "{revokeTarget?.name}" ?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Toute requête utilisant ce token échouera immédiatement. Cette
+              action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (revokeTarget) {
+                  revoke.mutate(revokeTarget.id);
+                  setRevokeTarget(null);
+                }
+              }}
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              Révoquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

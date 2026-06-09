@@ -50,7 +50,7 @@ function formatRelative(iso: string | null): string {
   const diffMs = d.getTime() - now.getTime();
   const absSec = Math.abs(diffMs) / 1000;
   const past = diffMs < 0;
-  if (absSec < 60) return past ? "a l'instant" : "dans quelques secondes";
+  if (absSec < 60) return past ? "à l'instant" : "dans quelques secondes";
   if (absSec < 3600) {
     const m = Math.round(absSec / 60);
     return past ? `il y a ${m} min` : `dans ${m} min`;
@@ -87,11 +87,11 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["autopilot", siteId], data);
-      toast.success(data.enabled ? "Autopilote actif" : "Autopilote desactive");
+      toast.success(data.enabled ? "Autopilote actif" : "Autopilote désactivé");
       setPendingEnabled(null);
     },
     onError: () => {
-      toast.error("Sauvegarde echouee");
+      toast.error("Sauvegarde échouée");
       setPendingEnabled(null);
     },
   });
@@ -101,14 +101,14 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
       const res = await authFetch(`/sites/${siteId}/autopilot/run/`, { method: "POST" });
       const body = (await res.json()) as RunResult;
       if (!res.ok) {
-        const msg = ("error" in body && body.error) || ("skipped_reason" in body && body.skipped_reason) || "Run echoue";
+        const msg = ("error" in body && body.error) || ("skipped_reason" in body && body.skipped_reason) || "Run échoué";
         throw new Error(msg as string);
       }
       return body;
     },
     onSuccess: (data) => {
       if (data.ok) {
-        toast.success(`Article cree : "${data.post_title || data.topic}"`);
+        toast.success(`Article créé : "${data.post_title || data.topic}"`);
       }
       queryClient.invalidateQueries({ queryKey: ["autopilot", siteId] });
       queryClient.invalidateQueries({ queryKey: ["site-posts"] });
@@ -146,7 +146,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
           Mode autopilote
         </CardTitle>
         <CardDescription>
-          Gridar genere automatiquement des articles en draft en piochant les sujets parmi tes mots-cles trackes.
+          Gridar génère automatiquement des articles en draft en piochant les sujets parmi tes mots-clés trackés.
           Tu reviews et publies a ta convenance.
         </CardDescription>
       </CardHeader>
@@ -155,7 +155,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
           <div className="space-y-0.5">
             <Label className="text-base">Activer l'autopilote</Label>
             <p className="text-sm text-muted-foreground">
-              {isEnabled ? "Generation programmee active" : "Aucune generation automatique"}
+              {isEnabled ? "Génération programmée active" : "Aucune génération automatique"}
             </p>
           </div>
           <Switch
@@ -173,10 +173,10 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
             <div className="flex-1">
               <p className="font-medium text-amber-900 dark:text-amber-200">
-                Aucun mot-cle tracke
+                Aucun mot-clé tracké
               </p>
               <p className="text-amber-800 dark:text-amber-300 mt-0.5">
-                Ajoute des mots-cles dans <Link to={`/dashboard/${siteId}/positions`} className="underline">Positions</Link> avant d'activer l'autopilote.
+                Ajoute des mots-clés dans <Link to={`/dashboard/${siteId}/positions`} className="underline">Positions</Link> avant d'activer l'autopilote.
               </p>
             </div>
           </div>
@@ -203,7 +203,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
         </div>
 
         <div className="space-y-2">
-          <Label>Strategie</Label>
+          <Label>Stratégie</Label>
           <Select
             value={c.mode || "balanced"}
             onValueChange={(v) => save.mutate({ mode: v as AutopilotMode })}
@@ -213,13 +213,13 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="balanced">Balanced - 1 refresh / 2 creations (defaut)</SelectItem>
+              <SelectItem value="balanced">Balanced - 1 refresh / 2 créations (défaut)</SelectItem>
               <SelectItem value="refresh_first">Refresh first - prioriser les articles en perte de trafic</SelectItem>
-              <SelectItem value="create_only">Create only - generer uniquement de nouveaux articles</SelectItem>
+              <SelectItem value="create_only">Create only - générer uniquement de nouveaux articles</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Le mode refresh utilise GSC pour reperer les articles dont les impressions baissent de plus de 20% sur 30j, puis les regenere avec des donnees a jour. Sans GSC connecte, seul le mode create_only fonctionne.
+            Le mode refresh utilise GSC pour repérer les articles dont les impressions baissent de plus de 20% sur 30j, puis les régénère avec des données à jour. Sans GSC connecté, seul le mode create_only fonctionne.
           </p>
         </div>
 
@@ -228,7 +228,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
             <Label className="text-base">Publication automatique</Label>
             <p className="text-sm text-muted-foreground">
               {c.auto_publish
-                ? "Les articles sont publies directement (zero review)"
+                ? "Les articles sont publiés directement (zéro review)"
                 : "Les articles atterrissent en draft pour review"}
             </p>
           </div>
@@ -247,7 +247,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
                 Mode publication directe actif
               </p>
               <p className="text-amber-800 dark:text-amber-300 mt-0.5">
-                Les articles partent en prod sans relecture. Verifie ton prompt et ta memoire site avant de laisser tourner. Un redeploy Vercel est declenche automatiquement apres chaque publication.
+                Les articles partent en prod sans relecture. Vérifie ton prompt et ta mémoire site avant de laisser tourner. Un redeploy Vercel est déclenché automatiquement après chaque publication.
               </p>
             </div>
           </div>
@@ -257,7 +257,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
           <div className="rounded-lg border p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
               <KeyRound className="h-3.5 w-3.5" />
-              <span>Mots-cles dispo</span>
+              <span>Mots-clés dispo</span>
             </div>
             <p className="text-2xl font-semibold">{c.tracked_keywords_count}</p>
           </div>
@@ -284,7 +284,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
             </div>
           )}
           {c.is_due && c.enabled && c.ready_to_run && (
-            <Badge variant="secondary">Pret a generer maintenant</Badge>
+            <Badge variant="secondary">Prêt à générer maintenant</Badge>
           )}
         </div>
 
@@ -308,7 +308,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
             )}
           </Button>
           <p className="text-xs text-muted-foreground mt-2">
-            Utile pour tester. Le sujet est pioche au hasard parmi les mots-cles trackes sans article existant.
+            Utile pour tester. Le sujet est pioché au hasard parmi les mots-clés trackés sans article existant.
           </p>
         </div>
 
@@ -319,7 +319,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
               Declenchement automatique
             </p>
             <p className="text-blue-800 dark:text-blue-300">
-              L'autopilote tourne automatiquement chaque heure via un cron Railway. Si tes drafts n'apparaissent pas, c'est probablement que le service cron `run_autopilot` n'a pas ete cree sur Railway. Voir `backend/SCHEDULED_JOBS.md` pour la procedure (5 minutes, ~$1-3/mois).
+              L'autopilote tourne automatiquement chaque heure via un cron Railway. Si tes drafts n'apparaissent pas, c'est probablement que le service cron `run_autopilot` n'a pas été créé sur Railway. Voir `backend/SCHEDULED_JOBS.md` pour la procédure (5 minutes, ~$1-3/mois).
             </p>
             <p className="text-blue-800 dark:text-blue-300">
               En attendant, le bouton "Lancer maintenant" ci-dessus marche toujours.

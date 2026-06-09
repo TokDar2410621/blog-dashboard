@@ -1321,3 +1321,93 @@ class KeywordStrategy(models.Model):
 
     def __str__(self):
         return f"Strategy '{self.keyword}' ({self.intent}/{self.status})"
+
+
+# --------------------------------------------------------------------------
+# AI Visibility tracking (2026-06-08)
+# Track how a site is mentioned in LLM responses (ChatGPT / Perplexity /
+# Gemini / SearchGPT / Claude). One prompt -> N results across engines.
+# --------------------------------------------------------------------------
+
+class AiVisibilityPrompt(models.Model):
+    """A prompt the user wants to test against LLMs to see if their site is
+    cited in the answer (e.g. 'meilleur outil SEO IA pour PME au Quebec').
+    """
+    TARGET_INTENT_CHOICES = [
+        ('informational', 'Informationnel'),
+        ('commercial', 'Commercial / Comparatif'),
+        ('transactional', 'Transactionnel'),
+        ('navigational', 'Navigationnel'),
+        ('local', 'Local'),
+    ]
+
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='ai_visibility_prompts'
+    )
+    prompt = models.TextField(
+        verbose_name="Prompt teste",
+        help_text="Question posee aux LLMs pour mesurer la visibilite."
+    )
+    target_intent = models.CharField(
+        max_length=20, choices=TARGET_INTENT_CHOICES, blank=True, null=True,
+    )
+    language = models.CharField(
+        max_length=2, choices=Site.LANGUAGE_CHOICES, default='fr',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['site', '-created_at']),
+        ]
+
+    def __str__(self):
+        excerpt = (self.prompt or '')[:60]
+        return f"AiVisibilityPrompt #{self.id}: {excerpt}"
+
+
+class AiVisibilityResult(models.Model):
+    """One check of a prompt against one LLM engine. Stores whether the
+    site was cited, optional citation_url and rank.
+    """
+    ENGINE_CHOICES = [
+        ('chatgpt', 'ChatGPT'),
+        ('perplexity', 'Perplexity'),
+        ('gemini', 'Gemini'),
+        ('searchgpt', 'SearchGPT'),
+        ('claude', 'Claude'),
+    ]
+
+    prompt = models.ForeignKey(
+        AiVisibilityPrompt, on_delete=models.CASCADE, related_name='results'
+    )
+    engine = models.CharField(
+        max_length=20, choices=ENGINE_CHOICES, db_index=True,
+    )
+    response_excerpt = models.TextField(
+        blank=True, default='',
+        help_text="Premiers ~500 caracteres de la reponse du LLM."
+    )
+    is_cited = models.BooleanField(
+        default=False, db_index=True,
+        help_text="True si le domaine du site apparait dans la reponse."
+    )
+    citation_url = models.URLField(
+        max_length=500, blank=True, null=True,
+    )
+    citation_rank = models.PositiveIntegerField(
+        blank=True, null=True,
+        help_text="Position de la citation dans la reponse (1 = premiere)."
+    )
+    checked_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-checked_at']
+        indexes = [
+            models.Index(fields=['prompt', 'engine']),
+            models.Index(fields=['prompt', '-checked_at']),
+        ]
+
+    def __str__(self):
+        return f"AiVisibilityResult #{self.id} ({self.engine}, cited={self.is_cited})"

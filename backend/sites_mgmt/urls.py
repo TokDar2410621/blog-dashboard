@@ -56,6 +56,8 @@ from .api_v1 import (
     V1CreateLandingView, V1GenerateLandingView, V1LinkPagesView,
     V1SiteSeoScoreView, V1AIOverviewReadinessView,
     V1CheckRenderabilityView, V1LinkOpportunitiesView,
+    V1SerpAnalyzeView,
+    V1AiVisibilitySummaryView, V1AiVisibilityPromptsView, V1AiVisibilityRunView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -236,5 +238,11 @@ urlpatterns = [
     path('v1/check-renderability/', V1CheckRenderabilityView.as_view(), name='v1-check-renderability'),
     # Link Opportunities (P2 #11, 2026-06-08)
     path('v1/link-opportunities/', V1LinkOpportunitiesView.as_view(), name='v1-link-opportunities'),
+    # SERP Analyzer (2026-06-08)
+    path('v1/sites/<int:site_id>/serp-analyze/', V1SerpAnalyzeView.as_view(), name='v1-serp-analyze'),
+    # AI Visibility tracking (2026-06-08)
+    path('v1/sites/<int:site_id>/ai-visibility/summary/', V1AiVisibilitySummaryView.as_view(), name='v1-ai-visibility-summary'),
+    path('v1/sites/<int:site_id>/ai-visibility/prompts/', V1AiVisibilityPromptsView.as_view(), name='v1-ai-visibility-prompts'),
+    path('v1/sites/<int:site_id>/ai-visibility/run/', V1AiVisibilityRunView.as_view(), name='v1-ai-visibility-run'),
     path('', include(router.urls)),
 ]

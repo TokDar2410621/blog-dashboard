@@ -17,6 +17,12 @@ import { Switch } from "@/components/ui/switch";
 import {
   TrendingUp, Share2, Copy, RefreshCw, CheckCircle2, Sparkles,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function formatNumber(n: number): string {
   if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -99,27 +105,61 @@ export function ProofCard({ siteId }: { siteId: string | number }) {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-primary">
-                    +{formatNumber(s.total_impressions_gained)}
-                  </span>
-                  <TrendingUp className="h-4 w-4 text-primary" />
+            <TooltipProvider>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-3xl font-bold text-primary cursor-help">
+                          +{formatNumber(s.total_impressions_gained)}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="font-medium mb-1">Impressions gagnees</p>
+                        <p>
+                          Somme des impressions GSC supplementaires constatees
+                          a J+30 / J+60 / J+90 apres publication, comparees a
+                          la baseline pre-publication.
+                        </p>
+                        <p className="mt-2 text-muted-foreground">
+                          Source : Google Search Console + snapshots de
+                          baseline Gridar.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("proof.impressionsGained", "impressions gagnees")}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("proof.impressionsGained", "impressions gagnees")}
-                </p>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-primary">
-                  +{formatNumber(s.total_clicks_gained)}
+                <div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-3xl font-bold text-primary cursor-help">
+                        +{formatNumber(s.total_clicks_gained)}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium mb-1">Clics gagnes</p>
+                      <p>
+                        Somme des clics GSC supplementaires constates a J+30 /
+                        J+60 / J+90 apres publication, comparees a la baseline
+                        pre-publication.
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Source : Google Search Console + snapshots de baseline
+                        Gridar.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("proof.clicksGained", "clics gagnes")}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("proof.clicksGained", "clics gagnes")}
-                </p>
               </div>
-            </div>
+            </TooltipProvider>
 
             <p className="text-xs text-muted-foreground">
               {t("proof.attributionBase", "Sur {{count}} article(s) avec attribution active.", {

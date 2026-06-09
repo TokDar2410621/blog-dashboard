@@ -72,7 +72,7 @@ export default function Overview() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold">Bienvenue ! Voici tes 4 prochains pas.</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  En 10 minutes tu vas avoir ton premier article SEO publie.
+                  En 10 minutes tu vas avoir ton premier article SEO publié.
                 </p>
               </div>
             </div>
@@ -83,22 +83,22 @@ export default function Overview() {
                 <div className="flex-1">
                   <strong>Configure le profil auteur (E-E-A-T)</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Bio + credentials + photo. C&apos;est ce que Google recompense le plus en 2026.
+                    Bio + credentials + photo. C&apos;est ce que Google récompense le plus en 2026.
                   </p>
                 </div>
                 <Link href={`${base}/parametres`}>
                   <Button size="sm" variant="outline">
                     <Settings className="h-3 w-3 mr-1.5" />
-                    Parametres
+                    Paramètres
                   </Button>
                 </Link>
               </li>
               <li className="flex items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</span>
                 <div className="flex-1">
-                  <strong>Genere un brief strategique</strong>
+                  <strong>Génère un brief stratégique</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Tape ton mot-cle cible, on extrait le top SERP + les vraies questions de ton audience.
+                    Tape ton mot-clé cible, on extrait le top SERP + les vraies questions de ton audience.
                   </p>
                 </div>
                 <Link href={`${base}/generer`}>
@@ -111,24 +111,24 @@ export default function Overview() {
               <li className="flex items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</span>
                 <div className="flex-1">
-                  <strong>Genere ton premier article</strong>
+                  <strong>Génère ton premier article</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Claude ecrit en suivant ton brief, en lexique quebecois, avec ta voix.
+                    Claude écrit en suivant ton brief, en lexique québécois, avec ta voix.
                   </p>
                 </div>
                 <Link href={`${base}/generer`}>
                   <Button size="sm">
                     <Sparkles className="h-3 w-3 mr-1.5" />
-                    Generer
+                    Générer
                   </Button>
                 </Link>
               </li>
               <li className="flex items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">4</span>
                 <div className="flex-1">
-                  <strong>Suis tes mots-cles</strong>
+                  <strong>Suis tes mots-clés</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Ajoute 5 mots-cles cibles. On snapshot leur position Google chaque jour.
+                    Ajoute 5 mots-clés cibles. On snapshot leur position Google chaque jour.
                   </p>
                 </div>
                 <Link href={`${base}/positions`}>
@@ -142,7 +142,7 @@ export default function Overview() {
 
             <div className="pt-2 text-xs text-muted-foreground flex items-center gap-1">
               <ArrowRight className="h-3 w-3" />
-              Une fois ton premier article publie, ce panneau disparait.
+              Une fois ton premier article publié, ce panneau disparaît.
             </div>
           </CardContent>
         </Card>
@@ -152,7 +152,7 @@ export default function Overview() {
         <StatsCard title="Total articles" value={stats?.total_posts ?? 0} icon={FileText} />
         <StatsCard title="Total vues" value={stats?.total_views ?? 0} icon={Eye} />
         <StatsCard title="Brouillons" value={stats?.drafts ?? 0} icon={PenLine} />
-        <StatsCard title="Planifies" value={stats?.scheduled ?? 0} icon={Clock} />
+        <StatsCard title="Planifiés" value={stats?.scheduled ?? 0} icon={Clock} />
       </div>
 
       {siteId && <HreflangCard siteId={siteId} />}

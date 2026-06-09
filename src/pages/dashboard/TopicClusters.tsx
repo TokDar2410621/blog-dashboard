@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Network,
   Loader2,
@@ -22,10 +23,18 @@ import {
   GitBranch,
   Lightbulb,
   Sparkles,
-  Plus,
   AlertCircle,
+  Hexagon,
+  List as ListIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import {
+  TopicalMap,
+  type TopicalCluster,
+} from "@/components/topics/TopicalMap";
+import { TopicDrawer } from "@/components/topics/TopicDrawer";
+import type { HexTopic, HexStatus } from "@/components/topics/HexTile";
 
 type SlugRef = { slug: string; title: string; exists: boolean };
 
@@ -57,7 +66,17 @@ export default function TopicClusters() {
   const persistKey = (slot: string) => `gridar:site:${siteId}:topic-clusters:${slot}`;
   const [language, setLanguage] = usePersistedState<string>(persistKey("language"), "fr");
   const [data, setData] = usePersistedState<ClusterResult | null>(persistKey("data"), null);
+  const [view, setView] = usePersistedState<"map" | "list">(
+    persistKey("view"),
+    "map",
+  );
   const base = `/dashboard/${siteId}`;
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selection, setSelection] = useState<{
+    topic: HexTopic;
+    clusterTheme: string;
+  } | null>(null);
 
   const jobs = useJobs();
 
@@ -77,6 +96,64 @@ export default function TopicClusters() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  /**
+   * Map the backend cluster shape to the hex grid shape consumed by TopicalMap.
+   *
+   * - pillar + spokes that "exist" become "covered" hexes
+   * - spokes flagged exists=false become "missing" hexes (the LLM hinted at
+   *   them but no article matched)
+   * - suggested_new_articles become "recommended" hexes
+   *
+   * Volume/KD aren't returned by the cluster endpoint yet - left undefined.
+   */
+  const hexClusters = useMemo<TopicalCluster[]>(() => {
+    if (!data) return [];
+    return data.clusters.map((c) => {
+      const topics: HexTopic[] = [];
+      if (c.pillar) {
+        topics.push({
+          label: c.pillar.title,
+          status: (c.pillar.exists ? "covered" : "missing") as HexStatus,
+          meta: { slug: c.pillar.slug, pillar: true },
+        });
+      }
+      for (const sp of c.spokes) {
+        topics.push({
+          label: sp.title,
+          status: (sp.exists ? "covered" : "missing") as HexStatus,
+          meta: { slug: sp.slug },
+        });
+      }
+      for (const sn of c.suggested_new_articles) {
+        topics.push({
+          label: sn.title,
+          status: "recommended" as HexStatus,
+          meta: { rationale: sn.rationale },
+        });
+      }
+      return {
+        theme: c.theme,
+        summary: c.summary,
+        topics,
+      };
+    });
+  }, [data]);
+
+  const handleTopicClick = (topic: HexTopic, clusterTheme: string) => {
+    // Covered articles already have a dedicated page - go straight there
+    // for that case, otherwise open the drawer to let the user pick an
+    // angle and trigger generation.
+    if (topic.status === "covered" && topic.meta?.slug) {
+      // We could navigate, but keeping the drawer behavior consistent
+      // lets the user discover the article preview + decide. Open drawer.
+      setSelection({ topic, clusterTheme });
+      setDrawerOpen(true);
+      return;
+    }
+    setSelection({ topic, clusterTheme });
+    setDrawerOpen(true);
+  };
+
   /** Fires the analysis as a background job so the user can navigate away. */
   const runClusters = () => {
     jobs.start({
@@ -91,6 +168,7 @@ export default function TopicClusters() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      <PageBreadcrumb trail={[{ label: "Clusters" }]} />
       <div>
         <h1 className="text-2xl font-bold">{t("clusters.title")}</h1>
         <p className="text-muted-foreground">{t("clusters.subtitle")}</p>
@@ -153,19 +231,38 @@ export default function TopicClusters() {
 
       {data && !mutation.isPending && (
         <>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span>
-              {t("clusters.summary", {
-                clusters: data.clusters.length,
-                articles: data.article_count,
-              })}
-            </span>
-            {data.unassigned.length > 0 && (
-              <span className="flex items-center gap-1 text-amber-600">
-                <AlertCircle className="h-4 w-4" />
-                {t("clusters.unassignedCount", { count: data.unassigned.length })}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <span>
+                {t("clusters.summary", {
+                  clusters: data.clusters.length,
+                  articles: data.article_count,
+                })}
               </span>
-            )}
+              {data.unassigned.length > 0 && (
+                <span className="flex items-center gap-1 text-amber-600">
+                  <AlertCircle className="h-4 w-4" />
+                  {t("clusters.unassignedCount", { count: data.unassigned.length })}
+                </span>
+              )}
+            </div>
+
+            <Tabs
+              value={view}
+              onValueChange={(v) => setView(v as "map" | "list")}
+              className="w-auto"
+            >
+              <TabsList>
+                <TabsTrigger value="map" className="gap-1.5">
+                  <Hexagon className="h-3.5 w-3.5" />
+                  Topical Map
+                </TabsTrigger>
+                <TabsTrigger value="list" className="gap-1.5">
+                  <ListIcon className="h-3.5 w-3.5" />
+                  Liste
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
 
           {data.message && (
@@ -176,7 +273,14 @@ export default function TopicClusters() {
             </Card>
           )}
 
-          {data.clusters.map((cluster, idx) => (
+          {view === "map" && hexClusters.length > 0 && (
+            <TopicalMap
+              clusters={hexClusters}
+              onTopicClick={handleTopicClick}
+            />
+          )}
+
+          {view === "list" && data.clusters.map((cluster, idx) => (
             <Card key={idx}>
               <CardHeader>
                 <CardTitle className="text-lg">
@@ -326,6 +430,13 @@ export default function TopicClusters() {
           </CardContent>
         </Card>
       )}
+
+      <TopicDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        selection={selection}
+        siteBase={base}
+      />
     </div>
   );
 }

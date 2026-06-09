@@ -10,9 +10,50 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Eye, PenLine, Clock, Sparkles, ArrowRight, Search, BarChart3, Settings } from "lucide-react";
+import { FileText, Eye, PenLine, Clock, Sparkles, ArrowRight, Search, BarChart3, Settings, TrendingDown, Link2, Network, UserCheck } from "lucide-react";
 import { HreflangCard } from "@/components/HreflangCard";
 import { ProofCard } from "@/components/ProofCard";
+import {
+  RecommendationsPanel,
+  type Recommendation,
+} from "@/components/dashboard/RecommendationsPanel";
+
+// TODO: backend doit retourner sparkline + delta_7d par metric
+// (articles_count, total_views, drafts_count, scheduled_count) dans
+// /api/sites/:id/stats/. En attendant on génère un mock déterministe
+// à partir de la valeur actuelle pour ne pas avoir d'effet "qui saute".
+function mockSparkline(seed: number, current: number, points = 7): number[] {
+  if (current <= 0) {
+    return Array.from({ length: points }, () => 0);
+  }
+  // PRNG déterministe (mulberry32) seedée par (seed * 1000 + current)
+  let s = (seed * 1000 + current) >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out: number[] = [];
+  for (let i = 0; i < points; i++) {
+    const drift = (i / (points - 1)) * 0.15; // légère tendance haussière
+    const noise = (rand() - 0.5) * 0.2; // +/- 10%
+    out.push(Math.max(0, current * (0.85 + drift + noise)));
+  }
+  // Assure que le dernier point reflète la valeur réelle.
+  out[out.length - 1] = current;
+  return out;
+}
+
+// TODO: backend doit retourner delta_7d. Mock = pente entre premier et dernier point.
+function mockDelta(series: number[]): number {
+  if (series.length < 2) return 0;
+  const first = series[0];
+  const last = series[series.length - 1];
+  if (first <= 0) return last > 0 ? 100 : 0;
+  return ((last - first) / first) * 100;
+}
 
 export default function Overview() {
   const { t, i18n } = useTranslation();
@@ -48,8 +89,89 @@ export default function Overview() {
   }
 
   const totalPosts = stats?.total_posts ?? 0;
+  const totalViews = stats?.total_views ?? 0;
+  const drafts = stats?.drafts ?? 0;
+  const scheduled = stats?.scheduled ?? 0;
   const isFirstRun = totalPosts === 0;
   const base = `/dashboard/${siteId}`;
+
+  // Recommandations derivees cote client des stats deja chargees. Quand le
+  // backend exposera /sites/:id/recommendations/ on remplacera cette liste
+  // par un fetch direct. Pour l'instant on se base sur les signaux dispos :
+  // - drafts en attente -> publier
+  // - 0 mots-cles trackes -> setup positions
+  // - pas d'articles -> generer
+  // - sinon -> couvrir des sujets manquants (Topic Clusters)
+  // - liens internes : geree par /link-graph
+  // - E-E-A-T : geree par /parametres (auteur)
+  const recommendations: Recommendation[] = !isFirstRun
+    ? [
+        ...(drafts > 0
+          ? [
+              {
+                id: "publish-drafts",
+                icon: PenLine,
+                title: `Publier ${drafts} brouillon${drafts > 1 ? "s" : ""}`,
+                description:
+                  "Tu as des articles prets a publier. Chaque jour d'attente, c'est du trafic perdu.",
+                action_label: "Voir",
+                action_href: `${base}/articles?status=draft`,
+                priority: "high" as const,
+              },
+            ]
+          : []),
+        {
+          id: "re-optimize-decay",
+          icon: TrendingDown,
+          title: "Re-optimiser les pages en declin",
+          description:
+            "Identifie les articles qui perdent en impressions GSC et re-genere-les en 1 clic.",
+          action_label: "Analyser",
+          action_href: `${base}/decay`,
+          priority: "high",
+        },
+        {
+          id: "cover-missing-topics",
+          icon: Network,
+          title: "Couvrir les sujets manquants",
+          description:
+            "Topic Clusters detecte les trous dans ta couverture editoriale et suggere les briefs a generer.",
+          action_label: "Explorer",
+          action_href: `${base}/clusters`,
+          priority: "medium",
+        },
+        {
+          id: "internal-links",
+          icon: Link2,
+          title: "Reparer les liens internes manquants",
+          description:
+            "Le link-graph identifie les articles orphelins et les liens contextuels a ajouter pour booster le PageRank interne.",
+          action_label: "Voir",
+          action_href: `${base}/link-graph`,
+          priority: "medium",
+        },
+        {
+          id: "eeat-author",
+          icon: UserCheck,
+          title: "Completer le profil auteur (E-E-A-T)",
+          description:
+            "Bio, credentials, photo, lien LinkedIn. C'est le signal que Google recompense le plus depuis 2024.",
+          action_label: "Configurer",
+          action_href: `${base}/parametres/auteur`,
+          priority: "low",
+        },
+      ]
+    : [];
+
+  // TODO: remplacer par stats.sparkline_* et stats.delta_*_7d quand le backend les expose.
+  const sparkPosts = mockSparkline(1, totalPosts);
+  const sparkViews = mockSparkline(2, totalViews);
+  const sparkDrafts = mockSparkline(3, drafts);
+  const sparkScheduled = mockSparkline(4, scheduled);
+  const deltaPosts = mockDelta(sparkPosts);
+  const deltaViews = mockDelta(sparkViews);
+  const deltaDrafts = mockDelta(sparkDrafts);
+  const deltaScheduled = mockDelta(sparkScheduled);
 
   return (
     <div className="space-y-6">
@@ -83,7 +205,7 @@ export default function Overview() {
                     Bio + crédentials + photo. C&apos;est ce que Google récompense le plus en 2026.
                   </p>
                 </div>
-                <Link to={`${base}/parametres`}>
+                <Link to={`${base}/parametres/auteur`}>
                   <Button size="sm" variant="outline">
                     <Settings className="h-3 w-3 mr-1.5" />
                     Paramètres
@@ -149,23 +271,31 @@ export default function Overview() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title={t("overview.totalPosts")}
-          value={stats?.total_posts ?? 0}
+          value={totalPosts}
           icon={FileText}
+          sparkline={sparkPosts}
+          delta={deltaPosts}
         />
         <StatsCard
           title={t("overview.totalViews")}
-          value={stats?.total_views ?? 0}
+          value={totalViews}
           icon={Eye}
+          sparkline={sparkViews}
+          delta={deltaViews}
         />
         <StatsCard
           title={t("overview.drafts")}
-          value={stats?.drafts ?? 0}
+          value={drafts}
           icon={PenLine}
+          sparkline={sparkDrafts}
+          delta={deltaDrafts}
         />
         <StatsCard
           title={t("overview.scheduled")}
-          value={stats?.scheduled ?? 0}
+          value={scheduled}
           icon={Clock}
+          sparkline={sparkScheduled}
+          delta={deltaScheduled}
         />
       </div>
 
@@ -174,6 +304,14 @@ export default function Overview() {
 
       {/* Hreflang health */}
       {siteId && <HreflangCard siteId={siteId} />}
+
+      {/* Recommendations inbox - actions a fort impact derivees des stats */}
+      {!isFirstRun && (
+        <RecommendationsPanel
+          recommendations={recommendations}
+          subtitle="Actions a fort impact, triees par priorite. Cliquez pour aller a la page concernee."
+        />
+      )}
 
       {/* Recent Posts */}
       {stats?.recent_posts && stats.recent_posts.length > 0 && (

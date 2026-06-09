@@ -3,8 +3,8 @@ import { POST_STATUS_VARIANT, type PostStatus } from "@/lib/constants";
 
 const STATUS_LABELS_FR: Record<string, string> = {
   draft: "Brouillon",
-  published: "Publie",
-  scheduled: "Planifie",
+  published: "Publié",
+  scheduled: "Planifié",
 };
 
 export function PostStatusBadge({ status }: { status: string }) {

@@ -159,8 +159,8 @@ export default function Landing() {
             .
           </h1>
           <p className="hero-fade-3 mt-8 text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Ahrefs te facture 200&nbsp;US$ pour ecrire "shopping" a tes lecteurs quebecois.
-            Gridar redige tes articles en quebecois et les passe en audit SEO avant publication.
+            Ahrefs te facture 200&nbsp;US$ pour écrire "shopping" à tes lecteurs québécois.
+            Gridar rédige tes articles en québécois et les passe en audit SEO avant publication.
           </p>
           <div className="hero-fade-4 mt-12 flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/login">
@@ -234,10 +234,10 @@ export default function Landing() {
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
               Du sujet a
               <br />
-              <span className="text-emerald-400">l'article publie.</span>
+              <span className="text-emerald-400">l'article publié.</span>
             </h2>
             <p className="text-zinc-400 max-w-xl mx-auto">
-              Tu donnes un mot-cle. 90 secondes plus tard, l'article est sur ton domaine, audite et indexe.
+              Tu donnes un mot-clé. 90 secondes plus tard, l'article est sur ton domaine, audité et indexé.
             </p>
           </Reveal>
           <Reveal delay={150}>
@@ -284,7 +284,7 @@ export default function Landing() {
               icon={Globe}
               title="WordPress"
               tag="60% des PME québécoises"
-              body="Application Password native WP 5.6+, aucun plugin a installer. Gridar synchronise tes articles existants et publie les nouveaux sur ton WordPress."
+              body="Application Password native WP 5.6+, aucun plugin à installer. Gridar synchronise tes articles existants et publie les nouveaux sur ton WordPress."
             />
           </Reveal>
           <Reveal delay={120}>
@@ -292,7 +292,7 @@ export default function Landing() {
               icon={Newspaper}
               title="Pas encore de blog"
               tag="On t'en bâtit un"
-              body="On heberge un blog Next.js sur ton sous-domaine blog.tonsite.ca. Schema FR-CA, sitemap, robots.txt, Core Web Vitals : tout est deja configure."
+              body="On héberge un blog Next.js sur ton sous-domaine blog.tonsite.ca. Schema FR-CA, sitemap, robots.txt, Core Web Vitals : tout est déjà configuré."
             />
           </Reveal>
           <Reveal delay={240}>
@@ -313,12 +313,12 @@ export default function Landing() {
             Le parcours SEO complet
           </p>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Brief, ecriture, audit, suivi.
+            Brief, écriture, audit, suivi.
             <br />
             Un seul outil.
           </h2>
           <p className="mt-6 text-zinc-400 max-w-2xl mx-auto">
-            24 outils dans un seul dashboard. Tu n&apos;achetes plus Ahrefs, Surfer et Frase a part.
+            24 outils dans un seul dashboard. Tu n&apos;achètes plus Ahrefs, Surfer et Frase à part.
           </p>
         </Reveal>
 
@@ -327,7 +327,7 @@ export default function Landing() {
           phase="01"
           icon={Search}
           title="Recherche stratégique"
-          subtitle="Avant d'ecrire, tu vois la structure, les FAQ, les entites et le word count des articles qui rankent deja sur ta requete."
+          subtitle="Avant d'écrire, tu vois la structure, les FAQ, les entités et le word count des articles qui rankent déjà sur ta requête."
           features={[
             "Brief de contenu (intent + outline + FAQ + entités + EEAT)",
             "People Also Ask + schema FAQPage prêt à coller",
@@ -343,7 +343,7 @@ export default function Landing() {
           phase="02"
           icon={PenLine}
           title="Génération en lexique québécois"
-          subtitle="Claude redige sur ton outline, avec ta voix et tes anecdotes. L'article sait que tu existes."
+          subtitle="Claude rédige sur ton outline, avec ta voix et tes anecdotes. L'article sait que tu existes."
           features={[
             "Article complet généré sur ton outline",
             "Knowledge base personnelle (ta voix, tes anecdotes)",
@@ -360,7 +360,7 @@ export default function Landing() {
           phase="03"
           icon={BarChart3}
           title="Suivi & optimisation continue"
-          subtitle="Apres publication, Gridar suit tes positions Google chaque jour et te previent quand un article commence a glisser."
+          subtitle="Après publication, Gridar suit tes positions Google chaque jour et te prévient quand un article commence à glisser."
           features={[
             "Audit IA (per-article + bulk site-wide)",
             "Suivi positions Google quotidien (graphe 90 j)",
@@ -389,7 +389,7 @@ export default function Landing() {
                 Surfer te sort un article avec "shopping" et "week-end" partout.
                 Tes lecteurs lisent <em className="text-emerald-300 not-italic">magasinage</em> et{" "}
                 <em className="text-emerald-300 not-italic">fin de semaine</em> au quotidien.
-                Gridar ecrit dans leur vocabulaire, pas celui d'un traducteur Parisien.
+                Gridar écrit dans leur vocabulaire, pas celui d'un traducteur Parisien.
               </p>
               <ul className="mt-8 space-y-4">
                 {[
@@ -423,7 +423,7 @@ export default function Landing() {
               Tarifs en CAD · sans lock-in
             </p>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-              Tarifs en CAD. Pas de piege SaaS.
+              Tarifs en CAD. Pas de piège SaaS.
             </h2>
           </Reveal>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
@@ -639,7 +639,7 @@ export default function Landing() {
             Tes concurrents écrivent encore dans Word.
           </h2>
           <p className="mt-6 text-lg text-zinc-400">
-            Toi tu auras un brief aligne sur le top 10 SERP, un article redige
+            Toi tu auras un brief aligné sur le top 10 SERP, un article rédigé
             dans le vocabulaire de tes lecteurs, et un audit qui pointe quoi
             corriger ligne par ligne. 10 minutes par article.
           </p>
@@ -1433,7 +1433,7 @@ const FAQS = [
   },
   {
     q: "Combien d'articles puis-je générer par mois ?",
-    a: "Plan Essai : 1/mois. Solo : 8/mois. Pro : 60/mois. Agence : 200/mois. Au-dela, tu achetes des credits a la piece (5$ pour 5 articles).",
+    a: "Plan Essai : 1/mois. Solo : 8/mois. Pro : 60/mois. Agence : 200/mois. Au-delà, tu achètes des crédits à la pièce (5$ pour 5 articles).",
   },
   {
     q: "Et si je veux annuler ?",

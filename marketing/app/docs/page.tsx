@@ -5,7 +5,7 @@ import { readDoc } from "@/lib/docs";
 export const metadata: Metadata = {
   title: "Documentation Gridar",
   description:
-    "Documentation produit Gridar : demarrage, connecter ton site, generation d'articles, outils SEO, plans, API REST, integrations MCP/n8n.",
+    "Documentation produit Gridar : démarrage, connecter ton site, génération d'articles, outils SEO, plans, API REST, intégrations MCP/n8n.",
   alternates: { canonical: "/docs" },
 };
 

@@ -30,6 +30,9 @@ const McpAuthorize = lazy(() => import("./pages/McpAuthorize"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
+const MultiSiteShell = lazy(
+  () => import("./pages/dashboard/MultiSiteShell")
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -114,6 +117,14 @@ function App() {
                   element={
                     <AuthGuard>
                       <OnboardingExternal />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/dashboard/overview"
+                  element={
+                    <AuthGuard>
+                      <MultiSiteShell />
                     </AuthGuard>
                   }
                 />

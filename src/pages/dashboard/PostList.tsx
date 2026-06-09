@@ -24,6 +24,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
@@ -38,12 +50,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { PostListItem } from "@/lib/schemas";
+import { ExportButton } from "@/components/ui/ExportButton";
+import { exportToCsv, exportToJson, type ExportColumn } from "@/lib/csv-export";
 
 export default function PostList() {
   const { t, i18n } = useTranslation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ slug: string; title: string } | null>(null);
   const { data, isLoading } = useAllPosts(page);
   const deletePost = useDeletePost();
   const navigate = useNavigate();
@@ -80,7 +95,36 @@ export default function PostList() {
     : posts;
 
   const handleDelete = (slug: string, title: string) => {
-    if (!confirm(t("posts.deleteConfirm", { title }))) return;
+    setDeleteTarget({ slug, title });
+  };
+
+  const POST_COLUMNS: ExportColumn<PostListItem>[] = [
+    { key: "title", label: "Titre" },
+    { key: "slug", label: "Slug" },
+    { key: "status", label: "Statut" },
+    { key: "category", label: "Categorie" },
+    { key: "language", label: "Langue" },
+    { key: "view_count", label: "Vues" },
+    { key: "featured", label: "Mis en avant" },
+    { key: "created_at", label: "Date de creation" },
+  ];
+
+  const handleExportPosts = (format: "csv" | "json") => {
+    if (filteredPosts.length === 0) {
+      toast.info("Aucun article a exporter");
+      return;
+    }
+    const filename = `articles-${siteId}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.${format}`;
+    if (format === "csv") exportToCsv(filename, filteredPosts, POST_COLUMNS);
+    else exportToJson(filename, filteredPosts, POST_COLUMNS);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const slug = deleteTarget.slug;
+    setDeleteTarget(null);
     deletePost.mutate(slug, {
       onSuccess: () => toast.success(t("posts.deleted")),
       onError: () => toast.error(t("posts.deleteError")),
@@ -91,10 +135,16 @@ export default function PostList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("posts.title")}</h1>
-        <Button onClick={() => setTemplateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t("posts.newPost")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton
+            onExport={handleExportPosts}
+            disabled={filteredPosts.length === 0}
+          />
+          <Button onClick={() => setTemplateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t("posts.newPost")}
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -283,6 +333,31 @@ export default function PostList() {
         }
         onSelectBlank={() => navigate(`${base}/articles/nouveau`)}
       />
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("posts.deleteConfirm", { title: deleteTarget?.title ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("posts.deleteConfirmDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              {t("posts.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

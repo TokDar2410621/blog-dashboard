@@ -7,13 +7,13 @@ import { BlogList } from "@/components/BlogList";
 import { fetchBlogPosts } from "@/lib/blog-api";
 
 export const metadata: Metadata = {
-  title: "Blog Gridar - Tactiques SEO concretes pour PME quebecoises",
+  title: "Blog Gridar - Tactiques SEO concrètes pour PME québécoises",
   description:
-    "Articles SEO ecrits, audites et publies avec Gridar. Dogfooding pur. Lexique FR-CA, exemples quebecois, sans bullshit marketing.",
+    "Articles SEO écrits, audités et publiés avec Gridar. Dogfooding pur. Lexique FR-CA, exemples québécois, sans bullshit marketing.",
   alternates: { canonical: "/blog" },
   openGraph: {
     title: "Blog Gridar",
-    description: "Tactiques SEO QC ecrites avec Gridar.",
+    description: "Tactiques SEO QC écrites avec Gridar.",
     url: "https://gridar.app/blog",
     type: "website",
   },
@@ -77,8 +77,8 @@ export default async function BlogIndexPage() {
             .
           </h1>
           <p className="text-lg text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Tactiques SEO concretes pour PME quebecoises. Chaque article est
-            redige, audite et publie avec Gridar. On dogfoode notre propre produit.
+            Tactiques SEO concrètes pour PME québécoises. Chaque article est
+            rédigé, audité et publié avec Gridar. On dogfoode notre propre produit.
           </p>
         </div>
       </section>
@@ -97,10 +97,10 @@ export default async function BlogIndexPage() {
           />
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight mb-3">
-              Tu veux generer ce genre d&apos;article sur ton site ?
+              Tu veux générer ce genre d&apos;article sur ton site ?
             </h2>
             <p className="text-zinc-400 mb-8 max-w-xl mx-auto">
-              Gridar le fait pour toi. Du brief au deploiement WordPress, Shopify
+              Gridar le fait pour toi. Du brief au déploiement WordPress, Shopify
               ou Webflow. Sans carte pour essayer.
             </p>
             <Link href="/login">

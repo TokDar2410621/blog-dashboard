@@ -25,6 +25,13 @@ import {
   Activity,
   Search,
 } from "lucide-react";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type ScoreComponent = { name: string; score: number; weight: number };
 type Reco = {
@@ -162,6 +169,7 @@ export default function SiteAudit() {
   if (isError || !data) {
     return (
       <div className="space-y-4 max-w-6xl">
+        <PageBreadcrumb trail={[{ label: "Audit du site" }]} />
         <h1 className="text-2xl font-bold">Audit du site</h1>
         <Card>
           <CardContent className="py-12 text-center">
@@ -181,6 +189,7 @@ export default function SiteAudit() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      <PageBreadcrumb trail={[{ label: "Audit du site" }]} />
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -214,10 +223,30 @@ export default function SiteAudit() {
                 <Gauge className="h-3.5 w-3.5" />
                 Score SEO global
               </div>
-              <div className={`text-6xl font-bold tabular-nums ${scoreColor(data.composite_score)}`}>
-                {data.composite_score ?? "-"}
-                <span className="text-2xl text-muted-foreground font-normal">/100</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`text-6xl font-bold tabular-nums cursor-help ${scoreColor(data.composite_score)}`}
+                    >
+                      {data.composite_score ?? "-"}
+                      <span className="text-2xl text-muted-foreground font-normal">/100</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-medium mb-1">Score SEO composite</p>
+                    <p>
+                      Moyenne ponderee de 4 signaux : PageSpeed (25%), positions
+                      des mots-cles suivis (25%), profil de liens (25%) et
+                      fraicheur du contenu (25%). Sources : Google PageSpeed
+                      Insights, GSC ou estimations Serper.
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                      Excellent : 80+, Bon : 60-79, Moyen : 40-59, Faible : &lt;40.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <div className={`text-sm font-medium ${scoreColor(data.composite_score)}`}>
                 {scoreLabel(data.composite_score)}
               </div>
@@ -460,7 +489,7 @@ export default function SiteAudit() {
                 <p className="mb-3">
                   Google Search Console non connecte - pas de detection automatique.
                 </p>
-                <Link to={`${base}/parametres`}>
+                <Link to={`${base}/parametres/gsc`}>
                   <Button size="sm" variant="outline">
                     Connecter GSC
                     <ArrowRight className="h-3.5 w-3.5 ml-1.5" />

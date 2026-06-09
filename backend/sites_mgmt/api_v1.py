@@ -28,6 +28,7 @@ from rest_framework.views import APIView
 
 from blog.models import BlogPost
 from .models import (
+    AiVisibilityPrompt, AiVisibilityResult,
     ApiToken, HostedPost, HostedLanding, KeywordStrategy,
     Site, Subscription, TrackedKeyword, SerpRank,
 )
@@ -2813,3 +2814,469 @@ class V1LinkOpportunitiesView(BaseV1View):
             'targets': targets,
             'count': len(targets),
         })
+
+
+# --------------------------------------------------------------------------
+# SERP Analyzer (2026-06-08) - lightweight Surfer-like view of the top 10
+# --------------------------------------------------------------------------
+
+
+class V1SerpAnalyzeView(BaseV1View):
+    """POST /api/v1/sites/<id>/serp-analyze/
+
+    Body: {"keyword": str, "language": "fr"|"en"|"es"}
+
+    Fetches the top 10 organic results for `keyword` via Serper.dev, then for
+    each URL fetches the HTML and computes:
+      - word_count    (visible text)
+      - headings_count (h1+h2+h3 tags)
+      - has_faq        (heuristic: "FAQ" or schema.org FAQPage)
+      - has_video      (presence of <video> or youtube embed)
+      - domain         (root domain, sans scheme/www)
+
+    Returns:
+      {
+        keyword, language,
+        top_10: [{position, url, domain, title, snippet,
+                  word_count, headings_count, has_faq, has_video}],
+        averages: {word_count_avg, headings_avg, faq_pct, video_pct}
+      }
+
+    Fetch failures degrade gracefully: the row still appears with null metrics
+    and a `fetch_error: true` flag - the averages skip null values.
+    """
+
+    def post(self, request, site_id):
+        # Authenticate the site even though we don't use any site-scoped data;
+        # this keeps the endpoint behind the same plan/quota as other v1 calls
+        # and lets us report per-site usage later.
+        self.get_user_site(request, site_id)
+
+        keyword = (request.data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword est requis.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        language = (request.data.get('language') or 'fr').strip().lower()[:2]
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response({'error': 'SERPER_API_KEY non configuree.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if language == 'en':
+            hl, gl = 'en', 'us'
+        elif language == 'es':
+            hl, gl = 'es', 'es'
+        else:
+            hl, gl = 'fr', 'ca'
+
+        try:
+            resp = requests.post(
+                'https://google.serper.dev/search',
+                headers={
+                    'X-API-KEY': api_key,
+                    'Content-Type': 'application/json',
+                },
+                json={'q': keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                timeout=10,
+            )
+        except requests.Timeout:
+            return Response({'error': 'Serper timeout.'},
+                            status=status.HTTP_504_GATEWAY_TIMEOUT)
+        except Exception as e:
+            return Response({'error': f'Serper erreur: {str(e)[:120]}'},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        if resp.status_code != 200:
+            return Response({'error': f'Serper HTTP {resp.status_code}'},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        organic = (resp.json() or {}).get('organic', []) or []
+        organic = organic[:10]
+
+        tag_re = re.compile(r'<[^>]+>')
+        head_re = re.compile(r'<h[1-3][\s>]', re.IGNORECASE)
+        script_re = re.compile(r'<(script|style)[^>]*>.*?</\1>',
+                               re.IGNORECASE | re.DOTALL)
+        ws_re = re.compile(r'\s+')
+        faq_re = re.compile(
+            r'(FAQPage|"@type"\s*:\s*"FAQPage"|\bFAQ\b|'
+            r'questions? frequentes?|foire aux questions)',
+            re.IGNORECASE,
+        )
+        video_re = re.compile(
+            r'(<video[\s>]|youtube\.com/embed|youtu\.be/|vimeo\.com/video)',
+            re.IGNORECASE,
+        )
+
+        def _root_domain(u: str) -> str:
+            try:
+                from urllib.parse import urlparse
+                netloc = urlparse(u).netloc.lower()
+                if netloc.startswith('www.'):
+                    netloc = netloc[4:]
+                return netloc
+            except Exception:
+                return ''
+
+        top_10 = []
+        for idx, item in enumerate(organic, start=1):
+            url = (item.get('link') or '').strip()
+            entry = {
+                'position': idx,
+                'url': url,
+                'domain': _root_domain(url),
+                'title': item.get('title') or '',
+                'snippet': item.get('snippet') or '',
+                'word_count': None,
+                'headings_count': None,
+                'has_faq': False,
+                'has_video': False,
+                'fetch_error': False,
+            }
+
+            if not url:
+                entry['fetch_error'] = True
+                top_10.append(entry)
+                continue
+
+            try:
+                page = requests.get(
+                    url,
+                    timeout=6,
+                    headers={'User-Agent': 'Mozilla/5.0 GridarSerpBot/1.0'},
+                )
+                if not page.ok:
+                    entry['fetch_error'] = True
+                    top_10.append(entry)
+                    continue
+                html = page.text or ''
+                entry['headings_count'] = len(head_re.findall(html))
+                entry['has_faq'] = bool(faq_re.search(html))
+                entry['has_video'] = bool(video_re.search(html))
+                cleaned = script_re.sub(' ', html)
+                text = tag_re.sub(' ', cleaned)
+                text = ws_re.sub(' ', text).strip()
+                entry['word_count'] = (
+                    len([w for w in text.split(' ') if w]) if text else 0
+                )
+            except Exception:
+                entry['fetch_error'] = True
+
+            top_10.append(entry)
+
+        words = [r['word_count'] for r in top_10 if r['word_count'] is not None]
+        heads = [r['headings_count'] for r in top_10
+                 if r['headings_count'] is not None]
+        total = len(top_10) or 1
+        faq_count = sum(1 for r in top_10 if r['has_faq'])
+        video_count = sum(1 for r in top_10 if r['has_video'])
+
+        averages = {
+            'word_count_avg': int(sum(words) / len(words)) if words else 0,
+            'headings_avg': round(sum(heads) / len(heads), 1) if heads else 0,
+            'faq_pct': round(100.0 * faq_count / total, 1),
+            'video_pct': round(100.0 * video_count / total, 1),
+        }
+
+        return Response({
+            'keyword': keyword,
+            'language': language,
+            'top_10': top_10,
+            'averages': averages,
+        })
+
+
+# --------------------------------------------------------------------------
+# AI Visibility tracking (2026-06-08)
+# Track how a site is mentioned in LLM responses (ChatGPT / Perplexity /
+# Gemini / SearchGPT / Claude). V1: mocked results to validate the UX.
+# --------------------------------------------------------------------------
+
+AI_ENGINE_WEIGHTS = {
+    'chatgpt': 0.30,
+    'perplexity': 0.25,
+    'gemini': 0.20,
+    'searchgpt': 0.15,
+    'claude': 0.10,
+}
+
+AI_ENGINES = list(AI_ENGINE_WEIGHTS.keys())
+
+
+def _ai_visibility_compute_score(qs) -> float:
+    """Weighted score = sum(weight_engine * cite_rate_engine) * 100.
+
+    qs is a queryset of AiVisibilityResult. Engines with zero checks are
+    skipped (their weight is ignored, not penalised) so a site that hasn't
+    been tested on Gemini doesn't lose 20 points.
+    """
+    from collections import defaultdict
+    totals: dict[str, int] = defaultdict(int)
+    cited: dict[str, int] = defaultdict(int)
+    for engine, is_cited in qs.values_list('engine', 'is_cited'):
+        totals[engine] += 1
+        if is_cited:
+            cited[engine] += 1
+    if not totals:
+        return 0.0
+    used_weight = sum(AI_ENGINE_WEIGHTS.get(e, 0.0) for e in totals.keys())
+    if used_weight == 0:
+        return 0.0
+    weighted = 0.0
+    for engine, total in totals.items():
+        w = AI_ENGINE_WEIGHTS.get(engine, 0.0)
+        rate = cited[engine] / total if total else 0.0
+        weighted += (w / used_weight) * rate
+    return round(weighted * 100.0, 1)
+
+
+def _mock_engine_response(engine: str, prompt_text: str, site) -> dict:
+    """Generate a plausible mocked LLM response for V1 testing.
+
+    Returns dict with is_cited, response_excerpt, citation_url, citation_rank.
+    Cite probability is engine-biased so the breakdown looks realistic.
+    """
+    import random
+    # Engine bias: Perplexity cites sources most often; Claude rarely cites.
+    cite_probability = {
+        'chatgpt': 0.45,
+        'perplexity': 0.65,
+        'gemini': 0.40,
+        'searchgpt': 0.55,
+        'claude': 0.25,
+    }.get(engine, 0.40)
+
+    is_cited = random.random() < cite_probability
+    citation_url = None
+    citation_rank = None
+    domain = (site.domain or '').strip() or 'example.com'
+
+    if is_cited:
+        citation_rank = random.randint(1, 5)
+        path_options = ['', '/blog', '/articles', '/guide', '/about']
+        citation_url = f"https://{domain}{random.choice(path_options)}"
+
+    engine_label = {
+        'chatgpt': 'ChatGPT',
+        'perplexity': 'Perplexity',
+        'gemini': 'Gemini',
+        'searchgpt': 'SearchGPT',
+        'claude': 'Claude',
+    }.get(engine, engine.title())
+
+    if is_cited:
+        excerpt = (
+            f"[{engine_label} mock] Pour repondre a \"{prompt_text[:80]}\", "
+            f"plusieurs ressources peuvent t'aider, notamment {domain} qui "
+            f"propose une approche detaillee du sujet. Voir aussi d'autres "
+            f"references citees en position {citation_rank}."
+        )
+    else:
+        excerpt = (
+            f"[{engine_label} mock] Pour repondre a \"{prompt_text[:80]}\", "
+            f"voici une synthese generale sans citer {domain}. Plusieurs "
+            f"approches existent selon ton contexte."
+        )
+
+    return {
+        'is_cited': is_cited,
+        'response_excerpt': excerpt[:500],
+        'citation_url': citation_url,
+        'citation_rank': citation_rank,
+    }
+
+
+class V1AiVisibilitySummaryView(BaseV1View):
+    """GET /api/v1/sites/<id>/ai-visibility/summary/
+
+    Returns aggregated visibility metrics for the site:
+      - score (weighted 0-100)
+      - total_mentions
+      - cited_pages_count
+      - breakdown_by_engine
+      - delta_7d (vs the previous 7-day window)
+    """
+    def get(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        prompts_qs = AiVisibilityPrompt.objects.filter(site=site)
+        all_results = AiVisibilityResult.objects.filter(prompt__site=site)
+
+        score = _ai_visibility_compute_score(all_results)
+
+        now = timezone.now()
+        last_7d_qs = all_results.filter(checked_at__gte=now - timedelta(days=7))
+        prev_7d_qs = all_results.filter(
+            checked_at__gte=now - timedelta(days=14),
+            checked_at__lt=now - timedelta(days=7),
+        )
+        score_last = _ai_visibility_compute_score(last_7d_qs)
+        score_prev = _ai_visibility_compute_score(prev_7d_qs)
+        delta_7d = round(score_last - score_prev, 1)
+
+        total_mentions = all_results.filter(is_cited=True).count()
+        cited_pages_count = (
+            all_results.filter(is_cited=True)
+            .exclude(citation_url__isnull=True)
+            .exclude(citation_url='')
+            .values('citation_url').distinct().count()
+        )
+
+        breakdown: dict[str, dict] = {}
+        for engine in AI_ENGINES:
+            engine_qs = all_results.filter(engine=engine)
+            total = engine_qs.count()
+            cited = engine_qs.filter(is_cited=True).count()
+            breakdown[engine] = {
+                'total_checks': total,
+                'cited_count': cited,
+                'cite_rate': round((cited / total) * 100.0, 1) if total else 0.0,
+            }
+
+        return Response({
+            'score': score,
+            'total_mentions': total_mentions,
+            'cited_pages_count': cited_pages_count,
+            'total_checks': all_results.count(),
+            'total_prompts': prompts_qs.count(),
+            'breakdown_by_engine': breakdown,
+            'delta_7d': delta_7d,
+        })
+
+
+class V1AiVisibilityPromptsView(BaseV1View):
+    """GET/POST /api/v1/sites/<id>/ai-visibility/prompts/
+
+    GET: list every tracked prompt with citation aggregates.
+    POST: create a new prompt to track.
+    """
+    def get(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        prompts = AiVisibilityPrompt.objects.filter(site=site).order_by('-created_at')
+
+        results = []
+        for p in prompts:
+            qs = p.results.all()
+            total_checks = qs.count()
+            citation_count = qs.filter(is_cited=True).count()
+            engines_mentioning = sorted(
+                set(qs.filter(is_cited=True).values_list('engine', flat=True))
+            )
+            last = qs.order_by('-checked_at').first()
+            results.append({
+                'id': p.id,
+                'prompt': p.prompt,
+                'target_intent': p.target_intent,
+                'language': p.language,
+                'created_at': p.created_at.isoformat(),
+                'total_checks': total_checks,
+                'citation_count': citation_count,
+                'engines_mentioning': engines_mentioning,
+                'last_checked_at': last.checked_at.isoformat() if last else None,
+            })
+
+        return Response({'results': results, 'count': len(results)})
+
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        prompt_text = (request.data.get('prompt') or '').strip()
+        if not prompt_text:
+            return Response(
+                {'error': 'Le champ prompt est obligatoire.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_intent = (request.data.get('target_intent') or '').strip() or None
+        valid_intents = dict(AiVisibilityPrompt.TARGET_INTENT_CHOICES)
+        if target_intent and target_intent not in valid_intents:
+            return Response(
+                {'error': f'target_intent doit etre dans {list(valid_intents)}.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        language = (request.data.get('language') or site.default_language or 'fr').lower()[:2]
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
+
+        prompt = AiVisibilityPrompt.objects.create(
+            site=site,
+            prompt=prompt_text,
+            target_intent=target_intent,
+            language=language,
+        )
+        return Response({
+            'id': prompt.id,
+            'prompt': prompt.prompt,
+            'target_intent': prompt.target_intent,
+            'language': prompt.language,
+            'created_at': prompt.created_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
+
+
+class V1AiVisibilityRunView(BaseV1View):
+    """POST /api/v1/sites/<id>/ai-visibility/run/
+
+    Trigger a check series for the site's tracked prompts.
+
+    V1 (NO external LLM API calls): create mocked AiVisibilityResult rows
+    for every (prompt, engine) pair so the UI can be validated.
+
+    Body: {prompt_id?: int}
+      - if prompt_id provided, only run checks for that single prompt
+      - else run checks for every tracked prompt on the site
+    """
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        prompt_id = request.data.get('prompt_id')
+
+        if prompt_id is not None:
+            try:
+                prompts = [AiVisibilityPrompt.objects.get(
+                    id=int(prompt_id), site=site
+                )]
+            except (AiVisibilityPrompt.DoesNotExist, ValueError, TypeError):
+                return Response(
+                    {'error': 'Prompt introuvable.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        else:
+            prompts = list(AiVisibilityPrompt.objects.filter(site=site))
+
+        if not prompts:
+            return Response(
+                {'error': 'Aucun prompt tracke. Ajoute un prompt avant de lancer un check.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created_results = []
+        for p in prompts:
+            for engine in AI_ENGINES:
+                mock = _mock_engine_response(engine, p.prompt, site)
+                r = AiVisibilityResult.objects.create(
+                    prompt=p,
+                    engine=engine,
+                    response_excerpt=mock['response_excerpt'],
+                    is_cited=mock['is_cited'],
+                    citation_url=mock['citation_url'],
+                    citation_rank=mock['citation_rank'],
+                )
+                created_results.append({
+                    'id': r.id,
+                    'prompt_id': p.id,
+                    'engine': engine,
+                    'is_cited': r.is_cited,
+                    'citation_url': r.citation_url,
+                    'citation_rank': r.citation_rank,
+                    'checked_at': r.checked_at.isoformat(),
+                })
+
+        return Response({
+            'checks_run': len(created_results),
+            'prompts_checked': len(prompts),
+            'engines_per_prompt': len(AI_ENGINES),
+            'results': created_results,
+            'mocked': True,
+            'note': 'V1 mock - external LLM APIs not called yet.',
+        }, status=status.HTTP_201_CREATED)

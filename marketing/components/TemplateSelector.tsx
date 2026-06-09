@@ -33,26 +33,26 @@ interface TemplateSelectorProps {
 // Mirrors src/i18n/fr.json templates branch. Hardcoded for now; the migration
 // will plug i18n later if EN ships.
 const FR: Record<string, string> = {
-  "templates.md.news": "Actualite",
+  "templates.md.news": "Actualité",
   "templates.md.newsDesc": "Intro, faits, impact, conclusion",
   "templates.md.tutorial": "Tutoriel",
-  "templates.md.tutorialDesc": "Prerequis, etapes, depannage, resume",
+  "templates.md.tutorialDesc": "Prérequis, étapes, dépannage, résumé",
   "templates.md.comparison": "Comparaison",
-  "templates.md.comparisonDesc": "Criteres, options, tableau, verdict",
+  "templates.md.comparisonDesc": "Critères, options, tableau, verdict",
   "templates.md.guide": "Guide",
   "templates.md.guideDesc": "Vue d'ensemble, sections, FAQ",
   "templates.md.review": "Review",
-  "templates.md.reviewDesc": "Presentation, pros/cons, verdict",
-  "templates.md.story": "Recit personnel",
-  "templates.md.storyDesc": "Accroche, contexte, defi, lecon",
+  "templates.md.reviewDesc": "Présentation, pros/cons, verdict",
+  "templates.md.story": "Récit personnel",
+  "templates.md.storyDesc": "Accroche, contexte, défi, leçon",
   "templates.visual.hero": "Hero",
-  "templates.visual.heroDesc": "Image pleine largeur + texte centre",
+  "templates.visual.heroDesc": "Image pleine largeur + texte centré",
   "templates.visual.minimal": "Minimal",
-  "templates.visual.minimalDesc": "Texte epure, sans fioritures",
+  "templates.visual.minimalDesc": "Texte épuré, sans fioritures",
   "templates.visual.sidebar": "Sidebar",
-  "templates.visual.sidebarDesc": "Contenu + table des matieres laterale",
+  "templates.visual.sidebarDesc": "Contenu + table des matières latérale",
   "templates.visual.magazine": "Magazine",
-  "templates.visual.magazineDesc": "Mise en page editoriale avec image",
+  "templates.visual.magazineDesc": "Mise en page éditoriale avec image",
   "templates.ai.quickNews": "Actu rapide",
   "templates.ai.quickNewsDesc": "Article court, recherche Serper",
   "templates.ai.deepTutorial": "Tuto approfondi",
@@ -60,9 +60,9 @@ const FR: Record<string, string> = {
   "templates.ai.comparison": "Comparatif",
   "templates.ai.comparisonDesc": "Comparaison produits/outils",
   "templates.ai.guide": "Guide ultime",
-  "templates.ai.guideDesc": "Guide complet et detaille",
-  "templates.ai.story": "Recit perso",
-  "templates.ai.storyDesc": "Histoire personnelle et lecons",
+  "templates.ai.guideDesc": "Guide complet et détaillé",
+  "templates.ai.story": "Récit perso",
+  "templates.ai.storyDesc": "Histoire personnelle et leçons",
   "templates.ai.local": "Annuaire local",
   "templates.ai.localDesc": "Ressources et services locaux",
 };
@@ -87,7 +87,7 @@ export function TemplateSelector({
         <DialogHeader>
           <DialogTitle>Choisir un template</DialogTitle>
           <DialogDescription>
-            Selectionnez un type de template pour votre article
+            Sélectionnez un type de template pour votre article
           </DialogDescription>
         </DialogHeader>
 
@@ -129,7 +129,7 @@ export function TemplateSelector({
                 <div className="min-w-0">
                   <p className="font-medium text-sm">Article vierge</p>
                   <p className="text-xs text-muted-foreground">
-                    Commencer avec un editeur vide
+                    Commencer avec un éditeur vide
                   </p>
                 </div>
               </CardContent>

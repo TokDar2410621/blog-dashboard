@@ -9798,7 +9798,7 @@ def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
 
     def _tokenize(s: str) -> list[str]:
         # Strip common separators that split the title (|, -, ·, etc.)
-        s = re.sub(r'[\|\-·•—–:]', ' ', s)
+        s = re.sub(r'[\|\-·•\u2014\u2013:]', ' ', s)
         # Keep letters + digits + accents; drop punctuation.
         words = re.findall(r"[A-Za-zÀ-ÿ0-9]+", s.lower())
         return [w for w in words if len(w) >= 4 and _normalize(w) not in _STOPWORDS and not w.isdigit()]

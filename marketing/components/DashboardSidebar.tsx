@@ -57,17 +57,17 @@ export function DashboardSidebar() {
     { label: "Tableau de bord", icon: LayoutDashboard, href: base },
     { label: "Audit du site", icon: Gauge, href: `${base}/audit-site` },
     { label: "Articles", icon: FileText, href: `${base}/articles` },
-    { label: "Generer un article", icon: Sparkles, href: `${base}/generer` },
+    { label: "Générer un article", icon: Sparkles, href: `${base}/generer` },
     { label: "Audit global SEO", icon: TrendingUp, href: `${base}/audit-global` },
     { label: "Suivi des positions", icon: TrendingUp, href: `${base}/positions` },
-    { label: "Detection de declin", icon: TrendingDown, href: `${base}/decay` },
+    { label: "Détection de déclin", icon: TrendingDown, href: `${base}/decay` },
     { label: "Topic clusters", icon: Network, href: `${base}/clusters` },
     { label: "Maillage interne", icon: Link2, href: `${base}/link-graph` },
     { label: "Redirections 301", icon: Move, href: `${base}/redirects` },
-    { label: "Liens casses", icon: Unlink2, href: `${base}/broken-links` },
+    { label: "Liens cassés", icon: Unlink2, href: `${base}/broken-links` },
     { label: "Rapport hebdo", icon: Calendar, href: `${base}/digest` },
     { label: "Images", icon: ImageIcon, href: `${base}/images` },
-    { label: "Parametres", icon: Settings, href: `${base}/parametres` },
+    { label: "Paramètres", icon: Settings, href: `${base}/parametres` },
   ];
 
   const handleLogout = () => {

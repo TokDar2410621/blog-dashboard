@@ -22,8 +22,19 @@ import {
   Trash2,
   Wrench,
   ArrowRight,
+  Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ExportButton } from "@/components/ui/ExportButton";
+import { exportToCsv, exportToJson, type ExportColumn } from "@/lib/csv-export";
 
 type DecayingPage = {
   url: string;
@@ -52,12 +63,36 @@ type DecayResult = {
 
 const ACTION_META: Record<
   DecayingPage["suggested_action"],
-  { color: string; icon: typeof Wrench }
+  { color: string; icon: typeof Wrench; severity: "high" | "medium" | "low" }
 > = {
-  redirect_or_remove: { color: "red", icon: Trash2 },
-  major_refresh: { color: "amber", icon: Wrench },
-  minor_refresh: { color: "blue", icon: RefreshCw },
+  redirect_or_remove: { color: "red", icon: Trash2, severity: "high" },
+  major_refresh: { color: "amber", icon: Wrench, severity: "medium" },
+  minor_refresh: { color: "blue", icon: RefreshCw, severity: "low" },
 };
+
+// Client-side projected lift: how many impressions we expect to recover if
+// the page is re-optimized. Rule of thumb: lost impressions * 1.5 recovery
+// factor (refreshed content often climbs past its previous baseline). We
+// weight by suggested_action severity because a redirect candidate has lower
+// recovery odds than a minor refresh.
+const RECOVERY_FACTOR: Record<DecayingPage["suggested_action"], number> = {
+  redirect_or_remove: 0.5,
+  major_refresh: 1.5,
+  minor_refresh: 1.8,
+};
+
+function projectedLift(page: DecayingPage): number {
+  const lost = Math.max(0, page.impressions_before - page.impressions_now);
+  return Math.round(lost * RECOVERY_FACTOR[page.suggested_action]);
+}
+
+function formatLift(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `${k.toFixed(k >= 10 ? 0 : 1)}k`;
+  }
+  return String(n);
+}
 
 export default function ContentDecay() {
   const { t } = useTranslation();
@@ -85,8 +120,36 @@ export default function ContentDecay() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const DECAY_COLUMNS: ExportColumn<DecayingPage>[] = [
+    { key: "slug", label: "Slug" },
+    { key: "url", label: "URL" },
+    { key: "impressions_before", label: "Impressions (avant)" },
+    { key: "impressions_now", label: "Impressions (maintenant)" },
+    { key: "impressions_delta_pct", label: "Delta impressions (%)" },
+    { key: "clicks_before", label: "Clics (avant)" },
+    { key: "clicks_now", label: "Clics (maintenant)" },
+    { key: "clicks_delta_pct", label: "Delta clics (%)" },
+    { key: "position_before", label: "Position (avant)" },
+    { key: "position_now", label: "Position (maintenant)" },
+    { key: "suggested_action", label: "Action suggeree" },
+  ];
+
+  const handleExportDecay = (format: "csv" | "json") => {
+    const rows = data?.decaying ?? [];
+    if (rows.length === 0) {
+      toast.info("Aucune page en declin a exporter");
+      return;
+    }
+    const filename = `pages-declin-${siteId}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.${format}`;
+    if (format === "csv") exportToCsv(filename, rows, DECAY_COLUMNS);
+    else exportToJson(filename, rows, DECAY_COLUMNS);
+  };
+
   return (
     <div className="space-y-6 max-w-5xl">
+      <PageBreadcrumb trail={[{ label: "Decay" }]} />
       <div>
         <h1 className="text-2xl font-bold">{t("decay.title")}</h1>
         <p className="text-muted-foreground">{t("decay.subtitle")}</p>
@@ -146,7 +209,7 @@ export default function ContentDecay() {
         <Card>
           <CardContent className="py-6 text-center text-sm">
             <p className="mb-3">{t("decay.gscNotConfigured")}</p>
-            <Link to={`${base}/parametres`}>
+            <Link to={`${base}/parametres/gsc`}>
               <Button variant="outline">
                 {t("decay.goToSettings")}
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -160,7 +223,7 @@ export default function ContentDecay() {
         <Card>
           <CardContent className="py-6 text-center text-sm">
             <p className="mb-3">{t("decay.gscReauthRequired")}</p>
-            <Link to={`${base}/parametres`}>
+            <Link to={`${base}/parametres/gsc`}>
               <Button variant="outline">
                 {t("decay.goToSettings")}
                 <ArrowRight className="h-4 w-4 ml-2" />
@@ -179,48 +242,102 @@ export default function ContentDecay() {
 
       {data && !mutation.isPending && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-amber-600 flex items-center gap-2">
-                  <ArrowDown className="h-6 w-6" />
-                  {data.decaying_count}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {t("decay.decaying")}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-green-600">
-                  {data.healthy_count}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {t("decay.healthy")}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-3xl font-bold text-blue-600">
-                  {data.new_pages_count}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {t("decay.new")}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <TooltipProvider>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-3xl font-bold text-amber-600 flex items-center gap-2 cursor-help">
+                        <ArrowDown className="h-6 w-6" />
+                        {data.decaying_count}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium mb-1">Pages en declin</p>
+                      <p>
+                        URLs dont les impressions ont chute de plus de 30% entre
+                        la fenetre courante et la fenetre precedente. Source :
+                        Google Search Console (clics, impressions, position
+                        moyenne).
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Critique : -50% ou plus, Moyen : -30 a -50%, A surveiller : -15 a -30%.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {t("decay.decaying")}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-3xl font-bold text-green-600 cursor-help">
+                        {data.healthy_count}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium mb-1">Pages saines</p>
+                      <p>
+                        URLs dont les impressions sont stables ou en hausse
+                        d&apos;une fenetre a l&apos;autre. Source : Google
+                        Search Console.
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Variation tolerede : entre -15% et +infini.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {t("decay.healthy")}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-3xl font-bold text-blue-600 cursor-help">
+                        {data.new_pages_count}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium mb-1">Nouvelles pages</p>
+                      <p>
+                        Pages absentes du GSC sur la fenetre precedente -
+                        publiees ou indexees recemment, donc pas encore
+                        comparables.
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Source : Google Search Console.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {t("decay.new")}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TooltipProvider>
 
-          <p className="text-xs text-muted-foreground">
-            {t("decay.periodCompare", {
-              cur_start: data.period_current.start,
-              cur_end: data.period_current.end,
-              prev_start: data.period_previous.start,
-              prev_end: data.period_previous.end,
-            })}
-          </p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              {t("decay.periodCompare", {
+                cur_start: data.period_current.start,
+                cur_end: data.period_current.end,
+                prev_start: data.period_previous.start,
+                prev_end: data.period_previous.end,
+              })}
+            </p>
+            <ExportButton
+              onExport={handleExportDecay}
+              disabled={data.decaying.length === 0}
+            />
+          </div>
 
           {data.decaying.length === 0 ? (
             <Card>
@@ -230,8 +347,44 @@ export default function ContentDecay() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {data.decaying.map((page) => {
+            <>
+              {(() => {
+                const sortedPages = [...data.decaying]
+                  .map((p) => ({ page: p, lift: projectedLift(p) }))
+                  .sort((a, b) => b.lift - a.lift);
+                const totalLift = sortedPages.reduce(
+                  (acc, x) => acc + x.lift,
+                  0,
+                );
+                return (
+                  <>
+                    <Card className="border-primary/30 bg-primary/5">
+                      <CardContent className="pt-6 pb-5">
+                        <div className="flex items-start gap-3">
+                          <div className="shrink-0 h-10 w-10 rounded-md bg-primary/15 flex items-center justify-center">
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h2 className="text-lg font-bold">
+                              {sortedPages.length} page
+                              {sortedPages.length > 1 ? "s" : ""} a
+                              re-optimiser
+                            </h2>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              Gain projete{" "}
+                              <span className="font-semibold text-foreground">
+                                +{formatLift(totalLift)} impressions/mois
+                              </span>{" "}
+                              si tu corriges les pages ci-dessous (facteur de
+                              recuperation 1.5x sur les pertes GSC).
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="space-y-3">
+                      {sortedPages.map(({ page, lift }) => {
                 const meta = ACTION_META[page.suggested_action];
                 const ActionIcon = meta.icon;
                 return (
@@ -331,19 +484,41 @@ export default function ContentDecay() {
                             <ActionIcon className="h-3 w-3" />
                             {t(`decay.action.${page.suggested_action}`)}
                           </span>
-                          <Link to={`${base}/articles/${page.slug}`}>
-                            <Button size="sm" variant="outline">
-                              {t("decay.fix")}
-                              <ArrowRight className="h-3 w-3 ml-1" />
-                            </Button>
-                          </Link>
+                          {lift > 0 && (
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1">
+                              <TrendingUp className="h-3 w-3" />
+                              +{formatLift(lift)} imp/mois
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Link to={`${base}/articles/${page.slug}`}>
+                              <Button size="sm" variant="outline">
+                                {t("decay.fix")}
+                                <ArrowRight className="h-3 w-3 ml-1" />
+                              </Button>
+                            </Link>
+                            <Link
+                              to={`${base}/generer?slug=${encodeURIComponent(
+                                page.slug,
+                              )}&autostart=1&hint=decay`}
+                            >
+                              <Button size="sm">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Re-optimiser
+                              </Button>
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 );
               })}
-            </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
           )}
         </>
       )}

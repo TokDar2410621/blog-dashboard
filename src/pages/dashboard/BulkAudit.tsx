@@ -22,6 +22,15 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ExportButton } from "@/components/ui/ExportButton";
+import { exportToCsv, exportToJson, type ExportColumn } from "@/lib/csv-export";
 
 type Distribution = {
   excellent: number;
@@ -76,6 +85,27 @@ export default function BulkAudit() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const WEAKEST_COLUMNS: ExportColumn<WeakArticle>[] = [
+    { key: "title", label: "Titre" },
+    { key: "slug", label: "Slug" },
+    { key: "language", label: "Langue" },
+    { key: "score", label: "Score" },
+    { key: "verdict", label: "Verdict" },
+  ];
+
+  const handleExportWeakest = (format: "csv" | "json") => {
+    const rows = data?.weakest_articles ?? [];
+    if (rows.length === 0) {
+      toast.info("Aucun article a exporter");
+      return;
+    }
+    const filename = `articles-faibles-${siteId}-${new Date()
+      .toISOString()
+      .slice(0, 10)}.${format}`;
+    if (format === "csv") exportToCsv(filename, rows, WEAKEST_COLUMNS);
+    else exportToJson(filename, rows, WEAKEST_COLUMNS);
+  };
+
   const total = data
     ? data.distribution.excellent +
       data.distribution.good +
@@ -87,6 +117,7 @@ export default function BulkAudit() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <PageBreadcrumb trail={[{ label: "Audit en masse" }]} />
       <div>
         <h1 className="text-2xl font-bold">{t("bulkAudit.title")}</h1>
         <p className="text-muted-foreground">{t("bulkAudit.subtitle")}</p>
@@ -160,9 +191,26 @@ export default function BulkAudit() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-3xl font-bold">
-                  {data.mean_score ?? "-"}
-                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="text-3xl font-bold cursor-help">
+                        {data.mean_score ?? "-"}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="font-medium mb-1">Score moyen d&apos;article</p>
+                      <p>
+                        Moyenne des scores individuels generes par l&apos;audit
+                        IA sur chaque article (qualite editoriale + SEO
+                        on-page + lisibilite). Source : audits Gridar (Gemini).
+                      </p>
+                      <p className="mt-2 text-muted-foreground">
+                        Excellent : 85+, Bon : 70-84, Moyen : 50-69, Faible : &lt;50.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <div className="text-xs text-muted-foreground mt-1">
                   {t("bulkAudit.meanScore")}
                 </div>
@@ -328,10 +376,14 @@ export default function BulkAudit() {
           {/* Weakest articles */}
           {data.weakest_articles.length > 0 && (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
                 <CardTitle className="text-base">
                   {t("bulkAudit.weakestArticles")}
                 </CardTitle>
+                <ExportButton
+                  onExport={handleExportWeakest}
+                  disabled={data.weakest_articles.length === 0}
+                />
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">

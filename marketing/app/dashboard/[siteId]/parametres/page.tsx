@@ -148,8 +148,8 @@ export default function SiteSettings() {
       setDomainVerified(data.verified);
       toast.success(
         data.verified
-          ? "Domaine deja verifie - blog en ligne."
-          : "Domaine enregistre. Suis les instructions DNS ci-dessous."
+          ? "Domaine déjà vérifié - blog en ligne."
+          : "Domaine enregistré. Suis les instructions DNS ci-dessous."
       );
     },
     onError: (e: Error) => toast.error(e.message),
@@ -189,7 +189,7 @@ export default function SiteSettings() {
       setProvisionResult(null);
       setDomainVerified(false);
       setPublicBlogDomain("");
-      toast.success("Domaine retire");
+      toast.success("Domaine retiré");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -209,7 +209,7 @@ export default function SiteSettings() {
     onSuccess: (data) => {
       const fresh = (data.competitors || []).filter(Boolean);
       if (fresh.length === 0) {
-        toast.info("Aucun concurrent suggere - le contexte du site est trop generique.");
+        toast.info("Aucun concurrent suggéré - le contexte du site est trop générique.");
         return;
       }
       const existing = competitors
@@ -220,7 +220,7 @@ export default function SiteSettings() {
         new Set([...existing, ...fresh].map((s) => s.trim()).filter(Boolean))
       );
       setCompetitors(merged.join("\n"));
-      toast.success(`${fresh.length} concurrents suggeres. Revois la liste avant d'enregistrer.`);
+      toast.success(`${fresh.length} concurrents suggérés. Revois la liste avant d'enregistrer.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -253,9 +253,9 @@ export default function SiteSettings() {
       if (!res.ok) throw new Error("schema generation failed");
       const data = await res.json();
       setLbSchema(data.schema);
-      toast.success("Schema LocalBusiness genere");
+      toast.success("Schema LocalBusiness généré");
     } catch {
-      toast.error("Erreur generation schema");
+      toast.error("Erreur génération schema");
     } finally {
       setLbGenerating(false);
     }
@@ -266,7 +266,7 @@ export default function SiteSettings() {
     const tag = `<script type="application/ld+json">\n${JSON.stringify(lbSchema, null, 2)}\n</script>`;
     navigator.clipboard.writeText(tag);
     setLbCopied(true);
-    toast.success("Schema copie dans le presse-papiers");
+    toast.success("Schema copié dans le presse-papiers");
     setTimeout(() => setLbCopied(false), 1500);
   };
 
@@ -421,7 +421,7 @@ export default function SiteSettings() {
           ...(logoUrl ? { logo_url: logoUrl } : {}),
         },
       });
-      toast.success("Parametres sauvegardes !");
+      toast.success("Paramètres sauvegardés !");
     } catch {
       toast.error("Erreur lors de la sauvegarde");
     }
@@ -438,21 +438,21 @@ export default function SiteSettings() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold">{"Parametres du site"}</h1>
+        <h1 className="text-2xl font-bold">{"Paramètres du site"}</h1>
         <p className="text-muted-foreground">
-          {"Configurez les informations du site et la base de connaissances pour la generation d'articles"}
+          {"Configurez les informations du site et la base de connaissances pour la génération d'articles"}
         </p>
       </div>
 
       <Tabs defaultValue="identity" className="w-full">
         <TabsList className="sticky top-0 z-10 bg-background w-full flex-wrap h-auto justify-start gap-1">
-          <TabsTrigger value="identity">Identite</TabsTrigger>
+          <TabsTrigger value="identity">Identité</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="author">Auteur (EEAT)</TabsTrigger>
           <TabsTrigger value="local">Local SEO</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="integrations">Intégrations</TabsTrigger>
           <TabsTrigger value="autopilot">Autopilote</TabsTrigger>
-          <TabsTrigger value="advanced">Avance</TabsTrigger>
+          <TabsTrigger value="advanced">Avancé</TabsTrigger>
         </TabsList>
 
         {/* ===================== IDENTITY ===================== */}
@@ -462,7 +462,7 @@ export default function SiteSettings() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                {"Informations generales"}
+                {"Informations générales"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -534,7 +534,7 @@ export default function SiteSettings() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <UserIcon className="h-5 w-5" />
-                Auteur et langue par defaut
+                Auteur et langue par défaut
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -999,7 +999,7 @@ export default function SiteSettings() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   On enregistre automatiquement le domaine sur Vercel et on te donne
-                  le CNAME a coller chez ton registrar. SSL auto en moins de 5 min.
+                  le CNAME à coller chez ton registrar. SSL auto en moins de 5 min.
                 </p>
               </div>
 
@@ -1009,7 +1009,7 @@ export default function SiteSettings() {
                   <div className="flex items-start gap-2">
                     <Loader2 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 animate-spin" />
                     <div className="space-y-2 flex-1">
-                      <strong>Etape DNS - colle ces valeurs chez ton registrar :</strong>
+                      <strong>Étape DNS - colle ces valeurs chez ton registrar :</strong>
                       <div className="font-mono bg-background border rounded p-2 space-y-1">
                         <div><span className="text-muted-foreground">Type :</span> CNAME</div>
                         <div><span className="text-muted-foreground">Nom :</span> {provisionResult.domain.split(".")[0] || "blog"}</div>
@@ -1017,7 +1017,7 @@ export default function SiteSettings() {
                       </div>
                       <p>{provisionResult.next_step}</p>
                       <p className="italic">
-                        On verifie automatiquement toutes les 8 secondes. Cette page se mettra a jour quand le DNS aura propage.
+                        On vérifie automatiquement toutes les 8 secondes. Cette page se mettra à jour quand le DNS aura propagé.
                       </p>
                     </div>
                   </div>
@@ -1063,7 +1063,7 @@ export default function SiteSettings() {
                 Vercel Deploy Hook
               </CardTitle>
               <CardDescription>
-                URL du webhook Vercel pour redeployer automatiquement le site apres chaque modification d&apos;article.
+                URL du webhook Vercel pour redéployer automatiquement le site après chaque modification d&apos;article.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1084,8 +1084,8 @@ export default function SiteSettings() {
                 Google Search Console
               </CardTitle>
               <CardDescription>
-                URL exacte de ta property GSC (avec le slash final). Etape requise
-                avant de pouvoir voir les positions reelles de tes articles.
+                URL exacte de ta property GSC (avec le slash final). Étape requise
+                avant de pouvoir voir les positions réelles de tes articles.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -1099,7 +1099,7 @@ export default function SiteSettings() {
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Deux formats supportes :
+                  Deux formats supportés :
                   <br />
                   - <strong>URL prefix</strong> (couvre exactement un sous-domaine + protocole) :{" "}
                   <code className="text-foreground">https://tonsite.com/</code> (slash final)
@@ -1107,7 +1107,7 @@ export default function SiteSettings() {
                   - <strong>Domain</strong> (couvre tous les sous-domaines + http/https) :{" "}
                   <code className="text-foreground">sc-domain:tonsite.com</code>
                   <br />
-                  Copie-colle l&apos;URL exacte affichee dans Search Console.
+                  Copie-colle l&apos;URL exacte affichée dans Search Console.
                 </p>
               </div>
 
@@ -1126,7 +1126,7 @@ export default function SiteSettings() {
               </Button>
 
               <div className="rounded-md border border-border/50 bg-muted/30 p-3 text-xs space-y-2">
-                <p className="font-semibold">Etapes une-fois :</p>
+                <p className="font-semibold">Étapes une-fois :</p>
                 <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
                   <li>
                     <a
@@ -1154,18 +1154,18 @@ export default function SiteSettings() {
                 {"Base de connaissances"}
               </CardTitle>
               <CardDescription>
-                {"Ce texte est injecte dans le prompt de Claude lors de la generation d'articles. Il permet a l'IA d'ecrire avec votre voix, vos anecdotes et votre ton personnel. Plus c'est detaille, meilleur sera le resultat."}
+                {"Ce texte est injecté dans le prompt de Claude lors de la génération d'articles. Il permet à l'IA d'écrire avec votre voix, vos anecdotes et votre ton personnel. Plus c'est détaillé, meilleur sera le résultat."}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea
                 value={knowledgeBase}
                 onChange={(e) => setKnowledgeBase(e.target.value)}
-                placeholder={"ex: Je suis fondateur d'Arivex Studio. J'ecris pour les PME quebecoises. Mon ton est direct, concret, sans bullshit marketing."}
+                placeholder={"ex: Je suis fondateur d'Arivex Studio. J'écris pour les PME québécoises. Mon ton est direct, concret, sans bullshit marketing."}
                 className="min-h-[400px] font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                {knowledgeBase.length} {"caracteres"}
+                {knowledgeBase.length} {"caractères"}
               </p>
             </CardContent>
           </Card>
@@ -1175,9 +1175,9 @@ export default function SiteSettings() {
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-lg">Marques a ne PAS citer</CardTitle>
+                  <CardTitle className="text-lg">Marques à ne PAS citer</CardTitle>
                   <CardDescription>
-                    Une marque par ligne. Le generateur evitera de les mentionner et n'y mettra jamais de lien sortant.
+                    Une marque par ligne. Le générateur évitera de les mentionner et n'y mettra jamais de lien sortant.
                   </CardDescription>
                 </div>
                 <Button
@@ -1192,7 +1192,7 @@ export default function SiteSettings() {
                   ) : (
                     <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                   )}
-                  Suggerer avec IA
+                  Suggérer avec IA
                 </Button>
               </div>
             </CardHeader>
@@ -1204,7 +1204,7 @@ export default function SiteSettings() {
                 className="min-h-[140px] font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                Les suggestions IA s'ajoutent a la liste existante (sans ecraser ce que tu as deja ecrit).
+                Les suggestions IA s'ajoutent à la liste existante (sans écraser ce que tu as déjà écrit).
               </p>
             </CardContent>
           </Card>
@@ -1216,10 +1216,10 @@ export default function SiteSettings() {
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
                     <Brain className="h-5 w-5" />
-                    Memoire du site (RAG)
+                    Mémoire du site (RAG)
                   </CardTitle>
                   <CardDescription>
-                    Index vectoriel pgvector + Voyage AI. Chaque generation d'article retrieve les 8 extraits les plus pertinents (articles passes, KB, audits, notes) au lieu de tout balancer en prompt. Permet a l'IA de rester coherente entre les requetes.
+                    Index vectoriel pgvector + Voyage AI. Chaque génération d'article retrieve les 8 extraits les plus pertinents (articles passés, KB, audits, notes) au lieu de tout balancer en prompt. Permet à l'IA de rester cohérente entre les requêtes.
                   </CardDescription>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -1235,7 +1235,7 @@ export default function SiteSettings() {
                     ) : (
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                     )}
-                    Reindexer
+                    Réindexer
                   </Button>
                 </div>
               </div>
@@ -1260,7 +1260,7 @@ export default function SiteSettings() {
                             {k === "article" ? "Extraits"
                               : k === "kb" ? "Extraits KB"
                               : k === "audit" ? "Audits"
-                              : k === "decision" ? "Decisions"
+                              : k === "decision" ? "Décisions"
                               : "Notes"}
                           </div>
                           {showSources && (
@@ -1273,7 +1273,7 @@ export default function SiteSettings() {
                     })}
                   </div>
                   <p className="text-[11px] text-muted-foreground -mt-2">
-                    Chaque article publie est decoupe en plusieurs extraits (chunks) pour la recherche semantique. 1 article ~ 6-10 extraits selon sa longueur.
+                    Chaque article publié est découpé en plusieurs extraits (chunks) pour la recherche sémantique. 1 article ~ 6-10 extraits selon sa longueur.
                   </p>
                 </>
               ) : null}
@@ -1292,7 +1292,7 @@ export default function SiteSettings() {
                 <Textarea
                   value={manualNote}
                   onChange={(e) => setManualNote(e.target.value)}
-                  placeholder={"Ex: 'Ne jamais utiliser le tutoiement.' / 'Cibler Montreal, pas Quebec.' / 'Mettre tous les chiffres en majuscule.'"}
+                  placeholder={"Ex: 'Ne jamais utiliser le tutoiement.' / 'Cibler Montréal, pas Québec.' / 'Mettre tous les chiffres en majuscule.'"}
                   className="min-h-[100px] text-sm"
                 />
                 <Button
@@ -1311,7 +1311,7 @@ export default function SiteSettings() {
 
               {memoriesQuery.data?.memories && memoriesQuery.data.memories.length > 0 && (
                 <div className="border-t pt-4">
-                  <Label className="text-sm mb-2 block">Memoires recentes</Label>
+                  <Label className="text-sm mb-2 block">Mémoires récentes</Label>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {memoriesQuery.data.memories.slice(0, 30).map((m) => (
                       <div
@@ -1398,10 +1398,10 @@ export default function SiteSettings() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <AlertCircle className="h-5 w-5" />
-                  Reglages avances
+                  Réglages avancés
                 </CardTitle>
                 <CardDescription>
-                  Rien a configurer ici pour l'instant. Les futurs reglages techniques (limites API, webhooks, exports) apparaitront dans cet onglet.
+                  Rien à configurer ici pour l'instant. Les futurs réglages techniques (limites API, webhooks, exports) apparaîtront dans cet onglet.
                 </CardDescription>
               </CardHeader>
             </Card>

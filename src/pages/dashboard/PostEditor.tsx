@@ -13,6 +13,12 @@ import { SEOAnalyzer } from "@/components/SEOAnalyzer";
 import { ReadabilityCard } from "@/components/ReadabilityCard";
 import { LexiconCard } from "@/components/LexiconCard";
 import { PlagiarismCard } from "@/components/PlagiarismCard";
+import { ScorePanel } from "@/components/editor/ScorePanel";
+import {
+  buildTermUsage,
+  computeCompositeScore,
+  type TermSeed,
+} from "@/components/editor/contentScore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Button } from "@/components/ui/button";
@@ -54,6 +60,7 @@ import {
   TEMPLATE_TYPE,
   type PostStatus,
 } from "@/lib/constants";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
 
 function normalizePostStatus(
   value: string | undefined,
@@ -124,6 +131,105 @@ export default function PostEditor() {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const cursorPosRef = useRef(0);
   const replacingImageRef = useRef<string | null>(null);
+
+  // ----- Content Score (right rail, Surfer/Clearscope-style) ---------------
+  // Debounce the raw editor inputs that feed the score so we don't recompute
+  // on every keystroke. 600ms matches the brief.
+  const [debouncedScoreInputs, setDebouncedScoreInputs] = useState({
+    title: "",
+    excerpt: "",
+    content: "",
+    slug: "",
+    coverImage: "",
+    tagsInput: "",
+    language: "fr",
+  });
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedScoreInputs({
+        title,
+        excerpt,
+        content,
+        slug: postSlug,
+        coverImage,
+        tagsInput,
+        language,
+      });
+    }, 600);
+    return () => clearTimeout(handle);
+  }, [title, excerpt, content, postSlug, coverImage, tagsInput, language]);
+
+  // Active highlighted term in the inline editor (clicked from TermTracker).
+  const [activeTerm, setActiveTerm] = useState<string | null>(null);
+
+  // Term seeds: derived from tags input (primary = first tag, importance
+  // descending). TODO(v2): when gridar_get_brief returns recommended_terms,
+  // merge them in with their volume/relevance scores.
+  const termSeeds: TermSeed[] = useMemo(() => {
+    const tags = debouncedScoreInputs.tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    return tags.slice(0, 10).map((term, idx) => ({
+      term,
+      // Linear decay so the first tag stays the most important.
+      importance: 1 - idx * 0.08,
+    }));
+  }, [debouncedScoreInputs.tagsInput]);
+
+  const primaryKeyword = termSeeds[0]?.term ?? "";
+  const secondaryKeywords = termSeeds.slice(1).map((s) => s.term);
+
+  // Composite score - memoized off the debounced inputs.
+  const composite = useMemo(() => {
+    return computeCompositeScore({
+      title: debouncedScoreInputs.title,
+      excerpt: debouncedScoreInputs.excerpt,
+      content: debouncedScoreInputs.content,
+      slug: debouncedScoreInputs.slug,
+      coverImage: debouncedScoreInputs.coverImage,
+      keyword: primaryKeyword,
+      secondaryKeywords,
+      language: debouncedScoreInputs.language,
+    });
+  }, [debouncedScoreInputs, primaryKeyword, secondaryKeywords]);
+
+  const termUsages = useMemo(
+    () => buildTermUsage(debouncedScoreInputs.content, termSeeds),
+    [debouncedScoreInputs.content, termSeeds],
+  );
+
+  // Score trend: last 7 scores in sessionStorage keyed by slug.
+  const trendKey = postSlug ? `gridar.score.trend.${postSlug}` : null;
+  const [trend, setTrend] = useState<number[]>([]);
+  useEffect(() => {
+    if (!trendKey) return;
+    try {
+      const raw = sessionStorage.getItem(trendKey);
+      if (raw) setTrend(JSON.parse(raw));
+      else setTrend([]);
+    } catch {
+      setTrend([]);
+    }
+  }, [trendKey]);
+  useEffect(() => {
+    if (!trendKey) return;
+    if (composite.total <= 0) return;
+    // Only append when score actually changes - avoids polluting trend on
+    // every focus change.
+    setTrend((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1] === composite.total) {
+        return prev;
+      }
+      const next = [...prev, composite.total].slice(-7);
+      try {
+        sessionStorage.setItem(trendKey, JSON.stringify(next));
+      } catch {
+        /* ignore quota errors */
+      }
+      return next;
+    });
+  }, [composite.total, trendKey]);
 
   const handleImageInsert = (markdown: string) => {
     if (replacingImageRef.current) {
@@ -552,6 +658,20 @@ export default function PostEditor() {
 
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col">
+      <PageBreadcrumb
+        trail={[
+          { label: t("editor.articles", "Articles"), href: `${base}/articles` },
+          {
+            label: title
+              ? title.length > 40
+                ? `${title.slice(0, 40)}...`
+                : title
+              : isEditing
+              ? t("editor.editPost")
+              : t("editor.newPost"),
+          },
+        ]}
+      />
       {/* Sticky Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
@@ -694,8 +814,11 @@ export default function PostEditor() {
         {view === "edit" && (
           <ResizablePanelGroup orientation="horizontal" className="h-full rounded-lg border">
             {/* Left panel: editor */}
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <div className="h-full flex flex-col overflow-y-auto">
+            <ResizablePanel defaultSize={40} minSize={25}>
+              <div
+                className="h-full flex flex-col overflow-y-auto"
+                data-active-term={activeTerm || undefined}
+              >
                 <div className="p-4 space-y-3 shrink-0">
                   <Input
                     value={title}
@@ -727,8 +850,8 @@ export default function PostEditor() {
 
             <ResizableHandle withHandle />
 
-            {/* Right panel: live preview */}
-            <ResizablePanel defaultSize={50} minSize={25}>
+            {/* Center panel: live preview */}
+            <ResizablePanel defaultSize={35} minSize={20}>
               <div className="h-full overflow-y-auto p-6">
                 <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
                   <Eye className="h-3.5 w-3.5" />
@@ -751,6 +874,29 @@ export default function PostEditor() {
                 )}
                 <MarkdownPreview content={content} onImageClick={handlePreviewImageClick} />
               </div>
+            </ResizablePanel>
+
+            <ResizableHandle withHandle />
+
+            {/* Right panel: Content Score gauge + term tracker (sticky rail) */}
+            <ResizablePanel defaultSize={25} minSize={18}>
+              <ScorePanel
+                title={debouncedScoreInputs.title}
+                excerpt={debouncedScoreInputs.excerpt}
+                content={debouncedScoreInputs.content}
+                slug={debouncedScoreInputs.slug}
+                coverImage={debouncedScoreInputs.coverImage}
+                keyword={primaryKeyword}
+                secondaryKeywords={secondaryKeywords}
+                language={debouncedScoreInputs.language}
+                terms={termUsages}
+                trend={trend}
+                precomputed={composite}
+                activeTerm={activeTerm}
+                onTermClick={(term) =>
+                  setActiveTerm((prev) => (prev === term ? null : term))
+                }
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         )}

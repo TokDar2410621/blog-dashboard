@@ -307,6 +307,37 @@ export async function analyzeCompetitors(body: {
   });
 }
 
+export async function serpAnalyze(
+  siteId: number,
+  body: { keyword: string; language?: "fr" | "en" | "es" },
+) {
+  return request<{
+    keyword: string;
+    language: string;
+    top_10: {
+      position: number;
+      url: string;
+      domain: string;
+      title: string;
+      snippet: string;
+      word_count: number | null;
+      headings_count: number | null;
+      has_faq: boolean;
+      has_video: boolean;
+      fetch_error: boolean;
+    }[];
+    averages: {
+      word_count_avg: number;
+      headings_avg: number;
+      faq_pct: number;
+      video_pct: number;
+    };
+  }>(`/sites/${siteId}/serp-analyze/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export async function getContentDecay(siteId: number, days = 30) {
   return request<Record<string, unknown>>(
     `/sites/${siteId}/content-decay/?days=${days}`,
@@ -679,6 +710,57 @@ export async function linkOpportunities(body: {
     }[];
     count: number;
   }>(`/link-opportunities/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AI Visibility tracking (2026-06-08)
+// ---------------------------------------------------------------------------
+
+export type AiVisibilityEngine =
+  | "chatgpt"
+  | "perplexity"
+  | "gemini"
+  | "searchgpt"
+  | "claude";
+
+export async function aiVisibilitySummary(siteId: number) {
+  return request<{
+    score: number;
+    total_mentions: number;
+    cited_pages_count: number;
+    total_checks: number;
+    total_prompts: number;
+    breakdown_by_engine: Record<
+      AiVisibilityEngine,
+      { total_checks: number; cited_count: number; cite_rate: number }
+    >;
+    delta_7d: number;
+  }>(`/sites/${siteId}/ai-visibility/summary/`);
+}
+
+export async function runAiVisibility(
+  siteId: number,
+  body: { prompt_id?: number } = {},
+) {
+  return request<{
+    checks_run: number;
+    prompts_checked: number;
+    engines_per_prompt: number;
+    results: {
+      id: number;
+      prompt_id: number;
+      engine: AiVisibilityEngine;
+      is_cited: boolean;
+      citation_url: string | null;
+      citation_rank: number | null;
+      checked_at: string;
+    }[];
+    mocked: boolean;
+    note: string;
+  }>(`/sites/${siteId}/ai-visibility/run/`, {
     method: "POST",
     body: JSON.stringify(body),
   });

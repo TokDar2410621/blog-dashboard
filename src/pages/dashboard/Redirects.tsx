@@ -15,6 +15,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
   Table,
   TableBody,
   TableCell,
@@ -51,6 +63,7 @@ export default function Redirects() {
   const [fromSlug, setFromSlug] = useState("");
   const [toSlug, setToSlug] = useState("");
   const [language, setLanguage] = useState("fr");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const list = useQuery({
     queryKey: ["redirects", siteId],
@@ -229,11 +242,7 @@ export default function Redirects() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          if (confirm(t("redirects.confirmDelete"))) {
-                            remove.mutate(r.id);
-                          }
-                        }}
+                        onClick={() => setDeleteId(r.id)}
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                       </Button>
@@ -245,6 +254,34 @@ export default function Redirects() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={deleteId !== null}
+        onOpenChange={(o) => !o && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("redirects.confirmDelete")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("redirects.confirmDeleteDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteId !== null) {
+                  remove.mutate(deleteId);
+                  setDeleteId(null);
+                }
+              }}
+              className={cn(buttonVariants({ variant: "destructive" }))}
+            >
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -35,6 +35,8 @@ import {
   Unlink2,
   Calendar,
   Coins,
+  Search,
+  Brain,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -61,6 +63,29 @@ export function DashboardSidebar() {
     { label: t("sidebar.digest"), icon: Calendar, href: `${base}/digest` },
     { label: t("sidebar.images"), icon: Image, href: `${base}/images` },
     { label: t("sidebar.settings"), icon: Settings, href: `${base}/parametres` },
+  ];
+
+  const insightsItems = [
+    {
+      label: t("sidebar.serpAnalyzer") || "Analyseur SERP",
+      icon: Search,
+      href: `${base}/serp-analyzer`,
+    },
+  ];
+
+  // "AI ERA" - next-gen SEO that targets LLM answers, not Google rankings.
+  const aiEraItems: {
+    label: string;
+    icon: typeof Brain;
+    href: string;
+    badge?: string;
+  }[] = [
+    {
+      label: t("sidebar.aiVisibility") || "Visibilite IA",
+      icon: Brain,
+      href: `${base}/ai-visibility`,
+      badge: "NEW",
+    },
   ];
 
   const handleLogout = () => {
@@ -104,6 +129,56 @@ export function DashboardSidebar() {
                     <Link to={item.href}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            {t("sidebar.insights") || "Insights"}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {insightsItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith(item.href)}
+                  >
+                    <Link to={item.href}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-1.5">
+            <span>{t("sidebar.aiEra") || "AI ERA"}</span>
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {aiEraItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith(item.href)}
+                  >
+                    <Link to={item.href}>
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1">{item.label}</span>
+                      {item.badge && (
+                        <span className="ml-auto text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded px-1.5 py-0.5">
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

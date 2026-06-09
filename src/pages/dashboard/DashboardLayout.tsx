@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -14,6 +14,16 @@ const PostEditor = lazy(() => import("./PostEditor"));
 const AIGenerator = lazy(() => import("./AIGenerator"));
 const ImageGallery = lazy(() => import("./ImageGallery"));
 const SiteSettings = lazy(() => import("./SiteSettings"));
+const SettingsLayout = lazy(() => import("./settings/SettingsLayout"));
+const SettingsGeneral = lazy(() => import("./settings/General"));
+const SettingsBranding = lazy(() => import("./settings/Branding"));
+const SettingsAuthor = lazy(() => import("./settings/Author"));
+const SettingsCta = lazy(() => import("./settings/Cta"));
+const SettingsLanguages = lazy(() => import("./settings/Languages"));
+const SettingsGsc = lazy(() => import("./settings/Gsc"));
+const SettingsMemory = lazy(() => import("./settings/Memory"));
+const SettingsAutopilot = lazy(() => import("./settings/Autopilot"));
+const SettingsIntegrations = lazy(() => import("./settings/Integrations"));
 const BulkAudit = lazy(() => import("./BulkAudit"));
 const KeywordTracker = lazy(() => import("./KeywordTracker"));
 const ContentDecay = lazy(() => import("./ContentDecay"));
@@ -22,6 +32,8 @@ const LinkGraph = lazy(() => import("./LinkGraph"));
 const Redirects = lazy(() => import("./Redirects"));
 const BrokenLinks = lazy(() => import("./BrokenLinks"));
 const WeeklyDigest = lazy(() => import("./WeeklyDigest"));
+const SerpAnalyzer = lazy(() => import("./SerpAnalyzer"));
+const AiVisibility = lazy(() => import("./AiVisibility"));
 
 function PageLoader() {
   return (
@@ -59,9 +71,24 @@ export default function DashboardLayout() {
                   <Route path="link-graph" element={<LinkGraph />} />
                   <Route path="redirects" element={<Redirects />} />
                   <Route path="broken-links" element={<BrokenLinks />} />
+                  <Route path="serp-analyzer" element={<SerpAnalyzer />} />
+                  <Route path="ai-visibility" element={<AiVisibility />} />
                   <Route path="digest" element={<WeeklyDigest />} />
                   <Route path="images" element={<ImageGallery />} />
-                  <Route path="parametres" element={<SiteSettings />} />
+                  <Route path="parametres" element={<SettingsLayout />}>
+                    <Route index element={<Navigate to="general" replace />} />
+                    <Route path="general" element={<SettingsGeneral />} />
+                    <Route path="branding" element={<SettingsBranding />} />
+                    <Route path="auteur" element={<SettingsAuthor />} />
+                    <Route path="cta" element={<SettingsCta />} />
+                    <Route path="langues" element={<SettingsLanguages />} />
+                    <Route path="gsc" element={<SettingsGsc />} />
+                    <Route path="memoire" element={<SettingsMemory />} />
+                    <Route path="autopilote" element={<SettingsAutopilot />} />
+                    <Route path="integrations" element={<SettingsIntegrations />} />
+                  </Route>
+                  {/* Legacy redirect (kept so old deep links keep working) */}
+                  <Route path="parametres/legacy" element={<SiteSettings />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

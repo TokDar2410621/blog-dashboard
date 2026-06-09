@@ -234,7 +234,7 @@ export default function KeywordTracker() {
           "Contexte trop maigre : remplis la description du site ou publie quelques articles pour des suggestions pertinentes."
         );
       } else if (!d.keywords.length) {
-        toast.info("Aucune suggestion. Verifie que le site a un nom + description.");
+        toast.info("Aucune suggestion. Vérifie que le site a un nom + description.");
       }
     },
     onError: (err: Error) => toast.error(err.message),
@@ -260,8 +260,8 @@ export default function KeywordTracker() {
     },
     onSuccess: ({ added, failed }) => {
       qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
-      if (failed === 0) toast.success(`${added} mot(s)-cle(s) ajoute(s)`);
-      else toast.warning(`${added} ajoutes, ${failed} en echec (quota ou doublon ?)`);
+      if (failed === 0) toast.success(`${added} mot(s)-clé(s) ajouté(s)`);
+      else toast.warning(`${added} ajoutés, ${failed} en échec (quota ou doublon ?)`);
       setSuggestions(null);
       setSuggestionMeta(null);
       setSelectedSuggestions(new Set());
@@ -285,8 +285,8 @@ export default function KeywordTracker() {
       qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
       toast.success(
         d.updated_count > 0
-          ? `${d.updated_count}/${d.total_processed} mot(s)-cle(s) reclasse(s)`
-          : "Aucun changement (tout etait deja bien classe)"
+          ? `${d.updated_count}/${d.total_processed} mot(s)-clé(s) reclassé(s)`
+          : "Aucun changement (tout était déjà bien classé)"
       );
     },
     onError: (err: Error) => toast.error(err.message),
@@ -298,13 +298,13 @@ export default function KeywordTracker() {
         method: "PATCH",
         body: JSON.stringify({ intent }),
       });
-      if (!res.ok) throw new Error("Erreur mise a jour intent");
+      if (!res.ok) throw new Error("Erreur mise à jour intent");
       return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tracked-keywords", siteId] });
     },
-    onError: () => toast.error("Erreur mise a jour intent"),
+    onError: () => toast.error("Erreur mise à jour intent"),
   });
 
   const history = useQuery<History>({
@@ -323,7 +323,7 @@ export default function KeywordTracker() {
     <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold">{"Suivi des positions Google"}</h1>
-        <p className="text-muted-foreground">{"Ajoute les mots-cles pour lesquels tu veux suivre ton ranking dans le temps. Lance un snapshot manuellement ou laisse l'agent schedule le faire chaque jour."}</p>
+        <p className="text-muted-foreground">{"Ajoute les mots-clés pour lesquels tu veux suivre ton ranking dans le temps. Lance un snapshot manuellement ou laisse l'agent schedule le faire chaque jour."}</p>
       </div>
 
       {/* Add form */}
@@ -331,17 +331,17 @@ export default function KeywordTracker() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
-            {"Ajouter un mot-cle a suivre"}
+            {"Ajouter un mot-clé à suivre"}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_2fr_auto] gap-3 items-end">
             <div className="space-y-1">
-              <label className="text-xs font-medium">{"Mot-cle"}</label>
+              <label className="text-xs font-medium">{"Mot-clé"}</label>
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder={"Ex: automatisation pme quebec"}
+                placeholder={"Ex: automatisation pme québec"}
               />
             </div>
             <div className="space-y-1">
@@ -382,7 +382,7 @@ export default function KeywordTracker() {
 
           <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-muted-foreground">
-              Pas d'idees ? Laisse l'IA proposer des mots-cles basee sur ton site (nom, description, SERP Google).
+              Pas d'idées ? Laisse l'IA proposer des mots-clés basée sur ton site (nom, description, SERP Google).
             </p>
             <Button
               type="button"
@@ -399,7 +399,7 @@ export default function KeywordTracker() {
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Suggerer avec l'IA
+                  Suggérer avec l'IA
                 </>
               )}
             </Button>
@@ -416,23 +416,23 @@ export default function KeywordTracker() {
               Suggestions IA ({suggestions.length})
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Coche celles que tu veux tracker, puis clique "Ajouter la selection".
+              Coche celles que tu veux tracker, puis clique "Ajouter la sélection".
             </p>
             {suggestionMeta && (
               <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
-                <span className="text-muted-foreground">Contexte utilise :</span>
+                <span className="text-muted-foreground">Contexte utilisé :</span>
                 <span className={`px-2 py-0.5 rounded ${suggestionMeta.rag_chunks_used > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                   RAG : {suggestionMeta.rag_chunks_used} chunk{suggestionMeta.rag_chunks_used > 1 ? "s" : ""}
                 </span>
                 <span className={`px-2 py-0.5 rounded ${suggestionMeta.homepage_fetched ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
-                  Homepage : {suggestionMeta.homepage_fetched ? "scrappee" : "non dispo"}
+                  Homepage : {suggestionMeta.homepage_fetched ? "scrappée" : "non dispo"}
                 </span>
                 <span className={`px-2 py-0.5 rounded ${suggestionMeta.serp_sources_used > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-muted text-muted-foreground"}`}>
                   SERP : {suggestionMeta.serp_sources_used} titres
                 </span>
                 {suggestionMeta.context_thin && (
                   <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                    Contexte maigre - resultats potentiellement bruites
+                    Contexte maigre - résultats potentiellement bruités
                   </span>
                 )}
               </div>
@@ -711,7 +711,7 @@ export default function KeywordTracker() {
                                   </h4>
                                   {history.data.snapshots.length === 0 ? (
                                     <p className="text-xs text-muted-foreground">
-                                      {"Aucun snapshot enregistre."}
+                                      {"Aucun snapshot enregistré."}
                                     </p>
                                   ) : (
                                     <RankChart snapshots={history.data.snapshots} />

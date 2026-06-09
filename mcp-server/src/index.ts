@@ -19,6 +19,7 @@ import {
   ApiError,
   addMemory,
   aiOverviewReadiness,
+  aiVisibilitySummary,
   analyzeCompetitors,
   approveStrategy,
   auditArticle,
@@ -60,7 +61,9 @@ import {
   proposeKeywordStrategy,
   rebuildMemory,
   revokeProofShare,
+  runAiVisibility,
   runAutopilotNow,
+  serpAnalyze,
   setAutopilotConfig,
   siteSeoScore,
   snapshotKeywords,
@@ -265,6 +268,28 @@ const KeywordLangArgs = z
   .object({
     keyword: z.string().min(1),
     language: z.enum(["fr", "en", "es"]).optional(),
+  })
+  .strict();
+
+const SerpAnalyzeArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    keyword: z.string().min(1),
+    language: z.enum(["fr", "en", "es"]).optional(),
+  })
+  .strict();
+
+const RunAiVisibilityArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    prompt_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Optional: only re-check this single tracked prompt. Omit to re-check every prompt on the site.",
+      ),
   })
   .strict();
 
@@ -686,6 +711,33 @@ const tools: ToolDef[] = [
       "Analyze the SERP top 10 for a keyword: average word count, common headings, entity coverage, gap analysis.",
     schema: KeywordLangArgs,
     handler: (input) => analyzeCompetitors(input),
+  },
+  {
+    name: "gridar_serp_analyze",
+    description:
+      "SERP Analyzer: fetch the top 10 organic results for a keyword and compute per-URL metrics (word count, h1/h2/h3 count, FAQ presence, video embed) plus averages. Lightweight Surfer-style benchmark used to size a competing article.",
+    schema: SerpAnalyzeArgs,
+    handler: (input) => {
+      const { site_id, ...body } = input;
+      return serpAnalyze(site_id, body);
+    },
+  },
+  {
+    name: "gridar_ai_visibility_summary",
+    description:
+      "AI Visibility tracker: returns aggregated metrics describing how often the site is cited in LLM responses (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). Output: {score (weighted 0-100), total_mentions, cited_pages_count, total_checks, total_prompts, breakdown_by_engine: {engine: {total_checks, cited_count, cite_rate}}, delta_7d}. Use this to show users their AI-search visibility (the next-gen SEO metric).",
+    schema: SiteIdOnly,
+    handler: (input) => aiVisibilitySummary(input.site_id),
+  },
+  {
+    name: "gridar_run_ai_visibility",
+    description:
+      "Trigger an AI Visibility check series for a site's tracked prompts. Creates one AiVisibilityResult per (prompt, engine) pair across all 5 engines (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). V1: results are mocked plausibly so the user can validate the UI before external LLM APIs are wired. Pass prompt_id to re-check only a single prompt.",
+    schema: RunAiVisibilityArgs,
+    handler: (input) => {
+      const { site_id, ...body } = input;
+      return runAiVisibility(site_id, body);
+    },
   },
   {
     name: "gridar_get_content_decay",

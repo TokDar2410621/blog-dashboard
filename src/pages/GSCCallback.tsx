@@ -70,7 +70,7 @@ export default function GSCCallback() {
     submitGSCOAuthCallback(siteId, code, state)
       .then(() => {
         toast.success("Google Search Console connecté");
-        navigate(`/dashboard/${siteId}/parametres`, { replace: true });
+        navigate(`/dashboard/${siteId}/parametres/gsc`, { replace: true });
       })
       .catch((err) => {
         const msg =
@@ -78,7 +78,7 @@ export default function GSCCallback() {
             ? err.message
             : "Connexion à Google Search Console impossible.";
         toast.error(msg);
-        navigate(`/dashboard/${siteId}/parametres`, { replace: true });
+        navigate(`/dashboard/${siteId}/parametres/gsc`, { replace: true });
       })
       .finally(() => setPending(false));
   }, [params, navigate]);

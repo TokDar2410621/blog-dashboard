@@ -31,6 +31,7 @@ import { SearchTrendsPanel } from "@/components/SearchTrendsPanel";
 import { QuotaBanner } from "@/components/QuotaBanner";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { authFetch, ApiError } from "@/lib/api-client";
+import { PageBreadcrumb } from "@/components/PageBreadcrumb";
 
 export default function AIGenerator() {
   const { t } = useTranslation();
@@ -212,6 +213,7 @@ export default function AIGenerator() {
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <PageBreadcrumb trail={[{ label: "Generer" }]} />
       <div>
         <h1 className="text-2xl font-bold">{t("ai.title")}</h1>
         <p className="text-muted-foreground">

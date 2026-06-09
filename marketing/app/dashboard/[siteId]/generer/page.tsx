@@ -152,30 +152,30 @@ function AIGeneratorInner() {
     try {
       const data = await generateArticle.mutateAsync(params);
       setResult(data);
-      toast.success(dryRun ? "Apercu pret" : "Article publie");
+      toast.success(dryRun ? "Aperçu prêt" : "Article publié");
     } catch (err) {
       if (err instanceof ApiError && err.status === 402 && err.body?.quota_exceeded) {
         setQuotaError(err.message);
         return;
       }
       const msg = err instanceof Error ? err.message : "";
-      toast.error(msg || "Erreur generation");
+      toast.error(msg || "Erreur génération");
     }
   };
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold">Generer un article</h1>
+        <h1 className="text-2xl font-bold">Générer un article</h1>
         <p className="text-muted-foreground">
-          Donne un sujet ou un titre, Claude redige avec ta voix et ta knowledge base.
+          Donne un sujet ou un titre, Claude rédige avec ta voix et ta knowledge base.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Parametres</CardTitle>
+            <CardTitle className="text-lg">Paramètres</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -183,7 +183,7 @@ function AIGeneratorInner() {
               <Input
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="ex: meilleur CRM PME quebec"
+                placeholder="ex: meilleur CRM PME québec"
               />
               <p className="text-xs text-muted-foreground">
                 Le sujet (ou le titre) est requis. Tu peux laisser vide pour laisser l&apos;IA choisir.
@@ -191,16 +191,16 @@ function AIGeneratorInner() {
             </div>
 
             <div className="space-y-2">
-              <Label>Titre force (optionnel)</Label>
+              <Label>Titre forcé (optionnel)</Label>
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ex: Comment choisir un CRM PME au Quebec en 2026"
+                placeholder="ex: Comment choisir un CRM PME au Québec en 2026"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Methode de recherche</Label>
+              <Label>Méthode de recherche</Label>
               <Select value={searchMethod} onValueChange={setSearchMethod}>
                 <SelectTrigger>
                   <SelectValue />
@@ -219,12 +219,12 @@ function AIGeneratorInner() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="news">Actualite</SelectItem>
+                  <SelectItem value="news">Actualité</SelectItem>
                   <SelectItem value="tutorial">Tutoriel</SelectItem>
                   <SelectItem value="comparison">Comparaison</SelectItem>
                   <SelectItem value="guide">Guide</SelectItem>
                   <SelectItem value="review">Review</SelectItem>
-                  <SelectItem value="story">Recit personnel</SelectItem>
+                  <SelectItem value="story">Récit personnel</SelectItem>
                   <SelectItem value="local">Local</SelectItem>
                 </SelectContent>
               </Select>
@@ -261,17 +261,17 @@ function AIGeneratorInner() {
             </div>
 
             <div className="space-y-2">
-              <Label>Mots-cles (optionnel, separes par virgule)</Label>
+              <Label>Mots-clés (optionnel, séparés par virgule)</Label>
               <Input
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
-                placeholder="ex: crm, pme, quebec"
+                placeholder="ex: crm, pme, québec"
               />
             </div>
 
             <div className="flex items-center gap-3">
               <Switch checked={dryRun} onCheckedChange={setDryRun} />
-              <Label>Apercu seul (n&apos;enregistre pas, ne consomme pas de quota)</Label>
+              <Label>Aperçu seul (n&apos;enregistre pas, ne consomme pas de quota)</Label>
             </div>
 
             <Button
@@ -282,24 +282,24 @@ function AIGeneratorInner() {
               disabled={generateArticle.isPending || cannotGenerate}
               title={
                 cannotGenerate
-                  ? "Quota mensuel epuise. Achete des credits pour continuer."
+                  ? "Quota mensuel épuisé. Achète des crédits pour continuer."
                   : undefined
               }
             >
               {generateArticle.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generation en cours...
+                  Génération en cours...
                 </>
               ) : cannotGenerate ? (
                 <>
                   <AlertTriangle className="h-4 w-4 mr-2" />
-                  Quota epuise. Achete des credits
+                  Quota épuisé. Achète des crédits
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Generer
+                  Générer
                 </>
               )}
             </Button>
@@ -309,7 +309,7 @@ function AIGeneratorInner() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <div className="font-semibold mb-0.5">Generation bloquee</div>
+                    <div className="font-semibold mb-0.5">Génération bloquée</div>
                     <div className="text-muted-foreground">{quotaError}</div>
                   </div>
                 </div>
@@ -324,7 +324,7 @@ function AIGeneratorInner() {
                     ) : (
                       <Coins className="h-3.5 w-3.5 mr-1.5" />
                     )}
-                    +10 credits, 25$
+                    +10 crédits, 25$
                   </Button>
                   <Button
                     size="sm"
@@ -332,7 +332,7 @@ function AIGeneratorInner() {
                     onClick={() => buyCredits.mutate("medium")}
                     disabled={buyCredits.isPending}
                   >
-                    +50 credits, 99$
+                    +50 crédits, 99$
                   </Button>
                   <Button
                     size="sm"
@@ -349,14 +349,14 @@ function AIGeneratorInner() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Resultat</CardTitle>
+            <CardTitle className="text-lg">Résultat</CardTitle>
           </CardHeader>
           <CardContent>
             {generateArticle.isPending ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 <p className="text-muted-foreground text-sm">
-                  Generation en cours (1-2 minutes pour un article moyen)...
+                  Génération en cours (1-2 minutes pour un article moyen)...
                 </p>
               </div>
             ) : result ? (
@@ -376,14 +376,14 @@ function AIGeneratorInner() {
                   </Button>
                   <Button variant="outline" onClick={() => setResult(null)}>
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Generer un autre
+                    Générer un autre
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
                 <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                <p>Lance une generation pour voir le resultat ici.</p>
+                <p>Lance une génération pour voir le résultat ici.</p>
               </div>
             )}
           </CardContent>
@@ -391,7 +391,7 @@ function AIGeneratorInner() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Les panneaux de pre-redaction (Content Brief, PAA, Reddit/Quora, Trends) seront ajoutes dans une prochaine session.
+        Les panneaux de pré-rédaction (Content Brief, PAA, Reddit/Quora, Trends) seront ajoutés dans une prochaine session.
       </p>
     </div>
   );

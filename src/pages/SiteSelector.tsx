@@ -17,6 +17,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchSites,
@@ -44,6 +56,7 @@ import {
   ShoppingBag,
   Layers,
   Code,
+  LayoutDashboard,
 } from "lucide-react";
 import { WordPressConnectDialog } from "@/components/WordPressConnectDialog";
 import { ShopifyConnectDialog } from "@/components/ShopifyConnectDialog";
@@ -63,6 +76,7 @@ export default function SiteSelector() {
   const [wpDialogOpen, setWpDialogOpen] = useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
   const [webflowDialogOpen, setWebflowDialogOpen] = useState(false);
+  const [deleteSiteId, setDeleteSiteId] = useState<number | null>(null);
 
   const [name, setName] = useState("");
   const [databaseUrl, setDatabaseUrl] = useState("");
@@ -86,8 +100,14 @@ export default function SiteSelector() {
   };
 
   const handleDelete = (id: number) => {
-    if (!confirm(t("sites.deleteConfirm"))) return;
-    deleteMutation.mutate(id);
+    setDeleteSiteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteSiteId !== null) {
+      deleteMutation.mutate(deleteSiteId);
+      setDeleteSiteId(null);
+    }
   };
 
   const handleTestConnection = async (id: number) => {
@@ -153,6 +173,19 @@ export default function SiteSelector() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl space-y-6">
+        {sites.length > 1 && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/dashboard/overview")}
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              {t("sites.multiSiteView", "Voir vue multi-sites")}
+            </Button>
+          </div>
+        )}
+
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-4">
             <GridarMark className="h-8 w-8 text-primary" />
@@ -331,6 +364,29 @@ export default function SiteSelector() {
         <WordPressConnectDialog open={wpDialogOpen} onOpenChange={setWpDialogOpen} />
         <ShopifyConnectDialog open={shopifyDialogOpen} onOpenChange={setShopifyDialogOpen} />
         <WebflowConnectDialog open={webflowDialogOpen} onOpenChange={setWebflowDialogOpen} />
+
+        <AlertDialog
+          open={deleteSiteId !== null}
+          onOpenChange={(o) => !o && setDeleteSiteId(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("sites.deleteConfirm")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("sites.deleteConfirmDesc")}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className={cn(buttonVariants({ variant: "destructive" }))}
+              >
+                {t("common.delete")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <div className="text-center flex items-center justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>
