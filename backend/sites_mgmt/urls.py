@@ -58,6 +58,8 @@ from .api_v1 import (
     V1CheckRenderabilityView, V1LinkOpportunitiesView,
     V1SerpAnalyzeView,
     V1AiVisibilitySummaryView, V1AiVisibilityPromptsView, V1AiVisibilityRunView,
+    V1StrategicOpportunitiesView, V1StrategicOpportunitiesRefreshView,
+    V1StrategicOpportunityActionView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -244,5 +246,15 @@ urlpatterns = [
     path('v1/sites/<int:site_id>/ai-visibility/summary/', V1AiVisibilitySummaryView.as_view(), name='v1-ai-visibility-summary'),
     path('v1/sites/<int:site_id>/ai-visibility/prompts/', V1AiVisibilityPromptsView.as_view(), name='v1-ai-visibility-prompts'),
     path('v1/sites/<int:site_id>/ai-visibility/run/', V1AiVisibilityRunView.as_view(), name='v1-ai-visibility-run'),
+    # Strategic Opportunities (2026-06-09)
+    path('v1/sites/<int:site_id>/strategic-opportunities/',
+         V1StrategicOpportunitiesView.as_view(),
+         name='v1-strategic-opportunities'),
+    path('v1/sites/<int:site_id>/strategic-opportunities/refresh/',
+         V1StrategicOpportunitiesRefreshView.as_view(),
+         name='v1-strategic-opportunities-refresh'),
+    path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/<str:action>/',
+         V1StrategicOpportunityActionView.as_view(),
+         name='v1-strategic-opportunity-action'),
     path('', include(router.urls)),
 ]

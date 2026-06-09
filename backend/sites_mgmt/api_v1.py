@@ -3306,3 +3306,222 @@ class V1AiVisibilityRunView(BaseV1View):
             'mocked': True,
             'note': 'V1 mock - external LLM APIs not called yet.',
         }, status=status.HTTP_201_CREATED)
+
+
+# ===========================================================================
+# Strategic Opportunities (2026-06-09)
+# ===========================================================================
+# Cross-section of tracked keywords + site context + Claude. For each
+# transactional / commercial / local keyword without a matching landing, the
+# engine produces a structured page concept (hook, capture mechanism,
+# conversion path) + traffic estimate. The user reviews them on
+# /dashboard/X/opportunites and approves the ones to ship - approving
+# spawns a HostedLanding via the existing LandingGenerator path.
+
+class V1StrategicOpportunitiesView(BaseV1View):
+    """GET /api/v1/sites/<id>/strategic-opportunities/
+
+    Returns the current list ordered by priority then created_at desc. Does
+    NOT trigger Claude - call /refresh/ for that. Dismissed rows are hidden
+    by default; pass ?include_dismissed=1 to see them.
+    """
+
+    def get(self, request, site_id):
+        from .models import StrategicOpportunity
+        site = self.get_user_site(request, site_id)
+        include_dismissed = request.query_params.get('include_dismissed') == '1'
+        qs = StrategicOpportunity.objects.filter(site=site)
+        if not include_dismissed:
+            qs = qs.exclude(status='dismissed')
+        results = []
+        for op in qs.select_related('tracked_keyword', 'generated_landing'):
+            results.append({
+                'id': op.id,
+                'keyword': op.keyword,
+                'intent': op.intent,
+                'language': op.language,
+                'current_position': op.current_position,
+                'priority': op.priority,
+                'status': op.status,
+                'concept': op.concept,
+                'estimate': op.estimate,
+                'tracked_keyword_id': op.tracked_keyword_id,
+                'generated_landing_id': op.generated_landing_id,
+                'generated_landing_slug': (
+                    op.generated_landing.slug if op.generated_landing else None
+                ),
+                'created_at': op.created_at.isoformat(),
+                'refreshed_at': (
+                    op.refreshed_at.isoformat() if op.refreshed_at else None
+                ),
+            })
+        return Response({'results': results, 'count': len(results)})
+
+
+class V1StrategicOpportunitiesRefreshView(BaseV1View):
+    """POST /api/v1/sites/<id>/strategic-opportunities/refresh/
+
+    Loops over the eligible tracked keywords (non-info intent, no matching
+    landing) and re-runs the Claude strategic prompt for each. Upserts a
+    StrategicOpportunity row per (site, keyword). Bounded to max_keywords
+    (default 8, capped at 20) to keep Claude cost predictable.
+    """
+
+    def post(self, request, site_id):
+        from django.utils import timezone
+        from .models import StrategicOpportunity
+        from .strategic_opportunities import (
+            candidate_keywords, propose_opportunity,
+        )
+
+        site = self.get_user_site(request, site_id)
+        try:
+            max_kw = max(1, min(int(request.data.get('max_keywords') or 8), 20))
+        except (TypeError, ValueError):
+            max_kw = 8
+
+        candidates = list(candidate_keywords(site)[:max_kw])
+        refreshed = []
+        skipped = []
+
+        for tk in candidates:
+            result = propose_opportunity(site, tk)
+            if not result:
+                skipped.append({
+                    'keyword': tk.keyword, 'reason': 'llm_unavailable',
+                })
+                continue
+
+            concept = result['concept']
+            estimate = result['estimate']
+            priority = (concept.get('priority') or 'medium').lower()
+            if priority not in ('high', 'medium', 'low'):
+                priority = 'medium'
+
+            op, _ = StrategicOpportunity.objects.update_or_create(
+                site=site,
+                keyword=tk.keyword,
+                language=result['language'],
+                defaults={
+                    'tracked_keyword': tk,
+                    'intent': tk.intent or 'commercial',
+                    'concept': concept,
+                    'estimate': estimate,
+                    'current_position': result['current_position'],
+                    'priority': priority,
+                    # Preserve dismissed / done status if user already acted.
+                    'status': 'proposed',
+                    'refreshed_at': timezone.now(),
+                },
+            )
+            refreshed.append({
+                'id': op.id, 'keyword': op.keyword, 'priority': op.priority,
+            })
+
+        return Response({
+            'refreshed': refreshed,
+            'skipped': skipped,
+            'count_refreshed': len(refreshed),
+            'count_skipped': len(skipped),
+            'count_candidates': len(candidates),
+        })
+
+
+class V1StrategicOpportunityActionView(BaseV1View):
+    """POST /api/v1/sites/<id>/strategic-opportunities/<op_id>/<action>/
+
+    action = `dismiss` | `restore` | `approve`.
+
+    - dismiss : marks the opportunity as Ecartee. Won't reappear on refresh
+      unless the user restores it.
+    - restore : flips a dismissed row back to proposed.
+    - approve : generates a HostedLanding from the concept via
+      LandingGenerator (same engine as V1ApproveStrategyView). Marks the
+      opportunity `done` and links the new landing.
+    """
+
+    def post(self, request, site_id, op_id, action):
+        from django.utils import timezone
+        from .models import StrategicOpportunity, HostedLanding
+
+        site = self.get_user_site(request, site_id)
+        try:
+            op = StrategicOpportunity.objects.get(site=site, id=int(op_id))
+        except (StrategicOpportunity.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Opportunite introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if action == 'dismiss':
+            op.status = 'dismissed'
+            op.dismissed_at = timezone.now()
+            op.save(update_fields=['status', 'dismissed_at', 'updated_at'])
+            return Response({'id': op.id, 'status': op.status})
+
+        if action == 'restore':
+            op.status = 'proposed'
+            op.dismissed_at = None
+            op.save(update_fields=['status', 'dismissed_at', 'updated_at'])
+            return Response({'id': op.id, 'status': op.status})
+
+        if action == 'approve':
+            if op.status == 'done' and op.generated_landing_id:
+                return Response({
+                    'id': op.id, 'status': op.status,
+                    'landing_id': op.generated_landing_id,
+                    'note': 'Page deja creee.',
+                })
+
+            # Map page_type -> LandingGenerator page_subtype.
+            page_type = (op.concept or {}).get('page_type') or 'service_page'
+            subtype_map = {
+                'tool_landing': 'service',
+                'service_page': 'service',
+                'comparison': 'comparison',
+                'guide_pillar': 'pillar',
+                'quiz_landing': 'service',
+                'calculator': 'service',
+                'local_landing': 'local',
+                'lead_magnet': 'service',
+            }
+            page_subtype = subtype_map.get(page_type, 'service')
+
+            from .landing_generator import LandingGenerator, LandingGeneratorError
+            try:
+                gen = LandingGenerator(site=site, language=op.language)
+                payload = gen.generate(
+                    keyword=op.keyword,
+                    page_subtype=page_subtype,
+                )
+                # Honour the LLM-suggested slug if Claude gave one.
+                suggested_slug = (op.concept or {}).get('suggested_url_path') or ''
+                suggested_slug = suggested_slug.lstrip('/').strip()[:200]
+                if suggested_slug:
+                    payload['slug'] = suggested_slug
+                base_slug = payload['slug']
+                n = 1
+                while HostedLanding.objects.filter(
+                    site=site, slug=payload['slug']
+                ).exists():
+                    n += 1
+                    payload['slug'] = f'{base_slug}-{n}'[:200]
+                landing = HostedLanding.objects.create(site=site, **payload)
+            except LandingGeneratorError as e:
+                return Response({'error': str(e)},
+                                status=status.HTTP_502_BAD_GATEWAY)
+            except Exception as e:  # noqa: BLE001
+                logger.exception('Strategic opportunity approve failed')
+                return Response({'error': str(e)[:200]},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            op.status = 'done'
+            op.generated_landing = landing
+            op.save(update_fields=[
+                'status', 'generated_landing', 'updated_at',
+            ])
+            return Response({
+                'id': op.id, 'status': op.status,
+                'landing_id': landing.id, 'landing_slug': landing.slug,
+            })
+
+        return Response({'error': f"Action inconnue: {action}"},
+                        status=status.HTTP_400_BAD_REQUEST)
