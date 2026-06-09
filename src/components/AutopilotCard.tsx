@@ -23,9 +23,14 @@ import { Rocket, Loader2, AlertCircle, Play, Clock, KeyRound, Info } from "lucid
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
+type AutopilotMode = "refresh_first" | "create_only" | "balanced";
+
 type AutopilotConfig = {
   enabled: boolean;
   weekly_count: number;
+  auto_publish: boolean;
+  mode: AutopilotMode;
+  min_refresh_interval_days: number;
   last_run_at: string | null;
   last_error: string;
   next_run_at: string | null;
@@ -72,7 +77,7 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
   });
 
   const save = useMutation({
-    mutationFn: async (payload: Partial<Pick<AutopilotConfig, "enabled" | "weekly_count">>) => {
+    mutationFn: async (payload: Partial<Pick<AutopilotConfig, "enabled" | "weekly_count" | "auto_publish" | "mode">>) => {
       const res = await authFetch(`/sites/${siteId}/autopilot/`, {
         method: "PUT",
         body: JSON.stringify(payload),
@@ -196,6 +201,57 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
             </SelectContent>
           </Select>
         </div>
+
+        <div className="space-y-2">
+          <Label>Strategie</Label>
+          <Select
+            value={c.mode || "balanced"}
+            onValueChange={(v) => save.mutate({ mode: v as AutopilotMode })}
+            disabled={save.isPending}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="balanced">Balanced - 1 refresh / 2 creations (defaut)</SelectItem>
+              <SelectItem value="refresh_first">Refresh first - prioriser les articles en perte de trafic</SelectItem>
+              <SelectItem value="create_only">Create only - generer uniquement de nouveaux articles</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Le mode refresh utilise GSC pour reperer les articles dont les impressions baissent de plus de 20% sur 30j, puis les regenere avec des donnees a jour. Sans GSC connecte, seul le mode create_only fonctionne.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+          <div className="space-y-0.5 flex-1">
+            <Label className="text-base">Publication automatique</Label>
+            <p className="text-sm text-muted-foreground">
+              {c.auto_publish
+                ? "Les articles sont publies directement (zero review)"
+                : "Les articles atterrissent en draft pour review"}
+            </p>
+          </div>
+          <Switch
+            checked={c.auto_publish}
+            disabled={save.isPending}
+            onCheckedChange={(v) => save.mutate({ auto_publish: v })}
+          />
+        </div>
+
+        {c.auto_publish && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-900 dark:text-amber-200">
+                Mode publication directe actif
+              </p>
+              <p className="text-amber-800 dark:text-amber-300 mt-0.5">
+                Les articles partent en prod sans relecture. Verifie ton prompt et ta memoire site avant de laisser tourner. Un redeploy Vercel est declenche automatiquement apres chaque publication.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-lg border p-3">

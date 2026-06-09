@@ -14,8 +14,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 import secrets
 from datetime import timedelta
+
+import requests
 
 from django.utils import timezone
 from rest_framework import authentication, exceptions, status
@@ -25,8 +28,8 @@ from rest_framework.views import APIView
 
 from blog.models import BlogPost
 from .models import (
-    ApiToken, HostedPost, Site, Subscription, TrackedKeyword,
-    SerpRank,
+    ApiToken, HostedPost, HostedLanding, KeywordStrategy,
+    Site, Subscription, TrackedKeyword, SerpRank,
 )
 
 logger = logging.getLogger(__name__)
@@ -369,6 +372,26 @@ class V1GenerateView(BaseV1View):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Mandatory onboarding: refuse to generate if the site has no
+        # business_model declared OR no author_bio (E-E-A-T signal). Both
+        # drive prompt construction, so missing them produces generic slop.
+        missing_fields = []
+        if not (site.business_model or '').strip():
+            missing_fields.append('business_model')
+        if not (site.author_bio or '').strip():
+            missing_fields.append('author_bio')
+        if missing_fields:
+            return Response(
+                {
+                    'error': (
+                        "Onboarding incomplet : renseigne d'abord ces champs dans "
+                        "les paramètres du site avant de générer un article."
+                    ),
+                    'missing_fields': missing_fields,
+                },
+                status=422,
+            )
+
         alias = None if (site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
 
         # Enforce article quota (monthly first, then top-up credits).
@@ -408,6 +431,89 @@ class V1GenerateView(BaseV1View):
             logger.exception('V1 generate failed')
             return Response({'error': f'Erreur génération: {str(e)[:120]}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class V1GenerateSisterArticleView(BaseV1View):
+    """POST /api/v1/sites/<id>/articles/<slug>/generate-sister-article/
+
+    Body: {"target_language": "fr" | "en" | "es"}
+
+    Translate + adapt the source article into `target_language` and create a
+    new HostedPost in the same translation_group, so the hreflang alternates
+    wiring picks it up automatically. Consumes one article from the user's
+    monthly quota (translations count as articles).
+
+    Only available on hosted-mode sites (HostedPost). CMS-backed sites
+    (WordPress / Shopify / Webflow) get a 400 - they'd need adapter-specific
+    create paths we don't have yet.
+    """
+    def post(self, request, site_id, slug):
+        site = self.get_user_site(request, site_id)
+        from .article_generator import ArticleGenerator
+
+        if not site.is_hosted:
+            return Response(
+                {'error': 'Sister article generation is only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        target_language = (request.data.get('target_language') or '').lower().strip()
+        if target_language not in ('fr', 'en', 'es'):
+            return Response(
+                {'error': "target_language must be one of: 'fr', 'en', 'es'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not site.supports_language(target_language):
+            return Response(
+                {'error': f'Langue non autorisee pour ce site (langues: {site.effective_languages}).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            source_post = HostedPost.objects.get(site=site, slug=slug)
+        except HostedPost.DoesNotExist:
+            return Response({'error': 'Article source introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        # Quota: a sister article is a generation event. Block if the user
+        # would exceed their monthly plan + credit balance.
+        from .quota import check_article_quota, consume_article
+        try:
+            check_article_quota(request.user)
+        except exceptions.PermissionDenied as e:
+            return Response(
+                {'error': str(e), 'quota_exceeded': True},
+                status=status.HTTP_402_PAYMENT_REQUIRED,
+            )
+
+        try:
+            generator = ArticleGenerator(
+                alias=None,
+                knowledge_base=site.knowledge_base or '',
+                site=site,
+            )
+            new_post = generator.generate_sister_article(source_post, target_language)
+            consume_article(request.user)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception('V1 generate-sister-article failed')
+            return Response(
+                {'error': f'Erreur generation traduction: {str(e)[:120]}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                'slug': new_post.slug,
+                'id': new_post.id,
+                'language': new_post.language,
+                'translation_group': str(new_post.translation_group),
+                'status': new_post.status,
+                'title': new_post.title,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class V1AuditView(BaseV1View):
@@ -633,8 +739,11 @@ class V1SiteDetailView(BaseV1View):
             'gsc_connected': bool(s.gsc_property_url and s.gsc_refresh_token),
             'gsc_property_url': s.gsc_property_url or '',
             'autopilot_enabled': bool(getattr(s, 'autopilot_enabled', False)),
+            'autopilot_mode': getattr(s, 'autopilot_mode', 'balanced') or 'balanced',
+            'min_refresh_interval_days': getattr(s, 'min_refresh_interval_days', 30) or 30,
             'author_bio': getattr(s, 'author_bio', '') or '',
             'author_credentials': getattr(s, 'author_credentials', '') or '',
+            'business_model': getattr(s, 'business_model', '') or '',
         })
 
 
@@ -647,7 +756,8 @@ class V1SiteUpdateView(BaseV1View):
     EDITABLE = {
         'name', 'description', 'knowledge_base', 'competitors',
         'default_language', 'author_bio', 'author_credentials',
-        'public_blog_domain',
+        'public_blog_domain', 'business_model',
+        'primary_cta_text', 'primary_cta_url',
     }
 
     def patch(self, request, site_id):
@@ -1171,3 +1281,1535 @@ class V1PAAView(BaseV1View):
     def post(self, request):
         from .views import PAAView
         return _delegate(PAAView, request)
+
+
+# --------------------------------------------------------------------------
+# Topic Cluster Planner (2026-06-08)
+# --------------------------------------------------------------------------
+
+# Intent classification regex (FR + EN + ES). The first match wins, in order:
+# transactional -> commercial -> informational -> navigational -> local.
+# These are simple lexical signals; LLM is used as backup in propose_strategy.
+_INTENT_PATTERNS = [
+    # transactional: explicit purchase / quote / hire / service intent
+    ('transactional', re.compile(
+        r'\b(achat|acheter|prix|tarif|devis|commande|commander|reserver|reservation|'
+        r'service|services|agence|agency|cabinet|consultant|consultation|'
+        r'engager|embaucher|hire|buy|purchase|order|book|pricing|quote|'
+        r'comprar|precio|tarifa|reservar)\b',
+        re.IGNORECASE,
+    )),
+    # commercial: comparison / review / best-of intent
+    ('commercial', re.compile(
+        r'\b(vs|versus|comparatif|comparaison|review|reviews|avis|test|'
+        r'meilleur|meilleurs|meilleure|best|top|alternative|alternatives|'
+        r'comparison|opinion|opiniones|mejor|mejores)\b',
+        re.IGNORECASE,
+    )),
+    # informational: how / what / why / guide
+    ('informational', re.compile(
+        r'\b(comment|pourquoi|quoi|quelle|quel|guide|tutoriel|tutorial|how|'
+        r'what|why|when|where|definition|signification|explained|que es|'
+        r'como|por que)\b',
+        re.IGNORECASE,
+    )),
+    # local: geo signal
+    ('local', re.compile(
+        r'\b(pres de moi|near me|cerca de mi|montreal|quebec|paris|lyon|'
+        r'toronto|vancouver|local|locale|locaux)\b',
+        re.IGNORECASE,
+    )),
+]
+
+
+def _classify_intent_regex(keyword: str) -> tuple[str, float]:
+    """Return (intent, confidence) from lexical regex match.
+
+    Confidence is 0.85 for a strong regex match, 0.5 if nothing matches
+    (default to 'informational').
+    """
+    k = (keyword or '').strip()
+    if not k:
+        return ('informational', 0.0)
+    for intent, pattern in _INTENT_PATTERNS:
+        if pattern.search(k):
+            return (intent, 0.85)
+    return ('informational', 0.5)
+
+
+def _is_navigational(keyword: str, site_name: str | None = None) -> bool:
+    """Crude brand-detection: True if the keyword matches a known brand
+    (the user's own site name, or a single-token brand-shaped string)."""
+    k = (keyword or '').strip().lower()
+    if not k:
+        return False
+    if site_name and site_name.lower() in k:
+        return True
+    # Single CamelCase / lowercase token = likely a brand name
+    if ' ' not in k and len(k) <= 20 and not any(c.isdigit() for c in k):
+        return True
+    return False
+
+
+class V1ClassifyIntentView(BaseV1View):
+    """POST /api/v1/classify-intent/ {keyword, site_id?}
+
+    Returns: {keyword, intent, confidence, navigational_match}
+
+    Used standalone OR as the first step of /keyword-strategy/.
+    """
+
+    def post(self, request):
+        keyword = (request.data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        site_id = request.data.get('site_id')
+        site_name = None
+        if site_id:
+            try:
+                site = self.get_user_site(request, site_id)
+                site_name = site.name
+            except Exception:
+                site_name = None
+
+        intent, confidence = _classify_intent_regex(keyword)
+        nav = _is_navigational(keyword, site_name)
+        # Navigational overrides everything else when the keyword IS the brand.
+        if nav and site_name and site_name.lower() in keyword.lower():
+            intent = 'navigational'
+            confidence = 0.95
+
+        return Response({
+            'keyword': keyword,
+            'intent': intent,
+            'confidence': confidence,
+            'navigational_match': nav,
+        })
+
+
+def _propose_structure_for_intent(intent: str, keyword: str) -> str:
+    """Map (intent, keyword shape) to a proposed_structure enum."""
+    k = (keyword or '').lower()
+    if intent == 'transactional':
+        return 'single_landing'
+    if intent == 'commercial':
+        if ' vs ' in k or ' versus ' in k:
+            return 'comparison_table'
+        return 'pillar_cluster'
+    if intent == 'local':
+        return 'local_landing'
+    if intent == 'navigational':
+        return 'single_landing'
+    # informational default
+    return 'pillar_cluster'
+
+
+def _propose_pages(structure: str, keyword: str, language: str = 'fr') -> list:
+    """Generate a default proposed_pages list given the structure + keyword."""
+    from django.utils.text import slugify
+    base_slug = slugify(keyword)[:80] or 'page'
+
+    if structure == 'single_landing':
+        return [{
+            'type': 'landing',
+            'title': keyword.title(),
+            'slug': base_slug,
+            'keyword': keyword,
+            'role': 'pillar',
+            'page_subtype': 'service',
+        }]
+
+    if structure == 'comparison_table':
+        return [{
+            'type': 'landing',
+            'title': keyword.title(),
+            'slug': base_slug,
+            'keyword': keyword,
+            'role': 'pillar',
+            'page_subtype': 'comparison',
+        }]
+
+    if structure == 'local_landing':
+        return [{
+            'type': 'landing',
+            'title': keyword.title(),
+            'slug': base_slug,
+            'keyword': keyword,
+            'role': 'pillar',
+            'page_subtype': 'local',
+        }]
+
+    if structure == 'pillar_cluster':
+        # 1 pillar + 4 cluster articles
+        return [
+            {
+                'type': 'landing',
+                'title': f'{keyword.title()} - Guide complet',
+                'slug': base_slug,
+                'keyword': keyword,
+                'role': 'pillar',
+                'page_subtype': 'pillar',
+            },
+            {
+                'type': 'article',
+                'title': f'Comment choisir {keyword}',
+                'slug': f'comment-choisir-{base_slug}'[:200],
+                'keyword': f'comment choisir {keyword}',
+                'role': 'cluster',
+            },
+            {
+                'type': 'article',
+                'title': f'{keyword.title()} - Erreurs frequentes',
+                'slug': f'erreurs-{base_slug}'[:200],
+                'keyword': f'erreurs {keyword}',
+                'role': 'cluster',
+            },
+            {
+                'type': 'article',
+                'title': f'{keyword.title()} - Prix et tarifs',
+                'slug': f'prix-{base_slug}'[:200],
+                'keyword': f'prix {keyword}',
+                'role': 'cluster',
+            },
+            {
+                'type': 'article',
+                'title': f'{keyword.title()} - Cas pratiques',
+                'slug': f'cas-pratiques-{base_slug}'[:200],
+                'keyword': f'cas pratiques {keyword}',
+                'role': 'cluster',
+            },
+        ]
+
+    return [{
+        'type': 'article',
+        'title': keyword.title(),
+        'slug': base_slug,
+        'keyword': keyword,
+        'role': 'standalone',
+    }]
+
+
+def _call_claude_for_strategy(keyword: str, intent: str, site, serp_summary: str = '') -> dict:
+    """Use Claude to enrich the proposed strategy with rationale + tuned
+    proposed_pages. Falls back to defaults if Claude unavailable.
+    """
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return {}
+    try:
+        bm = site.business_model or 'agency'
+        prompt = f"""Tu es expert SEO topic cluster.
+
+KEYWORD: "{keyword}"
+INTENT DETECTE: {intent}
+BUSINESS MODEL DU SITE: {bm}
+SITE: {site.name}
+{serp_summary}
+
+Propose une structure de pages optimale et explique ton choix en 1 phrase.
+Reponds en JSON strict (pas de markdown):
+{{
+  "rationale": "<1 phrase qui explique le choix de structure>",
+  "structure": "<single_landing|pillar_cluster|comparison_table|local_landing|blog_post>",
+  "pages": [
+    {{"type":"landing"|"article", "title":str, "slug":str, "keyword":str,
+      "role":"pillar"|"cluster"|"alternative", "page_subtype":str}},
+    ...
+  ]
+}}
+Pour un intent transactional, propose UNE landing.
+Pour informational, propose 1 pillar landing + 3-5 articles cluster.
+Pour commercial avec "vs", propose une comparison_table.
+"""
+        resp = requests.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key': api_key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            },
+            json={
+                'model': 'claude-sonnet-4-20250514',
+                'max_tokens': 1500,
+                'messages': [{'role': 'user', 'content': prompt}],
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        text = resp.json()['content'][0]['text']
+        import re as _re
+        match = _re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return {}
+        import json as _json
+        return _json.loads(match.group())
+    except Exception as exc:
+        logger.warning('Strategy LLM enrichment failed: %s', exc)
+        return {}
+
+
+def _fetch_serp_summary(keyword: str, language: str = 'fr') -> str:
+    """Optional helper: fetch a brief SERP snapshot via Serper for the prompt.
+
+    Returns a plain-text summary or '' if the API key is missing / call fails.
+    """
+    api_key = os.environ.get('SERPER_API_KEY')
+    if not api_key:
+        return ''
+    try:
+        resp = requests.post(
+            'https://google.serper.dev/search',
+            headers={'X-API-KEY': api_key, 'Content-Type': 'application/json'},
+            json={'q': keyword, 'gl': 'ca', 'hl': language, 'num': 5},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        organic = data.get('organic', [])[:5]
+        lines = ['SERP top 5:']
+        for i, item in enumerate(organic, 1):
+            lines.append(f"{i}. {item.get('title','')} - {item.get('link','')}")
+        return '\n'.join(lines)
+    except Exception:
+        return ''
+
+
+class V1ProposeKeywordStrategyView(BaseV1View):
+    """POST /api/v1/sites/<id>/keyword-strategy/ {keyword, language?}
+
+    Classifies intent, analyzes SERP, proposes structure + pages.
+    Idempotent on (site, keyword): re-running returns the existing draft.
+    """
+
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        keyword = (request.data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        language = (request.data.get('language') or site.default_language or 'fr')[:2]
+
+        # Classify intent (regex + brand check)
+        intent, confidence = _classify_intent_regex(keyword)
+        if _is_navigational(keyword, site.name) and site.name.lower() in keyword.lower():
+            intent = 'navigational'
+            confidence = 0.95
+
+        # SERP summary (best-effort)
+        serp_summary = _fetch_serp_summary(keyword, language)
+
+        # Claude enrichment (best-effort)
+        llm_data = _call_claude_for_strategy(keyword, intent, site, serp_summary)
+
+        if llm_data and llm_data.get('structure'):
+            structure = llm_data['structure']
+            pages = llm_data.get('pages') or _propose_pages(structure, keyword, language)
+            rationale = llm_data.get('rationale') or ''
+        else:
+            structure = _propose_structure_for_intent(intent, keyword)
+            pages = _propose_pages(structure, keyword, language)
+            rationale = (
+                f"Intent '{intent}' detecte (confiance {confidence:.0%}). "
+                f"Structure proposee: {structure}."
+            )
+
+        # Preserve status if the strategy already exists and was approved /
+        # done - only re-running on a draft should overwrite content blocks.
+        existing = KeywordStrategy.objects.filter(site=site, keyword=keyword).first()
+        preserved_status = 'draft'
+        if existing and existing.status in ('approved', 'generating', 'done'):
+            preserved_status = existing.status
+
+        strategy, created = KeywordStrategy.objects.update_or_create(
+            site=site, keyword=keyword,
+            defaults={
+                'language': language,
+                'intent': intent,
+                'intent_confidence': confidence,
+                'business_model_detected': site.business_model or '',
+                'serp_analysis': {'summary': serp_summary} if serp_summary else {},
+                'proposed_structure': structure,
+                'proposed_pages': pages,
+                'rationale': rationale,
+                'status': preserved_status,
+            },
+        )
+
+        return Response({
+            'id': strategy.id,
+            'site_id': site.id,
+            'keyword': strategy.keyword,
+            'intent': strategy.intent,
+            'intent_confidence': strategy.intent_confidence,
+            'proposed_structure': strategy.proposed_structure,
+            'proposed_pages': strategy.proposed_pages,
+            'rationale': strategy.rationale,
+            'status': strategy.status,
+            'created': created,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class V1ApproveStrategyView(BaseV1View):
+    """POST /api/v1/sites/<id>/keyword-strategy/<strategy_id>/approve/
+
+    Body: {customizations?: {pages: [...]}}
+
+    Marks the strategy approved and generates each proposed_page using
+    LandingGenerator (for type='landing') or queues an article generation
+    (for type='article'). For articles we currently just register the
+    intent - the user runs gridar_generate_article on each title manually
+    to keep quota usage explicit.
+    """
+
+    def post(self, request, site_id, strategy_id):
+        site = self.get_user_site(request, site_id)
+        try:
+            strategy = KeywordStrategy.objects.get(site=site, id=int(strategy_id))
+        except (KeywordStrategy.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Strategy introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if strategy.status not in ('draft', 'approved'):
+            return Response(
+                {'error': f"Strategy deja en etat '{strategy.status}'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Optional customizations override the proposed_pages list
+        customizations = request.data.get('customizations') or {}
+        if isinstance(customizations.get('pages'), list):
+            pages = customizations['pages']
+            strategy.proposed_pages = pages
+        else:
+            pages = list(strategy.proposed_pages or [])
+
+        strategy.status = 'generating'
+        strategy.approved_at = timezone.now()
+        strategy.approved_by = request.user
+        strategy.save(update_fields=[
+            'proposed_pages', 'status', 'approved_at', 'approved_by', 'updated_at',
+        ])
+
+        generated_landings = []
+        generated_articles = []
+        errors = []
+
+        from .landing_generator import LandingGenerator, LandingGeneratorError
+
+        gen = LandingGenerator(site=site, language=strategy.language)
+
+        for page in pages:
+            try:
+                if page.get('type') == 'landing':
+                    payload = gen.generate(
+                        keyword=page.get('keyword') or strategy.keyword,
+                        page_subtype=page.get('page_subtype') or 'service',
+                    )
+                    # Override the slug if proposed_pages had a custom one
+                    if page.get('slug'):
+                        payload['slug'] = page['slug'][:200]
+                    # Dedup slug
+                    base_slug = payload['slug']
+                    n = 1
+                    while HostedLanding.objects.filter(
+                        site=site, slug=payload['slug']
+                    ).exists():
+                        n += 1
+                        payload['slug'] = f'{base_slug}-{n}'[:200]
+                    landing = HostedLanding.objects.create(site=site, **payload)
+                    generated_landings.append(landing.id)
+                else:
+                    # type='article' - we just register the intent in
+                    # generated_pages_fks so the UI can show it as "to do".
+                    # Actual article generation is left to gridar_generate_article
+                    # so quota usage stays explicit.
+                    generated_articles.append({
+                        'planned': True,
+                        'title': page.get('title'),
+                        'keyword': page.get('keyword'),
+                        'slug': page.get('slug'),
+                    })
+            except LandingGeneratorError as e:
+                errors.append({'page': page, 'error': str(e)})
+            except Exception as e:  # noqa: BLE001
+                logger.exception('Strategy approve - page failed')
+                errors.append({'page': page, 'error': str(e)[:120]})
+
+        strategy.generated_pages_fks = {
+            'landings': generated_landings,
+            'articles': generated_articles,
+        }
+        strategy.status = 'done' if not errors else 'approved'
+        strategy.save(update_fields=[
+            'generated_pages_fks', 'status', 'updated_at',
+        ])
+
+        return Response({
+            'id': strategy.id,
+            'status': strategy.status,
+            'generated_landings': generated_landings,
+            'planned_articles': generated_articles,
+            'errors': errors,
+        })
+
+
+class V1CreateLandingView(BaseV1View):
+    """POST /api/v1/sites/<id>/landings/manual/
+
+    Body: {title, h1, slug?, hero_subtitle?, value_props?, faq?, ...}
+
+    Manual (non-AI) landing creation. Mirrors V1ArticleCreateView for landings.
+    """
+
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        if not site.is_hosted:
+            return Response(
+                {'error': 'Landings are only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = request.data or {}
+        title = (data.get('title') or '').strip()
+        h1 = (data.get('h1') or title).strip()
+        if not title:
+            return Response({'error': 'title is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        from django.utils.text import slugify
+        slug = (data.get('slug') or slugify(title))[:200]
+        if HostedLanding.objects.filter(site=site, slug=slug).exists():
+            return Response(
+                {'error': f'Slug "{slug}" already exists on this site.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        language = (data.get('language') or site.default_language or 'fr')[:2]
+        status_val = (data.get('status') or 'draft').lower()
+        if status_val not in ('draft', 'published'):
+            status_val = 'draft'
+
+        from datetime import date as _date
+        landing = HostedLanding.objects.create(
+            site=site,
+            title=title[:200],
+            slug=slug,
+            h1=h1[:200],
+            hero_subtitle=(data.get('hero_subtitle') or '')[:500],
+            hero_cta_text=(data.get('hero_cta_text') or '')[:80],
+            hero_cta_url=(data.get('hero_cta_url') or '')[:500],
+            value_props=data.get('value_props') or [],
+            social_proof=data.get('social_proof') or [],
+            faq=data.get('faq') or [],
+            cta_bottom_text=(data.get('cta_bottom_text') or '')[:80],
+            cta_bottom_url=(data.get('cta_bottom_url') or '')[:500],
+            body_markdown=data.get('body_markdown') or '',
+            target_keyword=(data.get('target_keyword') or '')[:200],
+            schema_type=(data.get('schema_type') or 'WebPage')[:20],
+            page_subtype=(data.get('page_subtype') or 'generic')[:20],
+            language=language,
+            status=status_val,
+            cover_image=(data.get('cover_image') or '')[:500],
+            meta_description=(data.get('meta_description') or '')[:300],
+            published_at=_date.today() if status_val == 'published' else None,
+        )
+        return Response({
+            'id': landing.id,
+            'slug': landing.slug,
+            'status': landing.status,
+        }, status=status.HTTP_201_CREATED)
+
+
+class V1GenerateLandingView(BaseV1View):
+    """POST /api/v1/sites/<id>/landings/generate/
+
+    Body: {keyword, primary_cta_text?, primary_cta_url?, value_props?, page_subtype?}
+
+    AI-generates a landing payload via LandingGenerator and saves it as a draft.
+    Consumes one article from the user's monthly quota (landing == article unit).
+    """
+
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        if not site.is_hosted:
+            return Response(
+                {'error': 'AI landing generation is only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = request.data or {}
+        keyword = (data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Onboarding gate (same as V1GenerateView)
+        missing = []
+        if not (site.business_model or '').strip():
+            missing.append('business_model')
+        if missing:
+            return Response(
+                {'error': "Renseigne d'abord business_model dans les params du site.",
+                 'missing_fields': missing},
+                status=422,
+            )
+
+        # Quota
+        from .quota import check_article_quota, consume_article
+        try:
+            check_article_quota(request.user)
+        except exceptions.PermissionDenied as e:
+            return Response({'error': str(e), 'quota_exceeded': True},
+                            status=status.HTTP_402_PAYMENT_REQUIRED)
+
+        from .landing_generator import LandingGenerator, LandingGeneratorError
+        try:
+            gen = LandingGenerator(site=site, language=data.get('language'))
+            payload = gen.generate(
+                keyword=keyword,
+                primary_cta_text=data.get('primary_cta_text'),
+                primary_cta_url=data.get('primary_cta_url'),
+                value_props_seed=data.get('value_props'),
+                page_subtype=(data.get('page_subtype') or 'service'),
+            )
+        except LandingGeneratorError as e:
+            return Response({'error': str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:  # noqa: BLE001
+            logger.exception('V1GenerateLanding failed')
+            return Response({'error': f'Generation error: {str(e)[:120]}'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Dedup slug
+        base = payload['slug']
+        n = 1
+        while HostedLanding.objects.filter(site=site, slug=payload['slug']).exists():
+            n += 1
+            payload['slug'] = f'{base}-{n}'[:200]
+
+        landing = HostedLanding.objects.create(site=site, **payload)
+        consume_article(request.user)
+        return Response({
+            'id': landing.id,
+            'slug': landing.slug,
+            'title': landing.title,
+            'h1': landing.h1,
+            'status': landing.status,
+            'page_subtype': landing.page_subtype,
+        }, status=status.HTTP_201_CREATED)
+
+
+class V1LinkPagesView(BaseV1View):
+    """POST /api/v1/sites/<id>/link-pages/
+
+    Body: {source_slug, target_slug, anchor_text, source_type?, target_type?}
+
+    Inserts an inline markdown link from source page to target page. Both
+    pages can be landings OR articles. The source's body is patched in-place;
+    if the anchor is already present we no-op.
+
+    source_type / target_type default to 'auto' which checks landing first then article.
+    """
+
+    def post(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        if not site.is_hosted:
+            return Response(
+                {'error': 'link-pages is only available on hosted sites.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        data = request.data or {}
+        src = (data.get('source_slug') or '').strip()
+        tgt = (data.get('target_slug') or '').strip()
+        anchor = (data.get('anchor_text') or '').strip()
+        if not src or not tgt or not anchor:
+            return Response(
+                {'error': 'source_slug, target_slug, anchor_text required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if src == tgt:
+            return Response({'error': 'source and target must differ.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        def _find_page(slug):
+            landing = HostedLanding.objects.filter(site=site, slug=slug).first()
+            if landing:
+                return ('landing', landing)
+            post = HostedPost.objects.filter(site=site, slug=slug).first()
+            if post:
+                return ('article', post)
+            return (None, None)
+
+        src_kind, src_obj = _find_page(src)
+        tgt_kind, tgt_obj = _find_page(tgt)
+        if not src_obj:
+            return Response({'error': f'Source slug "{src}" not found.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        if not tgt_obj:
+            return Response({'error': f'Target slug "{tgt}" not found.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        # Build the link
+        if tgt_kind == 'landing':
+            target_url = f'/landings/{tgt_obj.slug}'
+        else:
+            target_url = f'/blog/{tgt_obj.slug}'
+        md_link = f'[{anchor}]({target_url})'
+
+        # Get source body field
+        if src_kind == 'landing':
+            body_field = 'body_markdown'
+        else:
+            body_field = 'content'
+        body = getattr(src_obj, body_field) or ''
+
+        if md_link in body or target_url in body:
+            return Response({
+                'status': 'already_linked',
+                'source_slug': src,
+                'target_slug': tgt,
+            })
+
+        # Replace first occurrence of `anchor` (case-insensitive, word-bounded)
+        pattern = re.compile(rf'\b({re.escape(anchor)})\b', re.IGNORECASE)
+        new_body, count = pattern.subn(md_link, body, count=1)
+        if count == 0:
+            # Anchor text not in body - append a "Voir aussi" line at the end
+            sep = '\n\n' if body else ''
+            new_body = body + f'{sep}Voir aussi: {md_link}'
+
+        setattr(src_obj, body_field, new_body)
+        src_obj.save(update_fields=[body_field, 'updated_at'])
+
+        return Response({
+            'status': 'linked',
+            'source_slug': src,
+            'source_type': src_kind,
+            'target_slug': tgt,
+            'target_type': tgt_kind,
+            'anchor_text': anchor,
+            'inserted_inline': count > 0,
+        })
+
+
+# --------------------------------------------------------------------------
+# Site SEO Score (composite) - P1 #7 (2026-06-08)
+# --------------------------------------------------------------------------
+
+# Weighted checks for the composite score. Weights sum to 100 so the score is
+# already in [0, 100] without extra normalization.
+_SEO_SCORE_WEIGHTS = {
+    'indexability':              15,
+    'author_bio_filled':         10,
+    'business_model_declared':   10,
+    'gsc_connected':             15,
+    'has_cluster':               10,
+    'hreflang_valid':            10,
+    'cwv_ok':                    10,
+    'faq_coverage':              10,
+    'no_transactional_blog':     10,
+}
+
+
+def _compute_site_seo_score(site) -> dict:
+    """Return {score, breakdown, action_items} for the given site.
+
+    Each check returns True/False (or a float in [0,1] for partial credit).
+    Weighted by `_SEO_SCORE_WEIGHTS`; final score in [0, 100].
+    """
+    from django.db.models import Count
+
+    breakdown: dict[str, float] = {}
+    action_items: list[dict] = []
+
+    # 1) Indexability: a site is "indexable" if it has at least one published
+    # post (else Google has nothing to crawl). We don't fetch robots.txt here -
+    # that's the job of the bulk audit. This is a content-presence proxy.
+    if site.is_hosted:
+        published_count = HostedPost.objects.filter(site=site, status='published').count()
+        total_count = HostedPost.objects.filter(site=site).count()
+    else:
+        # External sites: we trust the integration (we can't query them cheaply
+        # here without DB connection setup). Assume indexable if domain set.
+        published_count = 1 if site.domain else 0
+        total_count = published_count
+
+    indexable = published_count > 0
+    breakdown['indexability'] = bool(indexable)
+    if not indexable:
+        action_items.append({
+            'issue': 'Aucun article publie - Google n a rien a indexer.',
+            'fix_url': f'/sites/{site.id}/posts/new/',
+        })
+
+    # 2) Author bio filled (E-E-A-T signal)
+    author_ok = bool((site.author_bio or '').strip())
+    breakdown['author_bio_filled'] = author_ok
+    if not author_ok:
+        action_items.append({
+            'issue': 'Bio de l auteur vide - signal E-E-A-T manquant.',
+            'fix_url': f'/sites/{site.id}/settings/',
+        })
+
+    # 3) Business model declared (drives prompts; 'personal_blog' counts as
+    # unset because it's the default placeholder for hobby sites).
+    bm = (site.business_model or '').strip()
+    bm_ok = bool(bm and bm != 'personal_blog')
+    breakdown['business_model_declared'] = bm_ok
+    if not bm_ok:
+        action_items.append({
+            'issue': 'Modele d affaires non declare - generations IA seront generiques.',
+            'fix_url': f'/sites/{site.id}/settings/',
+        })
+
+    # 4) GSC connected
+    gsc_ok = bool(site.gsc_property_url and site.gsc_refresh_token)
+    breakdown['gsc_connected'] = gsc_ok
+    if not gsc_ok:
+        action_items.append({
+            'issue': 'Google Search Console non connecte - pas de mesure d impressions / clics.',
+            'fix_url': f'/sites/{site.id}/integrations/',
+        })
+
+    # 5) Has at least one approved/generated pillar+spokes cluster strategy.
+    has_cluster = KeywordStrategy.objects.filter(
+        site=site,
+        status__in=['approved', 'generating', 'done'],
+        proposed_structure__in=['pillar_cluster', 'pillar_spokes'],
+    ).exists()
+    breakdown['has_cluster'] = has_cluster
+    if not has_cluster:
+        action_items.append({
+            'issue': 'Aucun cluster pillar + spokes approuve - autorite topique faible.',
+            'fix_url': f'/sites/{site.id}/keyword-strategy/',
+        })
+
+    # 6) Hreflang valid if multilingual. Pass if site is monolingual (nothing
+    # to wire) OR if at least one translation_group has posts in >=2 languages.
+    languages = site.effective_languages or [site.default_language or 'fr']
+    is_multilingual = len(set(languages)) > 1
+    if not is_multilingual:
+        hreflang_ok = True
+    elif site.is_hosted:
+        groups = (
+            HostedPost.objects.filter(site=site, status='published')
+            .values('translation_group')
+            .annotate(lang_count=Count('language', distinct=True))
+            .filter(lang_count__gte=2)
+        )
+        hreflang_ok = groups.exists()
+    else:
+        # External sites: we can't check cheaply. Assume valid unless proven
+        # otherwise by the dedicated hreflang-check tool.
+        hreflang_ok = True
+    breakdown['hreflang_valid'] = hreflang_ok
+    if not hreflang_ok:
+        action_items.append({
+            'issue': 'Site multilingue sans hreflang - cannibalisation cross-langue probable.',
+            'fix_url': f'/sites/{site.id}/site-audit/',
+        })
+
+    # 7) Core Web Vitals OK. We don't run PageSpeed here (too slow / quota);
+    # instead we check whether the latest cached bulk audit recorded a CWV
+    # pass. Best-effort: if no audit data exists yet, mark as 'unknown' and
+    # neither pass nor fail (0.5 partial credit).
+    from django.core.cache import cache as _cache
+    audit_cached = _cache.get(f'site-audit:{site.id}')
+    if audit_cached and isinstance(audit_cached, dict):
+        ps = audit_cached.get('pagespeed') or {}
+        perf = ps.get('performance')
+        if perf is None:
+            cwv_value: float = 0.5
+        else:
+            cwv_value = 1.0 if perf >= 70 else 0.0
+    else:
+        cwv_value = 0.5  # unknown - partial credit so we don't penalize new sites
+    breakdown['cwv_ok'] = cwv_value
+    if cwv_value < 1.0:
+        action_items.append({
+            'issue': 'Core Web Vitals non valides ou non mesures - lancer un audit PageSpeed.',
+            'fix_url': f'/sites/{site.id}/site-audit/',
+        })
+
+    # 8) FAQ coverage: % of published posts with FAQ schema in schema_jsonld.
+    if site.is_hosted and total_count > 0:
+        with_faq = HostedPost.objects.filter(
+            site=site, schema_jsonld__has_key='@type',
+        ).count()
+        faq_ratio = with_faq / max(1, total_count)
+    else:
+        faq_ratio = 0.0
+    breakdown['faq_coverage'] = round(faq_ratio, 3)
+    if faq_ratio < 0.5:
+        action_items.append({
+            'issue': (
+                f'Couverture FAQ schema faible ({int(faq_ratio * 100)}%). '
+                'Ajouter une section FAQ aux articles boost les featured snippets.'
+            ),
+            'fix_url': f'/sites/{site.id}/posts/',
+        })
+
+    # 9) No transactional intent on blog posts. If the user tracks keywords
+    # whose intent is "transactional" but no landing exists (only blog posts),
+    # they're competing with their own commercial pages.
+    transactional_strategies = KeywordStrategy.objects.filter(
+        site=site, intent='transactional', status__in=['draft', 'approved', 'generating', 'done'],
+    )
+    bad_transactional = transactional_strategies.filter(
+        proposed_structure='blog_post',
+    ).count()
+    no_trans_blog_ok = bad_transactional == 0
+    breakdown['no_transactional_blog'] = no_trans_blog_ok
+    if not no_trans_blog_ok:
+        action_items.append({
+            'issue': (
+                f'{bad_transactional} mot-cle(s) transactionnel(s) classe(s) comme '
+                'blog post - devraient etre des landings.'
+            ),
+            'fix_url': f'/sites/{site.id}/keyword-strategy/',
+        })
+
+    # Compute weighted score.
+    total_weight = sum(_SEO_SCORE_WEIGHTS.values())
+    weighted_sum = 0.0
+    for check, weight in _SEO_SCORE_WEIGHTS.items():
+        val = breakdown.get(check, 0)
+        if isinstance(val, bool):
+            val = 1.0 if val else 0.0
+        else:
+            try:
+                val = float(val)
+            except (TypeError, ValueError):
+                val = 0.0
+            val = max(0.0, min(1.0, val))
+        weighted_sum += val * weight
+    score = int(round(weighted_sum / total_weight * 100))
+
+    return {
+        'score': score,
+        'breakdown': breakdown,
+        'action_items': action_items,
+    }
+
+
+class V1SiteSeoScoreView(BaseV1View):
+    """GET /api/v1/sites/<id>/seo-score/
+
+    Returns a composite SEO score (0-100) computed from 9 weighted checks:
+    indexability, author bio, business model, GSC connection, pillar+spokes
+    cluster, hreflang validity (if multilingual), Core Web Vitals, FAQ
+    schema coverage, no transactional intent stuck on blog posts.
+
+    Response: {score, breakdown: {...}, action_items: [{issue, fix_url}]}
+    """
+
+    def get(self, request, site_id):
+        site = self.get_user_site(request, site_id)
+        return Response(_compute_site_seo_score(site))
+
+
+# --------------------------------------------------------------------------
+# AI Overview Readiness - P1 #6 (2026-06-08)
+# --------------------------------------------------------------------------
+#
+# Scores how well-suited a single article is for being picked as the source
+# block of Google's AI Overview (SGE), Bing Copilot answers, Perplexity
+# citations and ChatGPT browse answers. The five sub-checks lean on
+# established AI-Overview research signals:
+#   - faq_density: explicit Q&A blocks (LLMs love direct questions)
+#   - h2_h3_structure: extractible sectioning
+#   - eeat_signals: author bio + sources/dates in the body
+#   - concrete_data: numbers, dates, percentages, units
+#   - extractible_quotes: short paragraphs right after a heading (snippet
+#     candidates - the kind of block LLMs love to lift verbatim)
+
+_AIO_QUESTION_RE = re.compile(r'[^.?!\n]*\?\s', re.UNICODE)
+_AIO_H2_RE = re.compile(r'^##\s+\S', re.MULTILINE)
+_AIO_H3_RE = re.compile(r'^###\s+\S', re.MULTILINE)
+_AIO_NUMBER_RE = re.compile(
+    r'\b\d{1,4}([.,]\d+)?\s*(%|\$|EUR|USD|CAD|kg|km|m|cm|mm|g|ml|l|'
+    r'h|hr|min|sec|annee|annees|ans|jours|mois|semaines)?\b',
+    re.IGNORECASE,
+)
+_AIO_DATE_RE = re.compile(
+    r'\b(20\d{2}|19\d{2}|janvier|fevrier|mars|avril|mai|juin|juillet|'
+    r'aout|septembre|octobre|novembre|decembre|january|february|march|'
+    r'april|may|june|july|august|september|october|november|december|'
+    r'\d{1,2}/\d{1,2}/\d{2,4})\b',
+    re.IGNORECASE,
+)
+_AIO_SOURCE_RE = re.compile(
+    r'\b(source|sources|reference|references|selon|according to|cite|'
+    r'cited|etude|study|recherche|research|rapport|report|d apres|'
+    r'd\'apres)\b',
+    re.IGNORECASE,
+)
+
+
+def _compute_ai_overview_readiness(site, article: dict) -> dict:
+    """Score how AI-Overview-ready an article is.
+
+    Args:
+        site: Site object (for E-E-A-T author_bio signal).
+        article: dict with at least {title, content} keys. Optional: excerpt.
+
+    Returns: {score: 0-100, breakdown: {...}, suggestions: [str, ...]}
+    """
+    title = (article.get('title') or '').strip()
+    content = (article.get('content') or '').strip()
+    words = re.findall(r"\b\w+\b", content)
+    word_count = len(words)
+
+    # --- 1) FAQ density ----------------------------------------------------
+    # nb_questions / max(1, word_count // 200). >=1.0 = ~1 question per 200
+    # words which is solid for FAQ-rich Q&A pages. Cap at 1.0 for scoring.
+    questions = _AIO_QUESTION_RE.findall(content)
+    nb_questions = len(questions)
+    denom = max(1, word_count // 200)
+    faq_density_raw = nb_questions / denom
+    faq_density_score = min(1.0, faq_density_raw)
+
+    # --- 2) H2/H3 structure -----------------------------------------------
+    nb_h2 = len(_AIO_H2_RE.findall(content))
+    nb_h3 = len(_AIO_H3_RE.findall(content))
+    nb_headings = nb_h2 + nb_h3
+    has_good_structure = nb_headings > 5
+    # Partial credit: 0.5 for 3-5 headings, 1.0 for >5, 0.0 for <3
+    if nb_headings > 5:
+        structure_score = 1.0
+    elif nb_headings >= 3:
+        structure_score = 0.5
+    else:
+        structure_score = 0.0
+
+    # --- 3) E-E-A-T signals -----------------------------------------------
+    has_author_bio = bool((getattr(site, 'author_bio', '') or '').strip())
+    has_sources_or_dates = bool(
+        _AIO_SOURCE_RE.search(content) or _AIO_DATE_RE.search(content)
+    )
+    eeat_count = int(has_author_bio) + int(has_sources_or_dates)
+    eeat_score = eeat_count / 2.0  # 0, 0.5 or 1.0
+
+    # --- 4) Concrete data --------------------------------------------------
+    # Density of numeric / date tokens. We expect at least 1 every 250 words
+    # for a data-rich article. Cap at 1.0.
+    numbers = _AIO_NUMBER_RE.findall(content)
+    dates = _AIO_DATE_RE.findall(content)
+    nb_data_tokens = len(numbers) + len(dates)
+    data_denom = max(1, word_count // 250)
+    data_density_raw = nb_data_tokens / data_denom
+    data_score = min(1.0, data_density_raw)
+
+    # --- 5) Extractible quotes ---------------------------------------------
+    # Short paragraphs (< 250 chars) directly after a "## " heading - prime
+    # snippet material for AI-Overview lifts.
+    lines = content.split('\n')
+    extractible_count = 0
+    nb_h2_seen = 0
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith('## ') and not line.startswith('### '):
+            nb_h2_seen += 1
+            # Look at the next non-empty paragraph
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines):
+                # Collect the next paragraph (until blank line)
+                para_lines = []
+                while j < len(lines) and lines[j].strip():
+                    para_lines.append(lines[j])
+                    j += 1
+                para = ' '.join(para_lines).strip()
+                # Skip headings as "paragraphs"
+                if para and not para.startswith('#') and len(para) < 250:
+                    extractible_count += 1
+            i = j
+        else:
+            i += 1
+    # Score: ratio of H2 sections that have an extractible lead paragraph.
+    if nb_h2_seen > 0:
+        quotes_score = min(1.0, extractible_count / nb_h2_seen)
+    else:
+        quotes_score = 0.0
+
+    # --- Weighted score ---------------------------------------------------
+    score_float = (
+        faq_density_score * 0.25
+        + structure_score * 0.20
+        + eeat_score * 0.20
+        + data_score * 0.20
+        + quotes_score * 0.15
+    ) * 100
+    score = int(round(score_float))
+
+    breakdown = {
+        'faq_density': round(faq_density_score, 3),
+        'h2_h3_structure': bool(has_good_structure),
+        'eeat_signals': eeat_count,
+        'concrete_data': round(data_score, 3),
+        'extractible_quotes': extractible_count,
+    }
+
+    # --- Suggestions -------------------------------------------------------
+    suggestions: list[str] = []
+    if faq_density_score < 0.5:
+        suggestions.append(
+            f"Ajouter une section FAQ : actuellement {nb_questions} question(s) "
+            f"pour {word_count} mots. Vise 1 question tous les 200 mots."
+        )
+    if not has_good_structure:
+        suggestions.append(
+            f"Renforcer la structure : seulement {nb_headings} en-tetes "
+            "H2/H3 detectes. Cible >5 pour faciliter l extraction AI Overview."
+        )
+    if not has_author_bio:
+        suggestions.append(
+            "Remplir la bio de l auteur dans les parametres du site (signal "
+            "E-E-A-T attendu par Google SGE)."
+        )
+    if not has_sources_or_dates:
+        suggestions.append(
+            "Ajouter des sources, dates ou references dans le contenu "
+            "(mots-cles : 'selon', 'source', 'etude', annees 20xx)."
+        )
+    if data_score < 0.5:
+        suggestions.append(
+            f"Inclure plus de donnees chiffrees : seulement {nb_data_tokens} "
+            "nombres/dates detectes. Les LLM citent les chiffres concrets."
+        )
+    if quotes_score < 0.5 and nb_h2_seen > 0:
+        suggestions.append(
+            f"Ajouter une phrase de resume (<250 chars) directement sous chaque "
+            f"## : {extractible_count}/{nb_h2_seen} sections en ont une. "
+            "C est le format prefere des AI Overviews."
+        )
+    if not suggestions:
+        suggestions.append(
+            "Tres bonne base AI Overview-ready. Continue a monitorer "
+            "la qualite des sources et la fraicheur des donnees."
+        )
+
+    return {
+        'score': score,
+        'breakdown': breakdown,
+        'suggestions': suggestions,
+    }
+
+
+def _fetch_article_for_readiness(site, slug: str) -> dict | None:
+    """Look up an article in any storage mode (hosted, external, CMS) and
+    return a {title, content, excerpt} dict, or None if not found.
+
+    Mirrors the dispatch logic in V1ArticleDetailView - we keep it local
+    so the JWT view can reuse it without going through the v1 endpoint.
+    """
+    if site.is_wordpress:
+        from .wordpress_adapter import WordPressClient, WordPressError
+        try:
+            post = WordPressClient(site).get_post(slug)
+        except WordPressError:
+            return None
+        if not post:
+            return None
+        return {
+            'title': post.get('title', ''),
+            'content': post.get('content', ''),
+            'excerpt': post.get('excerpt', ''),
+        }
+    if site.is_shopify:
+        from .shopify_adapter import ShopifyClient, ShopifyError
+        try:
+            post = ShopifyClient(site).get_post(slug)
+        except ShopifyError:
+            return None
+        if not post:
+            return None
+        return {
+            'title': post.get('title', ''),
+            'content': post.get('content', ''),
+            'excerpt': post.get('excerpt', ''),
+        }
+    if site.is_webflow:
+        from .webflow_adapter import WebflowClient, WebflowError
+        try:
+            post = WebflowClient(site).get_post(slug)
+        except WebflowError:
+            return None
+        if not post:
+            return None
+        return {
+            'title': post.get('title', ''),
+            'content': post.get('content', ''),
+            'excerpt': post.get('excerpt', ''),
+        }
+    if site.is_hosted:
+        try:
+            p = HostedPost.objects.get(site=site, slug=slug)
+        except HostedPost.DoesNotExist:
+            return None
+        return {'title': p.title, 'content': p.content, 'excerpt': p.excerpt}
+    from .db_utils import ensure_site_connection
+    alias = ensure_site_connection(site)
+    try:
+        p = BlogPost.objects.using(alias).get(slug=slug)
+    except BlogPost.DoesNotExist:
+        return None
+    return {
+        'title': p.title,
+        'content': getattr(p, 'content', ''),
+        'excerpt': getattr(p, 'excerpt', ''),
+    }
+
+
+class V1AIOverviewReadinessView(BaseV1View):
+    """GET /api/v1/sites/<id>/articles/<slug>/ai-overview-readiness/
+
+    Score how AI-Overview-ready an article is. 0-100 composite from 5
+    weighted checks: FAQ density (25%), H2/H3 structure (20%), E-E-A-T
+    signals (20%), concrete data (20%), extractible quotes (15%).
+
+    Response: {score: int, breakdown: {...}, suggestions: [str]}
+    """
+
+    def get(self, request, site_id, slug):
+        site = self.get_user_site(request, site_id)
+        article = _fetch_article_for_readiness(site, slug)
+        if not article:
+            return Response({'error': 'Article introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(_compute_ai_overview_readiness(site, article))
+
+
+# --------------------------------------------------------------------------
+# Renderability check - P1 #9 (2026-06-08)
+# --------------------------------------------------------------------------
+#
+# Quick "is this page server-rendered or client-rendered (SPA)?" probe.
+# Googlebot can render JS but it's slow + flaky; SSR / prerender is still
+# the gold standard for SEO. We fetch the raw HTML once and check whether
+# the <body> contains a meaningful chunk of text (>100 words). If not,
+# the page is most likely a JS-heavy SPA shell that needs prerendering
+# (Next.js SSG/SSR, Nuxt, Astro, prerender.io, etc.).
+#
+# We deliberately avoid Playwright/headless Chromium here - that would
+# require shipping a 300MB browser in the Railway container. Static HTML
+# fetch is enough to catch the worst offenders (Vite/CRA/Vue SPAs that
+# return `<div id="root"></div>` and nothing else).
+
+_HTML_TAG_RE = re.compile(r'<[^>]+>')
+_SCRIPT_STYLE_RE = re.compile(
+    r'<(script|style|noscript)[^>]*>.*?</\1>',
+    re.IGNORECASE | re.DOTALL,
+)
+_BODY_RE = re.compile(r'<body[^>]*>(.*?)</body>', re.IGNORECASE | re.DOTALL)
+_WHITESPACE_RE = re.compile(r'\s+')
+
+
+def _extract_body_text(html: str) -> str:
+    """Strip <script>/<style>/<noscript>, then HTML tags, from inside <body>.
+
+    Falls back to the whole document if no <body> tag is found (some
+    minified pages drop the explicit tag). Returns plain text whitespace-
+    normalized.
+    """
+    if not html:
+        return ''
+    match = _BODY_RE.search(html)
+    body = match.group(1) if match else html
+    # Remove script/style/noscript blocks first - their text doesn't count.
+    cleaned = _SCRIPT_STYLE_RE.sub(' ', body)
+    # Then strip every remaining HTML tag.
+    text = _HTML_TAG_RE.sub(' ', cleaned)
+    # Normalize whitespace.
+    return _WHITESPACE_RE.sub(' ', text).strip()
+
+
+def _check_renderability(url: str) -> dict:
+    """Fetch `url` and decide whether the static HTML already contains
+    meaningful body text (>100 words) or whether the page looks like an
+    unprerendered SPA shell.
+
+    Returns the response dict directly (no Django Response wrapper) so
+    both the v1 endpoint and the JWT view can reuse it.
+    """
+    out = {
+        'url': url,
+        'is_prerendered': False,
+        'html_contains_main_text': False,
+        'word_count': 0,
+        'warning': '',
+        'suggestion': '',
+    }
+
+    try:
+        resp = requests.get(
+            url,
+            timeout=10,
+            headers={
+                # Pretend to be Googlebot-ish so servers that gate prerender
+                # on UA still serve us the SEO version.
+                'User-Agent': (
+                    'Mozilla/5.0 (compatible; Googlebot/2.1; '
+                    '+http://www.google.com/bot.html)'
+                ),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            },
+            allow_redirects=True,
+        )
+    except requests.exceptions.Timeout:
+        out['warning'] = 'Timeout > 10s en recuperant la page.'
+        out['suggestion'] = (
+            'Le serveur ne repond pas assez vite. Verifier la performance '
+            'du backend ou tester avec une URL plus rapide.'
+        )
+        return out
+    except requests.exceptions.RequestException as exc:
+        out['warning'] = f'Erreur reseau: {str(exc)[:120]}'
+        out['suggestion'] = (
+            'Verifier que l URL est accessible publiquement et qu il n y a '
+            'pas de redirection cassee, de SSL invalide ou de pare-feu.'
+        )
+        return out
+
+    if resp.status_code >= 400:
+        out['warning'] = f'HTTP {resp.status_code} renvoye par la page.'
+        out['suggestion'] = (
+            'La page retourne une erreur HTTP. Googlebot ne pourra pas '
+            'l indexer tant que ce code ne sera pas 200.'
+        )
+        return out
+
+    html = resp.text or ''
+    body_text = _extract_body_text(html)
+    words = body_text.split()
+    word_count = len(words)
+    out['word_count'] = word_count
+
+    if word_count > 100:
+        out['is_prerendered'] = True
+        out['html_contains_main_text'] = True
+        out['warning'] = ''
+        out['suggestion'] = (
+            f'OK: la page contient {word_count} mots de texte visible des le '
+            'premier HTML. Googlebot peut l indexer sans dependre du JS.'
+        )
+        return out
+
+    # Suspect: SPA shell or content gated behind JS.
+    out['is_prerendered'] = False
+    out['html_contains_main_text'] = False
+    out['warning'] = (
+        f'Seulement {word_count} mots de texte detectes dans le HTML brut. '
+        'La page semble etre une SPA non-prerenderisee - Google doit '
+        'executer le JS pour voir le contenu, ce qui ralentit l indexation '
+        'et peut faire perdre du ranking.'
+    )
+    out['suggestion'] = (
+        'Activer le prerendering ou le SSR: Next.js (getStaticProps / '
+        'getServerSideProps), Nuxt, Astro, Vite SSG, ou un service externe '
+        'comme prerender.io / Rendertron. Verifier ensuite que le HTML '
+        'retourne sans JS contient bien les titres et le contenu principal.'
+    )
+    return out
+
+
+class V1CheckRenderabilityView(BaseV1View):
+    """POST /api/v1/check-renderability/ {url}
+
+    Fetches the URL and inspects whether the raw HTML response contains
+    enough body text (>100 words) to be considered server-rendered. Used
+    to warn users whose sites ship as JS-heavy SPAs (which Googlebot can
+    render but indexes more slowly and less reliably).
+
+    Response:
+        {
+            url: str,
+            is_prerendered: bool,
+            html_contains_main_text: bool,
+            word_count: int,
+            warning: str,
+            suggestion: str,
+        }
+    """
+
+    def post(self, request):
+        url = (request.data.get('url') or '').strip()
+        if not url:
+            return Response({'error': 'url is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not (url.startswith('http://') or url.startswith('https://')):
+            return Response(
+                {'error': 'url must start with http:// or https://.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(_check_renderability(url))
+
+
+# ---------------------------------------------------------------------------
+# Link Opportunities (P2 #11, 2026-06-08)
+# ---------------------------------------------------------------------------
+
+
+# Domains we never want to surface as link targets (social, marketplaces,
+# generic giants - cold outreach there is hopeless).
+_LINK_OPPORTUNITY_BLOCKLIST = {
+    'youtube.com', 'youtu.be', 'facebook.com', 'instagram.com', 'twitter.com',
+    'x.com', 'linkedin.com', 'pinterest.com', 'tiktok.com', 'reddit.com',
+    'quora.com', 'wikipedia.org', 'amazon.com', 'amazon.ca', 'amazon.fr',
+    'ebay.com', 'aliexpress.com', 'shopify.com', 'medium.com', 'github.com',
+    'stackoverflow.com', 'apple.com', 'google.com', 'microsoft.com',
+}
+
+# Country/language top-level domains used to bias filtering.
+_LANG_TLDS = {
+    'fr': {'.fr', '.ca', '.be', '.ch', '.lu', '.qc.ca'},
+    'en': {'.com', '.co.uk', '.uk', '.us', '.ca', '.au', '.nz', '.ie'},
+    'es': {'.es', '.mx', '.ar', '.co', '.cl', '.pe'},
+}
+
+
+def _extract_root_domain(url: str) -> str:
+    """Pull the registrable domain from a URL. Best-effort, no PSL."""
+    if not url:
+        return ''
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower()
+        if host.startswith('www.'):
+            host = host[4:]
+        return host
+    except Exception:
+        return ''
+
+
+def _is_blocklisted(domain: str) -> bool:
+    if not domain:
+        return True
+    for blocked in _LINK_OPPORTUNITY_BLOCKLIST:
+        if domain == blocked or domain.endswith('.' + blocked):
+            return True
+    return False
+
+
+def _matches_language(url: str, language: str) -> bool:
+    """Loose language filter: TLD match OR no obvious cross-language signal.
+
+    We accept by default rather than reject - Serper's hl/gl already biases
+    the results to the right locale, so we only need to drop obvious misses.
+    """
+    if language not in _LANG_TLDS:
+        return True
+    domain = _extract_root_domain(url)
+    if not domain:
+        return False
+    # If it ends with one of the language's TLDs, accept.
+    for tld in _LANG_TLDS[language]:
+        if domain.endswith(tld):
+            return True
+    # Accept .org/.net/.io regardless - they're language-neutral and Serper
+    # already filtered by hl/gl.
+    for neutral in ('.org', '.net', '.io', '.info', '.app', '.blog'):
+        if domain.endswith(neutral):
+            return True
+    return False
+
+
+def _serper_organic(query: str, hl: str, gl: str, num: int = 10) -> list:
+    """Run one Serper organic search. Returns [] on any failure."""
+    api_key = os.environ.get('SERPER_API_KEY')
+    if not api_key:
+        return []
+    try:
+        resp = requests.post(
+            'https://google.serper.dev/search',
+            headers={'X-API-KEY': api_key, 'Content-Type': 'application/json'},
+            json={'q': query, 'num': num, 'hl': hl, 'gl': gl},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return []
+        return (resp.json() or {}).get('organic', []) or []
+    except Exception as exc:
+        logger.warning('Serper link-opportunity query failed: %s', exc)
+        return []
+
+
+class V1LinkOpportunitiesView(BaseV1View):
+    """POST /api/v1/link-opportunities/ {keyword, language?}
+
+    Surface candidate sites for backlink outreach by querying Serper for
+    "best <keyword> sites" + "ressources <keyword>" (FR) or "resources
+    <keyword>" (EN/ES) and de-duplicating the SERP results by domain.
+
+    Returns {targets: [{domain, url, title, snippet, source_query}], count}.
+    """
+
+    def post(self, request):
+        keyword = (request.data.get('keyword') or '').strip()
+        if not keyword:
+            return Response({'error': 'keyword is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        language = (request.data.get('language') or 'fr').strip().lower()[:2]
+
+        if not os.environ.get('SERPER_API_KEY'):
+            return Response(
+                {'error': 'SERPER_API_KEY non configuree.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if language == 'en':
+            hl, gl = 'en', 'us'
+            queries = [
+                f'best {keyword} sites',
+                f'top {keyword} blogs',
+                f'{keyword} resources',
+            ]
+        elif language == 'es':
+            hl, gl = 'es', 'es'
+            queries = [
+                f'mejores sitios de {keyword}',
+                f'recursos {keyword}',
+                f'blogs sobre {keyword}',
+            ]
+        else:
+            hl, gl = 'fr', 'ca'
+            queries = [
+                f'meilleurs sites {keyword}',
+                f'ressources {keyword}',
+                f'blogs sur {keyword}',
+            ]
+
+        seen_domains: set[str] = set()
+        targets: list[dict] = []
+
+        for q in queries:
+            organic = _serper_organic(q, hl=hl, gl=gl, num=10)
+            for item in organic:
+                url = (item.get('link') or '').strip()
+                if not url:
+                    continue
+                domain = _extract_root_domain(url)
+                if not domain or domain in seen_domains:
+                    continue
+                if _is_blocklisted(domain):
+                    continue
+                if not _matches_language(url, language):
+                    continue
+                seen_domains.add(domain)
+                targets.append({
+                    'domain': domain,
+                    'url': url,
+                    'title': item.get('title') or '',
+                    'snippet': item.get('snippet') or '',
+                    'source_query': q,
+                })
+                if len(targets) >= 20:
+                    break
+            if len(targets) >= 20:
+                break
+
+        return Response({
+            'keyword': keyword,
+            'language': language,
+            'targets': targets,
+            'count': len(targets),
+        })

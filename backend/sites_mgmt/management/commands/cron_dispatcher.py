@@ -82,14 +82,30 @@ class Command(BaseCommand):
             + ', '.join(name for name, _ in jobs)
         )
 
+        ok_count = 0
+        fail_count = 0
         for name, cadence in jobs:
             if dry:
-                self.stdout.write(f'  [dry-run] would run: {name} ({cadence})')
+                self.stdout.write(f'  [dry-ok] would run: {name} ({cadence})')
+                ok_count += 1
                 continue
+            self.stdout.write(self.style.SUCCESS(f'  --> {name} ({cadence})'))
             try:
-                self.stdout.write(self.style.SUCCESS(f'  --> {name} ({cadence})'))
                 call_command(name)
+                ok_count += 1
+                self.stdout.write(self.style.SUCCESS(f'  [ok] {name}'))
             except Exception as e:
-                # Don't let one job kill the others - log and keep going.
+                fail_count += 1
                 logger.exception('cron_dispatcher: %s failed', name)
-                self.stderr.write(self.style.ERROR(f'  [err] {name}: {type(e).__name__}: {e}'))
+                self.stdout.write(self.style.ERROR(
+                    f'  [err] {name}: {type(e).__name__}: {e}'
+                ))
+                self.stderr.write(self.style.ERROR(
+                    f'  [err] {name}: {type(e).__name__}: {e}'
+                ))
+
+        self.stdout.write(
+            f'[{timezone.now().isoformat()}] summary: '
+            f'ok={ok_count} fail={fail_count} total={len(jobs)}'
+            + (' (dry-run)' if dry else '')
+        )

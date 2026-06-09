@@ -36,6 +36,15 @@ export type BlogPost = {
   published_at: string;
   category?: string | null;
   category_slug?: string | null;
+  // Auto-computed FAQPage JSON-LD (schema.org). Set by the backend on save()
+  // when the markdown content contains a "## FAQ" block. Empty object means
+  // "no FAQ on this post" - the renderer should skip the <script> injection.
+  schema_jsonld?: Record<string, unknown>;
+  // Hreflang alternates: every published sibling in the same translation_group,
+  // INCLUDING the current article. The frontend injects them as
+  // <link rel="alternate" hreflang="X" href="Y"> in <head>. URLs are relative
+  // (`/blog/<slug>`) - origin is resolved client-side.
+  hreflang_alternates?: { lang: string; url: string }[];
 };
 
 type ListResponse = {

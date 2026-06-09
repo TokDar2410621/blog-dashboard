@@ -54,7 +54,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.4.2",
+    "User-Agent": "@gridar/mcp-server/0.5.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 
@@ -154,6 +154,24 @@ export async function generateArticle(
 ) {
   return request<{ output: string; post_count: number }>(
     `/sites/${siteId}/generate/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function generateSisterArticle(
+  siteId: number,
+  sourceSlug: string,
+  body: { target_language: "fr" | "en" | "es" },
+) {
+  return request<{
+    slug: string;
+    id: number;
+    language: string;
+    translation_group: string;
+    status: string;
+    title: string;
+  }>(
+    `/sites/${siteId}/articles/${encodeURIComponent(sourceSlug)}/generate-sister-article/`,
     { method: "POST", body: JSON.stringify(body) },
   );
 }
@@ -459,6 +477,208 @@ export async function peopleAlsoAsk(body: {
   language?: "fr" | "en" | "es";
 }) {
   return request<Record<string, unknown>>(`/paa/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Topic Cluster Planner (0.5.0)
+// ---------------------------------------------------------------------------
+
+export async function classifyIntent(body: {
+  keyword: string;
+  site_id?: number;
+}) {
+  return request<{
+    keyword: string;
+    intent: "transactional" | "commercial" | "informational" | "navigational" | "local";
+    confidence: number;
+    navigational_match: boolean;
+  }>(`/classify-intent/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function proposeKeywordStrategy(
+  siteId: number,
+  body: { keyword: string; language?: "fr" | "en" | "es" },
+) {
+  return request<{
+    id: number;
+    site_id: number;
+    keyword: string;
+    intent: string;
+    intent_confidence: number;
+    proposed_structure: string;
+    proposed_pages: unknown[];
+    rationale: string;
+    status: string;
+    created: boolean;
+  }>(`/sites/${siteId}/keyword-strategy/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function approveStrategy(
+  siteId: number,
+  strategyId: number,
+  body: { customizations?: Record<string, unknown> } = {},
+) {
+  return request<{
+    id: number;
+    status: string;
+    generated_landings: number[];
+    planned_articles: unknown[];
+    errors: unknown[];
+  }>(`/sites/${siteId}/keyword-strategy/${strategyId}/approve/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createLanding(
+  siteId: number,
+  body: {
+    title: string;
+    h1?: string;
+    slug?: string;
+    hero_subtitle?: string;
+    hero_cta_text?: string;
+    hero_cta_url?: string;
+    value_props?: unknown[];
+    social_proof?: unknown[];
+    faq?: unknown[];
+    cta_bottom_text?: string;
+    cta_bottom_url?: string;
+    body_markdown?: string;
+    target_keyword?: string;
+    schema_type?: string;
+    page_subtype?: string;
+    language?: "fr" | "en" | "es";
+    status?: "draft" | "published";
+    cover_image?: string;
+    meta_description?: string;
+  },
+) {
+  return request<{ id: number; slug: string; status: string }>(
+    `/sites/${siteId}/landings/manual/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export async function generateLanding(
+  siteId: number,
+  body: {
+    keyword: string;
+    primary_cta_text?: string;
+    primary_cta_url?: string;
+    value_props?: unknown[];
+    page_subtype?: "service" | "product" | "pillar" | "comparison" | "local";
+    language?: "fr" | "en" | "es";
+  },
+) {
+  return request<{
+    id: number;
+    slug: string;
+    title: string;
+    h1: string;
+    status: string;
+    page_subtype: string;
+  }>(`/sites/${siteId}/landings/generate/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function linkPages(
+  siteId: number,
+  body: {
+    source_slug: string;
+    target_slug: string;
+    anchor_text: string;
+  },
+) {
+  return request<{
+    status: string;
+    source_slug: string;
+    source_type?: string;
+    target_slug: string;
+    target_type?: string;
+    anchor_text?: string;
+    inserted_inline?: boolean;
+  }>(`/sites/${siteId}/link-pages/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function siteSeoScore(siteId: number) {
+  return request<{
+    score: number;
+    breakdown: {
+      indexability: boolean;
+      author_bio_filled: boolean;
+      business_model_declared: boolean;
+      gsc_connected: boolean;
+      has_cluster: boolean;
+      hreflang_valid: boolean;
+      cwv_ok: number | boolean;
+      faq_coverage: number;
+      no_transactional_blog: boolean;
+    };
+    action_items: { issue: string; fix_url: string }[];
+  }>(`/sites/${siteId}/seo-score/`);
+}
+
+export async function aiOverviewReadiness(siteId: number, slug: string) {
+  return request<{
+    score: number;
+    breakdown: {
+      faq_density: number;
+      h2_h3_structure: boolean;
+      eeat_signals: number;
+      concrete_data: number;
+      extractible_quotes: number;
+    };
+    suggestions: string[];
+  }>(
+    `/sites/${siteId}/articles/${encodeURIComponent(slug)}/ai-overview-readiness/`,
+  );
+}
+
+export async function checkRenderability(body: { url: string }) {
+  return request<{
+    url: string;
+    is_prerendered: boolean;
+    html_contains_main_text: boolean;
+    word_count: number;
+    warning: string;
+    suggestion: string;
+  }>(`/check-renderability/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function linkOpportunities(body: {
+  keyword: string;
+  language?: "fr" | "en" | "es";
+}) {
+  return request<{
+    keyword: string;
+    language: string;
+    targets: {
+      domain: string;
+      url: string;
+      title: string;
+      snippet: string;
+      source_query: string;
+    }[];
+    count: number;
+  }>(`/link-opportunities/`, {
     method: "POST",
     body: JSON.stringify(body),
   });

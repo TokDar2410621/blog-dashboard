@@ -231,6 +231,25 @@ def _serialize_hosted_post(post, detail=True):
         base['content'] = post.content
         base['memory_chunks_used'] = post.memory_chunks_used or []
         base['feedback_rating'] = post.feedback_rating
+        # FAQPage JSON-LD computed on save() from the markdown "## FAQ" block.
+        # The frontend (BlogPost.tsx) injects it in <head> when non-empty.
+        base['schema_jsonld'] = post.schema_jsonld or {}
+        # Hreflang alternates: any sibling HostedPost sharing the same
+        # translation_group (other languages), including the current one. The
+        # frontend injects `<link rel="alternate" hreflang="X" href="Y">` in
+        # <head> so Google can cluster the multi-lingual versions. We return
+        # only `lang` + `url` here because the frontend reuses the same
+        # `/blog/<slug>` route prefix; full origins are resolved client-side
+        # via window.location.origin.
+        siblings = HostedPost.objects.filter(
+            site_id=post.site_id,
+            translation_group=post.translation_group,
+            status='published',
+        ).values('language', 'slug')
+        base['hreflang_alternates'] = [
+            {'lang': s['language'], 'url': f"/blog/{s['slug']}"}
+            for s in siblings
+        ]
     return base
 
 
@@ -7991,6 +8010,19 @@ class AutopilotConfigView(APIView):
         if 'auto_publish' in data:
             site.autopilot_auto_publish = bool(data.get('auto_publish'))
             update_fields.append('autopilot_auto_publish')
+        if 'mode' in data:
+            mode = str(data.get('mode') or '').strip()
+            allowed = {choice[0] for choice in Site.AUTOPILOT_MODE_CHOICES}
+            if mode in allowed:
+                site.autopilot_mode = mode
+                update_fields.append('autopilot_mode')
+        if 'min_refresh_interval_days' in data:
+            try:
+                mri = int(data.get('min_refresh_interval_days'))
+            except (TypeError, ValueError):
+                mri = 30
+            site.min_refresh_interval_days = max(1, min(365, mri))
+            update_fields.append('min_refresh_interval_days')
 
         if update_fields:
             site.save(update_fields=update_fields)
@@ -8017,6 +8049,8 @@ class AutopilotConfigView(APIView):
             'enabled': site.autopilot_enabled,
             'weekly_count': site.autopilot_weekly_count,
             'auto_publish': site.autopilot_auto_publish,
+            'mode': getattr(site, 'autopilot_mode', 'balanced') or 'balanced',
+            'min_refresh_interval_days': getattr(site, 'min_refresh_interval_days', 30) or 30,
             'last_run_at': site.autopilot_last_run_at.isoformat() if site.autopilot_last_run_at else None,
             'last_error': site.autopilot_last_error or '',
             'next_run_at': next_run_at.isoformat() if next_run_at else None,
@@ -10229,4 +10263,65 @@ class WPConnectorView(BaseV1View):
             'domain': site.domain,
             'dashboard_url': f'https://gridar.app/dashboard/{site.id}',
         }, status=status.HTTP_201_CREATED)
+
+
+class SiteSeoScoreView(APIView):
+    """GET /api/sites/<id>/seo-score/
+
+    JWT-authenticated equivalent of V1SiteSeoScoreView. Returns the same
+    composite SEO score payload so the dashboard UI can render the score
+    card without needing an API token.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        from .api_v1 import _compute_site_seo_score
+        site = get_site_for_user(request, site_id)
+        return Response(_compute_site_seo_score(site))
+
+
+class AIOverviewReadinessView(APIView):
+    """GET /api/sites/<id>/posts/<slug>/ai-overview-readiness/
+
+    JWT-authenticated equivalent of V1AIOverviewReadinessView. Returns
+    a 0-100 score + breakdown + suggestions describing how well the
+    article is structured for AI Overview / SGE pickup.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id, slug):
+        from .api_v1 import (
+            _compute_ai_overview_readiness,
+            _fetch_article_for_readiness,
+        )
+        site = get_site_for_user(request, site_id)
+        article = _fetch_article_for_readiness(site, slug)
+        if not article:
+            from django.http import Http404
+            raise Http404('Article introuvable.')
+        return Response(_compute_ai_overview_readiness(site, article))
+
+
+class CheckRenderabilityView(APIView):
+    """POST /api/check-renderability/ {url}
+
+    JWT-authenticated equivalent of V1CheckRenderabilityView. Returns
+    {url, is_prerendered, html_contains_main_text, word_count, warning,
+    suggestion} so the dashboard UI can warn the user when their site
+    ships as an unprerendered SPA.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .api_v1 import _check_renderability
+        url = (request.data.get('url') or '').strip()
+        if not url:
+            return Response({'error': 'url is required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if not (url.startswith('http://') or url.startswith('https://')):
+            return Response(
+                {'error': 'url must start with http:// or https://.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(_check_renderability(url))
 

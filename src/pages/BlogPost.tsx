@@ -134,6 +134,66 @@ export default function BlogPost() {
     };
   }, [post]);
 
+  // Inject FAQPage JSON-LD computed server-side from the "## FAQ" markdown
+  // block. The backend stores it on HostedPost.schema_jsonld at save() time so
+  // the SPA just has to serialize + append - no client-side markdown parsing.
+  // Skipped when the post has no FAQ block (empty object from the API).
+  useEffect(() => {
+    if (!post) return;
+    const faq = post.schema_jsonld;
+    if (!faq || typeof faq !== "object" || Object.keys(faq).length === 0) {
+      return;
+    }
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.id = "post-faq-ld";
+    script.text = JSON.stringify(faq);
+    document.head.appendChild(script);
+    return () => {
+      document.getElementById("post-faq-ld")?.remove();
+    };
+  }, [post]);
+
+  // Inject hreflang alternates in <head> so Google clusters the multi-lingual
+  // versions of this article. Backend returns every published sibling sharing
+  // the same translation_group (including this one) as
+  // `{ lang, url: '/blog/<slug>' }`. We resolve absolute URLs against the
+  // current origin so SEO crawlers see canonical hrefs. An `x-default` points
+  // to the article's own language by convention - we don't have an explicit
+  // "default" signal from the backend, so we pick the current post.
+  useEffect(() => {
+    if (!post) return;
+    const alts = post.hreflang_alternates;
+    if (!alts || alts.length === 0) return;
+    const origin = window.location.origin;
+    const created: HTMLLinkElement[] = [];
+    for (const a of alts) {
+      if (!a?.lang || !a?.url) continue;
+      const link = document.createElement("link");
+      link.rel = "alternate";
+      link.hreflang = a.lang;
+      link.href = `${origin}${a.url}`;
+      link.dataset.hreflangInjected = "1";
+      document.head.appendChild(link);
+      created.push(link);
+    }
+    // x-default: route to the current post's language URL (best-effort -
+    // backend doesn't mark a canonical default yet).
+    const self = alts.find((a) => a.lang === post.language);
+    if (self) {
+      const link = document.createElement("link");
+      link.rel = "alternate";
+      link.hreflang = "x-default";
+      link.href = `${origin}${self.url}`;
+      link.dataset.hreflangInjected = "1";
+      document.head.appendChild(link);
+      created.push(link);
+    }
+    return () => {
+      for (const node of created) node.remove();
+    };
+  }, [post]);
+
   // Reading progress: how much of the article has scrolled past mid-viewport.
   useEffect(() => {
     function onScroll() {

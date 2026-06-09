@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from django.db import models
@@ -22,6 +23,14 @@ class UploadedImage(models.Model):
 
 class Site(models.Model):
     LANGUAGE_CHOICES = [('fr', 'Français'), ('en', 'English'), ('es', 'Español')]
+    BUSINESS_MODEL_CHOICES = [
+        ('agency', 'Agence'),
+        ('saas', 'SaaS'),
+        ('ecommerce', 'E-commerce'),
+        ('marketplace', 'Marketplace'),
+        ('media', 'Média / Édition'),
+        ('personal_blog', 'Blog personnel'),
+    ]
 
     # ── Identité ──────────────────────────────────────────────────────
     name = models.CharField(max_length=200, verbose_name="Nom du site")
@@ -51,6 +60,14 @@ class Site(models.Model):
         blank=True, default='',
         verbose_name="Marques à NE PAS citer",
         help_text="Une marque par ligne. Le générateur évitera de les mentionner et n'y mettra jamais de lien sortant."
+    )
+    # ── Business model (onboarding obligatoire) ───────────────────────
+    business_model = models.CharField(
+        max_length=20, choices=BUSINESS_MODEL_CHOICES, default='personal_blog',
+        verbose_name="Modèle d'affaires",
+        help_text="Détermine l'angle éditorial : SaaS pousse comparatifs/use-cases, "
+                  "e-commerce pousse fiches produits/buying guides, agence pousse "
+                  "case studies, etc. Champ obligatoire avant toute génération."
     )
     default_author = models.CharField(
         max_length=100, blank=True, default='',
@@ -89,6 +106,25 @@ class Site(models.Model):
     author_website = models.URLField(
         max_length=500, blank=True, default='',
         verbose_name="Site personnel",
+    )
+
+    # ── CTA primaire (injecte en conclusion de chaque article genere) ────
+    primary_cta_text = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name="Texte du CTA principal",
+        help_text=(
+            "Phrase d'appel a l'action injectee en conclusion de chaque article "
+            "genere (ex: 'Reserve ta consultation gratuite'). Le generateur "
+            "construit un bouton/lien naturel a partir de ce texte + l'URL ci-dessous."
+        )
+    )
+    primary_cta_url = models.URLField(
+        max_length=500, blank=True, default='',
+        verbose_name="URL du CTA principal",
+        help_text=(
+            "Destination du CTA (ex: page de contact, page d'inscription, formulaire "
+            "de devis). Inclus uniquement si le texte du CTA est aussi renseigne."
+        )
     )
 
     default_language = models.CharField(
@@ -243,6 +279,30 @@ class Site(models.Model):
         default=False,
         verbose_name="Publication automatique",
         help_text="Si actif, les articles générés par l'autopilote sont publiés directement (sans passer par draft). Désactivé par défaut pour garder une étape de review."
+    )
+    AUTOPILOT_MODE_CHOICES = [
+        ('refresh_first', 'Refresh first - prioriser le rafraichissement des articles en perte de trafic'),
+        ('create_only', 'Create only - generer uniquement de nouveaux articles'),
+        ('balanced', 'Balanced - alterner refresh et creation (1 refresh / 2 creations)'),
+    ]
+    autopilot_mode = models.CharField(
+        max_length=20, choices=AUTOPILOT_MODE_CHOICES, default='balanced',
+        verbose_name="Strategie autopilote",
+        help_text=(
+            "create_only: comportement legacy, ne genere que de nouveaux articles. "
+            "refresh_first: prioritise systematiquement le refresh des articles en "
+            "decay (impressions GSC -20% ou plus). balanced (defaut): alterne 1 "
+            "refresh pour 2 creations."
+        ),
+    )
+    min_refresh_interval_days = models.PositiveIntegerField(
+        default=30,
+        verbose_name="Intervalle minimum entre 2 refresh d'un meme article (jours)",
+        help_text=(
+            "Empeche l'autopilote de rafraichir 2x de suite le meme article. "
+            "Un article ne peut etre refreshe que si son updated_at est plus "
+            "ancien que ce nombre de jours."
+        ),
     )
 
     # ── Méta ──────────────────────────────────────────────────────────
@@ -539,6 +599,14 @@ class HostedPost(models.Model):
         default=0,
         help_text="0 = no feedback yet, 1 = good (boost chunks), -1 = bad (penalize)",
     )
+    schema_jsonld = models.JSONField(
+        default=dict, blank=True,
+        help_text="Auto-computed FAQPage JSON-LD (schema.org) injected in <head> "
+                  "at render time. Filled by HostedPost.save() when the content "
+                  "contains a '## FAQ' block with question/answer pairs; empty "
+                  "dict otherwise. Re-computed on every save so editing the FAQ "
+                  "in the editor keeps the markup in sync.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -552,6 +620,112 @@ class HostedPost(models.Model):
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        # Recompute the FAQPage JSON-LD from the markdown body so the public
+        # render template can just inject it without re-parsing. Only published
+        # posts get a non-empty payload because Google won't index drafts and
+        # surfacing FAQ markup on a hidden page is just noise.
+        try:
+            if self.status == 'published':
+                self.schema_jsonld = _build_faq_jsonld(self.content, self.language) or {}
+            else:
+                self.schema_jsonld = {}
+        except Exception:
+            # Never let JSON-LD computation block the save - the field is purely
+            # additive. Worst case we lose the FAQ markup for one revision.
+            self.schema_jsonld = {}
+        # When the caller passes update_fields (partial save), make sure we also
+        # persist the recomputed schema_jsonld; otherwise the freshly computed
+        # value silently stays in memory only.
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            update_fields.add('schema_jsonld')
+            kwargs['update_fields'] = list(update_fields)
+        super().save(*args, **kwargs)
+
+
+# Compiled once at import time. Matches a "## FAQ" or "## Foire aux questions"
+# H2 (case-insensitive) and captures everything until the next H2 or EOF.
+_FAQ_SECTION_RE = re.compile(
+    r'^##\s+(?:FAQ|F\.A\.Q\.?|Foire aux questions|Questions fr[ée]quentes|Frequently asked questions)\b[^\n]*\n(.*?)(?=^##\s|\Z)',
+    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+)
+# Inside the FAQ block, Q/A pairs can take several shapes. We support:
+#   - "### Question?\nAnswer..."  (markdown sub-heading per Q)
+#   - "**Question?**\nAnswer..."  (bold question per Q)
+#   - "Q: Question?\nR: Answer"   (legacy generator output, FR)
+#   - "Q: Question?\nA: Answer"   (legacy generator output, EN)
+_FAQ_PAIR_PATTERNS = [
+    re.compile(r'^###\s+(?P<q>.+?)\s*\n+(?P<a>.+?)(?=\n###\s|\n\*\*|\nQ\s*:|\Z)',
+               re.MULTILINE | re.DOTALL),
+    re.compile(r'^\*\*(?P<q>.+?)\*\*\s*\n+(?P<a>.+?)(?=\n\*\*|\n###\s|\nQ\s*:|\Z)',
+               re.MULTILINE | re.DOTALL),
+    re.compile(r'^Q\s*:\s*(?P<q>.+?)\s*\n+(?:R|A)\s*:\s*(?P<a>.+?)(?=\nQ\s*:|\n###\s|\n\*\*|\Z)',
+               re.MULTILINE | re.DOTALL),
+]
+
+
+def _build_faq_jsonld(content, language='fr'):
+    """Parse a markdown body and return a schema.org FAQPage JSON-LD dict.
+
+    Returns an empty dict if no FAQ block is found or no Q/A pairs match.
+    The returned shape is the standard FAQPage Question/Answer tree:
+    https://developers.google.com/search/docs/appearance/structured-data/faqpage
+
+    Idempotent and side-effect-free. Safe to call on every save.
+    """
+    if not content:
+        return {}
+    match = _FAQ_SECTION_RE.search(content)
+    if not match:
+        return {}
+    section = match.group(1).strip()
+    if not section:
+        return {}
+
+    pairs = []
+    seen_questions = set()
+    for pattern in _FAQ_PAIR_PATTERNS:
+        for m in pattern.finditer(section):
+            q = (m.group('q') or '').strip().rstrip(':').strip()
+            a = (m.group('a') or '').strip()
+            if not q or not a:
+                continue
+            # Strip surrounding markdown (bold/italic) leftovers from the
+            # question and collapse internal whitespace.
+            q = re.sub(r'\s+', ' ', q).strip('*_ ').strip()
+            a = re.sub(r'\s+', ' ', a).strip()
+            key = q.lower()
+            if key in seen_questions:
+                continue
+            seen_questions.add(key)
+            pairs.append((q, a))
+        if pairs:
+            # First pattern that matched wins, so we don't double-count when
+            # the LLM mixes formats.
+            break
+
+    if not pairs:
+        return {}
+
+    return {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        'inLanguage': language or 'fr',
+        'mainEntity': [
+            {
+                '@type': 'Question',
+                'name': q,
+                'acceptedAnswer': {
+                    '@type': 'Answer',
+                    'text': a,
+                },
+            }
+            for q, a in pairs
+        ],
+    }
 
 
 class ApiToken(models.Model):
@@ -936,3 +1110,214 @@ class ProofShareToken(models.Model):
 
     def __str__(self):
         return f"ProofToken {self.site.name} ({'on' if self.enabled else 'off'})"
+
+
+# =============================================================================
+# Topic Cluster Planner (2026-06-08)
+# =============================================================================
+# A landing page is structured content (hero / value props / FAQ / CTA) - NOT a
+# blog article. The Topic Cluster Planner classifies a target keyword's intent
+# then proposes a site structure (one pillar landing + N supporting blog posts)
+# the user can approve. HostedLanding stores the landings, KeywordStrategy
+# stores the proposal + approval audit trail.
+
+
+class HostedLanding(models.Model):
+    """Structured landing page (transactional / service / pillar) hosted on Gridar.
+
+    Distinct from HostedPost (blog article) because landings are NOT prose - they
+    are structured blocks (hero, value props, social proof, FAQ, bottom CTA)
+    rendered by the public frontend with conversion-optimized layout. Each
+    landing targets ONE primary keyword and lives at /landings/<slug>.
+    """
+    STATUS_CHOICES = [
+        ('draft', 'Brouillon'),
+        ('published', 'Publie'),
+    ]
+    LANGUAGE_CHOICES = [
+        ('fr', 'Francais'),
+        ('en', 'English'),
+        ('es', 'Espanol'),
+    ]
+    PAGE_SUBTYPE_CHOICES = [
+        ('service', 'Page service (transactionnel)'),
+        ('product', 'Fiche produit'),
+        ('pillar', 'Pillar page (cluster)'),
+        ('comparison', 'Comparatif'),
+        ('local', 'Page locale (geo)'),
+        ('about', 'A propos'),
+        ('contact', 'Contact'),
+        ('generic', 'Generique'),
+    ]
+    SCHEMA_TYPE_CHOICES = [
+        ('WebPage', 'WebPage'),
+        ('Service', 'Service'),
+        ('Product', 'Product'),
+        ('LocalBusiness', 'LocalBusiness'),
+        ('FAQPage', 'FAQPage'),
+        ('Article', 'Article'),
+    ]
+
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='hosted_landings'
+    )
+    title = models.CharField(max_length=200, help_text="SEO <title>")
+    slug = models.SlugField(max_length=200)
+    h1 = models.CharField(
+        max_length=200,
+        help_text="Visible H1, often longer / more emotional than the <title>.",
+    )
+    hero_subtitle = models.CharField(
+        max_length=500, blank=True, default='',
+        help_text="Sentence under the H1 - 1-2 lines max.",
+    )
+    hero_cta_text = models.CharField(max_length=80, blank=True, default='')
+    hero_cta_url = models.CharField(max_length=500, blank=True, default='')
+    value_props = models.JSONField(
+        default=list, blank=True,
+        help_text='[{"icon": str, "title": str, "description": str}, ...]',
+    )
+    social_proof = models.JSONField(
+        default=list, blank=True,
+        help_text='[{"type": "testimonial"|"logo"|"stat", ...}, ...]',
+    )
+    faq = models.JSONField(
+        default=list, blank=True,
+        help_text='[{"question": str, "answer": str}, ...]',
+    )
+    cta_bottom_text = models.CharField(max_length=80, blank=True, default='')
+    cta_bottom_url = models.CharField(max_length=500, blank=True, default='')
+    body_markdown = models.TextField(
+        blank=True, default='',
+        help_text="Optional free-form markdown rendered between value_props and FAQ.",
+    )
+    target_keyword = models.CharField(
+        max_length=200, blank=True, default='', db_index=True,
+        help_text="Primary keyword this landing targets.",
+    )
+    schema_type = models.CharField(
+        max_length=20, choices=SCHEMA_TYPE_CHOICES, default='WebPage',
+    )
+    page_subtype = models.CharField(
+        max_length=20, choices=PAGE_SUBTYPE_CHOICES, default='generic', db_index=True,
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True,
+    )
+    language = models.CharField(
+        max_length=2, choices=LANGUAGE_CHOICES, default='fr', db_index=True,
+    )
+    translation_group = models.UUIDField(default=uuid.uuid4, db_index=True)
+    cover_image = models.URLField(max_length=500, blank=True, default='')
+    meta_description = models.CharField(max_length=300, blank=True, default='')
+    schema_jsonld = models.JSONField(
+        default=dict, blank=True,
+        help_text="Auto-computed JSON-LD (Service/FAQPage/etc) injected at render time.",
+    )
+    published_at = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['site', 'slug']]
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['site', 'status']),
+            models.Index(fields=['site', 'page_subtype']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.site.name})"
+
+
+class KeywordStrategy(models.Model):
+    """Proposed site structure for a target keyword.
+
+    Generated by V1ProposeKeywordStrategyView: classifies intent, analyzes the
+    SERP, then proposes the proper structure (single landing / pillar+cluster /
+    blog post). User reviews + approves; on approval the engine generates the
+    landings + articles described in proposed_pages.
+    """
+    INTENT_CHOICES = [
+        ('transactional', 'Transactionnel'),
+        ('commercial', 'Commercial (comparatif / review)'),
+        ('informational', 'Informationnel'),
+        ('navigational', 'Navigationnel (brand)'),
+        ('local', 'Local'),
+    ]
+    BUSINESS_MODEL_CHOICES = Site.BUSINESS_MODEL_CHOICES
+    PROPOSED_STRUCTURE_CHOICES = [
+        ('single_landing', 'Une seule landing'),
+        ('pillar_cluster', 'Pillar + cluster d articles'),
+        ('blog_post', 'Article de blog standalone'),
+        ('comparison_table', 'Page comparatif (vs)'),
+        ('local_landing', 'Landing locale (geo)'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Brouillon (propose)'),
+        ('approved', 'Approuve par l utilisateur'),
+        ('generating', 'Generation en cours'),
+        ('done', 'Pages generees'),
+        ('rejected', 'Rejete'),
+    ]
+
+    site = models.ForeignKey(
+        Site, on_delete=models.CASCADE, related_name='keyword_strategies'
+    )
+    keyword = models.CharField(max_length=255, db_index=True)
+    language = models.CharField(
+        max_length=2, choices=Site.LANGUAGE_CHOICES, default='fr',
+    )
+    intent = models.CharField(
+        max_length=20, choices=INTENT_CHOICES, default='informational', db_index=True,
+    )
+    intent_confidence = models.FloatField(
+        default=0.5,
+        help_text="0.0-1.0 confidence score from the classifier.",
+    )
+    business_model_detected = models.CharField(
+        max_length=20, choices=BUSINESS_MODEL_CHOICES, blank=True, default='',
+        help_text="Business model inferred from SERP (may differ from site's).",
+    )
+    serp_analysis = models.JSONField(
+        default=dict, blank=True,
+        help_text="{'top_results': [...], 'features': {...}, 'avg_word_count': int}",
+    )
+    proposed_structure = models.CharField(
+        max_length=30, choices=PROPOSED_STRUCTURE_CHOICES, default='blog_post',
+    )
+    proposed_pages = models.JSONField(
+        default=list, blank=True,
+        help_text='[{"type":"landing|article","title":str,"slug":str,'
+                  '"keyword":str,"role":"pillar|cluster|alternative"}, ...]',
+    )
+    rationale = models.TextField(
+        blank=True, default='',
+        help_text="Plain-language explanation of why this structure was chosen.",
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True,
+    )
+    generated_pages_fks = models.JSONField(
+        default=dict, blank=True,
+        help_text='{"landings": [<HostedLanding.id>, ...], '
+                  '"articles": [<HostedPost.id>, ...]} after approval.',
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='approved_strategies',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['site', 'keyword']]
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['site', 'status']),
+            models.Index(fields=['site', 'intent']),
+        ]
+
+    def __str__(self):
+        return f"Strategy '{self.keyword}' ({self.intent}/{self.status})"

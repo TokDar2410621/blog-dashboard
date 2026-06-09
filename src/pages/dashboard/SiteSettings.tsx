@@ -282,6 +282,7 @@ export default function SiteSettings() {
   const [ogImageUrl, setOgImageUrl] = useState("");
   const [defaultAuthor, setDefaultAuthor] = useState("");
   const [defaultLanguage, setDefaultLanguage] = useState<string>("fr");
+  const [businessModel, setBusinessModel] = useState<string>("personal_blog");
   // EEAT author profile
   const [authorRole, setAuthorRole] = useState("");
   const [authorBio, setAuthorBio] = useState("");
@@ -290,6 +291,9 @@ export default function SiteSettings() {
   const [authorLinkedin, setAuthorLinkedin] = useState("");
   const [authorTwitter, setAuthorTwitter] = useState("");
   const [authorWebsite, setAuthorWebsite] = useState("");
+  // Primary CTA injected in every generated article's conclusion
+  const [primaryCtaText, setPrimaryCtaText] = useState("");
+  const [primaryCtaUrl, setPrimaryCtaUrl] = useState("");
   // Public blog (Next.js frontend on our infra)
   const [publicBlogDomain, setPublicBlogDomain] = useState("");
   const [brandColor, setBrandColor] = useState("");
@@ -348,6 +352,7 @@ export default function SiteSettings() {
       setOgImageUrl(site.og_image_url || "");
       setDefaultAuthor(site.default_author || "");
       setDefaultLanguage(site.default_language || "fr");
+      setBusinessModel(site.business_model || "personal_blog");
       setAuthorRole(site.author_role || "");
       setAuthorBio(site.author_bio || "");
       setAuthorCredentials(site.author_credentials || "");
@@ -355,6 +360,8 @@ export default function SiteSettings() {
       setAuthorLinkedin(site.author_linkedin || "");
       setAuthorTwitter(site.author_twitter || "");
       setAuthorWebsite(site.author_website || "");
+      setPrimaryCtaText(site.primary_cta_text || "");
+      setPrimaryCtaUrl(site.primary_cta_url || "");
       setPublicBlogDomain(site.public_blog_domain || "");
       const tc = (site as { theme_config?: Record<string, string> }).theme_config || {};
       setBrandColor(tc.brand_color || "");
@@ -407,6 +414,7 @@ export default function SiteSettings() {
         og_image_url: ogImageUrl,
         default_author: defaultAuthor,
         default_language: defaultLanguage,
+        business_model: businessModel,
         author_role: authorRole,
         author_bio: authorBio,
         author_credentials: authorCredentials,
@@ -414,6 +422,8 @@ export default function SiteSettings() {
         author_linkedin: authorLinkedin,
         author_twitter: authorTwitter,
         author_website: authorWebsite,
+        primary_cta_text: primaryCtaText.trim(),
+        primary_cta_url: primaryCtaUrl.trim(),
         public_blog_domain: publicBlogDomain.trim().toLowerCase(),
         theme_config: {
           ...(brandColor ? { brand_color: brandColor } : {}),
@@ -526,6 +536,82 @@ export default function SiteSettings() {
                   </Button>
                 );
               })}
+            </CardContent>
+          </Card>
+
+          {/* Business model (mandatory before generation) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Rocket className="h-5 w-5" />
+                Modele d'affaires
+              </CardTitle>
+              <CardDescription>
+                Determine l'angle editorial des articles generes. Champ obligatoire
+                avant la premiere generation - sans ca, le LLM produit du contenu
+                generique.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Label className="text-sm">Type de business</Label>
+              <select
+                value={businessModel}
+                onChange={(e) => setBusinessModel(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="personal_blog">Blog personnel</option>
+                <option value="agency">Agence (services BtoB)</option>
+                <option value="saas">SaaS</option>
+                <option value="ecommerce">E-commerce</option>
+                <option value="marketplace">Marketplace</option>
+                <option value="media">Media / Edition</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                SaaS pousse comparatifs + use-cases. E-commerce pousse buying guides.
+                Agence pousse case studies. Media pousse evergreen long-form.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Primary CTA injected in every generated article's conclusion */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Rocket className="h-5 w-5" />
+                Call-to-action principal
+              </CardTitle>
+              <CardDescription>
+                Phrase d'appel a l'action injectee a la conclusion de chaque
+                article genere. Laisse vide pour desactiver. Le generateur
+                utilise le texte + l'URL exacts que tu definis ici.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm">Texte du CTA</Label>
+                <Input
+                  value={primaryCtaText}
+                  onChange={(e) => setPrimaryCtaText(e.target.value)}
+                  placeholder="Ex: Reserve ta consultation gratuite"
+                  maxLength={200}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Devient le texte d'ancre du lien dans la conclusion. {primaryCtaText.length}/200.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">URL du CTA</Label>
+                <Input
+                  value={primaryCtaUrl}
+                  onChange={(e) => setPrimaryCtaUrl(e.target.value)}
+                  placeholder="https://tonsite.com/contact"
+                  type="url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Destination du lien (page de contact, formulaire, page produit).
+                  Les deux champs doivent etre remplis pour que le CTA soit injecte.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

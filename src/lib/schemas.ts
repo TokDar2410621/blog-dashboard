@@ -51,6 +51,15 @@ export const siteSchema = z.object({
   author_linkedin: z.string().optional(),
   author_twitter: z.string().optional(),
   author_website: z.string().optional(),
+  business_model: z
+    .enum(["agency", "saas", "ecommerce", "marketplace", "media", "personal_blog"])
+    .optional(),
+  primary_cta_text: z.string().optional(),
+  primary_cta_url: z.string().optional(),
+  autopilot_mode: z
+    .enum(["refresh_first", "create_only", "balanced"])
+    .optional(),
+  min_refresh_interval_days: z.number().optional(),
   public_blog_domain: z.string().optional(),
   theme_config: z.record(z.string(), z.unknown()).nullable().optional(),
   blog_config: z.record(z.string(), z.unknown()).nullable().optional(),

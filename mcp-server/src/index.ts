@@ -18,18 +18,25 @@ import { z } from "zod";
 import {
   ApiError,
   addMemory,
+  aiOverviewReadiness,
   analyzeCompetitors,
+  approveStrategy,
   auditArticle,
   bulkAudit,
   checkHreflang,
   checkPlagiarism,
   checkReadability,
+  checkRenderability,
+  classifyIntent,
+  createLanding,
   createManualArticle,
   deleteArticle,
   deleteMemory,
   detectCannibalization,
   enableProofShare,
   generateArticle,
+  generateLanding,
+  generateSisterArticle,
   getArticle,
   getAutopilotConfig,
   getBrief,
@@ -42,16 +49,20 @@ import {
   getSiteDetail,
   getWeeklyDigest,
   keywordResearch,
+  linkOpportunities,
+  linkPages,
   listArticles,
   listKeywords,
   listMemories,
   listSites,
   pageSpeed,
   peopleAlsoAsk,
+  proposeKeywordStrategy,
   rebuildMemory,
   revokeProofShare,
   runAutopilotNow,
   setAutopilotConfig,
+  siteSeoScore,
   snapshotKeywords,
   suggestCompetitors,
   suggestInternalLinks,
@@ -146,6 +157,21 @@ const GenerateArticleArgs = z
   .refine((v) => !!v.topic || !!v.title, {
     message: "Provide either 'topic' or 'title'.",
   });
+
+const GenerateSisterArticleArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    source_slug: z
+      .string()
+      .min(1)
+      .describe("Slug of the source article to translate from."),
+    target_language: z
+      .enum(["fr", "en", "es"])
+      .describe(
+        "Target language for the translation. Must differ from the source article's language and be allowed by the site.",
+      ),
+  })
+  .strict();
 
 const AuditArticleArgs = z
   .object({
@@ -358,6 +384,123 @@ const PageSpeedArgs = z
   })
   .strict();
 
+const CheckRenderabilityArgs = z
+  .object({
+    url: z
+      .string()
+      .url()
+      .describe(
+        "Public URL to fetch and inspect (must include http:// or https://).",
+      ),
+  })
+  .strict();
+
+// --- Topic Cluster Planner (0.5.0) ----------------------------------------
+
+const ClassifyIntentArgs = z
+  .object({
+    keyword: z.string().min(1),
+    site_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe("Optional - improves brand detection by checking the site name"),
+  })
+  .strict();
+
+const ProposeKeywordStrategyArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    keyword: z.string().min(1),
+    language: z.enum(["fr", "en", "es"]).optional(),
+  })
+  .strict();
+
+const ApproveStrategyArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    strategy_id: z.number().int().positive(),
+    customizations: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        "Optional override: {pages: [...]} to replace the proposed pages list",
+      ),
+  })
+  .strict();
+
+const CreateLandingArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    title: z.string().min(1),
+    h1: z.string().optional(),
+    slug: z.string().optional(),
+    hero_subtitle: z.string().optional(),
+    hero_cta_text: z.string().optional(),
+    hero_cta_url: z.string().optional(),
+    value_props: z.array(z.record(z.unknown())).optional(),
+    social_proof: z.array(z.record(z.unknown())).optional(),
+    faq: z.array(z.record(z.unknown())).optional(),
+    cta_bottom_text: z.string().optional(),
+    cta_bottom_url: z.string().optional(),
+    body_markdown: z.string().optional(),
+    target_keyword: z.string().optional(),
+    schema_type: z
+      .enum([
+        "WebPage",
+        "Service",
+        "Product",
+        "LocalBusiness",
+        "FAQPage",
+        "Article",
+      ])
+      .optional(),
+    page_subtype: z
+      .enum([
+        "service",
+        "product",
+        "pillar",
+        "comparison",
+        "local",
+        "about",
+        "contact",
+        "generic",
+      ])
+      .optional(),
+    language: z.enum(["fr", "en", "es"]).optional(),
+    status: z.enum(["draft", "published"]).optional(),
+    cover_image: z.string().optional(),
+    meta_description: z.string().optional(),
+  })
+  .strict();
+
+const GenerateLandingArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    keyword: z.string().min(1),
+    primary_cta_text: z.string().optional(),
+    primary_cta_url: z.string().optional(),
+    value_props: z
+      .array(z.record(z.unknown()))
+      .optional()
+      .describe("Optional seed value-props the LLM will keep + expand"),
+    page_subtype: z
+      .enum(["service", "product", "pillar", "comparison", "local"])
+      .optional(),
+    language: z.enum(["fr", "en", "es"]).optional(),
+  })
+  .strict();
+
+const LinkPagesArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    source_slug: z.string().min(1),
+    target_slug: z.string().min(1),
+    anchor_text: z.string().min(1),
+  })
+  .strict();
+
 // ---------------------------------------------------------------------------
 // Tool registry
 // ---------------------------------------------------------------------------
@@ -412,6 +555,16 @@ const tools: ToolDef[] = [
       const { site_id, ...body } = input;
       return generateArticle(site_id, body);
     },
+  },
+  {
+    name: "gridar_generate_sister_article",
+    description:
+      "Translate + adapt an existing article into another language and publish it as a sibling sharing the same translation_group (so hreflang alternates wire up automatically). Costs one article from the user's monthly quota (or one credit). Only available on hosted-mode sites. The new post is created with status='draft' for review.",
+    schema: GenerateSisterArticleArgs,
+    handler: (input) =>
+      generateSisterArticle(input.site_id, input.source_slug, {
+        target_language: input.target_language,
+      }),
   },
   {
     name: "gridar_audit_article",
@@ -614,6 +767,13 @@ const tools: ToolDef[] = [
     schema: KeywordLangArgs,
     handler: (input) => peopleAlsoAsk(input),
   },
+  {
+    name: "gridar_link_opportunities",
+    description:
+      "Surface candidate sites for backlink outreach on a keyword. Queries Serper for 'best <keyword> sites' + resources / blogs variants, de-duplicates by domain, filters out social/marketplace giants, and returns the top targets (domain + url + title + snippet + source_query).",
+    schema: KeywordLangArgs,
+    handler: (input) => linkOpportunities(input),
+  },
   // --- GSC ----------------------------------------------------------------
   {
     name: "gridar_gsc_queries",
@@ -709,6 +869,88 @@ const tools: ToolDef[] = [
     schema: SiteIdOnly,
     handler: (input) => revokeProofShare(input.site_id),
   },
+  // --- Topic Cluster Planner (0.5.0) -------------------------------------
+  {
+    name: "gridar_classify_intent",
+    description:
+      "Classify the search intent of a keyword (transactional, commercial, informational, navigational, local) with a confidence score. Step 1 of the topic cluster workflow. Pass site_id for brand-aware detection.",
+    schema: ClassifyIntentArgs,
+    handler: (input) => classifyIntent(input),
+  },
+  {
+    name: "gridar_propose_keyword_strategy",
+    description:
+      "Propose a site structure for a target keyword: classifies intent, analyzes the SERP, then proposes single-landing OR pillar+cluster OR comparison-table OR local-landing OR blog post. Returns a KeywordStrategy.id the user can approve. Idempotent on (site, keyword): re-running refreshes a draft, never overwrites an approved strategy.",
+    schema: ProposeKeywordStrategyArgs,
+    handler: (input) =>
+      proposeKeywordStrategy(input.site_id, {
+        keyword: input.keyword,
+        language: input.language,
+      }),
+  },
+  {
+    name: "gridar_approve_strategy",
+    description:
+      "Approve a proposed keyword strategy and generate every proposed_page. Landings are AI-generated and saved as drafts; articles are queued (the user runs gridar_generate_article on each one to control quota). Pass customizations.pages to override the proposed pages list before generation.",
+    schema: ApproveStrategyArgs,
+    handler: (input) =>
+      approveStrategy(input.site_id, input.strategy_id, {
+        customizations: input.customizations,
+      }),
+  },
+  {
+    name: "gridar_create_landing",
+    description:
+      "Create a structured landing page manually (no AI, no quota). Body is composed of structured blocks: hero (h1 + subtitle + CTA), value_props, social_proof, FAQ, bottom CTA. Use this when the user already has the copy.",
+    schema: CreateLandingArgs,
+    handler: (input) => {
+      const { site_id, ...body } = input;
+      return createLanding(site_id, body);
+    },
+  },
+  {
+    name: "gridar_generate_landing",
+    description:
+      "AI-generate a complete landing page payload from a target keyword (H1, hero subtitle, 3-5 value props, social proof, 4-6 FAQ, bottom CTA, body markdown). Consumes one article from the user's monthly quota (or one credit). Saved as draft on the hosted site.",
+    schema: GenerateLandingArgs,
+    handler: (input) => {
+      const { site_id, ...body } = input;
+      return generateLanding(site_id, body);
+    },
+  },
+  {
+    name: "gridar_link_pages",
+    description:
+      "Insert an inline contextual link from one page to another on the same site. Works between landings, articles, or any mix. If the anchor text is found in the source body it's converted in-place; otherwise a 'Voir aussi' line is appended. No-op when already linked. Use to build topic cluster internal linking.",
+    schema: LinkPagesArgs,
+    handler: (input) =>
+      linkPages(input.site_id, {
+        source_slug: input.source_slug,
+        target_slug: input.target_slug,
+        anchor_text: input.anchor_text,
+      }),
+  },
+  {
+    name: "gridar_site_seo_score",
+    description:
+      "Composite SEO health score (0-100) for a site, computed from 9 weighted checks: indexability, author bio, business model declared, GSC connection, presence of an approved pillar+spokes cluster, hreflang validity (if multilingual), Core Web Vitals, FAQ schema coverage, and absence of transactional intents stuck on blog posts. Returns {score, breakdown, action_items: [{issue, fix_url}]} so the UI / agent can surface concrete next steps.",
+    schema: SiteIdOnly,
+    handler: (input) => siteSeoScore(input.site_id),
+  },
+  {
+    name: "gridar_ai_overview_readiness",
+    description:
+      "Score how AI-Overview-ready a single article is (0-100). Computed from 5 weighted checks: FAQ density (25%), H2/H3 structure (20%), E-E-A-T signals - author bio + sources/dates (20%), concrete data - numbers + dates (20%), and extractible quotes - short paragraphs right after ## headings (15%). Returns {score, breakdown, suggestions: string[]} so the agent can advise the user where to improve the article for Google SGE / Bing Copilot / Perplexity pickup.",
+    schema: SlugRefArgs,
+    handler: (input) => aiOverviewReadiness(input.site_id, input.slug),
+  },
+  {
+    name: "gridar_check_renderability",
+    description:
+      "Fetch a URL and detect whether it's server-rendered (SSR/SSG/prerendered) or a JavaScript SPA shell that Googlebot has to render itself. Inspects the raw HTML body and counts visible text words after stripping scripts and styles - >100 words = OK, less = suspect SPA. Returns {url, is_prerendered, html_contains_main_text, word_count, warning, suggestion}. Use this to quickly tell a user whether their site is Googlebot-friendly or needs prerendering / SSR (Next.js, Nuxt, Astro, prerender.io).",
+    schema: CheckRenderabilityArgs,
+    handler: (input) => checkRenderability({ url: input.url }),
+  },
 ];
 
 // Convert a zod schema to a JSON Schema object for the MCP tools/list response.
@@ -800,7 +1042,7 @@ export function createMcpServer(): Server {
   const server = new Server(
     {
       name: "gridar-mcp",
-      version: "0.4.2",
+      version: "0.5.0",
     },
     {
       capabilities: { tools: {} },

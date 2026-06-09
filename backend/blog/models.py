@@ -76,7 +76,7 @@ class BlogPost(models.Model):
     scheduled_at = models.DateTimeField(null=True, blank=True, verbose_name="Publication planifiee")
     view_count = models.PositiveIntegerField(default=0, verbose_name="Nombre de vues")
 
-    published_at = models.DateField(verbose_name="Date de publication")
+    published_at = models.DateField(null=True, blank=True, verbose_name="Date de publication")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Date de creation")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Derniere modification")
 

@@ -431,6 +431,39 @@ export async function generateArticle(
   return generateArticleResponseSchema.parse(data);
 }
 
+// Generate Sister Article (multi-lang translation that shares translation_group)
+export type GenerateSisterArticleResponse = {
+  slug: string;
+  id: number;
+  language: string;
+  translation_group: string;
+  status: string;
+  title: string;
+};
+
+export async function generateSisterArticle(
+  siteId: number,
+  sourceSlug: string,
+  body: { target_language: "fr" | "en" | "es" },
+  signal?: AbortSignal,
+): Promise<GenerateSisterArticleResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/articles/${encodeURIComponent(sourceSlug)}/generate-sister-article/`,
+    { method: "POST", body: JSON.stringify(body) },
+    signal,
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      err.error || "Sister article generation failed",
+      res.status,
+      undefined,
+      err,
+    );
+  }
+  return res.json();
+}
+
 // Pexels Search
 export async function searchPexels(query: string): Promise<PexelsResponse> {
   const res = await authFetch(`/pexels/search/?query=${encodeURIComponent(query)}`);
@@ -679,5 +712,150 @@ export async function enableProofShare(
 export async function revokeProofShare(siteId: number): Promise<ProofShareState> {
   const res = await authFetch(`/sites/${siteId}/proof/share/`, { method: "DELETE" });
   if (!res.ok) throw new ApiError("Revoke share failed", res.status);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Topic Cluster Planner (2026-06-08)
+// ---------------------------------------------------------------------------
+
+export type KeywordIntent =
+  | "transactional"
+  | "commercial"
+  | "informational"
+  | "navigational"
+  | "local";
+
+export type ProposedPage = {
+  type: "landing" | "article";
+  title: string;
+  slug: string;
+  keyword: string;
+  role: "pillar" | "cluster" | "alternative" | "standalone";
+  page_subtype?: string;
+};
+
+export type KeywordStrategy = {
+  id: number;
+  site_id: number;
+  keyword: string;
+  intent: KeywordIntent;
+  intent_confidence: number;
+  proposed_structure: string;
+  proposed_pages: ProposedPage[];
+  rationale: string;
+  status: string;
+  created: boolean;
+};
+
+export type HostedLandingDraft = {
+  id: number;
+  slug: string;
+  title?: string;
+  h1?: string;
+  status: string;
+  page_subtype?: string;
+};
+
+export async function classifyKeywordIntent(
+  keyword: string,
+  siteId?: number,
+): Promise<{
+  keyword: string;
+  intent: KeywordIntent;
+  confidence: number;
+  navigational_match: boolean;
+}> {
+  const res = await authFetch(`/v1/classify-intent/`, {
+    method: "POST",
+    body: JSON.stringify({ keyword, site_id: siteId }),
+  });
+  if (!res.ok) throw new ApiError("Intent classification failed", res.status);
+  return res.json();
+}
+
+export async function proposeKeywordStrategy(
+  siteId: number,
+  keyword: string,
+  language?: "fr" | "en" | "es",
+): Promise<KeywordStrategy> {
+  const res = await authFetch(`/v1/sites/${siteId}/keyword-strategy/`, {
+    method: "POST",
+    body: JSON.stringify({ keyword, language }),
+  });
+  if (!res.ok) throw new ApiError("Strategy proposal failed", res.status);
+  return res.json();
+}
+
+export async function approveKeywordStrategy(
+  siteId: number,
+  strategyId: number,
+  customizations?: { pages?: ProposedPage[] },
+): Promise<{
+  id: number;
+  status: string;
+  generated_landings: number[];
+  planned_articles: unknown[];
+  errors: unknown[];
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/keyword-strategy/${strategyId}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ customizations: customizations ?? {} }),
+    },
+  );
+  if (!res.ok) throw new ApiError("Strategy approval failed", res.status);
+  return res.json();
+}
+
+export async function createLandingManual(
+  siteId: number,
+  body: Record<string, unknown>,
+): Promise<HostedLandingDraft> {
+  const res = await authFetch(`/v1/sites/${siteId}/landings/manual/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Landing creation failed", res.status);
+  return res.json();
+}
+
+export async function generateLandingAi(
+  siteId: number,
+  body: {
+    keyword: string;
+    primary_cta_text?: string;
+    primary_cta_url?: string;
+    value_props?: unknown[];
+    page_subtype?: "service" | "product" | "pillar" | "comparison" | "local";
+    language?: "fr" | "en" | "es";
+  },
+): Promise<HostedLandingDraft> {
+  const res = await authFetch(`/v1/sites/${siteId}/landings/generate/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Landing generation failed", res.status);
+  return res.json();
+}
+
+export async function linkPagesV1(
+  siteId: number,
+  body: { source_slug: string; target_slug: string; anchor_text: string },
+): Promise<{
+  status: string;
+  source_slug: string;
+  source_type?: string;
+  target_slug: string;
+  target_type?: string;
+  anchor_text?: string;
+  inserted_inline?: boolean;
+}> {
+  const res = await authFetch(`/v1/sites/${siteId}/link-pages/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Link insertion failed", res.status);
   return res.json();
 }

@@ -28,7 +28,8 @@ from .views import (
     SiteSitemapView, SiteRSSView,
     BillingMeView, BillingCheckoutView, BillingPortalView, BillingWebhookView,
     BillingCreditsView, BillingCreditsCheckoutView,
-    PlagiarismCheckView,
+    PlagiarismCheckView, SiteSeoScoreView, AIOverviewReadinessView,
+    CheckRenderabilityView,
     PageSpeedView, LinkSuggestionsView, BacklinksView, SEOSchemaView,
     PublicSiteView, PublicSiteByDomainView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
@@ -50,6 +51,11 @@ from .api_v1 import (
     V1ProofSummaryView, V1ProofAttributionView, V1ProofShareView,
     V1SuggestKeywordsView, V1SuggestCompetitorsView,
     V1KeywordResearchView, V1PageSpeedView, V1PAAView,
+    V1GenerateSisterArticleView,
+    V1ClassifyIntentView, V1ProposeKeywordStrategyView, V1ApproveStrategyView,
+    V1CreateLandingView, V1GenerateLandingView, V1LinkPagesView,
+    V1SiteSeoScoreView, V1AIOverviewReadinessView,
+    V1CheckRenderabilityView, V1LinkOpportunitiesView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -129,6 +135,8 @@ urlpatterns = [
     path('sites/<int:site_id>/memories/<int:pk>/', SiteMemoryDetailView.as_view(), name='site-memory-detail'),
     path('sites/<int:site_id>/posts/<slug:slug>/feedback/', PostFeedbackView.as_view(), name='post-feedback'),
     path('sites/<int:site_id>/site-audit/', SiteAuditAggregatorView.as_view(), name='site-audit-aggregator'),
+    path('sites/<int:site_id>/seo-score/', SiteSeoScoreView.as_view(), name='site-seo-score'),
+    path('sites/<int:site_id>/posts/<slug:slug>/ai-overview-readiness/', AIOverviewReadinessView.as_view(), name='site-post-ai-overview-readiness'),
     path('sites/<int:site_id>/blog-domain/provision/', BlogDomainProvisionView.as_view(), name='blog-domain-provision'),
     path('sites/<int:site_id>/blog-domain/status/', BlogDomainStatusView.as_view(), name='blog-domain-status'),
     path('sites/<int:site_id>/blog-domain/', BlogDomainRemoveView.as_view(), name='blog-domain-remove'),
@@ -173,6 +181,8 @@ urlpatterns = [
     # is consumed as a slug).
     path('v1/sites/<int:site_id>/articles/manual/', V1ArticleCreateView.as_view(), name='v1-article-create'),
     path('v1/sites/<int:site_id>/articles/<slug:slug>/manual/', V1ArticleMutateView.as_view(), name='v1-article-mutate'),
+    path('v1/sites/<int:site_id>/articles/<slug:slug>/generate-sister-article/', V1GenerateSisterArticleView.as_view(), name='v1-generate-sister-article'),
+    path('v1/sites/<int:site_id>/articles/<slug:slug>/ai-overview-readiness/', V1AIOverviewReadinessView.as_view(), name='v1-ai-overview-readiness'),
     path('v1/sites/<int:site_id>/articles/<slug:slug>/', V1ArticleDetailView.as_view(), name='v1-article-detail'),
     path('v1/sites/<int:site_id>/generate/', V1GenerateView.as_view(), name='v1-generate'),
     path('v1/audit/', V1AuditView.as_view(), name='v1-audit'),
@@ -213,5 +223,18 @@ urlpatterns = [
     path('v1/keyword-research/', V1KeywordResearchView.as_view(), name='v1-keyword-research'),
     path('v1/page-speed/', V1PageSpeedView.as_view(), name='v1-page-speed'),
     path('v1/paa/', V1PAAView.as_view(), name='v1-paa'),
+    # Topic Cluster Planner (2026-06-08)
+    path('v1/classify-intent/', V1ClassifyIntentView.as_view(), name='v1-classify-intent'),
+    path('v1/sites/<int:site_id>/keyword-strategy/', V1ProposeKeywordStrategyView.as_view(), name='v1-propose-keyword-strategy'),
+    path('v1/sites/<int:site_id>/keyword-strategy/<int:strategy_id>/approve/', V1ApproveStrategyView.as_view(), name='v1-approve-strategy'),
+    path('v1/sites/<int:site_id>/landings/manual/', V1CreateLandingView.as_view(), name='v1-landing-create'),
+    path('v1/sites/<int:site_id>/landings/generate/', V1GenerateLandingView.as_view(), name='v1-landing-generate'),
+    path('v1/sites/<int:site_id>/link-pages/', V1LinkPagesView.as_view(), name='v1-link-pages'),
+    path('v1/sites/<int:site_id>/seo-score/', V1SiteSeoScoreView.as_view(), name='v1-site-seo-score'),
+    # Renderability check (P1 #9, 2026-06-08)
+    path('check-renderability/', CheckRenderabilityView.as_view(), name='check-renderability'),
+    path('v1/check-renderability/', V1CheckRenderabilityView.as_view(), name='v1-check-renderability'),
+    # Link Opportunities (P2 #11, 2026-06-08)
+    path('v1/link-opportunities/', V1LinkOpportunitiesView.as_view(), name='v1-link-opportunities'),
     path('', include(router.urls)),
 ]

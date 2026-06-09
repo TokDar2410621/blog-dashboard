@@ -287,6 +287,32 @@ class ArticleGenerator:
 {forbid_block}
 """
 
+    def _cta_block(self):
+        """Build the CTA OBLIGATOIRE EN CONCLUSION prompt section.
+
+        Returns '' when the site has no primary CTA configured (or when no
+        Site instance is attached). Otherwise instructs Claude to wrap the
+        article with the exact CTA text + URL at the end - we don't want
+        the LLM rewriting the CTA copy or inventing a different URL, so the
+        instructions are strict.
+        """
+        s = self.site
+        if not s:
+            return ''
+        cta_text = (getattr(s, 'primary_cta_text', '') or '').strip()
+        cta_url = (getattr(s, 'primary_cta_url', '') or '').strip()
+        if not cta_text or not cta_url:
+            return ''
+        return f"""
+**CTA OBLIGATOIRE EN CONCLUSION :**
+- Termine OBLIGATOIREMENT l'article par un appel a l'action utilisant ce texte EXACT et cette URL EXACTE.
+- Texte du CTA (a utiliser tel quel) : "{cta_text}"
+- URL du CTA (a utiliser telle quelle) : {cta_url}
+- Format markdown a inserer dans la conclusion : [{cta_text}]({cta_url})
+- Tu peux ajouter UNE phrase de transition juste avant le lien, mais ne modifie ni le texte d'ancre, ni l'URL.
+- Le CTA doit etre la DERNIERE chose que le lecteur voit (apres la conclusion, avant l'eventuelle FAQ).
+"""
+
     # === KNOWLEDGE BASE ===
 
     def _split_kb_chunks(self):
@@ -931,6 +957,7 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
         brand_block = self._brand_block()
         memory_block = self._memory_block(topic_analysis)
         stop_slop_block = self._stop_slop_block(self.language)
+        cta_block = self._cta_block()
 
         if self.article_type == 'local':
             prompt = f'''Tu ecris un article ANNUAIRE/GUIDE listant les entreprises d'une region.
@@ -939,6 +966,8 @@ Schemas Schema.org pertinents pour cet article: {schemas_block}
 **REGION/SUJET:** {topic_analysis.get('topic', self.custom_topic)}
 
 {brand_block}
+
+{cta_block}
 
 {memory_block}
 
@@ -994,6 +1023,8 @@ Toute la sortie (titre, intro, H2, paragraphes, conclusion) doit etre en {lang_n
 NE MELANGE PAS les langues. NE TRADUIS PAS vers l'anglais si la cible est le francais.
 
 {brand_block}
+
+{cta_block}
 
 {memory_block}
 
@@ -1592,7 +1623,8 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
             cover_image=cover_image or '',
             reading_time=reading_time,
             featured=False,
-            published_at=date.today(),
+            status=self.default_status,
+            published_at=date.today() if self.default_status == 'published' else None,
             language=getattr(self, 'language', 'fr'),
         )
         post.save(using=self.alias)
@@ -1678,3 +1710,270 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
                     related.append(post)
 
         return related[:limit]
+
+    # === SISTER ARTICLE (multi-lang translation) ===
+
+    def generate_sister_article(self, source_post, target_language):
+        """Build a translated+adapted sister article from `source_post`.
+
+        Reuses the source's translation_group so the hreflang alternates query
+        wires the new post into the same multi-lingual cluster. Only supported
+        on hosted-mode sites (HostedPost); raises ValueError otherwise so the
+        view can return a clean 400. The translation is performed by Claude
+        with explicit instructions to adapt (idioms, examples, cultural refs)
+        rather than render a word-for-word calque.
+
+        Returns the freshly-created HostedPost.
+        """
+        from .models import HostedPost, HostedCategory, HostedTag
+
+        if target_language not in ('fr', 'en', 'es'):
+            raise ValueError(f"Langue cible invalide: {target_language}")
+
+        # source_post is a HostedPost (we only support hosted-mode sites for
+        # sister articles; CMS modes would need adapter-specific create paths
+        # we don't have generalised yet).
+        if not isinstance(source_post, HostedPost):
+            raise ValueError(
+                "generate_sister_article ne supporte que les sites en mode hosted."
+            )
+
+        if source_post.language == target_language:
+            raise ValueError(
+                f"L'article source est deja en {target_language}. "
+                "Choisis une langue cible differente."
+            )
+
+        # Refuse if a sibling in target_language already exists in the same
+        # translation_group: that's the whole point of the group, no duplicates.
+        existing_sibling = HostedPost.objects.filter(
+            site=source_post.site,
+            translation_group=source_post.translation_group,
+            language=target_language,
+        ).first()
+        if existing_sibling:
+            raise ValueError(
+                f"Une version {target_language} existe deja dans ce groupe "
+                f"de traduction (slug: {existing_sibling.slug})."
+            )
+
+        self.log(f'[SISTER] Translation {source_post.language} -> {target_language}')
+
+        lang_names = {
+            'fr': ('francais', 'French'),
+            'en': ('English', 'English'),
+            'es': ('espanol', 'Spanish'),
+        }
+        source_name = lang_names.get(source_post.language, ('francais', 'French'))[0]
+        target_name, target_en = lang_names.get(target_language, ('English', 'English'))
+
+        prompt = f'''Tu es un traducteur-redacteur SEO bilingue. Tu vas adapter (PAS traduire mot-a-mot) un article de blog de {source_name} vers {target_name} ({target_en}).
+
+**REGLES CRITIQUES:**
+1. Ecris ENTIEREMENT en {target_name}. Aucune phrase melangee.
+2. ADAPTE, ne traduis pas litteralement :
+   - Reformule les idiomes ({source_name} -> {target_name} natif)
+   - Remplace les exemples culturellement specifiques par des equivalents de la culture cible
+   - Garde le ton et la voix de l'auteur (premiere personne, opinions, vulnerabilite)
+   - Ajuste les references locales (devises, lois, marques connues) si pertinent
+3. CONSERVE STRICTEMENT la structure markdown :
+   - Memes niveaux de titres (H1, H2, H3)
+   - Memes blocs de code, citations, listes
+   - Memes images (ne touche pas aux balises `![alt](url)`)
+   - Memes liens (mais traduis le `[anchor]` en {target_name})
+4. Le titre H1 doit etre traduit naturellement, pas mot-a-mot.
+5. Ne resume pas, n'allonge pas. Mot-pour-mot, vise la meme longueur que la source.
+6. Reponds UNIQUEMENT avec le markdown traduit, sans preambule ni commentaire.
+
+**TITRE SOURCE ({source_name}):** {source_post.title}
+
+**CONTENU SOURCE A ADAPTER:**
+
+{source_post.content}
+
+---
+
+Ecris maintenant la version {target_name} complete.'''
+
+        translated_markdown = self.call_claude(prompt, max_tokens=10000).strip()
+
+        # Pull the new title from the H1 if present, else translate the title
+        # field directly. The LLM is instructed to keep the H1, so the regex
+        # path is the common case.
+        new_title = source_post.title
+        h1_match = re.search(r'^#\s+(.+?)\s*$', translated_markdown, flags=re.MULTILINE)
+        if h1_match:
+            new_title = h1_match.group(1).strip()[:200]
+        else:
+            # Fallback: ask Claude to translate just the title (cheap, ~50
+            # tokens). Better than carrying the source-language title on a
+            # target-language article and hurting hreflang relevance.
+            self.log('[SISTER] No H1 in translation - translating title separately')
+            tprompt = (
+                f"Traduis ce titre de {source_name} vers {target_name}, "
+                f"de maniere naturelle et SEO-friendly (max 60 caracteres). "
+                f"Reponds UNIQUEMENT avec le titre traduit, sans guillemets.\n\n"
+                f"Titre: {source_post.title}"
+            )
+            try:
+                new_title = self.call_claude(tprompt, max_tokens=80).strip().strip('"\'')
+                new_title = new_title[:200] or source_post.title
+            except Exception as e:
+                self.log(f'[SISTER] Title translation failed: {e}')
+
+        # Translate excerpt the same way so the meta description matches the
+        # article body language. Empty excerpt = skip.
+        new_excerpt = source_post.excerpt or ''
+        if new_excerpt.strip():
+            eprompt = (
+                f"Traduis cette meta description de {source_name} vers {target_name}, "
+                f"naturellement (max 160 caracteres). Reponds UNIQUEMENT avec la "
+                f"traduction.\n\n{source_post.excerpt}"
+            )
+            try:
+                translated_excerpt = self.call_claude(eprompt, max_tokens=200).strip().strip('"\'')
+                if translated_excerpt:
+                    new_excerpt = translated_excerpt[:500]
+            except Exception as e:
+                self.log(f'[SISTER] Excerpt translation failed: {e}')
+
+        # Build a target-language slug. Prefer the new title; collisions get
+        # the language suffix so the unique_together (site, slug) holds.
+        base_slug = slugify(new_title) or f"{source_post.slug}-{target_language}"
+        candidate_slug = base_slug
+        attempt = 0
+        while HostedPost.objects.filter(site=source_post.site, slug=candidate_slug).exists():
+            attempt += 1
+            if attempt == 1:
+                candidate_slug = f"{base_slug}-{target_language}"
+            else:
+                candidate_slug = f"{base_slug}-{target_language}-{attempt}"
+
+        # Carry over the category by name (auto-created in target lang context).
+        new_category = source_post.category
+
+        new_post = HostedPost.objects.create(
+            site=source_post.site,
+            title=new_title,
+            slug=candidate_slug,
+            excerpt=new_excerpt,
+            content=translated_markdown,
+            author=source_post.author,
+            language=target_language,
+            translation_group=source_post.translation_group,
+            category=new_category,
+            cover_image=source_post.cover_image,
+            reading_time=source_post.reading_time,
+            featured=False,
+            status='draft',  # user reviews before publish - mirrors autopilot UX
+        )
+
+        # Carry tags (HostedTag is unique on (site, name), so re-attach by name).
+        for tag in source_post.tags.all():
+            t, _ = HostedTag.objects.get_or_create(site=source_post.site, name=tag.name)
+            new_post.tags.add(t)
+
+        self.log(
+            f'[SISTER] Created HostedPost #{new_post.id} '
+            f'(slug={new_post.slug}, lang={target_language}, '
+            f'translation_group={source_post.translation_group})'
+        )
+        return new_post
+
+    # === REFRESH (content decay path) ===
+
+    def update_article(self, post, refresh_prompt_hint=None, new_published_at=None):
+        """Regenerate an existing HostedPost in-place to fight content decay.
+
+        Keeps the slug, translation_group and URL stable so backlinks and the
+        GSC history survive. Updates content (regenerated by Claude with a
+        "refresh" angle), excerpt, reading_time, updated_at, and bumps
+        published_at to today (default) so the article appears as a freshly
+        published piece in feeds and the public blog. This is the refresh path
+        used by the autopilot's refresh_first / balanced modes.
+
+        Only supported on HostedPost - external Postgres / CMS modes (WP,
+        Shopify, Webflow) would need adapter-level update calls and are out
+        of scope for this iteration.
+
+        Returns the saved post.
+        """
+        from .models import HostedPost
+
+        if not isinstance(post, HostedPost):
+            raise ValueError(
+                "update_article supporte uniquement les HostedPost. "
+                "Le refresh n'est pas implemente pour WP / Shopify / Webflow."
+            )
+
+        self.log(f'[REFRESH] Regenerating HostedPost #{post.id} (slug={post.slug})')
+
+        lang_map = {
+            'fr': ('francais', 'French'),
+            'en': ('English', 'English'),
+            'es': ('espanol', 'Spanish'),
+        }
+        lang_native, lang_en = lang_map.get(post.language or 'fr', ('francais', 'French'))
+
+        hint_block = ''
+        if refresh_prompt_hint:
+            hint_block = f'\n**HINT DE REFRESH:** {refresh_prompt_hint}\n'
+
+        prompt = f'''Tu es un editeur SEO. Cet article perd du trafic et doit etre RAFRAICHI.
+
+**REGLE CRITIQUE DE LANGUE:** Reponds entierement en {lang_native} ({lang_en}).
+
+**TITRE:** {post.title}
+**ANGLE DE REFRESH:**
+- Mets a jour les dates et exemples obsoletes (vise l'annee {date.today().year}).
+- AJOUTE au moins une nouvelle section ## avec du contenu inedit (chiffres recents, nouveau angle, FAQ enrichie).
+- Renforce E-E-A-T : ajoute experience perso, source citee, expertise demontree.
+- Conserve la structure markdown existante (H2, listes, images).
+- Ne touche pas aux images existantes ![alt](url) ni aux liens internes [/blog/...].
+- Garde le meme ton et la meme voix que l'article original.
+- Ne raccourcis pas. Vise +10 a +30% de longueur.
+{hint_block}
+**CONTENU ACTUEL A RAFRAICHIR (markdown):**
+
+{post.content}
+
+---
+
+Reponds UNIQUEMENT avec le markdown rafraichi complet (avec le H1 s'il etait present), sans preambule.'''
+
+        refreshed = self.call_claude(prompt, max_tokens=10000).strip()
+
+        # Pull updated title from H1 if present (rare, content usually starts at H2).
+        new_title = post.title
+        h1_match = re.search(r'^#\s+(.+?)\s*$', refreshed, flags=re.MULTILINE)
+        if h1_match:
+            new_title = h1_match.group(1).strip()[:200] or post.title
+
+        # Regenerate the excerpt from the refreshed body so the meta description
+        # also reflects the update.
+        try:
+            new_excerpt = self.generate_excerpt(refreshed, new_title)
+        except Exception as e:
+            self.log(f'[REFRESH] Excerpt regeneration failed: {e}')
+            new_excerpt = post.excerpt
+
+        # Reading time on the refreshed body.
+        try:
+            new_reading_time = self.calculate_reading_time(refreshed)
+        except Exception:
+            new_reading_time = post.reading_time
+
+        post.title = new_title
+        post.content = refreshed
+        post.excerpt = new_excerpt
+        post.reading_time = new_reading_time
+        # Bump published_at so the article surfaces as freshly updated. Default
+        # to today; caller may override via new_published_at for testing.
+        post.published_at = new_published_at or date.today()
+        # If the post was a draft, treat the refresh as a (re)publish.
+        if post.status == 'draft':
+            post.status = 'published'
+        post.save()
+
+        self.log(f'[REFRESH] HostedPost #{post.id} updated (published_at={post.published_at})')
+        return post
