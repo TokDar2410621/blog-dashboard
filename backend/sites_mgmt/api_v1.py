@@ -1,8 +1,18 @@
 """Public developer API - `/api/v1/*` endpoints.
 
-Authenticated via Bearer ApiToken (separate from the dashboard JWT). Designed
-for clients to integrate with their own automation (n8n, Zapier, Make, custom
-scripts). Curated subset of internal endpoints; nothing destructive exposed.
+Two callers share these endpoints:
+  1. External integrations (n8n, Zapier, MCP, scripts) authenticate via
+     Bearer ApiToken.
+  2. The Gridar dashboard itself - logged-in users in the browser - calls
+     /api/v1/sites/<id>/ai-visibility/* and friends with the same httpOnly
+     JWT cookie that secures the rest of the dashboard. We accept both auth
+     classes so the dashboard doesn't have to mint and manage an API token
+     just to read its own data.
+
+Plan-based gating: external Bearer-token requests on free/solo plans are
+blocked (this is paid-API territory). Cookie-authenticated dashboard users
+go through the same plan check; the frontend should render an upgrade
+banner when it gets the resulting 403.
 
 Plan-based rate limits enforced at request time:
   free   → blocked entirely (403)
@@ -26,6 +36,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
+from config.authentication import CookieJWTAuthentication
 from blog.models import BlogPost
 from .models import (
     AiVisibilityPrompt, AiVisibilityResult,
@@ -146,18 +157,33 @@ class ApiPlanThrottle(UserRateThrottle):
 # --------------------------------------------------------------------------
 
 class BaseV1View(APIView):
-    authentication_classes = [ApiTokenAuthentication]
+    # CookieJWTAuthentication first so the dashboard's existing session
+    # cookie authenticates without a Bearer token. ApiTokenAuthentication
+    # stays as the fallback for external integrations (n8n, MCP, scripts)
+    # that present `Authorization: Bearer btb_...`.
+    authentication_classes = [CookieJWTAuthentication, ApiTokenAuthentication]
     throttle_classes = [ApiPlanThrottle]
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         if not request.user or not request.user.is_authenticated:
-            raise exceptions.AuthenticationFailed('Bearer token requis.')
-        sub = _get_subscription(request.user)
-        if sub.plan in ('free', 'solo'):
-            raise exceptions.PermissionDenied(
-                'Accès API réservé aux plans Pro et Agence. Mets à niveau sur /billing.'
+            raise exceptions.AuthenticationFailed(
+                'Session ou Bearer token requis.'
             )
+        # Plan-gate the *developer API* surface (Bearer ApiToken). When the
+        # caller is the dashboard (cookie JWT), let them through - the
+        # frontend is the gating layer there (hide Pro-only features for
+        # free/solo users in the sidebar). Staff bypass everything.
+        if request.user.is_staff:
+            return
+        authenticator = getattr(request, 'successful_authenticator', None)
+        if isinstance(authenticator, ApiTokenAuthentication):
+            sub = _get_subscription(request.user)
+            if sub.plan in ('free', 'solo'):
+                raise exceptions.PermissionDenied(
+                    'Accès API réservé aux plans Pro et Agence. '
+                    'Mets à niveau sur /billing.'
+                )
 
     def get_user_site(self, request, site_id):
         """Look up a site that belongs to the authenticated user. 404 otherwise."""
