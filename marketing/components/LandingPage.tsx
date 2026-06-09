@@ -93,7 +93,12 @@ export default function LandingPage() {
   const authedHref = isAuthenticated ? "/sites" : "/login";
   const primaryCtaLabel = isAuthenticated ? "Tableau de bord" : "Commencer";
   const headerCtaLabel = isAuthenticated ? "Tableau de bord" : "Connexion";
-  const hideLoginAffordance = authLoading;
+  // Hide the secondary "Connexion" text link entirely while we're still
+  // probing /auth/me/ AND once we know the user is authenticated - the
+  // primary "Tableau de bord" button covers that affordance, no point
+  // showing both. Authenticated users should not see the word "Connexion"
+  // anywhere in the header.
+  const hideLoginAffordance = authLoading || isAuthenticated;
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       {/* Global animation keyframes used across the page. */}
