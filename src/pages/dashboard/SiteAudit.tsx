@@ -8,7 +8,7 @@
  */
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { authFetch } from "@/lib/api-client";
+import { authFetch, listStrategicOpportunities } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Activity,
   Search,
+  Lightbulb,
 } from "lucide-react";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
 import {
@@ -152,6 +153,22 @@ export default function SiteAudit() {
     },
     staleTime: 60 * 1000, // 1 min
   });
+
+  // Strategic opportunities count - tiny GET, used to render the teaser
+  // card. Doesn't block the page; if it 404s we just hide the teaser.
+  const opportunitiesQuery = useQuery({
+    queryKey: ["opportunities-count", siteId],
+    queryFn: () => listStrategicOpportunities(Number(siteId)),
+    enabled: !!siteId,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
+  const proposedOpportunities = (
+    opportunitiesQuery.data?.results || []
+  ).filter((o) => o.status === "proposed");
+  const highPriorityCount = proposedOpportunities.filter(
+    (o) => o.priority === "high",
+  ).length;
 
   if (isLoading) {
     return (
@@ -283,6 +300,47 @@ export default function SiteAudit() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Strategic opportunities teaser. Only renders when at least one
+          proposed opportunity exists - the empty state lives on the
+          dedicated /opportunites page so we don't double-noise this view. */}
+      {proposedOpportunities.length > 0 && (
+        <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/[0.06] via-amber-500/[0.02] to-transparent">
+          <CardContent className="py-5 flex items-start gap-4 flex-wrap">
+            <span className="h-10 w-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <Lightbulb className="h-5 w-5 text-amber-400" />
+            </span>
+            <div className="flex-1 min-w-[16rem]">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-amber-400 mb-1">
+                Opportunités stratégiques détectées
+              </p>
+              <p className="font-semibold leading-snug">
+                {proposedOpportunities.length} page
+                {proposedOpportunities.length > 1 ? "s" : ""} à créer pour
+                capturer le trafic de tes mots-clés
+                {highPriorityCount > 0 && (
+                  <>
+                    {" "}
+                    <span className="text-emerald-400">
+                      ({highPriorityCount} priorité haute)
+                    </span>
+                  </>
+                )}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Claude a analysé tes mots-clés transactionnels et ton offre
+                pour proposer des landings qui ranquent ET convertissent.
+              </p>
+            </div>
+            <Link to={`${base}/opportunites`}>
+              <Button>
+                Voir les opportunités
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recos prioritaires */}
       {data.recos.length > 0 && (

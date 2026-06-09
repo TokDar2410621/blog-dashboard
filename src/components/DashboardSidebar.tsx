@@ -37,6 +37,7 @@ import {
   Coins,
   Search,
   Brain,
+  Lightbulb,
 } from "lucide-react";
 
 export function DashboardSidebar() {
@@ -51,6 +52,7 @@ export function DashboardSidebar() {
   const navItems = [
     { label: t("sidebar.dashboard"), icon: LayoutDashboard, href: base },
     { label: t("sidebar.siteAudit") || "Audit du site", icon: Gauge, href: `${base}/audit-site` },
+    { label: t("sidebar.opportunities") || "Opportunités SEO", icon: Lightbulb, href: `${base}/opportunites` },
     { label: t("sidebar.articles"), icon: FileText, href: `${base}/articles` },
     { label: t("sidebar.generate"), icon: Sparkles, href: `${base}/generer` },
     { label: t("sidebar.bulkAudit"), icon: TrendingUp, href: `${base}/audit-global` },

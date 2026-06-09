@@ -34,6 +34,7 @@ const BrokenLinks = lazy(() => import("./BrokenLinks"));
 const WeeklyDigest = lazy(() => import("./WeeklyDigest"));
 const SerpAnalyzer = lazy(() => import("./SerpAnalyzer"));
 const AiVisibility = lazy(() => import("./AiVisibility"));
+const Opportunities = lazy(() => import("./Opportunities"));
 
 function PageLoader() {
   return (
@@ -73,6 +74,7 @@ export default function DashboardLayout() {
                   <Route path="broken-links" element={<BrokenLinks />} />
                   <Route path="serp-analyzer" element={<SerpAnalyzer />} />
                   <Route path="ai-visibility" element={<AiVisibility />} />
+                  <Route path="opportunites" element={<Opportunities />} />
                   <Route path="digest" element={<WeeklyDigest />} />
                   <Route path="images" element={<ImageGallery />} />
                   <Route path="parametres" element={<SettingsLayout />}>

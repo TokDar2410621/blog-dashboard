@@ -1029,3 +1029,131 @@ export async function runAiVisibility(
   }
   return res.json();
 }
+
+// ============================================================================
+// Strategic Opportunities
+// ============================================================================
+// /api/v1/sites/<id>/strategic-opportunities/*
+// Backed by the Claude strategic engine: for each non-info-intent keyword
+// without a matching landing, the engine proposes a page concept tied to the
+// site's existing assets + a conversion mechanism. UI lives at
+// /dashboard/<siteId>/opportunites.
+
+export type StrategicOpportunityConcept = {
+  page_concept: string;
+  page_type:
+    | "tool_landing"
+    | "service_page"
+    | "comparison"
+    | "guide_pillar"
+    | "quiz_landing"
+    | "calculator"
+    | "local_landing"
+    | "lead_magnet"
+    | string;
+  suggested_title: string;
+  suggested_url_path: string;
+  hook: string;
+  capture_mechanism: string;
+  conversion_path: string;
+  angle: string;
+  asset_match: boolean;
+  asset_used: string | null;
+  why_this_works: string;
+  priority?: "high" | "medium" | "low";
+};
+
+export type StrategicOpportunityEstimate = {
+  monthly_volume: number;
+  target_position: number;
+  estimated_visits: number;
+  estimated_leads_range: [number, number];
+  estimated_paid_range: [number, number];
+  qualitative_traffic: "élevé" | "moyen" | "faible" | "marginal" | "inconnu";
+};
+
+export type StrategicOpportunity = {
+  id: number;
+  keyword: string;
+  intent: "info" | "commercial" | "transactional" | "local";
+  language: string;
+  current_position: number | null;
+  priority: "high" | "medium" | "low";
+  status: "proposed" | "approved" | "dismissed" | "done";
+  concept: StrategicOpportunityConcept;
+  estimate: StrategicOpportunityEstimate;
+  tracked_keyword_id: number | null;
+  generated_landing_id: number | null;
+  generated_landing_slug: string | null;
+  created_at: string;
+  refreshed_at: string | null;
+};
+
+export async function listStrategicOpportunities(
+  siteId: number,
+  options: { includeDismissed?: boolean } = {},
+): Promise<{ results: StrategicOpportunity[]; count: number }> {
+  const qs = options.includeDismissed ? "?include_dismissed=1" : "";
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${qs}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Liste des opportunités impossible", res.status);
+  }
+  return res.json();
+}
+
+export async function refreshStrategicOpportunities(
+  siteId: number,
+  body: { max_keywords?: number } = {},
+): Promise<{
+  refreshed: Array<{ id: number; keyword: string; priority: string }>;
+  skipped: Array<{ keyword: string; reason: string }>;
+  count_refreshed: number;
+  count_skipped: number;
+  count_candidates: number;
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/refresh/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string"
+        ? err.error
+        : "Régénération des opportunités impossible",
+      res.status,
+      "OPPORTUNITIES_REFRESH_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+export async function actionStrategicOpportunity(
+  siteId: number,
+  opportunityId: number,
+  action: "dismiss" | "restore" | "approve",
+): Promise<{
+  id: number;
+  status: StrategicOpportunity["status"];
+  landing_id?: number;
+  landing_slug?: string;
+  note?: string;
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${opportunityId}/${action}/`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : `Action ${action} impossible`,
+      res.status,
+      `OPPORTUNITY_${action.toUpperCase()}_FAILED`,
+      err,
+    );
+  }
+  return res.json();
+}
