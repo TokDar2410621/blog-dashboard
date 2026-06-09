@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ function scoreLabel(s: number | null | undefined) {
 }
 
 export function PublicAuditPage() {
+  const searchParams = useSearchParams();
   const [domain, setDomain] = useState("");
   const [auditing, setAuditing] = useState(false);
   const [result, setResult] = useState<AuditResult | null>(null);
@@ -72,6 +74,7 @@ export function PublicAuditPage() {
   const [consented, setConsented] = useState(false);
   const [submittingLead, setSubmittingLead] = useState(false);
   const [leadCaptured, setLeadCaptured] = useState(false);
+  const autorunFired = useRef(false);
 
   type Stats = {
     audits_this_month: number;
@@ -87,9 +90,9 @@ export function PublicAuditPage() {
       .catch(() => {});
   }, []);
 
-  const runAudit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!domain.trim()) return;
+  const runAuditFor = async (target: string) => {
+    const clean = target.trim();
+    if (!clean) return;
     setAuditing(true);
     setResult(null);
     setLeadCaptured(false);
@@ -97,7 +100,7 @@ export function PublicAuditPage() {
       const res = await fetch(`${API_BASE}/api/public/audit/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: domain.trim() }),
+        body: JSON.stringify({ domain: clean }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -111,6 +114,24 @@ export function PublicAuditPage() {
       setAuditing(false);
     }
   };
+
+  const runAudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runAuditFor(domain);
+  };
+
+  // Hero landing -> /audit?domain=...&autorun=1 : prefill + auto-launch.
+  useEffect(() => {
+    if (autorunFired.current) return;
+    const prefill = searchParams?.get("domain") || "";
+    if (!prefill) return;
+    setDomain(prefill);
+    if (searchParams?.get("autorun") === "1") {
+      autorunFired.current = true;
+      runAuditFor(prefill);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const submitEmail = async (e: React.FormEvent) => {
     e.preventDefault();

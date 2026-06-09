@@ -118,10 +118,6 @@ export default function LandingPage() {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
-        @keyframes marqueeX {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
         @media (prefers-reduced-motion: no-preference) {
           .hero-fade-1 { animation: heroFadeUp 0.7s ease-out 0.05s backwards; }
           .hero-fade-2 { animation: heroFadeUp 0.7s ease-out 0.20s backwards; }
@@ -131,7 +127,6 @@ export default function LandingPage() {
           .float-slow { animation: float 5s ease-in-out infinite; }
           .glow-pulse { animation: glowPulse 4s ease-in-out infinite; }
           .draw-line { animation: drawLine 2s ease-out 0.3s backwards; }
-          .marquee-x { animation: marqueeX 30s linear infinite; }
         }
       `}</style>
 
@@ -267,25 +262,25 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* "Trusted by" marquee - subtle visual touch */}
-      <section className="relative z-10 border-t border-white/5 py-10 overflow-hidden">
-        <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-600 mb-6">
-          Construit avec
-        </p>
-        <div className="relative max-w-6xl mx-auto px-6 overflow-hidden">
-          <div className="flex marquee-x gap-12 whitespace-nowrap w-max">
-            {[...TECH_LIST, ...TECH_LIST].map((label, i) => (
-              <span
-                key={i}
-                className="text-zinc-500 text-sm font-mono shrink-0 hover:text-zinc-300 transition-colors"
-              >
-                {label}
-              </span>
+      {/* What you get - 4 outcomes from the client's perspective */}
+      <section className="relative z-10 border-t border-white/5 py-14 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-6">
+          <p className="text-center text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-600 mb-8">
+            Ce que tu repars avec
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {OUTCOMES.map((o, i) => (
+              <Reveal key={o.title} delay={i * 80}>
+                <div className="h-full rounded-xl border border-white/10 bg-zinc-900/40 p-5 hover:border-emerald-500/30 motion-safe:transition-colors">
+                  <div className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-br from-emerald-300 to-cyan-400 bg-clip-text text-transparent">
+                    {o.metric}
+                  </div>
+                  <div className="mt-2 font-semibold text-zinc-100">{o.title}</div>
+                  <div className="mt-1 text-xs text-zinc-500 leading-relaxed">{o.body}</div>
+                </div>
+              </Reveal>
             ))}
           </div>
-          {/* Edge fades */}
-          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-zinc-950 to-transparent pointer-events-none" />
-          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-zinc-950 to-transparent pointer-events-none" />
         </div>
       </section>
 
@@ -563,6 +558,77 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Guarantee - Hormozi-style stacked risk reversal */}
+      <section className="relative z-10 py-24 border-t border-white/5">
+        <div className="max-w-5xl mx-auto px-6">
+          <Reveal className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-5">
+              <ShieldCheck className="h-3 w-3" />
+              Garantie triple Gridar
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[0.95]">
+              Tu ne risques
+              <br />
+              <span className="text-emerald-400">absolument rien.</span>
+            </h2>
+            <p className="mt-6 text-zinc-400 max-w-2xl mx-auto text-base">
+              On empile trois garanties pour que tu n'aies aucune raison de ne pas tester. Si Gridar ne livre pas, c'est nous qui payons - pas toi.
+            </p>
+          </Reveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Reveal delay={0}>
+              <div className="h-full rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.08] to-transparent p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold">1</span>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-300">Garantie qualité</div>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Premier article refait gratuitement</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Ton premier article ne te plaît pas ? On le re-génère gratuitement, autant de fois qu'il faut, jusqu'à ce qu'il sonne comme toi. Tant que c'est pas bon, on continue.
+                </p>
+              </div>
+            </Reveal>
+
+            <Reveal delay={120}>
+              <div className="h-full rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.08] to-transparent p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold">2</span>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-300">Garantie 30 jours</div>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Remboursement complet, sans question</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Pas convaincu après 30 jours ? Un courriel à <span className="text-zinc-200">tokamdarius@gmail.com</span>, on rembourse 100% en 48h. Tu gardes tous les articles publiés. Aucun frais d'annulation.
+                </p>
+              </div>
+            </Reveal>
+
+            <Reveal delay={240}>
+              <div className="h-full rounded-2xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/[0.08] to-transparent p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-300 font-bold">3</span>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-300">Garantie 0 lock-in</div>
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Tes articles t'appartiennent</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Tout reste sur ton domaine, ton WordPress, ton compte Google. Si tu pars, tu pars avec tout. Aucun watermark, aucune dépendance, aucun lock-in technique.
+                </p>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={400} className="mt-10 text-center">
+            <p className="text-sm text-zinc-500">
+              Conditions complètes :{" "}
+              <Link href="/terms" className="text-zinc-300 underline underline-offset-2 hover:text-emerald-300">
+                voir les CGU
+              </Link>
+              . Garantie applicable au premier abonnement par client.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
       {/* Integrations */}
       <section className="relative z-10 max-w-5xl mx-auto px-6 py-24 border-t border-white/5">
         <Reveal>
@@ -664,14 +730,31 @@ export default function LandingPage() {
             dans le vocabulaire de tes lecteurs, et un audit qui pointe quoi
             corriger ligne par ligne. 10 minutes par article.
           </p>
-          <div className="mt-12">
+          <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center items-center">
             <Link href={authedHref}>
-              <Button size="lg" className="bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-8 text-base motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02]">
+              <Button size="lg" className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-8 text-base motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02]">
                 <Sparkles className="h-4 w-4 mr-2" />
                 {isAuthenticated ? "Aller au tableau de bord" : "Commencer gratuitement"}
               </Button>
             </Link>
+            <span className="hidden sm:inline text-xs text-zinc-600 font-mono">ou</span>
+            <a
+              href="mailto:tokamdarius@gmail.com?subject=Demo%2015%20min%20-%20Gridar&body=Salut%20Darius%2C%0A%0AJ%27aimerais%20voir%20Gridar%20en%2015%20min.%20Mon%20site%20%3A%20%0AMa%20question%20%3A%20%0A%0AMerci%20%21"
+              className="w-full sm:w-auto"
+            >
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full sm:w-auto h-12 px-6 bg-transparent border-white/15 hover:bg-white/5 text-zinc-100 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
+              >
+                Réserve 15 min avec Darius
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </a>
           </div>
+          <p className="mt-5 text-xs text-zinc-500">
+            Aucune carte requise · Annule en 1 clic · Garantie 30 jours
+          </p>
         </Reveal>
       </section>
 
@@ -1467,21 +1550,29 @@ function PriceCard({
   );
 }
 
-// --- Tech stack marquee --------------------------------------------------
+// --- Client-perspective outcomes (replaces the old tech stack marquee) ----
 
-const TECH_LIST = [
-  "Anthropic Claude",
-  "Gemini 2.5 Flash",
-  "Google Search Console",
-  "Serper SERP",
-  "Originality.ai",
-  "WordPress REST API",
-  "PageSpeed Insights",
-  "Pexels",
-  "Vercel Edge",
-  "Railway",
-  "Stripe",
-  "Schema.org",
+const OUTCOMES: { metric: string; title: string; body: string }[] = [
+  {
+    metric: "10 min",
+    title: "Par article publié",
+    body: "Brief, écriture, audit, publication. Du sujet à la mise en ligne sur ton WordPress en moins de 10 minutes.",
+  },
+  {
+    metric: "60 s",
+    title: "Audit complet",
+    body: "Tags, schema, vitesse mobile, positions Google, mots-clés manquants. Tout scanné en moins d'une minute.",
+  },
+  {
+    metric: "FR-CA",
+    title: "Lexique québécois",
+    body: "Magasinage, fin de semaine, courriel. Tes lecteurs lisent leur vocabulaire, pas celui d'un traducteur parisien.",
+  },
+  {
+    metric: "0 plugin",
+    title: "Aucune install",
+    body: "Application Password WP natif, proxy Cloudflare/Vercel pour les non-WP. Zéro code à toucher chez ton hébergeur.",
+  },
 ];
 
 // --- FAQ data --------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PublicAuditPage } from "@/components/PublicAuditPage";
 
 export const metadata: Metadata = {
@@ -14,6 +15,13 @@ export const metadata: Metadata = {
   },
 };
 
+// PublicAuditPage uses useSearchParams() to prefill from /audit?domain=...&autorun=1
+// (hero CTA on /). Next.js requires that to be wrapped in <Suspense> when the page
+// is statically pre-rendered, otherwise the build fails at export time.
 export default function AuditPage() {
-  return <PublicAuditPage />;
+  return (
+    <Suspense fallback={null}>
+      <PublicAuditPage />
+    </Suspense>
+  );
 }
