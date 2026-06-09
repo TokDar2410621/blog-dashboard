@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
@@ -26,6 +28,15 @@ COOKIE_OPTS = {
     'samesite': 'Lax',
     'path': '/',
 }
+# When the marketing site (gridar.app) and the dashboard SPA (e.g. gridar.app
+# proxied, app.gridar.app, or a preview URL) live on different hosts within
+# the same registrable domain, we need the cookie scoped to the parent
+# domain so both surfaces see the same session. Set
+# AUTH_COOKIE_DOMAIN=.gridar.app on Railway in production. Left unset, the
+# cookie stays host-only (correct for localhost during dev).
+_AUTH_COOKIE_DOMAIN = os.getenv('AUTH_COOKIE_DOMAIN', '').strip()
+if _AUTH_COOKIE_DOMAIN:
+    COOKIE_OPTS['domain'] = _AUTH_COOKIE_DOMAIN
 
 ACCESS_MAX_AGE = int(settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds())
 REFRESH_MAX_AGE = int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
@@ -112,8 +123,11 @@ class CookieLogoutView(APIView):
 
     def post(self, request, *args, **kwargs):
         response = Response({'detail': 'Logged out'})
-        response.delete_cookie('access_token', path='/')
-        response.delete_cookie('refresh_token', path='/')
+        # delete_cookie must mirror the domain used when the cookie was set,
+        # otherwise the browser leaves the original cookie in place and the
+        # user appears logged in until the access_token TTL elapses.
+        response.delete_cookie('access_token', path='/', domain=_AUTH_COOKIE_DOMAIN or None)
+        response.delete_cookie('refresh_token', path='/', domain=_AUTH_COOKIE_DOMAIN or None)
         return response
 
 
