@@ -54,7 +54,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.5.0",
+    "User-Agent": "@gridar/mcp-server/0.6.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 
@@ -763,5 +763,98 @@ export async function runAiVisibility(
   }>(`/sites/${siteId}/ai-visibility/run/`, {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Strategic Opportunities (2026-06-09)
+// ---------------------------------------------------------------------------
+//
+// For each non-info-intent tracked keyword without a matching landing, the
+// backend engine produces a structured page concept tied to the site's
+// existing assets and a quantitative traffic + lead estimate. Approving an
+// opportunity generates the matching HostedLanding via the LandingGenerator.
+
+export type StrategicOpportunityConcept = {
+  page_concept: string;
+  page_type: string;
+  suggested_title: string;
+  suggested_url_path: string;
+  hook: string;
+  capture_mechanism: string;
+  conversion_path: string;
+  angle: string;
+  asset_match: boolean;
+  asset_used: string | null;
+  why_this_works: string;
+  priority?: "high" | "medium" | "low";
+};
+
+export type StrategicOpportunityEstimate = {
+  monthly_volume: number;
+  target_position: number;
+  estimated_visits: number;
+  estimated_leads_range: [number, number];
+  estimated_paid_range: [number, number];
+  qualitative_traffic: string;
+};
+
+export type StrategicOpportunity = {
+  id: number;
+  keyword: string;
+  intent: "info" | "commercial" | "transactional" | "local";
+  language: string;
+  current_position: number | null;
+  priority: "high" | "medium" | "low";
+  status: "proposed" | "approved" | "dismissed" | "done";
+  concept: StrategicOpportunityConcept;
+  estimate: StrategicOpportunityEstimate;
+  tracked_keyword_id: number | null;
+  generated_landing_id: number | null;
+  generated_landing_slug: string | null;
+  created_at: string;
+  refreshed_at: string | null;
+};
+
+export async function listStrategicOpportunities(
+  siteId: number,
+  opts: { include_dismissed?: boolean } = {},
+) {
+  const qs = opts.include_dismissed ? "?include_dismissed=1" : "";
+  return request<{ results: StrategicOpportunity[]; count: number }>(
+    `/sites/${siteId}/strategic-opportunities/${qs}`,
+  );
+}
+
+export async function refreshStrategicOpportunities(
+  siteId: number,
+  body: { max_keywords?: number } = {},
+) {
+  return request<{
+    refreshed: { id: number; keyword: string; priority: string }[];
+    skipped: { keyword: string; reason: string }[];
+    count_refreshed: number;
+    count_skipped: number;
+    count_candidates: number;
+  }>(`/sites/${siteId}/strategic-opportunities/refresh/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function actionStrategicOpportunity(
+  siteId: number,
+  opportunityId: number,
+  action: "approve" | "dismiss" | "restore",
+) {
+  return request<{
+    id: number;
+    status: StrategicOpportunity["status"];
+    landing_id?: number;
+    landing_slug?: string;
+    note?: string;
+  }>(`/sites/${siteId}/strategic-opportunities/${opportunityId}/${action}/`, {
+    method: "POST",
+    body: JSON.stringify({}),
   });
 }

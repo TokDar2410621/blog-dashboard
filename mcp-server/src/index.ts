@@ -17,6 +17,7 @@ import { z } from "zod";
 
 import {
   ApiError,
+  actionStrategicOpportunity,
   addMemory,
   aiOverviewReadiness,
   aiVisibilitySummary,
@@ -56,10 +57,12 @@ import {
   listKeywords,
   listMemories,
   listSites,
+  listStrategicOpportunities,
   pageSpeed,
   peopleAlsoAsk,
   proposeKeywordStrategy,
   rebuildMemory,
+  refreshStrategicOpportunities,
   revokeProofShare,
   runAiVisibility,
   runAutopilotNow,
@@ -451,6 +454,45 @@ const ApproveStrategyArgs = z
       .optional()
       .describe(
         "Optional override: {pages: [...]} to replace the proposed pages list",
+      ),
+  })
+  .strict();
+
+// --- Strategic Opportunities ---------------------------------------------
+
+const ListStrategicOpportunitiesArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    include_dismissed: z
+      .boolean()
+      .optional()
+      .describe("Set true to also return opportunities the user dismissed"),
+  })
+  .strict();
+
+const RefreshStrategicOpportunitiesArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    max_keywords: z
+      .number()
+      .int()
+      .positive()
+      .max(20)
+      .optional()
+      .describe(
+        "Cap on how many tracked keywords the engine runs Claude against (default 8, max 20). Each one is one Claude call - keep this small unless you want a costly refresh.",
+      ),
+  })
+  .strict();
+
+const StrategicOpportunityActionArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    opportunity_id: z.number().int().positive(),
+    action: z
+      .enum(["approve", "dismiss", "restore"])
+      .describe(
+        "approve = generate the landing now and mark done; dismiss = hide it from the proposed list; restore = un-dismiss a previously dismissed opportunity.",
       ),
   })
   .strict();
@@ -1002,6 +1044,38 @@ const tools: ToolDef[] = [
       "Fetch a URL and detect whether it's server-rendered (SSR/SSG/prerendered) or a JavaScript SPA shell that Googlebot has to render itself. Inspects the raw HTML body and counts visible text words after stripping scripts and styles - >100 words = OK, less = suspect SPA. Returns {url, is_prerendered, html_contains_main_text, word_count, warning, suggestion}. Use this to quickly tell a user whether their site is Googlebot-friendly or needs prerendering / SSR (Next.js, Nuxt, Astro, prerender.io).",
     schema: CheckRenderabilityArgs,
     handler: (input) => checkRenderability({ url: input.url }),
+  },
+  {
+    name: "gridar_list_strategic_opportunities",
+    description:
+      "List the cached strategic opportunities for a site. Each one ties a tracked keyword (transactional / commercial / local intent, no landing yet) to a structured page concept: page_type (tool_landing | service_page | comparison | guide_pillar | quiz_landing | calculator | local_landing | lead_magnet), suggested_title, suggested_url_path, the hook (the specific thing that gets the click), capture_mechanism (how the lead is captured), conversion_path (how the lead becomes a customer), the angle vs the current SERP top 5, asset_match (whether the site already has the product/feature to power the hook), asset_used name, why_this_works rationale, and a priority bucket. Each opportunity also carries a quantitative estimate: monthly_volume (Serper), estimated_visits at SERP rank 5 (CTR table * volume), estimated_leads_range and estimated_paid_range computed from the site's business_model conversion table. Status flow: proposed (waiting) -> approved (landing being generated) -> done (HostedLanding live). Call gridar_refresh_strategic_opportunities first to populate, then this to enumerate.",
+    schema: ListStrategicOpportunitiesArgs,
+    handler: (input) =>
+      listStrategicOpportunities(input.site_id, {
+        include_dismissed: input.include_dismissed,
+      }),
+  },
+  {
+    name: "gridar_refresh_strategic_opportunities",
+    description:
+      "Run the strategic opportunity engine for a site. For each tracked keyword whose intent is non-info (transactional / commercial / local) AND that doesn't already have a matching landing, the engine builds a structured Claude prompt with the site's business_model + description + knowledge_base + CTA + SERP top 5 + existing pages list + Niveau-2 quantitative estimate, then asks Claude to propose ONE page that capitalises on the site's existing assets to capture and convert that keyword's intent. Each accepted concept is upserted as a StrategicOpportunity row. Bounded by max_keywords (default 8, cap 20) to keep Claude cost predictable. Idempotent: re-running refreshes concepts, preserves dismissed / done statuses. Returns counts + per-keyword refresh status.",
+    schema: RefreshStrategicOpportunitiesArgs,
+    handler: (input) =>
+      refreshStrategicOpportunities(input.site_id, {
+        max_keywords: input.max_keywords,
+      }),
+  },
+  {
+    name: "gridar_action_strategic_opportunity",
+    description:
+      "Take action on a single strategic opportunity. 'approve' triggers the LandingGenerator to AI-generate a full HostedLanding from the concept (mapping page_type -> page_subtype, honoring the suggested_url_path slug, dedup-ing against existing slugs) and marks the opportunity done with a forward link to the new landing. 'dismiss' hides the opportunity from the proposed list (won't reappear on refresh until restored). 'restore' un-dismisses. Use approve as the natural 'just go build it' command when an opportunity looks good.",
+    schema: StrategicOpportunityActionArgs,
+    handler: (input) =>
+      actionStrategicOpportunity(
+        input.site_id,
+        input.opportunity_id,
+        input.action,
+      ),
   },
 ];
 

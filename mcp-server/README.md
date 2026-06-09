@@ -6,7 +6,7 @@ Drive most of the Gridar dashboard from Claude Code, Claude Desktop, Cursor, Cod
 
 ## What it does
 
-Once installed, your AI client gets **43 tools** covering the dashboard surface.
+Once installed, your AI client gets **60 tools** covering the dashboard surface.
 
 ### Discovery & status
 
@@ -95,6 +95,14 @@ Once installed, your AI client gets **43 tools** covering the dashboard surface.
 | Tool | Purpose |
 |---|---|
 | `gridar_weekly_digest` | Weekly traffic + ranking + decay digest |
+
+### Strategic SEO opportunities
+
+| Tool | Purpose |
+|---|---|
+| `gridar_refresh_strategic_opportunities` | Run the engine: for each non-info tracked keyword without a landing, Claude proposes a page concept tied to the site's existing assets + Niveau-2 traffic/lead estimate |
+| `gridar_list_strategic_opportunities` | List cached opportunities with priority, concept (hook, capture, conversion path, angle), and quantitative estimate |
+| `gridar_action_strategic_opportunity` | `approve` -> AI-generate the matching HostedLanding immediately; `dismiss` / `restore` to manage the queue |
 
 ---
 
