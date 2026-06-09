@@ -7,7 +7,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  type TooltipProps,
+  type TooltipContentProps,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,7 +40,7 @@ const BUCKETS: Array<{
   { key: "top51plus", label: "51+", color: "rgb(63 63 70)" }, // zinc-700
 ];
 
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+function CustomTooltip({ active, payload, label }: Partial<TooltipContentProps<number, string>>) {
   if (!active || !payload || !payload.length) return null;
   const total = payload.reduce(
     (acc, p) => acc + (typeof p.value === "number" ? p.value : 0),

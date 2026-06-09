@@ -1,4 +1,4 @@
-import { useEffect, useState, ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -11,7 +11,7 @@ import {
   type ProvisionResult,
   type ScannedMeta,
   type SettingsContextValue,
-} from "./settingsContext";
+} from "./settingsContextValue";
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
