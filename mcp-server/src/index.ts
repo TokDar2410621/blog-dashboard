@@ -1168,7 +1168,7 @@ export function createMcpServer(): Server {
   const server = new Server(
     {
       name: "gridar-mcp",
-      version: "0.5.0",
+      version: "0.6.0",
     },
     {
       capabilities: { tools: {} },

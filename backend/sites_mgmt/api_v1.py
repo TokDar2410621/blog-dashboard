@@ -129,9 +129,22 @@ class ApiPlanThrottle(UserRateThrottle):
         return '600/hour'
 
     def allow_request(self, request, view):
+        # DRF calls wait() on us after a False to compute Retry-After. If we
+        # short-circuit before setting num_requests / duration / history /
+        # now (e.g. for an anonymous request), wait() crashes with
+        # AttributeError, which is uncaught and surfaces as a 500 HTML to
+        # the client. Seed safe defaults upfront so an early `return False`
+        # still leaves wait() callable.
+        self.num_requests = 1
+        self.duration = 3600
+        self.history = []
+        self.now = self.timer()
+
         user = getattr(request, 'user', None)
         if not user or not user.is_authenticated:
-            return False
+            # Let DRF respond with the standard 401 from the view layer.
+            # We don't throttle anonymous calls here.
+            return True
         sub = _get_subscription(user)
         limit = PLAN_API_LIMITS.get(sub.plan, PLAN_API_LIMITS['free'])['per_hour']
         if limit == 0:
@@ -142,7 +155,6 @@ class ApiPlanThrottle(UserRateThrottle):
         self.duration = 3600  # 1h
         self.key = self.cache_format.format(ident=user.pk)
         self.history = self.cache.get(self.key, [])
-        self.now = self.timer()
         while self.history and self.history[-1] <= self.now - self.duration:
             self.history.pop()
         if len(self.history) >= self.num_requests:
