@@ -33,6 +33,7 @@ from .views import (
     PageSpeedView, LinkSuggestionsView, BacklinksView, SEOSchemaView,
     PublicSiteView, PublicSiteByDomainView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
+    PublicLandingsView, PublicLandingDetailView,
     GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
     AutopilotConfigView, AutopilotRunView,
 )
@@ -176,6 +177,8 @@ urlpatterns = [
     path('public/sites/<int:site_id>/posts/', PublicPostsView.as_view(), name='public-posts'),
     path('public/sites/<int:site_id>/posts/<slug:slug>/', PublicPostDetailView.as_view(), name='public-post-detail'),
     path('public/sites/<int:site_id>/posts/<slug:slug>/translations/', PublicTranslationsView.as_view(), name='public-translations'),
+    path('public/sites/<int:site_id>/landings/', PublicLandingsView.as_view(), name='public-landings'),
+    path('public/sites/<int:site_id>/landings/<slug:slug>/', PublicLandingDetailView.as_view(), name='public-landing-detail'),
     path('public/sites/<int:site_id>/categories/', PublicCategoriesView.as_view(), name='public-categories'),
     # Public developer API v1 (Bearer ApiToken auth)
     path('v1/me/', V1MeView.as_view(), name='v1-me'),

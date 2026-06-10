@@ -1,12 +1,16 @@
 import type { MetadataRoute } from "next";
 import { fetchBlogPosts } from "@/lib/blog-api";
+import { listLandings } from "@/lib/landing-api";
 
 const SITE = "https://gridar.app";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const posts = await fetchBlogPosts();
+  const [posts, landings] = await Promise.all([
+    fetchBlogPosts(),
+    listLandings(),
+  ]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE}/`, changeFrequency: "weekly", priority: 1.0 },
@@ -25,5 +29,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticRoutes, ...postRoutes];
+  // HostedLanding rows served at the site root via app/[slug]/page.tsx.
+  // Higher priority than blog posts because these are conversion-optimized
+  // money pages, not informational articles.
+  const landingRoutes: MetadataRoute.Sitemap = landings.map((l) => ({
+    url: `${SITE}/${l.slug}`,
+    lastModified: l.updated_at ? new Date(l.updated_at) : undefined,
+    changeFrequency: "monthly",
+    priority: 0.85,
+  }));
+
+  return [...staticRoutes, ...postRoutes, ...landingRoutes];
 }

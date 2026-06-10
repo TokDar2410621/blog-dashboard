@@ -29,7 +29,7 @@ from django.http import HttpResponse
 import markdown as md_lib
 
 from .models import (
-    Site, UploadedImage, HostedPost, HostedCategory, HostedTag,
+    Site, UploadedImage, HostedPost, HostedCategory, HostedTag, HostedLanding,
     TrackedKeyword, SerpRank, Redirect, Subscription,
 )
 from .db_utils import ensure_site_connection, test_site_connection
@@ -7050,6 +7050,90 @@ class PublicTranslationsView(APIView):
             'translation_group': str(post.translation_group),
             'translations': [serialize(p, p.pk == post.pk) for p in translations],
         })
+
+
+def _serialize_hosted_landing(landing):
+    """Public-shape serializer for a HostedLanding. Used by the marketing
+    Next.js catch-all to render a landing at the site root."""
+    return {
+        'id': landing.id,
+        'title': landing.title,
+        'slug': landing.slug,
+        'h1': landing.h1,
+        'hero_subtitle': landing.hero_subtitle,
+        'hero_cta_text': landing.hero_cta_text,
+        'hero_cta_url': landing.hero_cta_url,
+        'value_props': landing.value_props or [],
+        'social_proof': landing.social_proof or [],
+        'faq': landing.faq or [],
+        'cta_bottom_text': landing.cta_bottom_text,
+        'cta_bottom_url': landing.cta_bottom_url,
+        'body_markdown': landing.body_markdown,
+        'target_keyword': landing.target_keyword,
+        'schema_type': landing.schema_type,
+        'page_subtype': landing.page_subtype,
+        'language': landing.language,
+        'translation_group': str(landing.translation_group),
+        'cover_image': landing.cover_image,
+        'meta_description': landing.meta_description,
+        'schema_jsonld': landing.schema_jsonld or {},
+        'published_at': landing.published_at.isoformat() if landing.published_at else None,
+        'created_at': landing.created_at.isoformat(),
+        'updated_at': landing.updated_at.isoformat(),
+    }
+
+
+class PublicLandingsView(APIView):
+    """GET /api/public/sites/<id>/landings/ - list published landings (slugs only).
+
+    Used by the marketing Next.js sitemap.ts to enumerate landing URLs Google
+    should index. Returns minimal payload (slug + updated_at + language) -
+    full content is fetched per-page via PublicLandingDetailView.
+    """
+    permission_classes = []
+
+    def get(self, request, site_id):
+        site = _public_get_site(site_id, request)
+        if not site:
+            return Response({'error': 'Invalid API key'},
+                            status=status.HTTP_403_FORBIDDEN)
+        landings = HostedLanding.objects.filter(
+            site=site, status='published',
+        ).only('slug', 'language', 'updated_at')
+        return Response({
+            'results': [
+                {
+                    'slug': l.slug,
+                    'language': l.language,
+                    'updated_at': l.updated_at.isoformat(),
+                }
+                for l in landings
+            ],
+            'count': landings.count(),
+        })
+
+
+class PublicLandingDetailView(APIView):
+    """GET /api/public/sites/<id>/landings/<slug>/ - single published landing.
+
+    Used by the marketing Next.js catch-all route to render a landing at the
+    site root (e.g. gridar.app/audit-seo-gratuit-quebec). Only returns
+    landings with status='published' to keep drafts out of public reach.
+    """
+    permission_classes = []
+
+    def get(self, request, site_id, slug):
+        site = _public_get_site(site_id, request)
+        if not site:
+            return Response({'error': 'Invalid API key'},
+                            status=status.HTTP_403_FORBIDDEN)
+        landing = HostedLanding.objects.filter(
+            site=site, slug=slug, status='published',
+        ).first()
+        if landing is None:
+            from django.http import Http404
+            raise Http404('Landing introuvable.')
+        return Response(_serialize_hosted_landing(landing))
 
 
 class PublicCategoriesView(APIView):
