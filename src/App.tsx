@@ -27,6 +27,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const McpAuthorize = lazy(() => import("./pages/McpAuthorize"));
+const HostedLandingPage = lazy(() => import("./pages/HostedLandingPage"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -136,6 +137,12 @@ function App() {
                     </AuthGuard>
                   }
                 />
+                {/* Catch-all single-segment slug for HostedLanding rows
+                    (e.g. /audit-seo-gratuit-quebec). React Router v6 ranks
+                    static routes above dynamic, so /audit, /docs, /blog
+                    etc. still win against this. Multi-segment unknown
+                    paths fall through to the * redirect below. */}
+                <Route path="/:slug" element={<HostedLandingPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
