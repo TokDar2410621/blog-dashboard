@@ -29,11 +29,65 @@ import logging
 import os
 from datetime import timedelta
 from typing import Callable, NamedTuple
+from urllib.parse import quote
 
+from django.core import signing
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Unsubscribe tokens
+# ---------------------------------------------------------------------------
+# Signed with the project SECRET_KEY (django.core.signing) so nobody can
+# forge an opt-out for an address they don't control from the URL alone.
+# No expiry: an unsubscribe link in a 2-year-old email must still work
+# (Loi 25 / RGPD - opting out cannot be time-boxed).
+#
+# Legacy note: emails sent before 2026-06-11 carry a plain ?email= link.
+# The unsubscribe endpoint accepts that too - an unverified opt-out is the
+# compliant failure mode (worst case someone is unsubscribed by a third
+# party; the inverse, a person who CANNOT opt out, is the legal risk).
+
+_UNSUB_SALT = 'sites_mgmt.lead-unsubscribe'
+
+
+def make_unsubscribe_token(email: str) -> str:
+    return signing.dumps((email or '').strip().lower(), salt=_UNSUB_SALT)
+
+
+def read_unsubscribe_token(token: str) -> str | None:
+    """Return the email the token was signed for, or None if invalid."""
+    try:
+        value = signing.loads(token, salt=_UNSUB_SALT)
+    except signing.BadSignature:
+        return None
+    return value if isinstance(value, str) and '@' in value else None
+
+
+def apply_unsubscribe(email: str) -> int:
+    """Opt the address out of ALL marketing. Updates every Lead row sharing
+    the email (one row exists per audit, not per address) so any future
+    queryset filtered on unsubscribed_at catches them all. Idempotent.
+    Returns the number of rows updated (0 = unknown address or already out -
+    callers should NOT leak which, to avoid email enumeration)."""
+    from .models import Lead
+    return Lead.objects.filter(
+        email__iexact=(email or '').strip(),
+        unsubscribed_at__isnull=True,
+    ).update(unsubscribed_at=timezone.now(), consented_marketing=False)
+
+
+def unsubscribe_url_for(email: str) -> str:
+    """Public landing URL for the footer link. Carries both the signed
+    token (authoritative) and the plain email (display + legacy parity)."""
+    token = make_unsubscribe_token(email)
+    return (
+        'https://gridar.app/unsubscribe'
+        f'?email={quote(email)}&t={quote(token)}'
+    )
 
 
 class StepDef(NamedTuple):
@@ -50,6 +104,7 @@ class StepDef(NamedTuple):
             'score': lead.score_at_capture,
             'audit_url': f'https://gridar.app/audit?domain={lead.domain_audited}',
             'signup_url': 'https://gridar.app/login',
+            'unsubscribe_url': unsubscribe_url_for(lead.email),
         }
         html = render_to_string(f'emails/{self.template}.html', ctx)
         text = render_to_string(f'emails/{self.template}.txt', ctx)
@@ -125,6 +180,12 @@ def send_lead_step(lead, step: StepDef) -> dict:
     if is_marketing and not lead.consented_marketing:
         return {'sent': False, 'reason': 'no_marketing_consent', 'provider_message_id': None}
 
+    # Opt-out gate: an unsubscribed address never receives marketing again,
+    # regardless of the consent flag captured at the time. j0 stays allowed -
+    # it is the report the person just explicitly requested.
+    if is_marketing and lead.unsubscribed_at is not None:
+        return {'sent': False, 'reason': 'unsubscribed', 'provider_message_id': None}
+
     resend = _get_resend_client()
     if resend is None:
         # Record a failure row so the cron knows to retry later.
@@ -142,14 +203,33 @@ def send_lead_step(lead, step: StepDef) -> dict:
         )
         return {'sent': False, 'reason': f'render_failed:{e}', 'provider_message_id': None}
 
+    # RFC 8058 one-click unsubscribe headers. Gmail/Yahoo bulk-sender rules
+    # require them for marketing mail; mailbox providers POST to the URL
+    # with body "List-Unsubscribe=One-Click" and no cookies, which the
+    # public one-click endpoint accepts. Only attached to marketing steps.
+    headers = {}
+    if is_marketing:
+        token = make_unsubscribe_token(lead.email)
+        one_click = (
+            'https://api.gridar.app/api/public/unsubscribe/one-click/'
+            f'?t={quote(token)}'
+        )
+        headers = {
+            'List-Unsubscribe': f'<{one_click}>',
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        }
+
     try:
-        resp = resend.Emails.send({
+        payload = {
             'from': from_addr,
             'to': [lead.email],
             'subject': rendered['subject'],
             'html': rendered['html'],
             'text': rendered['text'],
-        })
+        }
+        if headers:
+            payload['headers'] = headers
+        resp = resend.Emails.send(payload)
         msg_id = resp.get('id', '') if isinstance(resp, dict) else ''
         LeadEmailSent.objects.create(
             lead=lead, step=step.code,
@@ -185,8 +265,11 @@ def send_due_steps(now=None) -> dict:
             # j0 is sent inline at lead capture, not via cron.
             continue
         threshold = now - timedelta(days=step.delay_days)
+        # All cron-driven steps are marketing: don't even iterate leads that
+        # opted out (send_lead_step re-checks as a belt-and-suspenders gate).
         due = Lead.objects.filter(
             created_at__lte=threshold,
+            unsubscribed_at__isnull=True,
         ).exclude(emails_sent__step=step.code)
 
         per_step = {'sent': 0, 'skipped': 0, 'errors': 0}
@@ -196,7 +279,7 @@ def send_due_steps(now=None) -> dict:
             if result['sent']:
                 per_step['sent'] += 1
                 summary['sent'] += 1
-            elif result['reason'] in ('already_sent', 'no_marketing_consent'):
+            elif result['reason'] in ('already_sent', 'no_marketing_consent', 'unsubscribed'):
                 per_step['skipped'] += 1
                 summary['skipped'] += 1
             else:

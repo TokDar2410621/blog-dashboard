@@ -30,4 +30,4 @@ Vendredi je te montre comment SiteX a passe de 47/100 a 78/100 en 90 jours avec 
 Darius
 
 ---
-Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}
+Se desinscrire : {{ unsubscribe_url|safe }}

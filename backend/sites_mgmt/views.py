@@ -20,6 +20,8 @@ from django.db import ProgrammingError
 from django.db.models import Sum
 from django.utils.text import slugify
 from django.core.management import call_command
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from datetime import date, datetime
 from io import StringIO
 import requests as http_requests
@@ -10196,6 +10198,80 @@ class PublicLeadCaptureView(APIView):
             'ok': True,
             'message': 'Email enregistre. Le rapport complet est maintenant visible.',
         }, status=status.HTTP_201_CREATED)
+
+
+class PublicUnsubscribeView(APIView):
+    """POST /api/public/unsubscribe/ {token} or {email}
+
+    Opt-out endpoint behind the gridar.app/unsubscribe confirmation page.
+
+    Two accepted credentials:
+      - `token`: signed (django.core.signing) - authoritative, unforgeable.
+      - `email`: plain - kept because every email sent before 2026-06-11
+        carries a plain ?email= footer link that must keep working. An
+        unverified opt-out is the compliant failure mode: the worst case is
+        a third party unsubscribing someone, the inverse (a person who
+        cannot opt out) is the Loi 25 / RGPD violation.
+
+    Always returns 200 with {ok: true} when input is well-formed, whether
+    or not the address matched any lead - no email enumeration oracle.
+    """
+    authentication_classes = []  # public, mirror PublicLeadCaptureView
+    permission_classes = []
+    throttle_classes = [PublicAuditThrottle]
+
+    def post(self, request):
+        from .email_service import apply_unsubscribe, read_unsubscribe_token
+
+        token = (request.data.get('token') or '').strip()
+        email = None
+        if token:
+            email = read_unsubscribe_token(token)
+            if email is None:
+                return Response(
+                    {'error': 'Lien de desinscription invalide.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            raw = (request.data.get('email') or '').strip().lower()
+            import re
+            if not raw or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', raw):
+                return Response(
+                    {'error': 'Email invalide.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            email = raw
+
+        updated = apply_unsubscribe(email)
+        logger.info('Unsubscribe request for %s (rows updated: %s)', email, updated)
+        return Response({'ok': True})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class PublicUnsubscribeOneClickView(APIView):
+    """POST /api/public/unsubscribe/one-click/?t=<token>
+
+    RFC 8058 List-Unsubscribe-Post target. Gmail / Yahoo / Outlook POST
+    here (form body `List-Unsubscribe=One-Click`, no cookies, no JS) when
+    the user clicks their mail client's native unsubscribe button. Token
+    only - this URL is machine-generated per recipient, never typed.
+    """
+    authentication_classes = []
+    permission_classes = []
+    # No throttle: mailbox providers batch their POSTs from shared IPs;
+    # throttling them would silently drop legitimate opt-outs.
+
+    def post(self, request):
+        from .email_service import apply_unsubscribe, read_unsubscribe_token
+
+        token = (request.query_params.get('t') or '').strip()
+        email = read_unsubscribe_token(token) if token else None
+        if email is None:
+            return Response(
+                {'error': 'invalid token'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        apply_unsubscribe(email)
+        return Response({'ok': True})
 
 
 class PublicAuditStatsView(APIView):

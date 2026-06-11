@@ -37,4 +37,4 @@ La semaine prochaine je te fais une offre - premier mois gratuit, no card. Stay 
 Darius
 
 ---
-Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}
+Se desinscrire : {{ unsubscribe_url|safe }}

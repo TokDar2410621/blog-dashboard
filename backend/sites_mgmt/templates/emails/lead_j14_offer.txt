@@ -23,4 +23,4 @@ Darius
 Fondateur, Gridar / Arivex Studio
 
 ---
-Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}
+Se desinscrire : {{ unsubscribe_url|safe }}

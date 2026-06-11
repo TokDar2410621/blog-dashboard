@@ -28,6 +28,7 @@ const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
 const McpAuthorize = lazy(() => import("./pages/McpAuthorize"));
 const HostedLandingPage = lazy(() => import("./pages/HostedLandingPage"));
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const DashboardLayout = lazy(
   () => import("./pages/dashboard/DashboardLayout")
 );
@@ -137,6 +138,9 @@ function App() {
                     </AuthGuard>
                   }
                 />
+                {/* Loi 25: opt-out page linked from every lead email footer.
+                    Static segment, so it outranks the /:slug catch-all. */}
+                <Route path="/unsubscribe" element={<Unsubscribe />} />
                 {/* Catch-all single-segment slug for HostedLanding rows
                     (e.g. /audit-seo-gratuit-quebec). React Router v6 ranks
                     static routes above dynamic, so /audit, /docs, /blog

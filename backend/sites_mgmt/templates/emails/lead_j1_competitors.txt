@@ -19,4 +19,4 @@ Demain je te montre 5 articles concrets a publier pour reprendre du terrain.
 Darius
 
 ---
-Se desinscrire : https://gridar.app/unsubscribe?email={{ lead.email }}
+Se desinscrire : {{ unsubscribe_url|safe }}

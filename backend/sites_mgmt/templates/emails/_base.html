@@ -26,7 +26,7 @@
       <td style="padding:16px 32px 32px;border-top:1px solid #eee;font-size:11px;line-height:1.5;color:#888;">
         Gridar - Arivex Studio - Saint-Hyacinthe, QC<br>
         Tu recois ce courriel parce que tu as audite ton site sur <a href="https://gridar.app/audit" style="color:#10b981;text-decoration:none;">gridar.app/audit</a>.
-        {% block unsubscribe %}<a href="https://gridar.app/unsubscribe?email={{ lead.email }}" style="color:#888;text-decoration:underline;">Se desinscrire</a>{% endblock %}
+        {% block unsubscribe %}<a href="{{ unsubscribe_url }}" style="color:#888;text-decoration:underline;">Se desinscrire</a>{% endblock %}
       </td>
     </tr>
   </table>

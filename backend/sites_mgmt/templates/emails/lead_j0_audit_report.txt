@@ -13,7 +13,7 @@ Voici le lien vers le rapport SEO complet de {{ domain }} :
 
 Pas spammeur, pas d'autorepondeur 12 etapes. Du concret, court, action-able.
 Si ca te saoule, ce lien marche en 1 click :
-https://gridar.app/unsubscribe?email={{ lead.email }}
+{{ unsubscribe_url|safe }}
 
 A demain,
 Darius - Fondateur, Gridar

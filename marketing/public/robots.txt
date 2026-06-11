@@ -13,5 +13,6 @@ Disallow: /billing
 Disallow: /compare
 Disallow: /oauth/
 Disallow: /reset-password
+Disallow: /unsubscribe
 
 Sitemap: https://gridar.app/sitemap.xml

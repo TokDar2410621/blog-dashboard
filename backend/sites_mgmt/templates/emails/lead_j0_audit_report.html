@@ -1,6 +1,6 @@
 {% extends "emails/_base.html" %}
 {% block title %}Ton rapport SEO complet{% endblock %}
-{% block unsubscribe %}<a href="https://gridar.app/unsubscribe?email={{ lead.email }}" style="color:#888;text-decoration:underline;">Se desinscrire</a> · Email transactionnel (rapport demande){% endblock %}
+{% block unsubscribe %}<a href="{{ unsubscribe_url }}" style="color:#888;text-decoration:underline;">Se desinscrire</a> · Email transactionnel (rapport demande){% endblock %}
 
 {% block content %}
 <p>Salut {{ first_name }},</p>

@@ -439,8 +439,8 @@ class HostedTagAdmin(admin.ModelAdmin):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('email', 'domain_audited', 'source', 'score_at_capture', 'consented_marketing', 'converted_to_user', 'created_at')
-    list_filter = ('source', 'consented_marketing', 'created_at')
+    list_display = ('email', 'domain_audited', 'source', 'score_at_capture', 'consented_marketing', 'unsubscribed_at', 'converted_to_user', 'created_at')
+    list_filter = ('source', 'consented_marketing', ('unsubscribed_at', admin.EmptyFieldListFilter), 'created_at')
     search_fields = ('email', 'domain_audited', 'ip')
     readonly_fields = ('created_at', 'ip', 'user_agent', 'locale', 'score_at_capture')
     raw_id_fields = ('converted_to_user',)

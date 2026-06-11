@@ -406,6 +406,14 @@ class Lead(models.Model):
         null=True, blank=True,
         help_text="Composite SEO score at the moment of capture, for cohort analysis.",
     )
+    unsubscribed_at = models.DateTimeField(
+        null=True, blank=True, db_index=True,
+        help_text="Loi 25 / RGPD: timestamp of the opt-out. Set on EVERY Lead "
+                  "row sharing the same email (the audit page creates one row "
+                  "per audit, not per address). Blocks all marketing steps; "
+                  "the transactional j0 report still goes out when the person "
+                  "explicitly requests a new audit.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     converted_to_user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
