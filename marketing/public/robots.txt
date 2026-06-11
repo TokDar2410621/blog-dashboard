@@ -4,5 +4,14 @@ Disallow: /dashboard/
 Disallow: /api/
 Disallow: /auth/
 Disallow: /onboarding/
+Disallow: /admin/
+Disallow: /accounts/
+Disallow: /account/
+Disallow: /login
+Disallow: /sites
+Disallow: /billing
+Disallow: /compare
+Disallow: /oauth/
+Disallow: /reset-password
 
 Sitemap: https://gridar.app/sitemap.xml
