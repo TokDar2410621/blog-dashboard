@@ -197,61 +197,61 @@ export default function Overview() {
             </div>
 
             <ol className="space-y-3 text-sm">
-              <li className="flex items-start gap-3 p-3 rounded border bg-background">
+              <li className="flex flex-wrap items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">1</span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[12rem]">
                   <strong>Configure le profil auteur (E-E-A-T)</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Bio + crédentials + photo. C&apos;est ce que Google récompense le plus en 2026.
                   </p>
                 </div>
                 <Link to={`${base}/parametres/auteur`}>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" className="h-10 md:h-8">
                     <Settings className="h-3 w-3 mr-1.5" />
                     Paramètres
                   </Button>
                 </Link>
               </li>
-              <li className="flex items-start gap-3 p-3 rounded border bg-background">
+              <li className="flex flex-wrap items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">2</span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[12rem]">
                   <strong>Génère un brief stratégique</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Tape ton mot-clé cible, on extrait le top SERP + les vraies questions de ton audience.
                   </p>
                 </div>
                 <Link to={`${base}/generer`}>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" className="h-10 md:h-8">
                     <Search className="h-3 w-3 mr-1.5" />
                     Brief
                   </Button>
                 </Link>
               </li>
-              <li className="flex items-start gap-3 p-3 rounded border bg-background">
+              <li className="flex flex-wrap items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">3</span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[12rem]">
                   <strong>Génère ton premier article</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Claude écrit en suivant ton brief, en lexique québécois, avec ta voix.
                   </p>
                 </div>
                 <Link to={`${base}/generer`}>
-                  <Button size="sm">
+                  <Button size="sm" className="h-10 md:h-8">
                     <Sparkles className="h-3 w-3 mr-1.5" />
                     Générer
                   </Button>
                 </Link>
               </li>
-              <li className="flex items-start gap-3 p-3 rounded border bg-background">
+              <li className="flex flex-wrap items-start gap-3 p-3 rounded border bg-background">
                 <span className="shrink-0 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">4</span>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[12rem]">
                   <strong>Suis tes mots-clés</strong>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Ajoute 5 mots-clés cibles. On snapshot leur position Google chaque jour.
                   </p>
                 </div>
                 <Link to={`${base}/positions`}>
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" className="h-10 md:h-8">
                     <BarChart3 className="h-3 w-3 mr-1.5" />
                     Positions
                   </Button>
@@ -333,13 +333,13 @@ export default function Overview() {
                     key={post.slug}
                     className="flex items-center justify-between py-2 border-b last:border-0"
                   >
-                    <div>
-                      <p className="font-medium text-sm">{post.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{post.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(post.created_at).toLocaleDateString(i18n.language === "fr" ? "fr-CA" : "en-CA")}
                       </p>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex shrink-0 items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Eye className="h-3 w-3" />
                         {post.view_count}

@@ -470,11 +470,11 @@ export default function AIGenerator() {
             ) : result ? (
               <div className="space-y-4">
                 <div className="bg-muted/50 rounded-md p-4 max-h-96 overflow-y-auto">
-                  <pre className="text-xs whitespace-pre-wrap font-mono">
+                  <pre className="text-xs whitespace-pre-wrap break-words font-mono">
                     {result.output}
                   </pre>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     onClick={() => navigate(`${base}/articles`)}

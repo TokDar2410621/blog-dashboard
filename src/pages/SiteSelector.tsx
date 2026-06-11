@@ -206,17 +206,17 @@ export default function SiteSelector() {
           <div className="space-y-3">
             {sites.map((site: Site) => (
               <Card key={site.id} className="hover:border-primary/50 transition-colors">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3">
+                <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
                     <Globe className="h-5 w-5 text-muted-foreground" />
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium">{site.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground truncate">
                         {site.domain || t("common.noDomain")}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => handleTestConnection(site.id)}>
                       <CheckCircle className="h-4 w-4 mr-1" />
                       {t("common.test")}
@@ -238,7 +238,7 @@ export default function SiteSelector() {
             ))}
           </div>
         ) : (
-          <div className="relative rounded-2xl overflow-hidden border border-border/50 bg-zinc-950">
+          <div className="relative min-h-[360px] rounded-2xl overflow-hidden border border-border/50 bg-zinc-950">
             {/* Emerald glow background */}
             <div
               aria-hidden
@@ -251,11 +251,10 @@ export default function SiteSelector() {
 
             {/* Grayed-out mockup preview, scaled down */}
             <div
-              className="relative grayscale opacity-50 pointer-events-none"
+              className="relative grayscale opacity-50 pointer-events-none -mb-20 md:-mb-44"
               style={{
                 transform: "scale(0.7)",
                 transformOrigin: "50% 30%",
-                marginBottom: "-180px",
               }}
             >
               <ProductMockup3D />
@@ -284,7 +283,7 @@ export default function SiteSelector() {
         )}
 
         {/* CMS quick-connect - primary path for non-technical users */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <Button
             className="w-full"
             size="lg"
@@ -388,27 +387,27 @@ export default function SiteSelector() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <div className="text-center flex items-center justify-center gap-2">
+        <div className="text-center flex flex-wrap items-center justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => navigate("/compare")}>
             <BarChart3 className="h-4 w-4 mr-2" />
             {t("sites.compare", "Comparer mes sites")}
           </Button>
-          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
           <Button variant="ghost" size="sm" onClick={() => navigate("/billing")}>
             <CreditCard className="h-4 w-4 mr-2" />
             Abonnement
           </Button>
-          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
           <Button variant="ghost" size="sm" onClick={() => navigate("/account/api-keys")}>
             <Key className="h-4 w-4 mr-2" />
             API
           </Button>
-          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
           <Button variant="ghost" size="sm" onClick={() => navigate("/onboarding/external")}>
             <Code className="h-4 w-4 mr-2" />
             Mode externe (React/Next.js)
           </Button>
-          <span className="text-muted-foreground">·</span>
+          <span className="text-muted-foreground hidden sm:inline">·</span>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             {t("sites.logout")}

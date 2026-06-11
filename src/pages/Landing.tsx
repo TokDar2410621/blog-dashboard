@@ -1234,10 +1234,10 @@ function LexiconLiveMockup() {
             ["TVA", "TPS + TVQ", "fiscalité QC"],
           ].map(([from, to, src]) => (
             <div key={from} className="flex items-center gap-3">
-              <span className="line-through text-zinc-500 w-32 truncate">{from}</span>
+              <span className="line-through text-zinc-500 w-20 sm:w-32 truncate">{from}</span>
               <ArrowRight className="h-3 w-3 text-zinc-600 shrink-0" />
               <span className="text-emerald-300 font-medium flex-1 truncate">{to}</span>
-              <span className="text-[10px] text-zinc-600 shrink-0">{src}</span>
+              <span className="text-[10px] text-zinc-600 shrink-0 hidden sm:inline">{src}</span>
             </div>
           ))}
           <div className="text-xs text-zinc-500 pt-3 border-t border-white/5 mt-3">

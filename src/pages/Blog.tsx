@@ -196,7 +196,7 @@ export default function Blog() {
                     </span>
                   </div>
                   <div className="p-8 md:p-10 flex flex-col justify-center">
-                    <div className="flex items-center gap-3 text-xs text-zinc-500 mb-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500 mb-3">
                       {featured.published_at && <span>{formatDate(featured.published_at)}</span>}
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" />

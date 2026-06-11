@@ -220,13 +220,21 @@ export default function Redirects() {
               <TableBody>
                 {list.data.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell
+                      className="font-mono text-xs max-w-40 truncate"
+                      title={r.from_slug}
+                    >
                       {r.from_slug}
                     </TableCell>
                     <TableCell>
                       <ArrowRight className="h-3 w-3 text-muted-foreground" />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{r.to_slug}</TableCell>
+                    <TableCell
+                      className="font-mono text-xs max-w-40 truncate"
+                      title={r.to_slug}
+                    >
+                      {r.to_slug}
+                    </TableCell>
                     <TableCell>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono uppercase">
                         {r.language}

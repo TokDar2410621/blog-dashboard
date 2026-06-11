@@ -597,7 +597,7 @@ export default function Opportunities() {
             ET convertir. Approuve celles qui matchent ta stratégie.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -655,7 +655,7 @@ export default function Opportunities() {
                 Ajoute tes mots-clés dans le tracker puis clique sur Régénérer.
               </p>
             </div>
-            <div className="flex justify-center gap-2 pt-2">
+            <div className="flex flex-wrap justify-center gap-2 pt-2">
               <Button asChild variant="outline">
                 <Link to={`/dashboard/${sid}/positions`}>
                   <Target className="h-4 w-4 mr-2" />

@@ -153,7 +153,7 @@ export default function Docs() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 grid lg:grid-cols-[260px_1fr] gap-8 py-8">
         {/* Sidebar nav */}
-        <aside className="lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+        <aside className="order-last lg:order-first lg:sticky lg:top-20 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <nav className="space-y-0.5 text-sm">
             {NAV.map((item, i) => {
               if (item.section) {
@@ -194,6 +194,7 @@ export default function Docs() {
                          prose-h2:mt-10 prose-h2:border-t prose-h2:border-border/40 prose-h2:pt-6
                          prose-code:before:content-none prose-code:after:content-none
                          prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.9em] prose-code:font-mono
+                         [&_:not(pre)>code]:break-all
                          prose-pre:bg-muted/50 prose-pre:border prose-pre:border-border/50
                          prose-table:text-sm
                          prose-th:bg-muted/30 prose-th:font-semibold
@@ -229,6 +230,11 @@ export default function Docs() {
                       <Link to={rewriteRelativeLink(href)}>{children}</Link>
                     );
                   },
+                  table: ({ node: _node, ...props }) => (
+                    <div className="overflow-x-auto">
+                      <table {...props} />
+                    </div>
+                  ),
                 }}
               >
                 {md}

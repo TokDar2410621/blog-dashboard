@@ -36,7 +36,7 @@ export default function Gsc() {
             type="text"
             className="font-mono text-sm"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground break-words">
             Deux formats supportés :
             <br />
             - <strong>URL prefix</strong> (couvre exactement un sous-domaine + protocole) :{" "}
@@ -75,7 +75,7 @@ export default function Gsc() {
               >
                 search.google.com/search-console
               </a>{" "}
-              -&gt; Add property -&gt; URL prefix -&gt; <code>https://{domain || "tonsite.com"}/</code>
+              -&gt; Add property -&gt; URL prefix -&gt; <code className="break-all">https://{domain || "tonsite.com"}/</code>
             </li>
             <li>Verify ownership (DNS TXT, balise HTML ou Google Analytics)</li>
             <li>Copie l&apos;URL exacte ci-dessus, sauvegarde, puis clique &laquo; Connecter Google Search Console &raquo; pour le OAuth.</li>

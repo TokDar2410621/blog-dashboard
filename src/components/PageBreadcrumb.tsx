@@ -36,7 +36,12 @@ export function PageBreadcrumb({ trail }: { trail: Crumb[] }) {
         <BreadcrumbSeparator />
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to={base}>{siteName}</Link>
+            <Link
+              to={base}
+              className="inline-block max-w-[40vw] truncate align-bottom sm:max-w-none"
+            >
+              {siteName}
+            </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
         {trail.map((crumb, i) => {

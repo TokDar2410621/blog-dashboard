@@ -103,6 +103,7 @@ export default function PostEditor() {
   const [scheduledAt, setScheduledAt] = useState("");
   const [autoSlug, setAutoSlug] = useState(true);
   const [view, setView] = useState<"edit" | "seo" | "settings">("edit");
+  const [mobilePanel, setMobilePanel] = useState<"edit" | "preview" | "score">("edit");
   const [language, setLanguage] = useState<string>("fr");
   const [translationGroup, setTranslationGroup] = useState<string>("");
   const [translating, setTranslating] = useState(false);
@@ -657,7 +658,7 @@ export default function PostEditor() {
   }
 
   return (
-    <div className="h-[calc(100vh-3rem)] flex flex-col">
+    <div className="h-[calc(100dvh-3rem)] flex flex-col">
       <PageBreadcrumb
         trail={[
           { label: t("editor.articles", "Articles"), href: `${base}/articles` },
@@ -673,7 +674,7 @@ export default function PostEditor() {
         ]}
       />
       {/* Sticky Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-border shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 pb-3 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -691,7 +692,7 @@ export default function PostEditor() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isEditing && memoryChunksUsed.length > 0 && (
             <div className="flex items-center gap-1 border rounded-md px-1.5 py-0.5 mr-1">
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">
@@ -812,9 +813,39 @@ export default function PostEditor() {
       <div className="flex-1 min-h-0">
         {/* Split view: Editor + Preview */}
         {view === "edit" && (
-          <ResizablePanelGroup orientation="horizontal" className="h-full rounded-lg border">
+          <div className="h-full flex flex-col">
+            <div className="flex md:hidden items-center gap-1.5 pb-2 shrink-0">
+              <Button
+                variant={mobilePanel === "edit" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setMobilePanel("edit")}
+                className="h-7 text-xs"
+              >
+                <PenLine className="h-3.5 w-3.5 mr-1" />
+                {t("editor.tabEditor")}
+              </Button>
+              <Button
+                variant={mobilePanel === "preview" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setMobilePanel("preview")}
+                className="h-7 text-xs"
+              >
+                <Eye className="h-3.5 w-3.5 mr-1" />
+                {t("editor.livePreview")}
+              </Button>
+              <Button
+                variant={mobilePanel === "score" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setMobilePanel("score")}
+                className="h-7 text-xs"
+              >
+                <Star className="h-3.5 w-3.5 mr-1" />
+                Score
+              </Button>
+            </div>
+          <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0 rounded-lg border">
             {/* Left panel: editor */}
-            <ResizablePanel defaultSize={40} minSize={25}>
+            <ResizablePanel defaultSize={40} minSize={25} className={mobilePanel === "edit" ? "" : "hidden md:block"}>
               <div
                 className="h-full flex flex-col overflow-y-auto"
                 data-active-term={activeTerm || undefined}
@@ -848,10 +879,10 @@ export default function PostEditor() {
               </div>
             </ResizablePanel>
 
-            <ResizableHandle withHandle />
+            <ResizableHandle withHandle className="hidden md:flex" />
 
             {/* Center panel: live preview */}
-            <ResizablePanel defaultSize={35} minSize={20}>
+            <ResizablePanel defaultSize={35} minSize={20} className={mobilePanel === "preview" ? "" : "hidden md:block"}>
               <div className="h-full overflow-y-auto p-6">
                 <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
                   <Eye className="h-3.5 w-3.5" />
@@ -876,10 +907,10 @@ export default function PostEditor() {
               </div>
             </ResizablePanel>
 
-            <ResizableHandle withHandle />
+            <ResizableHandle withHandle className="hidden md:flex" />
 
             {/* Right panel: Content Score gauge + term tracker (sticky rail) */}
-            <ResizablePanel defaultSize={25} minSize={18}>
+            <ResizablePanel defaultSize={25} minSize={18} className={mobilePanel === "score" ? "" : "hidden md:block"}>
               <ScorePanel
                 title={debouncedScoreInputs.title}
                 excerpt={debouncedScoreInputs.excerpt}
@@ -899,6 +930,7 @@ export default function PostEditor() {
               />
             </ResizablePanel>
           </ResizablePanelGroup>
+          </div>
         )}
 
         {/* SEO view */}
@@ -1149,7 +1181,7 @@ export default function PostEditor() {
                   </div>
 
                   <div className="border-t pt-4">
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex flex-wrap gap-2 mb-3">
                       <Button
                         type="button"
                         variant={imageTab === "pexels" ? "default" : "outline"}
@@ -1226,7 +1258,7 @@ export default function PostEditor() {
                                     <Check className="h-5 w-5 text-primary-foreground drop-shadow" />
                                   </div>
                                 )}
-                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                   {photo.photographer}
                                 </div>
                               </button>
@@ -1283,7 +1315,7 @@ export default function PostEditor() {
                                     <Check className="h-5 w-5 text-primary-foreground drop-shadow" />
                                   </div>
                                 )}
-                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[10px] px-1 py-0.5 truncate opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                   {photo.photographer}
                                 </div>
                               </button>

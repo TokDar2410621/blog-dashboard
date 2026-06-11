@@ -163,7 +163,7 @@ export default function ContentDecay() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("decay.window")}</label>
               <Select value={days} onValueChange={setDays}>
@@ -390,7 +390,7 @@ export default function ContentDecay() {
                 return (
                   <Card key={page.url}>
                     <CardContent className="py-4">
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <Link
                             to={`${base}/articles/${page.slug}`}
@@ -471,7 +471,7 @@ export default function ContentDecay() {
                           </div>
                         </div>
 
-                        <div className="shrink-0 flex flex-col items-end gap-2">
+                        <div className="shrink-0 flex flex-col items-start sm:items-end gap-2">
                           <span
                             className={`text-xs px-2 py-1 rounded font-mono uppercase flex items-center gap-1 ${
                               meta.color === "red"

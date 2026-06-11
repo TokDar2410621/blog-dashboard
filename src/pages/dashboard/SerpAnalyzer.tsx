@@ -220,7 +220,11 @@ export default function SerpAnalyzer() {
                   </span>
                 </div>
               </div>
-              <Button onClick={handleGenerate} size="lg" className="shrink-0">
+              <Button
+                onClick={handleGenerate}
+                size="lg"
+                className="shrink-0 h-auto min-h-10 whitespace-normal"
+              >
                 <Sparkles className="h-4 w-4 mr-2" />
                 Generer un article qui bat ce SERP
               </Button>
@@ -470,7 +474,11 @@ export default function SerpAnalyzer() {
                   optimise pour battre le top 10.
                 </p>
               </div>
-              <Button onClick={handleGenerate} size="lg">
+              <Button
+                onClick={handleGenerate}
+                size="lg"
+                className="h-auto min-h-10 whitespace-normal"
+              >
                 <Sparkles className="h-4 w-4 mr-2" />
                 Generer un article qui bat ce SERP
               </Button>

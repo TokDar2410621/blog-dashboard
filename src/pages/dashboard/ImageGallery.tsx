@@ -171,7 +171,7 @@ export default function ImageGallery() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onClick={() => handleCopy(url)}
                       >
                         {copiedUrl === url ? (

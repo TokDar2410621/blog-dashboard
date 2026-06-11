@@ -313,7 +313,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={goBackToEmail}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                  className="min-h-10 py-2 px-2 -mx-2 text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-3 w-3" />
@@ -322,7 +322,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={handleForgotPassword}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="min-h-10 py-2 px-2 -mx-2 text-muted-foreground hover:text-foreground"
                   disabled={loading}
                 >
                   {t("login.forgotPassword", "Mot de passe oublié ?")}
@@ -376,7 +376,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={goBackToEmail}
-                className="w-full text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+                className="w-full min-h-10 py-2 text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
                 disabled={loading}
               >
                 <ArrowLeft className="h-3 w-3" />
@@ -442,7 +442,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={goBackToEmail}
-                className="w-full text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
+                className="w-full min-h-10 py-2 text-xs text-muted-foreground hover:text-foreground inline-flex items-center justify-center gap-1"
                 disabled={loading}
               >
                 <ArrowLeft className="h-3 w-3" />

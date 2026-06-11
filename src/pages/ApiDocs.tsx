@@ -97,9 +97,9 @@ export default function ApiDocs() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-4 md:p-6">
       <div className="max-w-5xl mx-auto space-y-8">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
@@ -108,7 +108,7 @@ export default function ApiDocs() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
+          <div className="flex-1 min-w-[200px]">
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Code2 className="h-7 w-7 text-primary" />
               API REST publique

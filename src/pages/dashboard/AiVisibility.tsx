@@ -296,7 +296,7 @@ export default function AiVisibility() {
             Perplexity, Gemini, SearchGPT et Claude. Le nouveau SEO 2026.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <RangeSelector value={range} onChange={setRange} />
           <Button
             onClick={() => runAllMutation.mutate()}
@@ -305,6 +305,7 @@ export default function AiVisibility() {
               prompts.length === 0 ||
               promptsQuery.isLoading
             }
+            className="h-auto min-h-9 whitespace-normal"
           >
             {runAllMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -333,7 +334,7 @@ export default function AiVisibility() {
                 Score de visibilite IA
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex items-end justify-between gap-3 pb-4">
+            <CardContent className="flex flex-wrap items-end justify-between gap-3 pb-4">
               <ScoreGauge score={summary.score} />
               <div className="flex flex-col items-end gap-2 flex-1">
                 <DeltaBadge delta={summary.delta_7d} />

@@ -337,7 +337,16 @@ export default function HostedLandingPage() {
       {data.body_markdown && data.body_markdown.trim().length > 0 && (
         <section className="relative z-10 max-w-3xl mx-auto px-6 py-16 border-t border-white/5">
           <article className="prose prose-invert prose-zinc max-w-none prose-headings:tracking-tight prose-h2:text-3xl prose-h2:mt-12 prose-h2:mb-4 prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-3 prose-a:text-emerald-400 hover:prose-a:text-emerald-300 prose-strong:text-zinc-100 prose-li:my-1.5">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                table: ({ node: _node, ...props }) => (
+                  <div className="overflow-x-auto">
+                    <table {...props} />
+                  </div>
+                ),
+              }}
+            >
               {data.body_markdown}
             </ReactMarkdown>
           </article>

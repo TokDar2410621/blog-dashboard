@@ -83,7 +83,7 @@ export default function WeeklyDigest() {
 
   return (
     <div className="space-y-6 max-w-4xl print:max-w-none print:p-8">
-      <div className="flex items-center justify-between print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">{t("digest.title")}</h1>
           <p className="text-muted-foreground">{t("digest.subtitle")}</p>

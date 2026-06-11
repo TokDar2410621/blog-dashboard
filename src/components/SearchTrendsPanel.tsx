@@ -102,7 +102,7 @@ export function SearchTrendsPanel({
           <div className="space-y-1">
             <Label className="text-xs">{t("trends.timeframe")}</Label>
             <Select value={timeframe} onValueChange={setTimeframe}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-full md:w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

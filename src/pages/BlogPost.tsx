@@ -315,7 +315,7 @@ export default function BlogPost() {
               {post.excerpt}
             </p>
           )}
-          <div className="flex items-center gap-4 text-sm text-zinc-400">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-400">
             {post.author && (
               <span className="inline-flex items-center gap-1.5">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/20 text-emerald-300">
@@ -376,6 +376,11 @@ export default function BlogPost() {
                   .replace(/\s+/g, "-");
                 return <h3 id={id} {...rest}>{children}</h3>;
               },
+              table: ({ node: _node, ...props }) => (
+                <div className="overflow-x-auto">
+                  <table {...props} />
+                </div>
+              ),
             }}
           >
             {post.content}

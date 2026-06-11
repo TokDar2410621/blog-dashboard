@@ -209,11 +209,11 @@ export default function SiteAudit() {
       <PageBreadcrumb trail={[{ label: "Audit du site" }]} />
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold">Audit du site</h1>
           <p className="text-muted-foreground text-sm">
             Vue d&apos;ensemble SEO de{" "}
-            <span className="font-mono">{data.site_domain || data.site_name}</span>
+            <span className="font-mono break-all">{data.site_domain || data.site_name}</span>
           </p>
         </div>
         <Button
@@ -244,10 +244,10 @@ export default function SiteAudit() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className={`text-6xl font-bold tabular-nums cursor-help ${scoreColor(data.composite_score)}`}
+                      className={`text-5xl md:text-6xl font-bold tabular-nums cursor-help ${scoreColor(data.composite_score)}`}
                     >
                       {data.composite_score ?? "-"}
-                      <span className="text-2xl text-muted-foreground font-normal">/100</span>
+                      <span className="text-xl md:text-2xl text-muted-foreground font-normal">/100</span>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
@@ -355,10 +355,10 @@ export default function SiteAudit() {
             {data.recos.map((reco, i) => (
               <div
                 key={i}
-                className={`border rounded-md p-3 flex items-center gap-3 ${severityClasses(reco.severity)}`}
+                className={`border rounded-md p-3 flex flex-wrap items-center gap-3 ${severityClasses(reco.severity)}`}
               >
                 {severityIcon(reco.severity)}
-                <div className="flex-1 text-sm">{reco.message}</div>
+                <div className="flex-1 min-w-[10rem] text-sm">{reco.message}</div>
                 <Link to={reco.cta_href}>
                   <Button size="sm" variant="outline">
                     {reco.cta_label}

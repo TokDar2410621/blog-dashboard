@@ -84,7 +84,7 @@ export default function Integrations() {
                 <Loader2 className="h-4 w-4 text-amber-600 shrink-0 mt-0.5 animate-spin" />
                 <div className="space-y-2 flex-1">
                   <strong>Étape DNS - colle ces valeurs chez ton registrar :</strong>
-                  <div className="font-mono bg-background border rounded p-2 space-y-1">
+                  <div className="font-mono bg-background border rounded p-2 space-y-1 break-all">
                     <div><span className="text-muted-foreground">Type :</span> CNAME</div>
                     <div><span className="text-muted-foreground">Nom :</span> {provisionResult.domain.split(".")[0] || "blog"}</div>
                     <div><span className="text-muted-foreground">Valeur :</span> {provisionResult.cname_target}</div>
@@ -176,7 +176,7 @@ export default function Integrations() {
       {/* Marques a ne PAS citer */}
       <Card>
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
               <CardTitle className="text-lg">Marques à ne PAS citer</CardTitle>
               <CardDescription>
@@ -227,7 +227,7 @@ export default function Integrations() {
           <CardContent className="space-y-3">
             <div>
               <Label className="text-xs">Endpoints publics</Label>
-              <div className="mt-1 space-y-1 font-mono text-xs bg-muted/50 p-3 rounded">
+              <div className="mt-1 space-y-1 font-mono text-xs bg-muted/50 p-3 rounded overflow-x-auto">
                 <div>GET /api/public/sites/{site.id}/posts/</div>
                 <div>GET /api/public/sites/{site.id}/posts/&lt;slug&gt;/</div>
                 <div>GET /api/public/sites/{site.id}/categories/</div>

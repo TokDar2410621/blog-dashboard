@@ -224,7 +224,7 @@ export function MultiSiteHealthTable({
                         <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                           <Globe className="h-4 w-4 text-primary" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 max-w-[180px] md:max-w-[260px]">
                           <p className="font-medium truncate">{site.name}</p>
                           <p className="text-xs text-muted-foreground truncate">
                             {site.domain || "-"}

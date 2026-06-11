@@ -415,7 +415,7 @@ export default function OnboardingExternal() {
   }, [framework, siteId, selectedSite]);
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-3 md:p-6">
       <div className="max-w-5xl mx-auto space-y-8">
         <div className="flex items-center gap-3">
           <Button
@@ -441,14 +441,14 @@ export default function OnboardingExternal() {
         {/* Preview - "voilà ton blog avec ton branding" */}
         {selectedSite && (
           <div className="rounded-2xl border border-border/50 bg-zinc-950 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <div className="flex items-center justify-between min-w-0 px-6 py-4 border-b border-white/5">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-emerald-400" />
                 <span className="text-sm font-medium text-white">
                   Voilà à quoi ton blog ressemblera
                 </span>
               </div>
-              <span className="text-xs text-zinc-500 font-mono">
+              <span className="text-xs text-zinc-500 font-mono truncate min-w-0 max-w-[45%]">
                 {selectedSite.domain || "ton-domaine.com"}/blog/...
               </span>
             </div>
@@ -545,7 +545,7 @@ export default function OnboardingExternal() {
               3. Crée un token API
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm space-y-3">
+          <CardContent className="px-3 md:px-6 text-sm space-y-3">
             <p>
               Va sur{" "}
               <button
@@ -596,7 +596,7 @@ export default function OnboardingExternal() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 md:px-6">
                 <pre className="bg-muted/50 border border-border/50 rounded p-3 text-xs overflow-x-auto max-h-96">
                   <code>{blocks.list}</code>
                 </pre>
@@ -626,7 +626,7 @@ export default function OnboardingExternal() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 md:px-6">
                 <pre className="bg-muted/50 border border-border/50 rounded p-3 text-xs overflow-x-auto max-h-96">
                   <code>{blocks.detail}</code>
                 </pre>
@@ -656,13 +656,13 @@ export default function OnboardingExternal() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 md:px-6">
                 <pre className="bg-muted/50 border border-border/50 rounded p-3 text-xs overflow-x-auto max-h-96">
                   <code>{blocks.sitemap}</code>
                 </pre>
                 <p className="text-xs text-muted-foreground mt-3">
                   Une fois en place, soumets{" "}
-                  <code className="bg-muted px-1 rounded">
+                  <code className="bg-muted px-1 rounded break-all">
                     {selectedSite?.domain || "ton-domaine.com"}/sitemap.xml
                   </code>{" "}
                   à Google Search Console (Sitemaps → Add a new sitemap).
@@ -674,7 +674,7 @@ export default function OnboardingExternal() {
               <CardHeader>
                 <CardTitle className="text-lg">5. Tester l'API directement</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="px-3 md:px-6 space-y-2">
                 <p className="text-sm text-muted-foreground">
                   Avant de coder, vérifie que ton token marche :
                 </p>

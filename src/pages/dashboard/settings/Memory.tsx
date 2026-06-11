@@ -19,7 +19,7 @@ export default function Memory() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <CardTitle className="text-lg flex items-center gap-2">
               <Brain className="h-5 w-5" />

@@ -131,7 +131,7 @@ export default function BulkAudit() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">{t("bulkAudit.limit")}</label>
               <Select value={limit} onValueChange={setLimit}>

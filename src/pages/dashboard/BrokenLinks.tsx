@@ -98,7 +98,7 @@ export default function BrokenLinks() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-2">
               <label className="text-sm font-medium">
                 {t("brokenLinks.language")}

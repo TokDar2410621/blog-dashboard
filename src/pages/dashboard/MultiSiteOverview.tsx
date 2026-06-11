@@ -49,7 +49,7 @@ export default function MultiSiteOverview() {
       </header>
 
       {!isLoading && sites.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border/60 bg-card/40 p-10 text-center">
+        <div className="rounded-lg border border-dashed border-border/60 bg-card/40 p-6 md:p-10 text-center">
           <div className="mx-auto h-12 w-12 rounded-full bg-muted/40 flex items-center justify-center mb-4">
             <Inbox className="h-6 w-6 text-muted-foreground" />
           </div>

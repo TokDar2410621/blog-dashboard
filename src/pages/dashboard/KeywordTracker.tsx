@@ -565,7 +565,7 @@ export default function KeywordTracker() {
       </div>
 
       {/* Hero KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-4 gap-3">
         <StatsCard
           title="Share of Voice"
           value={`${heroKpis.sov}%`}
@@ -757,7 +757,7 @@ export default function KeywordTracker() {
             <div className="flex items-center justify-between gap-3 pt-3 border-t">
               <button
                 type="button"
-                className="text-xs text-muted-foreground hover:underline"
+                className="text-xs text-muted-foreground hover:underline px-3 py-2.5 -mx-3"
                 onClick={() => {
                   setSuggestions(null);
                   setSelectedSuggestions(new Set());
@@ -800,7 +800,7 @@ export default function KeywordTracker() {
             ? t("keywords.tracked", { count: list.data.length })
             : ""}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ExportButton
             onExport={handleExportKeywords}
             disabled={!list.data?.length}
@@ -1074,7 +1074,7 @@ function RankChart({ snapshots }: { snapshots: Snapshot[] }) {
     : 50;
 
   return (
-    <div className="w-full h-56 -ml-2">
+    <div className="w-full max-w-[calc(100vw-4rem)] sticky left-0 h-56 -ml-2">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}

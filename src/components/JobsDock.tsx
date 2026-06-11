@@ -104,7 +104,7 @@ export function JobsDock() {
       )}
 
       {expanded && (
-        <div className="bg-card border rounded-lg shadow-xl w-80 max-h-[60vh] flex flex-col">
+        <div className="bg-card border rounded-lg shadow-xl w-80 max-w-[calc(100vw-2rem)] max-h-[60vh] flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b">
             <div className="text-sm font-semibold">Taches en cours</div>
             <div className="flex items-center gap-1">
@@ -124,7 +124,7 @@ export function JobsDock() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-10 w-10 -my-1.5"
                 onClick={() => setExpanded(false)}
                 title="Reduire"
               >
@@ -170,7 +170,7 @@ export function JobsDock() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 shrink-0 -mr-1"
+                  className="h-10 w-10 -my-2 -mr-3 shrink-0"
                   onClick={(e) => {
                     e.stopPropagation();
                     dismiss(job.id);
