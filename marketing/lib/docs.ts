@@ -7,10 +7,17 @@
  *   docs/foo/README.md         -> 'foo'
  *   docs/foo/bar.md            -> 'foo/bar'
  */
+import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
-const DOCS_DIR = path.resolve(process.cwd(), "..", "docs");
+// docs/ lives INSIDE marketing/ so the folder ships with any deployment
+// of this app (remote CLI uploads, git builds, local). The "../docs"
+// fallback covers stale checkouts where the folder hasn't moved yet.
+const _localDocs = path.resolve(process.cwd(), "docs");
+const DOCS_DIR = existsSync(_localDocs)
+  ? _localDocs
+  : path.resolve(process.cwd(), "..", "docs");
 
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];

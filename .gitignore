@@ -38,3 +38,4 @@ backend/.env
 cypress/downloads/
 cypress/screenshots/
 cypress/videos/
+docs/

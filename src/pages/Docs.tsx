@@ -20,22 +20,24 @@ import { GridarMark } from "@/components/GridarMark";
 import { Button } from "@/components/ui/button";
 
 // Load every doc at build time as raw string.
-// The relative path is from THIS file: src/pages/ -> ../../docs
-const docFiles = import.meta.glob("../../docs/**/*.md", {
+// docs/ moved into marketing/ (the Next.js app owns the public docs since
+// the gridar.app cutover); this page reads the same source until the SPA
+// copy is retired. Relative path from THIS file: src/pages/ -> ../../marketing/docs
+const docFiles = import.meta.glob("../../marketing/docs/**/*.md", {
   query: "?raw",
   import: "default",
   eager: true,
 }) as Record<string, string>;
 
 /** Convert a Vite glob path to a clean URL slug.
- *  '../../docs/README.md'              -> ''   (index)
- *  '../../docs/getting-started.md'     -> 'getting-started'
- *  '../../docs/connect/README.md'      -> 'connect'
- *  '../../docs/connect/wordpress.md'   -> 'connect/wordpress'
+ *  '../../marketing/docs/README.md'            -> ''   (index)
+ *  '../../marketing/docs/getting-started.md'   -> 'getting-started'
+ *  '../../marketing/docs/connect/README.md'    -> 'connect'
+ *  '../../marketing/docs/connect/wordpress.md' -> 'connect/wordpress'
  */
 function pathToSlug(p: string): string {
   return p
-    .replace("../../docs/", "")
+    .replace("../../marketing/docs/", "")
     .replace(/\.md$/, "")
     .replace(/\/README$/, "")
     .replace(/^README$/, "");
