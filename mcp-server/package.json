@@ -1,7 +1,7 @@
 {
   "name": "@gridar/mcp-server",
-  "version": "0.6.0",
-  "description": "Model Context Protocol server for Gridar - 52 tools to drive the SEO dashboard (sites, articles, landings, topic cluster planner, keywords, autopilot, RAG memory, GSC proof of value, strategic SEO opportunities) from Claude Code, Claude Desktop, Cursor, Codex or any MCP-compatible client. Supports stdio (local) and Streamable HTTP (hosted) transports.",
+  "version": "0.7.0",
+  "description": "Model Context Protocol server for Gridar - 61 tools to drive the SEO dashboard (sites, articles, landings, topic cluster planner, keywords, autopilot, RAG memory, GSC proof of value, strategic SEO opportunities, AI-assistant prompt export) from Claude Code, Claude Desktop, Cursor, Codex or any MCP-compatible client. Supports stdio (local) and Streamable HTTP (hosted) transports.",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/TokDar2410621/blog-dashboard",

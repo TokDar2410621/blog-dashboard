@@ -3537,3 +3537,75 @@ class V1StrategicOpportunityActionView(BaseV1View):
 
         return Response({'error': f"Action inconnue: {action}"},
                         status=status.HTTP_400_BAD_REQUEST)
+
+
+# ===========================================================================
+# Prompt export (2026-06-10)
+# ===========================================================================
+# For users who build their site with an AI assistant (ChatGPT, Lovable, v0,
+# Bolt...) and have no CMS Gridar can push into. We hand them a ready-to-
+# paste prompt; THEIR AI does the integration in THEIR codebase. Pure
+# templating server-side - no LLM call, no quota.
+
+class V1LandingPromptView(BaseV1View):
+    """GET /api/v1/sites/<id>/landings/<landing_id>/prompt/?stack=nextjs
+
+    INTEGRATE mode: the landing copy already exists, the prompt instructs
+    the user's AI to integrate it verbatim (meta, structure, JSON-LD,
+    exact slug). `stack` adapts the final instructions - one of nextjs,
+    react, html, astro, wordpress, webflow, generic (default).
+    """
+
+    def get(self, request, site_id, landing_id):
+        from .models import HostedLanding
+        from .prompt_export import build_landing_prompt, normalize_stack
+
+        site = self.get_user_site(request, site_id)
+        landing = HostedLanding.objects.filter(
+            site=site, id=landing_id,
+        ).first()
+        if landing is None:
+            return Response({'error': 'Landing introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        stack = normalize_stack(request.query_params.get('stack'))
+        prompt = build_landing_prompt(landing, site, stack=stack)
+        return Response({
+            'prompt': prompt,
+            'source': 'landing',
+            'landing_id': landing.id,
+            'slug': landing.slug,
+            'stack': stack,
+            'char_count': len(prompt),
+        })
+
+
+class V1OpportunityPromptView(BaseV1View):
+    """GET /api/v1/sites/<id>/strategic-opportunities/<op_id>/prompt/?stack=...
+
+    CREATE mode: only the strategic concept exists, the prompt instructs
+    the user's AI to write the page following the brief (hook, capture
+    mechanism, conversion path, angle, FR-CA lexicon when language=fr).
+    """
+
+    def get(self, request, site_id, op_id):
+        from .models import StrategicOpportunity
+        from .prompt_export import build_opportunity_prompt, normalize_stack
+
+        site = self.get_user_site(request, site_id)
+        try:
+            op = StrategicOpportunity.objects.get(site=site, id=int(op_id))
+        except (StrategicOpportunity.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Opportunite introuvable.'},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        stack = normalize_stack(request.query_params.get('stack'))
+        prompt = build_opportunity_prompt(op, site, stack=stack)
+        return Response({
+            'prompt': prompt,
+            'source': 'opportunity',
+            'opportunity_id': op.id,
+            'keyword': op.keyword,
+            'stack': stack,
+            'char_count': len(prompt),
+        })

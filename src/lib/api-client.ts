@@ -1157,3 +1157,55 @@ export async function actionStrategicOpportunity(
   }
   return res.json();
 }
+
+// --- Prompt export -----------------------------------------------------
+// Ready-to-paste prompt for the user's own AI tool (ChatGPT, Lovable, v0,
+// Bolt...). Server-side templating, no LLM call, no quota.
+
+export type PromptStack =
+  | "nextjs"
+  | "react"
+  | "html"
+  | "astro"
+  | "wordpress"
+  | "webflow"
+  | "generic";
+
+export type PromptExportResponse = {
+  prompt: string;
+  source: "landing" | "opportunity";
+  landing_id?: number;
+  opportunity_id?: number;
+  slug?: string;
+  keyword?: string;
+  stack: PromptStack;
+  char_count: number;
+};
+
+export async function exportOpportunityPrompt(
+  siteId: number,
+  opportunityId: number,
+  stack: PromptStack = "generic",
+): Promise<PromptExportResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${opportunityId}/prompt/?stack=${stack}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Export du prompt impossible", res.status);
+  }
+  return res.json();
+}
+
+export async function exportLandingPrompt(
+  siteId: number,
+  landingId: number,
+  stack: PromptStack = "generic",
+): Promise<PromptExportResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/landings/${landingId}/prompt/?stack=${stack}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Export du prompt impossible", res.status);
+  }
+  return res.json();
+}

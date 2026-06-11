@@ -54,7 +54,7 @@ async function request<T = unknown>(
     Authorization: `Bearer ${getToken()}`,
     "Content-Type": "application/json",
     Accept: "application/json",
-    "User-Agent": "@gridar/mcp-server/0.6.0",
+    "User-Agent": "@gridar/mcp-server/0.7.0",
     ...(init.headers as Record<string, string> | undefined),
   };
 
@@ -857,4 +857,55 @@ export async function actionStrategicOpportunity(
     method: "POST",
     body: JSON.stringify({}),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Prompt export (2026-06-10)
+// ---------------------------------------------------------------------------
+// Ready-to-paste prompt for the user's AI coding assistant (ChatGPT, Lovable,
+// v0, Bolt...). Pure templating server-side - no LLM call, no quota.
+
+export type PromptStack =
+  | "nextjs"
+  | "react"
+  | "html"
+  | "astro"
+  | "wordpress"
+  | "webflow"
+  | "generic";
+
+export type PromptExportResponse = {
+  prompt: string;
+  source: "landing" | "opportunity";
+  landing_id?: number;
+  opportunity_id?: number;
+  slug?: string;
+  keyword?: string;
+  stack: PromptStack;
+  char_count: number;
+};
+
+export async function exportPagePrompt(
+  siteId: number,
+  opts: {
+    landing_id?: number;
+    opportunity_id?: number;
+    stack?: PromptStack;
+  },
+) {
+  const stackQs = opts.stack ? `?stack=${opts.stack}` : "";
+  if (opts.landing_id != null) {
+    return request<PromptExportResponse>(
+      `/sites/${siteId}/landings/${opts.landing_id}/prompt/${stackQs}`,
+    );
+  }
+  if (opts.opportunity_id != null) {
+    return request<PromptExportResponse>(
+      `/sites/${siteId}/strategic-opportunities/${opts.opportunity_id}/prompt/${stackQs}`,
+    );
+  }
+  throw new ApiError(
+    "exportPagePrompt requires landing_id or opportunity_id",
+    400,
+  );
 }

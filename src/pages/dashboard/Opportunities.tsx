@@ -23,6 +23,7 @@ import {
   ExternalLink,
   X,
   CheckCircle2,
+  Copy,
   EyeOff,
   Lightbulb,
   Layers,
@@ -37,6 +38,8 @@ import {
   listStrategicOpportunities,
   refreshStrategicOpportunities,
   actionStrategicOpportunity,
+  exportOpportunityPrompt,
+  exportLandingPrompt,
   type StrategicOpportunity,
 } from "@/lib/api-client";
 
@@ -152,6 +155,27 @@ function OpportunityCard({
     },
     onError: (err: Error) =>
       toast.error(err.message || "Restauration échouée."),
+  });
+
+  // "Copier le prompt IA" - delivery channel for users who build their site
+  // with an AI tool (ChatGPT, Lovable, v0, Bolt) and have no CMS. If a
+  // landing was already generated we export the integrate-verbatim prompt
+  // (real copy); otherwise the write-from-brief prompt (concept only).
+  const promptMutation = useMutation({
+    mutationFn: async () => {
+      const res = opp.generated_landing_id
+        ? await exportLandingPrompt(siteId, opp.generated_landing_id)
+        : await exportOpportunityPrompt(siteId, opp.id);
+      await navigator.clipboard.writeText(res.prompt);
+      return res;
+    },
+    onSuccess: () => {
+      toast.success(
+        "Prompt copié. Colle-le dans ChatGPT, Lovable, v0 ou ton IA préférée : elle crée la page dans TON code.",
+      );
+    },
+    onError: (err: Error) =>
+      toast.error(err.message || "Export du prompt échoué."),
   });
 
   const concept = opp.concept;
@@ -353,6 +377,21 @@ function OpportunityCard({
                 Pas pertinent
               </Button>
             </>
+          )}
+          {!isDismissed && (
+            <Button
+              variant="outline"
+              onClick={() => promptMutation.mutate()}
+              disabled={promptMutation.isPending}
+              title="Pour les sites gérés avec une IA (ChatGPT, Lovable, v0...) : copie un prompt complet que ton IA utilise pour créer la page dans ton propre code."
+            >
+              {promptMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4 mr-2" />
+              )}
+              Copier le prompt IA
+            </Button>
           )}
         </div>
       </CardContent>

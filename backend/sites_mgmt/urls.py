@@ -61,6 +61,7 @@ from .api_v1 import (
     V1AiVisibilitySummaryView, V1AiVisibilityPromptsView, V1AiVisibilityRunView,
     V1StrategicOpportunitiesView, V1StrategicOpportunitiesRefreshView,
     V1StrategicOpportunityActionView,
+    V1LandingPromptView, V1OpportunityPromptView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -256,6 +257,15 @@ urlpatterns = [
     path('v1/sites/<int:site_id>/strategic-opportunities/refresh/',
          V1StrategicOpportunitiesRefreshView.as_view(),
          name='v1-strategic-opportunities-refresh'),
+    # Prompt export routes MUST be declared before the generic
+    # <str:action> route below, otherwise 'prompt' would be swallowed
+    # by the action matcher.
+    path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/prompt/',
+         V1OpportunityPromptView.as_view(),
+         name='v1-strategic-opportunity-prompt'),
+    path('v1/sites/<int:site_id>/landings/<int:landing_id>/prompt/',
+         V1LandingPromptView.as_view(),
+         name='v1-landing-prompt'),
     path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/<str:action>/',
          V1StrategicOpportunityActionView.as_view(),
          name='v1-strategic-opportunity-action'),

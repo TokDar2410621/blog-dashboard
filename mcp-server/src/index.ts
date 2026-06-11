@@ -19,6 +19,7 @@ import {
   ApiError,
   actionStrategicOpportunity,
   addMemory,
+  exportPagePrompt,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -496,6 +497,49 @@ const StrategicOpportunityActionArgs = z
       ),
   })
   .strict();
+
+const ExportPagePromptArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    landing_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Export an INTEGRATE prompt from an existing HostedLanding (copy already written, must be reproduced verbatim).",
+      ),
+    opportunity_id: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "Export a CREATE prompt from a StrategicOpportunity (only the concept exists, the target AI writes the copy following the brief).",
+      ),
+    stack: z
+      .enum([
+        "nextjs",
+        "react",
+        "html",
+        "astro",
+        "wordpress",
+        "webflow",
+        "generic",
+      ])
+      .optional()
+      .describe(
+        "Adapts the final integration instructions to the user's tech stack. Default: generic.",
+      ),
+  })
+  .strict()
+  .refine(
+    (d) => (d.landing_id != null) !== (d.opportunity_id != null),
+    {
+      message:
+        "Provide exactly one of landing_id or opportunity_id, not both, not neither.",
+    },
+  );
 
 const CreateLandingArgs = z
   .object({
@@ -1077,6 +1121,18 @@ const tools: ToolDef[] = [
         input.action,
       ),
   },
+  {
+    name: "gridar_export_page_prompt",
+    description:
+      "Export a ready-to-paste prompt for the USER'S OWN AI coding assistant (ChatGPT, Lovable, v0, Bolt, Copilot, Gemini...). This is the delivery channel for clients who build their site with an AI tool and have no CMS Gridar can push into - their AI does the integration in their codebase, Gridar never touches their repo. Two modes: pass landing_id for an INTEGRATE prompt (the copy already exists and was keyword-calibrated - the prompt instructs the target AI to reproduce it verbatim, with exact slug, SEO meta, section structure and both JSON-LD blocks to inject as-is); or pass opportunity_id for a CREATE prompt (only the strategic concept exists - the prompt instructs the target AI to write the copy following the binding brief: hook, capture mechanism, conversion path, angle, FR-CA Quebec lexicon when the content language is French). Optional `stack` adapts the final integration instructions (nextjs, react, html, astro, wordpress, webflow, generic). Pure server-side templating: no LLM call, no quota consumed, instant. Returns {prompt, source, stack, char_count}. Typical flow: gridar_list_strategic_opportunities -> user picks one -> gridar_export_page_prompt(opportunity_id) -> hand the prompt text to the user to paste in their AI tool.",
+    schema: ExportPagePromptArgs,
+    handler: (input) =>
+      exportPagePrompt(input.site_id, {
+        landing_id: input.landing_id,
+        opportunity_id: input.opportunity_id,
+        stack: input.stack,
+      }),
+  },
 ];
 
 // Convert a zod schema to a JSON Schema object for the MCP tools/list response.
@@ -1168,7 +1224,7 @@ export function createMcpServer(): Server {
   const server = new Server(
     {
       name: "gridar-mcp",
-      version: "0.6.0",
+      version: "0.7.0",
     },
     {
       capabilities: { tools: {} },

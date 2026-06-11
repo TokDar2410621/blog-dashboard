@@ -95,7 +95,7 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     name: "gridar-mcp",
-    version: "0.6.0",
+    version: "0.7.0",
     transport: "streamable-http",
     oauth: true,
   });
