@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
 import {
+  ApiError,
   listStrategicOpportunities,
   refreshStrategicOpportunities,
   actionStrategicOpportunity,
@@ -161,21 +162,79 @@ function OpportunityCard({
   // with an AI tool (ChatGPT, Lovable, v0, Bolt) and have no CMS. If a
   // landing was already generated we export the integrate-verbatim prompt
   // (real copy); otherwise the write-from-brief prompt (concept only).
+  //
+  // Clipboard subtlety: Safari/iOS invalidate the click's user activation
+  // as soon as we await a network call, so a plain writeText-after-fetch
+  // rejects with NotAllowedError there. The promise-backed ClipboardItem
+  // form starts the clipboard write synchronously inside the gesture and
+  // lets the payload resolve later - supported by Safari 13.1+, Chrome
+  // 127+, Firefox 127+. When the clipboard is still blocked we keep the
+  // fetched prompt and surface it for manual copy instead of losing it.
+  const [manualPrompt, setManualPrompt] = useState<string | null>(null);
   const promptMutation = useMutation({
     mutationFn: async () => {
-      const res = opp.generated_landing_id
-        ? await exportLandingPrompt(siteId, opp.generated_landing_id)
-        : await exportOpportunityPrompt(siteId, opp.id);
-      await navigator.clipboard.writeText(res.prompt);
-      return res;
+      let fetchError: Error | null = null;
+      let prompt = "";
+      const textPromise = (
+        opp.generated_landing_id
+          ? exportLandingPrompt(siteId, opp.generated_landing_id)
+          : exportOpportunityPrompt(siteId, opp.id)
+      )
+        .then((res) => {
+          prompt = res.prompt;
+          return res.prompt;
+        })
+        .catch((e: Error) => {
+          fetchError = e;
+          throw e;
+        });
+
+      try {
+        if (
+          typeof ClipboardItem !== "undefined" &&
+          navigator.clipboard &&
+          "write" in navigator.clipboard
+        ) {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/plain": textPromise.then(
+                (p) => new Blob([p], { type: "text/plain" }),
+              ),
+            }),
+          ]);
+        } else {
+          await navigator.clipboard.writeText(await textPromise);
+        }
+      } catch (clipErr) {
+        // Make sure the fetch settled before deciding what failed.
+        await textPromise.catch(() => {});
+        if (fetchError) throw fetchError;
+        if (prompt) {
+          // API succeeded, clipboard refused: hand the text over manually.
+          setManualPrompt(prompt);
+          throw new Error("CLIPBOARD_BLOCKED");
+        }
+        throw clipErr;
+      }
+      return true;
     },
     onSuccess: () => {
+      setManualPrompt(null);
       toast.success(
         "Prompt copié. Colle-le dans ChatGPT, Lovable, v0 ou ton IA préférée : elle crée la page dans TON code.",
       );
     },
-    onError: (err: Error) =>
-      toast.error(err.message || "Export du prompt échoué."),
+    onError: (err: Error) => {
+      if (err.message === "CLIPBOARD_BLOCKED") {
+        toast.warning(
+          "Copie automatique bloquée par le navigateur. Le prompt est affiché sous la carte : sélectionne-le et copie-le manuellement.",
+        );
+        return;
+      }
+      toast.error(
+        err instanceof ApiError ? err.message : "Export du prompt échoué.",
+      );
+    },
   });
 
   const concept = opp.concept;
@@ -394,6 +453,32 @@ function OpportunityCard({
             </Button>
           )}
         </div>
+
+        {/* Manual copy fallback when the browser blocks programmatic
+            clipboard access (Safari focus rules, permissions). */}
+        {manualPrompt && (
+          <div className="space-y-2 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Copie automatique bloquée par le navigateur. Clique dans la zone
+              (le texte se sélectionne tout seul) puis Ctrl+C / Cmd+C :
+            </p>
+            <textarea
+              readOnly
+              value={manualPrompt}
+              rows={10}
+              className="w-full rounded-md border border-border bg-muted/30 p-3 text-xs font-mono leading-relaxed"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setManualPrompt(null)}
+            >
+              <X className="h-3.5 w-3.5 mr-1.5" />
+              Fermer
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

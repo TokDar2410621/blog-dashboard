@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import json
 
+from django.utils.text import slugify
+
 # Stacks we know how to give specific integration instructions for.
 # 'generic' is the fallback and must always exist in both languages.
 SUPPORTED_STACKS = (
@@ -34,6 +36,53 @@ SUPPORTED_STACKS = (
 def normalize_stack(value: str | None) -> str:
     v = (value or '').strip().lower()
     return v if v in SUPPORTED_STACKS else 'generic'
+
+
+def _txt(value) -> str:
+    """Coerce any JSON value to a stripped string ('' for None).
+
+    Landing / opportunity JSON fields come from unvalidated API payloads -
+    a question or a title can legally be an int or a nested object
+    (V1CreateLandingView persists faq/value_props without per-item
+    validation). Every place that renders user JSON goes through here so a
+    weird value degrades to its str() form instead of a 500.
+    """
+    if value is None:
+        return ''
+    return str(value).strip()
+
+
+def _valid_faq(faq) -> list[dict]:
+    """Keep only dict entries that actually carry a question."""
+    if not isinstance(faq, list):
+        return []
+    return [q for q in faq if isinstance(q, dict) and _txt(q.get('question'))]
+
+
+def _valid_props(value_props) -> list[dict]:
+    """Keep only dict entries that actually carry a title."""
+    if not isinstance(value_props, list):
+        return []
+    return [
+        v for v in value_props
+        if isinstance(v, dict) and _txt(v.get('title'))
+    ]
+
+
+# Obviously-templated placeholders. A missing Site.domain must NEVER ship a
+# plausible-looking fake domain ('ton-domaine.com' resolves for someone
+# else) into a canonical URL the client's AI injects verbatim.
+_DOMAIN_PLACEHOLDER_FR = 'TON-DOMAINE.example'
+_DOMAIN_PLACEHOLDER_EN = 'YOUR-DOMAIN.example'
+
+
+def _site_domain(site, lang: str) -> tuple[str, bool]:
+    """Return (domain, is_real)."""
+    domain = (site.domain or '').strip().rstrip('/')
+    if domain:
+        return domain, True
+    placeholder = _DOMAIN_PLACEHOLDER_FR if lang == 'fr' else _DOMAIN_PLACEHOLDER_EN
+    return placeholder, False
 
 
 # ---------------------------------------------------------------------------
@@ -164,23 +213,25 @@ def _primary_jsonld(landing, canonical_url: str) -> dict:
 
 
 def _faq_jsonld(faq: list) -> dict | None:
-    if not faq:
+    entries = [
+        {
+            '@type': 'Question',
+            'name': _txt(q.get('question')),
+            'acceptedAnswer': {
+                '@type': 'Answer',
+                'text': _txt(q.get('answer')),
+            },
+        }
+        for q in _valid_faq(faq)
+    ]
+    if not entries:
+        # No valid Q/A -> no FAQPage at all. An empty mainEntity is invalid
+        # schema.org markup, and the prompt orders verbatim injection.
         return None
     return {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
-        'mainEntity': [
-            {
-                '@type': 'Question',
-                'name': (q.get('question') or '').strip(),
-                'acceptedAnswer': {
-                    '@type': 'Answer',
-                    'text': (q.get('answer') or '').strip(),
-                },
-            }
-            for q in faq
-            if isinstance(q, dict) and q.get('question')
-        ],
+        'mainEntity': entries,
     }
 
 
@@ -194,15 +245,26 @@ def _dumps(obj) -> str:
 
 def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
     lang = (landing.language or 'fr')[:2]
-    domain = (site.domain or 'ton-domaine.com').strip().rstrip('/')
+    fr = lang == 'fr'
+    domain, domain_is_real = _site_domain(site, lang)
     slug = landing.slug or 'page'
     canonical = f'https://{domain}/{slug}'
-    fr = lang == 'fr'
 
-    value_props = landing.value_props or []
-    faq = landing.faq or []
+    value_props = _valid_props(landing.value_props)
+    faq = _valid_faq(landing.faq)
     primary_ld = _primary_jsonld(landing, canonical)
     faq_ld = _faq_jsonld(faq)
+
+    domain_note_fr = (
+        "\n- ATTENTION : le domaine n'est pas configure dans Gridar. "
+        f"Remplace `{domain}` par le vrai domaine du site PARTOUT "
+        "(canonical, og:url, JSON-LD) avant de publier."
+    )
+    domain_note_en = (
+        "\n- WARNING: the domain is not configured in Gridar. Replace "
+        f"`{domain}` with the site's real domain EVERYWHERE (canonical, "
+        "og:url, JSON-LD) before publishing."
+    )
 
     sections: list[str] = []
 
@@ -235,6 +297,7 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
             "- Open Graph : og:title = le title, og:description = la "
             "description, og:url = le canonical, og:type = website\n"
             f"- Langue declaree de la page : {lang}"
+            + ('' if domain_is_real else domain_note_fr)
         )
         hero = (
             "## Structure de la page (dans cet ordre)\n\n"
@@ -255,11 +318,9 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
                 f"### 2. Grille de benefices ({len(value_props)} cartes)"
             ]
             for vp in value_props:
-                if not isinstance(vp, dict):
-                    continue
                 cards.append(
-                    f"- [icone suggeree : {vp.get('icon') or 'aucune'}] "
-                    f"**{vp.get('title') or ''}** : {vp.get('description') or ''}"
+                    f"- [icone suggeree : {_txt(vp.get('icon')) or 'aucune'}] "
+                    f"**{_txt(vp.get('title'))}** : {_txt(vp.get('description'))}"
                 )
             sections.append('\n'.join(cards))
 
@@ -279,11 +340,9 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
                 "cliquables, navigables au clavier)"
             ]
             for q in faq:
-                if not isinstance(q, dict):
-                    continue
                 items.append(
-                    f"**Q : {q.get('question') or ''}**\n"
-                    f"R : {q.get('answer') or ''}"
+                    f"**Q : {_txt(q.get('question'))}**\n"
+                    f"R : {_txt(q.get('answer'))}"
                 )
             sections.append('\n\n'.join(items))
 
@@ -344,6 +403,7 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
             "- Open Graph: og:title = title, og:description = description, "
             "og:url = canonical, og:type = website\n"
             f"- Declared page language: {lang}"
+            + ('' if domain_is_real else domain_note_en)
         )
         hero = (
             "## Page structure (in this order)\n\n"
@@ -362,11 +422,9 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
         if value_props:
             cards = [f"### 2. Benefits grid ({len(value_props)} cards)"]
             for vp in value_props:
-                if not isinstance(vp, dict):
-                    continue
                 cards.append(
-                    f"- [suggested icon: {vp.get('icon') or 'none'}] "
-                    f"**{vp.get('title') or ''}**: {vp.get('description') or ''}"
+                    f"- [suggested icon: {_txt(vp.get('icon')) or 'none'}] "
+                    f"**{_txt(vp.get('title'))}**: {_txt(vp.get('description'))}"
                 )
             sections.append('\n'.join(cards))
 
@@ -386,11 +444,9 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
                 "keyboard accessible)"
             ]
             for q in faq:
-                if not isinstance(q, dict):
-                    continue
                 items.append(
-                    f"**Q: {q.get('question') or ''}**\n"
-                    f"A: {q.get('answer') or ''}"
+                    f"**Q: {_txt(q.get('question'))}**\n"
+                    f"A: {_txt(q.get('answer'))}"
                 )
             sections.append('\n\n'.join(items))
 
@@ -433,15 +489,31 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
 def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
     lang = (opportunity.language or 'fr')[:2]
     fr = lang == 'fr'
-    domain = (site.domain or 'ton-domaine.com').strip().rstrip('/')
-    concept = opportunity.concept or {}
+    domain, domain_is_real = _site_domain(site, lang)
+    concept = opportunity.concept if isinstance(opportunity.concept, dict) else {}
 
-    url_path = (concept.get('suggested_url_path') or '').strip() or \
-        f"/{opportunity.keyword.replace(' ', '-')}"
-    if not url_path.startswith('/'):
-        url_path = '/' + url_path
+    suggested = concept.get('suggested_url_path')
+    suggested = suggested.strip() if isinstance(suggested, str) else ''
+    if suggested:
+        url_path = suggested if suggested.startswith('/') else '/' + suggested
+    else:
+        # slugify strips accents / apostrophes / uppercase so a FR-CA
+        # keyword like "referencement web Quebec" never becomes a
+        # non-ASCII mixed-case URL the prompt then mandates as exact.
+        url_path = '/' + (slugify(opportunity.keyword) or 'page')
     slug = url_path.lstrip('/')
     canonical = f'https://{domain}{url_path}'
+
+    domain_note_fr = (
+        "\n- ATTENTION : le domaine n'est pas configure dans Gridar. "
+        f"Remplace `{domain}` par le vrai domaine du site PARTOUT "
+        "(canonical, og:url, JSON-LD) avant de publier."
+    )
+    domain_note_en = (
+        "\n- WARNING: the domain is not configured in Gridar. Replace "
+        f"`{domain}` with the site's real domain EVERYWHERE (canonical, "
+        "og:url, JSON-LD) before publishing."
+    )
 
     schema_type = {
         'comparison': 'Product',
@@ -527,6 +599,7 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
             f"- JSON-LD : un bloc `{schema_type}` (nom, description, url) + un "
             "bloc `FAQPage` construit sur tes questions/reponses. Les deux "
             "dans des balises `<script type=\"application/ld+json\">`."
+            + ('' if domain_is_real else domain_note_fr)
         )
         sections.append(
             "## Specifique a ton stack\n" + _stack_block(stack, slug, lang)
@@ -607,6 +680,7 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
             f"- JSON-LD: one `{schema_type}` block (name, description, url) + "
             "one `FAQPage` block built from your Q&As. Both inside "
             "`<script type=\"application/ld+json\">` tags."
+            + ('' if domain_is_real else domain_note_en)
         )
         sections.append(
             "## Stack-specific instructions\n" + _stack_block(stack, slug, lang)
