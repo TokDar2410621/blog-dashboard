@@ -4,6 +4,14 @@ import path from "node:path";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
 
 const nextConfig: NextConfig = {
+  // Django's URLs all end with a trailing slash (DRF convention) and its
+  // APPEND_SLASH middleware 301s slashless paths back to the slashed form.
+  // Next.js' default trailing-slash normalization 308s the slashed form to
+  // slashless BEFORE the /api rewrite runs - the two redirects ping-pong
+  // forever (ERR_TOO_MANY_REDIRECTS on every /api call). Disable Next's
+  // automatic handling; middleware.ts re-applies it for page routes only.
+  skipTrailingSlashRedirect: true,
+
   // Lock turbopack root to this folder. Without this Next picks up the
   // package-lock.json in the parent directory (Vite app) and warns.
   turbopack: {
