@@ -585,3 +585,631 @@ export async function uploadInlineImage(file: File): Promise<{ url: string }> {
   }
   return res.json();
 }
+
+// Generate Sister Article (multi-lang translation that shares translation_group)
+export type GenerateSisterArticleResponse = {
+  slug: string;
+  id: number;
+  language: string;
+  translation_group: string;
+  status: string;
+  title: string;
+};
+
+export async function generateSisterArticle(
+  siteId: number,
+  sourceSlug: string,
+  body: { target_language: "fr" | "en" | "es" },
+  signal?: AbortSignal,
+): Promise<GenerateSisterArticleResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/articles/${encodeURIComponent(sourceSlug)}/generate-sister-article/`,
+    { method: "POST", body: JSON.stringify(body) },
+    signal,
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      err.error || "Sister article generation failed",
+      res.status,
+      undefined,
+      err,
+    );
+  }
+  return res.json();
+}
+
+// ---- Proof loop (baseline + attribution) ----
+
+export type ProofQueryRow = {
+  query: string;
+  impressions: number;
+  clicks: number;
+  position: number | null;
+};
+
+export type ProofAttribution = {
+  id: number;
+  post_id: number;
+  post_slug: string;
+  post_title: string;
+  days_since_publish: 30 | 60 | 90;
+  captured_at: string;
+  period_start: string;
+  period_end: string;
+  indexed: boolean;
+  impressions: number;
+  clicks: number;
+  avg_position: number | null;
+  top_queries: ProofQueryRow[];
+  delta_vs_baseline: {
+    impressions: number;
+    clicks: number;
+    avg_position: number | null;
+  };
+};
+
+export type ProofTopGainer = {
+  post_id: number;
+  title: string;
+  slug: string;
+  horizon: 30 | 60 | 90;
+  impressions_gained: number;
+  clicks_gained: number;
+  top_queries: ProofQueryRow[];
+};
+
+export type ProofSummary = {
+  site_id: number;
+  site_name: string;
+  domain?: string;
+  posts_with_attribution: number;
+  total_impressions_gained: number;
+  total_clicks_gained: number;
+  top_gainers: ProofTopGainer[];
+};
+
+export type ProofShareState = {
+  enabled: boolean;
+  token: string | null;
+  public_url: string | null;
+  created_at?: string;
+  revoked_at?: string | null;
+  rotated?: boolean;
+};
+
+export async function fetchProofSummary(siteId: number): Promise<ProofSummary> {
+  const res = await authFetch(`/sites/${siteId}/proof/summary/`);
+  if (!res.ok) throw new ApiError("Proof summary failed", res.status);
+  return res.json();
+}
+
+export async function fetchProofAttribution(
+  siteId: number,
+  postId?: number,
+): Promise<{ attributions: ProofAttribution[] }> {
+  const q = postId ? `?post=${postId}` : "";
+  const res = await authFetch(`/sites/${siteId}/proof/attribution/${q}`);
+  if (!res.ok) throw new ApiError("Proof attribution failed", res.status);
+  return res.json();
+}
+
+export async function fetchProofShareState(siteId: number): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`);
+  if (!res.ok) throw new ApiError("Proof share state failed", res.status);
+  return res.json();
+}
+
+export async function enableProofShare(
+  siteId: number,
+  opts?: { rotate?: boolean },
+): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rotate: !!opts?.rotate }),
+  });
+  if (!res.ok) throw new ApiError("Enable share failed", res.status);
+  return res.json();
+}
+
+export async function revokeProofShare(siteId: number): Promise<ProofShareState> {
+  const res = await authFetch(`/sites/${siteId}/proof/share/`, { method: "DELETE" });
+  if (!res.ok) throw new ApiError("Revoke share failed", res.status);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Topic Cluster Planner (2026-06-08)
+// ---------------------------------------------------------------------------
+
+export type KeywordIntent =
+  | "transactional"
+  | "commercial"
+  | "informational"
+  | "navigational"
+  | "local";
+
+export type ProposedPage = {
+  type: "landing" | "article";
+  title: string;
+  slug: string;
+  keyword: string;
+  role: "pillar" | "cluster" | "alternative" | "standalone";
+  page_subtype?: string;
+};
+
+export type KeywordStrategy = {
+  id: number;
+  site_id: number;
+  keyword: string;
+  intent: KeywordIntent;
+  intent_confidence: number;
+  proposed_structure: string;
+  proposed_pages: ProposedPage[];
+  rationale: string;
+  status: string;
+  created: boolean;
+};
+
+export type HostedLandingDraft = {
+  id: number;
+  slug: string;
+  title?: string;
+  h1?: string;
+  status: string;
+  page_subtype?: string;
+};
+
+export async function classifyKeywordIntent(
+  keyword: string,
+  siteId?: number,
+): Promise<{
+  keyword: string;
+  intent: KeywordIntent;
+  confidence: number;
+  navigational_match: boolean;
+}> {
+  const res = await authFetch(`/v1/classify-intent/`, {
+    method: "POST",
+    body: JSON.stringify({ keyword, site_id: siteId }),
+  });
+  if (!res.ok) throw new ApiError("Intent classification failed", res.status);
+  return res.json();
+}
+
+export async function proposeKeywordStrategy(
+  siteId: number,
+  keyword: string,
+  language?: "fr" | "en" | "es",
+): Promise<KeywordStrategy> {
+  const res = await authFetch(`/v1/sites/${siteId}/keyword-strategy/`, {
+    method: "POST",
+    body: JSON.stringify({ keyword, language }),
+  });
+  if (!res.ok) throw new ApiError("Strategy proposal failed", res.status);
+  return res.json();
+}
+
+export async function approveKeywordStrategy(
+  siteId: number,
+  strategyId: number,
+  customizations?: { pages?: ProposedPage[] },
+): Promise<{
+  id: number;
+  status: string;
+  generated_landings: number[];
+  planned_articles: unknown[];
+  errors: unknown[];
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/keyword-strategy/${strategyId}/approve/`,
+    {
+      method: "POST",
+      body: JSON.stringify({ customizations: customizations ?? {} }),
+    },
+  );
+  if (!res.ok) throw new ApiError("Strategy approval failed", res.status);
+  return res.json();
+}
+
+export async function createLandingManual(
+  siteId: number,
+  body: Record<string, unknown>,
+): Promise<HostedLandingDraft> {
+  const res = await authFetch(`/v1/sites/${siteId}/landings/manual/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Landing creation failed", res.status);
+  return res.json();
+}
+
+export async function generateLandingAi(
+  siteId: number,
+  body: {
+    keyword: string;
+    primary_cta_text?: string;
+    primary_cta_url?: string;
+    value_props?: unknown[];
+    page_subtype?: "service" | "product" | "pillar" | "comparison" | "local";
+    language?: "fr" | "en" | "es";
+  },
+): Promise<HostedLandingDraft> {
+  const res = await authFetch(`/v1/sites/${siteId}/landings/generate/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Landing generation failed", res.status);
+  return res.json();
+}
+
+export async function linkPagesV1(
+  siteId: number,
+  body: { source_slug: string; target_slug: string; anchor_text: string },
+): Promise<{
+  status: string;
+  source_slug: string;
+  source_type?: string;
+  target_slug: string;
+  target_type?: string;
+  anchor_text?: string;
+  inserted_inline?: boolean;
+}> {
+  const res = await authFetch(`/v1/sites/${siteId}/link-pages/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new ApiError("Link insertion failed", res.status);
+  return res.json();
+}
+
+// SERP Analyzer (2026-06-08) - Surfer-style top-10 benchmark
+export type SerpAnalyzeResult = {
+  position: number;
+  url: string;
+  domain: string;
+  title: string;
+  snippet: string;
+  word_count: number | null;
+  headings_count: number | null;
+  has_faq: boolean;
+  has_video: boolean;
+  fetch_error: boolean;
+};
+
+export type SerpAnalyzeResponse = {
+  keyword: string;
+  language: string;
+  top_10: SerpAnalyzeResult[];
+  averages: {
+    word_count_avg: number;
+    headings_avg: number;
+    faq_pct: number;
+    video_pct: number;
+  };
+};
+
+export async function serpAnalyze(
+  siteId: number,
+  body: { keyword: string; language?: "fr" | "en" | "es" },
+): Promise<SerpAnalyzeResponse> {
+  const res = await authFetch(`/v1/sites/${siteId}/serp-analyze/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "SERP analyze failed",
+      res.status,
+      "SERP_ANALYZE_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// AI Visibility tracking (2026-06-08)
+// ---------------------------------------------------------------------------
+
+export type AiVisibilityEngine =
+  | "chatgpt"
+  | "perplexity"
+  | "gemini"
+  | "searchgpt"
+  | "claude";
+
+export type AiVisibilityEngineBreakdown = {
+  total_checks: number;
+  cited_count: number;
+  cite_rate: number;
+};
+
+export type AiVisibilitySummary = {
+  score: number;
+  total_mentions: number;
+  cited_pages_count: number;
+  total_checks: number;
+  total_prompts: number;
+  breakdown_by_engine: Record<AiVisibilityEngine, AiVisibilityEngineBreakdown>;
+  delta_7d: number;
+};
+
+export type AiVisibilityPrompt = {
+  id: number;
+  prompt: string;
+  target_intent: string | null;
+  language: string;
+  created_at: string;
+  total_checks: number;
+  citation_count: number;
+  engines_mentioning: AiVisibilityEngine[];
+  last_checked_at: string | null;
+};
+
+export type AiVisibilityRunResult = {
+  id: number;
+  prompt_id: number;
+  engine: AiVisibilityEngine;
+  is_cited: boolean;
+  citation_url: string | null;
+  citation_rank: number | null;
+  checked_at: string;
+};
+
+export type AiVisibilityRunResponse = {
+  checks_run: number;
+  prompts_checked: number;
+  engines_per_prompt: number;
+  results: AiVisibilityRunResult[];
+  mocked: boolean;
+  note: string;
+};
+
+export async function aiVisibilitySummary(
+  siteId: number,
+): Promise<AiVisibilitySummary> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/summary/`);
+  if (!res.ok) throw new ApiError("AI visibility summary failed", res.status);
+  return res.json();
+}
+
+export async function listAiVisibilityPrompts(
+  siteId: number,
+): Promise<{ results: AiVisibilityPrompt[]; count: number }> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/prompts/`);
+  if (!res.ok) throw new ApiError("AI visibility prompts failed", res.status);
+  return res.json();
+}
+
+export async function createAiVisibilityPrompt(
+  siteId: number,
+  body: {
+    prompt: string;
+    target_intent?: string | null;
+    language?: "fr" | "en" | "es";
+  },
+): Promise<{
+  id: number;
+  prompt: string;
+  target_intent: string | null;
+  language: string;
+  created_at: string;
+}> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/prompts/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "AI prompt creation failed",
+      res.status,
+      "AI_PROMPT_CREATE_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+export async function runAiVisibility(
+  siteId: number,
+  body: { prompt_id?: number } = {},
+): Promise<AiVisibilityRunResponse> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/run/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "AI visibility run failed",
+      res.status,
+      "AI_VIS_RUN_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+// ============================================================================
+// Strategic Opportunities
+// ============================================================================
+// /api/v1/sites/<id>/strategic-opportunities/*
+// Backed by the Claude strategic engine: for each non-info-intent keyword
+// without a matching landing, the engine proposes a page concept tied to the
+// site's existing assets + a conversion mechanism. UI lives at
+// /dashboard/<siteId>/opportunites.
+
+export type StrategicOpportunityConcept = {
+  page_concept: string;
+  page_type:
+    | "tool_landing"
+    | "service_page"
+    | "comparison"
+    | "guide_pillar"
+    | "quiz_landing"
+    | "calculator"
+    | "local_landing"
+    | "lead_magnet"
+    | string;
+  suggested_title: string;
+  suggested_url_path: string;
+  hook: string;
+  capture_mechanism: string;
+  conversion_path: string;
+  angle: string;
+  asset_match: boolean;
+  asset_used: string | null;
+  why_this_works: string;
+  priority?: "high" | "medium" | "low";
+};
+
+export type StrategicOpportunityEstimate = {
+  monthly_volume: number;
+  target_position: number;
+  estimated_visits: number;
+  estimated_leads_range: [number, number];
+  estimated_paid_range: [number, number];
+  qualitative_traffic: "élevé" | "moyen" | "faible" | "marginal" | "inconnu";
+};
+
+export type StrategicOpportunity = {
+  id: number;
+  keyword: string;
+  intent: "info" | "commercial" | "transactional" | "local";
+  language: string;
+  current_position: number | null;
+  priority: "high" | "medium" | "low";
+  status: "proposed" | "approved" | "dismissed" | "done";
+  concept: StrategicOpportunityConcept;
+  estimate: StrategicOpportunityEstimate;
+  tracked_keyword_id: number | null;
+  generated_landing_id: number | null;
+  generated_landing_slug: string | null;
+  created_at: string;
+  refreshed_at: string | null;
+};
+
+export async function listStrategicOpportunities(
+  siteId: number,
+  options: { includeDismissed?: boolean } = {},
+): Promise<{ results: StrategicOpportunity[]; count: number }> {
+  const qs = options.includeDismissed ? "?include_dismissed=1" : "";
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${qs}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Liste des opportunités impossible", res.status);
+  }
+  return res.json();
+}
+
+export async function refreshStrategicOpportunities(
+  siteId: number,
+  body: { max_keywords?: number } = {},
+): Promise<{
+  refreshed: Array<{ id: number; keyword: string; priority: string }>;
+  skipped: Array<{ keyword: string; reason: string }>;
+  count_refreshed: number;
+  count_skipped: number;
+  count_candidates: number;
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/refresh/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string"
+        ? err.error
+        : "Régénération des opportunités impossible",
+      res.status,
+      "OPPORTUNITIES_REFRESH_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
+export async function actionStrategicOpportunity(
+  siteId: number,
+  opportunityId: number,
+  action: "dismiss" | "restore" | "approve",
+): Promise<{
+  id: number;
+  status: StrategicOpportunity["status"];
+  landing_id?: number;
+  landing_slug?: string;
+  note?: string;
+}> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${opportunityId}/${action}/`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : `Action ${action} impossible`,
+      res.status,
+      `OPPORTUNITY_${action.toUpperCase()}_FAILED`,
+      err,
+    );
+  }
+  return res.json();
+}
+
+// --- Prompt export -----------------------------------------------------
+// Ready-to-paste prompt for the user's own AI tool (ChatGPT, Lovable, v0,
+// Bolt...). Server-side templating, no LLM call, no quota.
+
+export type PromptStack =
+  | "nextjs"
+  | "react"
+  | "html"
+  | "astro"
+  | "wordpress"
+  | "webflow"
+  | "generic";
+
+export type PromptExportResponse = {
+  prompt: string;
+  source: "landing" | "opportunity";
+  landing_id?: number;
+  opportunity_id?: number;
+  slug?: string;
+  keyword?: string;
+  stack: PromptStack;
+  char_count: number;
+};
+
+export async function exportOpportunityPrompt(
+  siteId: number,
+  opportunityId: number,
+  stack: PromptStack = "generic",
+): Promise<PromptExportResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/strategic-opportunities/${opportunityId}/prompt/?stack=${stack}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Export du prompt impossible", res.status);
+  }
+  return res.json();
+}
+
+export async function exportLandingPrompt(
+  siteId: number,
+  landingId: number,
+  stack: PromptStack = "generic",
+): Promise<PromptExportResponse> {
+  const res = await authFetch(
+    `/v1/sites/${siteId}/landings/${landingId}/prompt/?stack=${stack}`,
+  );
+  if (!res.ok) {
+    throw new ApiError("Export du prompt impossible", res.status);
+  }
+  return res.json();
+}

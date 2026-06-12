@@ -30,66 +30,15 @@ const nextConfig: NextConfig = {
   // native /audit, /blog, app/[slug]... win) but BEFORE dynamic routes -
   // which is what lets /login reach the SPA instead of being swallowed by
   // the app/[slug] hosted-landing catch-all.
+  // Every page is native to this app since the full SPA migration
+  // (2026-06-11). The only proxying left is the Django backend, kept
+  // same-origin so the httpOnly auth cookie lives on gridar.app and no
+  // CORS preflight hits the hot path.
   async rewrites() {
-    const rawDashboardUrl = process.env.DASHBOARD_INTERNAL_URL;
-    const apiRewrites = [
+    return [
       { source: "/api/:path*", destination: `${API_URL}/api/:path*` },
       { source: "/admin/:path*", destination: `${API_URL}/admin/:path*` },
       { source: "/accounts/:path*", destination: `${API_URL}/accounts/:path*` },
-    ];
-    if (!rawDashboardUrl) {
-      // The whole app surface (login, dashboard, OAuth callbacks, the SPA
-      // bundles) hangs on this single env var: a silent fallback in
-      // production would 404 every one of those routes at once. Fail the
-      // build instead so the misconfiguration is caught at deploy time.
-      if (process.env.VERCEL_ENV === "production") {
-        throw new Error(
-          "DASHBOARD_INTERNAL_URL is required in production: set it to the " +
-            "full https origin of the Vite SPA deployment (e.g. " +
-            "https://blog-dashboard-ebon.vercel.app), no trailing slash.",
-        );
-      }
-      // Local dev: still proxy /api/* so the AuthContext call works against
-      // a local Django (NEXT_PUBLIC_API_URL=http://localhost:8888).
-      return apiRewrites;
-    }
-    // Normalize the two classic value mistakes: a trailing slash produces
-    // double-slash destinations; a missing protocol makes next build throw
-    // a cryptic invalid-rewrite error. Fail fast with a clear message.
-    const DASHBOARD_URL = rawDashboardUrl.replace(/\/+$/, "");
-    if (!/^https?:\/\//.test(DASHBOARD_URL)) {
-      throw new Error(
-        `DASHBOARD_INTERNAL_URL must start with http(s)://, got: ${rawDashboardUrl}`,
-      );
-    }
-    // Every SPA surface. Page routes mirror src/App.tsx; asset routes are
-    // what the SPA's index.html references (hashed bundles, PWA icons,
-    // manifest, self-destroying service worker).
-    const SPA_PATHS = [
-      "/login",
-      "/sites",
-      "/compare",
-      "/billing",
-      "/reset-password",
-      "/account/:path*",
-      "/auth/:path*",
-      "/gsc/:path*",
-      "/oauth/:path*",
-      "/onboarding/:path*",
-      "/dashboard",
-      "/dashboard/:path*",
-      "/assets/:path*",
-      "/icons/:path*",
-      "/manifest.webmanifest",
-      "/sw.js",
-      "/registerSW.js",
-    ];
-    return [
-      ...apiRewrites,
-      ...SPA_PATHS.map((p) => ({
-        source: p,
-        destination: `${DASHBOARD_URL}${p}`,
-      })),
     ];
   },
 
