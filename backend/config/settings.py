@@ -138,9 +138,16 @@ CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # JWT-cookie ONLY. SessionAuthentication used to sit behind it as a
+    # fallback, but a Django session can exist without a JWT (allauth
+    # creates one during social-login attempts, admin logins too). In that
+    # state every GET authenticated fine via the session while every POST
+    # hit SessionAuthentication's CSRF check and died with an unexplained
+    # 403 (no CSRF token in the SPA-style fetches). The dashboard never
+    # intends session auth - dropping it makes a missing/expired JWT a
+    # clean 401, which authFetch handles by refreshing the cookie pair.
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'config.authentication.CookieJWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
