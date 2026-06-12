@@ -30,13 +30,13 @@ native existe dans marketing/app/, elle ecrase silencieusement son rewrite
 
 | # | Pages | Statut |
 |---|---|---|
-| 0 | Cutover domaine gridar.app -> gridar-marketing | EN ATTENTE clic Darius (voir PENDING_HUMAN) |
-| 1 | /login, /reset-password, /sites, /compare, /billing, /account/api-keys, /auth/[provider]/callback, /gsc/callback, /oauth/mcp-authorize, /onboarding/external | EN COURS 2026-06-11 |
-| 2 | Dashboard core : layout + sidebar + /dashboard/[siteId] (Overview), audit-site, /dashboard/overview (MultiSite) | a faire |
-| 3 | Tools lecture : positions (KeywordTracker), decay, clusters, link-graph, redirects, broken-links, serp-analyzer, ai-visibility, opportunites, digest, audit-global, images | a faire |
-| 4 | Settings (9 sous-pages) | a faire |
-| 5 | Les gros : articles (PostList), articles/[slug] (PostEditor ~3000 lignes), generer (AIGenerator) | a faire |
-| 6 | Suppression des pages SPA + retrait des rewrites proxy + retrait projet Vercel blog-dashboard + DASHBOARD_INTERNAL_URL | a faire EN DERNIER |
+| 0 | Cutover domaine gridar.app -> gridar-marketing | FAIT 2026-06-11 (www primaire, apex 308 -> www) |
+| 1 | auth/account surface (10 pages) | FAIT 2026-06-11 |
+| 2 | Dashboard core | FAIT 2026-06-11 (fleet 13 agents) |
+| 3 | Tools (12 routes) | FAIT 2026-06-11 |
+| 4 | Settings (9 sous-pages + context) | FAIT 2026-06-11 |
+| 5 | PostList + PostEditor + AIGenerator | FAIT 2026-06-11 |
+| 6 | SPA supprime (src/, vite, vercel.json racine), rewrites proxy retires | FAIT 2026-06-11 - MIGRATION TERMINEE |
 
 ## Notes techniques accumulees
 
@@ -47,3 +47,18 @@ native existe dans marketing/app/, elle ecrase silencieusement son rewrite
 - JobsContext/JobsDock (SPA) : a porter au batch 2 (le dashboard en depend).
 - recharts present dans marketing? NON - npm i recharts au debut du batch 2.
 - react-i18next : les pages EN existantes meurent avec le SPA.
+
+## POST-MIGRATION (2026-06-11, reste a faire)
+
+- CRITIQUE : NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID + NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID
+  absents du projet gridar-marketing (valeurs perdues avec le projet Vercel
+  supprime). Login Google/GitHub INDISPONIBLE (boutons caches) tant que Darius
+  ne les recupere pas (Google Cloud Console / GitHub Developer Settings) et ne
+  les pose pas + redeploy. Email+password fonctionne.
+- Brancher Git sur gridar-marketing (Settings > Git, Root Directory=marketing)
+  pour les auto-deploys; sinon deploys via `cd marketing && npx vercel deploy --prod`.
+- Supprimer le projet Vercel placeholder `gridar-app-spa` (jamais deploye).
+- Optionnel : remettre gridar.app (apex) comme domaine primaire au lieu de www
+  (les canonicals du code pointent sur gridar.app sans www).
+- Smoke runtime navigateur a faire par Darius : login email, navigation
+  dashboard, editeur, un cycle generer/publier.
