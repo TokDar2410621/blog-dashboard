@@ -43,11 +43,16 @@ const nextConfig: NextConfig = {
   // same-origin so the httpOnly auth cookie lives on gridar.app and no
   // CORS preflight hits the hot path.
   async rewrites() {
-    return [
-      { source: "/api/:path*", destination: `${API_URL}/api/:path*` },
-      { source: "/admin/:path*", destination: `${API_URL}/admin/:path*` },
-      { source: "/accounts/:path*", destination: `${API_URL}/accounts/:path*` },
-    ];
+    // :path* is segment-based, so a destination built from it DROPS the
+    // trailing slash (/api/auth/me/ would proxy as /api/auth/me and Django's
+    // APPEND_SLASH would bounce it back - redirect loop). Declare the
+    // slash-suffixed variant FIRST with an explicit trailing slash in the
+    // destination so Django receives exactly what the browser sent.
+    const proxied = ["api", "admin", "accounts"];
+    return proxied.flatMap((p) => [
+      { source: `/${p}/:path*/`, destination: `${API_URL}/${p}/:path*/` },
+      { source: `/${p}/:path*`, destination: `${API_URL}/${p}/:path*` },
+    ]);
   },
 
   images: {

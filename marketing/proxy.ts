@@ -9,23 +9,26 @@ import { NextRequest, NextResponse } from "next/server";
  * ping-ponged with Django's APPEND_SLASH 301 (slashless -> slashed),
  * producing ERR_TOO_MANY_REDIRECTS on every API call.
  *
- * This proxy restores the old behavior for everything EXCEPT the
- * paths proxied to Django, which must keep their trailing slashes intact.
+ * This proxy restores the old behavior for everything EXCEPT the paths
+ * proxied to Django, which must keep their trailing slashes intact.
+ *
+ * Gotcha: request.nextUrl.pathname strips the trailing slash and keeps it
+ * as internal state, so detection MUST read the raw request.url instead.
  */
 const PROXIED_PREFIXES = ["/api/", "/admin/", "/accounts/"];
 
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  // Raw pathname, slash included - nextUrl.pathname would hide it.
+  const rawPath = new URL(request.url).pathname;
 
   if (
-    pathname.length > 1 &&
-    pathname.endsWith("/") &&
-    !PROXIED_PREFIXES.some((p) => pathname.startsWith(p))
+    rawPath.length > 1 &&
+    rawPath.endsWith("/") &&
+    !PROXIED_PREFIXES.some((p) => rawPath.startsWith(p))
   ) {
-    // Clone keeps protocol/host/search; only the pathname changes.
-    const url = request.nextUrl.clone();
-    url.pathname = pathname.replace(/\/+$/, "");
-    return NextResponse.redirect(url, 308);
+    const target = new URL(request.url);
+    target.pathname = rawPath.replace(/\/+$/, "");
+    return NextResponse.redirect(target, 308);
   }
 
   return NextResponse.next();
