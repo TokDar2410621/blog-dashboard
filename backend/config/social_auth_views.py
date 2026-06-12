@@ -19,6 +19,8 @@ csrf_exempt so Django's CsrfViewMiddleware doesn't reject the request with
 OAuth `code` itself (single-use, bound to redirect_uri, verified with the
 provider), not from session-tied CSRF tokens.
 """
+from urllib.parse import urlparse
+
 from allauth.socialaccount.providers.github.views import GitHubOAuth2Adapter
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
@@ -26,6 +28,35 @@ from dj_rest_auth.registration.views import SocialLoginView
 from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+
+# Hosts allowed to host the OAuth callback page. The exchange redirect_uri
+# must EXACTLY match the one the SPA used at the authorize step, and the SPA
+# builds it from window.location.origin - which is www.gridar.app or
+# gridar.app depending on which one Vercel currently has as the primary
+# domain. A hardcoded settings value breaks every time the primary flips
+# (Google answers "invalid_grant" -> the UI shows "Echec de l'echange de
+# code"). So we accept the SPA's value, but only after strict validation.
+_ALLOWED_CALLBACK_HOSTS = {'gridar.app', 'www.gridar.app'}
+_LOCAL_CALLBACK_HOSTS = {'localhost:5173', 'localhost:3000', '127.0.0.1:3000'}
+
+
+def _negotiated_callback_url(request, provider: str, fallback: str) -> str:
+    """Return the redirect_uri the SPA actually used at the authorize step,
+    if and only if it matches our exact callback shape on a whitelisted
+    host. Anything else falls back to the static settings value."""
+    sent = (request.data.get('redirect_uri') or '').strip()
+    if not sent:
+        return fallback
+    u = urlparse(sent)
+    host = u.netloc.lower()
+    path_ok = u.path == f'/auth/{provider}/callback'
+    clean = not u.query and not u.fragment and not u.params
+    if path_ok and clean:
+        if u.scheme == 'https' and host in _ALLOWED_CALLBACK_HOSTS:
+            return sent
+        if u.scheme == 'http' and host in _LOCAL_CALLBACK_HOSTS and settings.DEBUG:
+            return sent
+    return fallback
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -41,7 +72,9 @@ class GoogleLoginView(SocialLoginView):
 
     @property
     def callback_url(self):
-        return settings.GOOGLE_OAUTH_CALLBACK_URL
+        return _negotiated_callback_url(
+            self.request, 'google', settings.GOOGLE_OAUTH_CALLBACK_URL,
+        )
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -52,4 +85,6 @@ class GitHubLoginView(SocialLoginView):
 
     @property
     def callback_url(self):
-        return settings.GITHUB_OAUTH_CALLBACK_URL
+        return _negotiated_callback_url(
+            self.request, 'github', settings.GITHUB_OAUTH_CALLBACK_URL,
+        )
