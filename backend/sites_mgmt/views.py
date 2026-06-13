@@ -9252,6 +9252,13 @@ class SiteAuditAggregatorView(APIView):
         if cached and not request.query_params.get('refresh'):
             return Response(cached)
 
+        # The full audit blocks on PageSpeed (up to 30s) + Serper backlinks
+        # (~10s). `?fast=1` runs only the DB-backed signals (keywords, stats,
+        # decay) and returns in ~1s, so the dashboard can paint immediately;
+        # the frontend fires the full request in parallel to fill in PageSpeed
+        # and backlinks. A warm cache (handled above) short-circuits both.
+        wants_fast = request.query_params.get('fast') in ('1', 'true', 'yes')
+
         # Homepage URL for PageSpeed + backlinks. Some sites don't have a
         # domain set (e.g. brand-new hosted site without subdomain yet) -
         # gracefully skip PageSpeed in that case.
@@ -9420,22 +9427,35 @@ class SiteAuditAggregatorView(APIView):
             except Exception as e:
                 return {'error': f'Decay: {str(e)[:80]}'}
 
-        # ── Run all in parallel ─────────────────────────────────────────────
+        # ── Run the relevant subtasks in parallel ───────────────────────────
+        # Fast mode skips the two slow external calls (PageSpeed, Serper) and
+        # marks them pending so the UI shows a per-card spinner instead of a
+        # blank card.
+        task_map = {
+            'keywords': task_keywords,
+            'stats': task_sitestats,
+            'decay': task_decay,
+        }
+        if not wants_fast:
+            task_map['pagespeed'] = task_pagespeed
+            task_map['backlinks'] = task_backlinks
+
         results = {}
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = {
-                pool.submit(task_pagespeed): 'pagespeed',
-                pool.submit(task_keywords): 'keywords',
-                pool.submit(task_backlinks): 'backlinks',
-                pool.submit(task_sitestats): 'stats',
-                pool.submit(task_decay): 'decay',
-            }
+        with ThreadPoolExecutor(max_workers=len(task_map)) as pool:
+            futures = {pool.submit(fn): key for key, fn in task_map.items()}
             for fut in as_completed(futures):
                 key = futures[fut]
                 try:
                     results[key] = fut.result()
                 except Exception as e:
                     results[key] = {'error': str(e)[:80]}
+
+        if wants_fast:
+            # Placeholders: no 'avg' / 'total_referring_domains' key means the
+            # score + recos logic below skips them (weight redistributed), and
+            # the `pending` flag tells the frontend to show a spinner.
+            results.setdefault('pagespeed', {'pending': True})
+            results.setdefault('backlinks', {'pending': True})
 
         # ── Composite score (0-100) ────────────────────────────────────────
         # Weights: PageSpeed 0.30, Rankings 0.30, Backlinks 0.15, Freshness 0.25.
@@ -9529,10 +9549,14 @@ class SiteAuditAggregatorView(APIView):
             'decay': decay,
             'recos': recos[:5],
             'gsc_connected': bool(site.gsc_refresh_token),
+            'partial': wants_fast,
         }
 
-        # Cache 10 min - audits update at daily cadence at best.
-        cache.set(cache_key, payload, timeout=600)
+        # Only the complete audit is cached (10 min - audits update at daily
+        # cadence at best). A partial payload must never populate the shared
+        # cache, or the full request would short-circuit to incomplete data.
+        if not wants_fast:
+            cache.set(cache_key, payload, timeout=600)
         return Response(payload)
 
 

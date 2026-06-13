@@ -75,6 +75,7 @@ type AuditPayload = {
     avg?: number;
     url?: string;
     error?: string;
+    pending?: boolean;
   };
   keywords: {
     total?: number;
@@ -87,6 +88,7 @@ type AuditPayload = {
     total_referring_domains?: number;
     top_domains?: [string, number][];
     error?: string;
+    pending?: boolean;
   };
   stats: Record<string, unknown>;
   decay: {
@@ -100,6 +102,7 @@ type AuditPayload = {
   };
   recos: Reco[];
   gsc_connected: boolean;
+  partial?: boolean;
 };
 
 function scoreColor(score: number | null | undefined) {
@@ -145,7 +148,12 @@ export function SiteAuditPage() {
   const siteId = params?.siteId;
   const base = `/dashboard/${siteId}`;
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery<AuditPayload>({
+  // The full audit blocks on PageSpeed (~20-30s) + backlinks. We fire two
+  // requests: a `?fast=1` one that returns the DB-backed signals (score,
+  // keywords, decay) in ~1s so the page paints right away, and the full one
+  // that fills in PageSpeed + backlinks when it lands. A warm server cache
+  // makes both return the complete payload instantly.
+  const fullQuery = useQuery<AuditPayload>({
     queryKey: ["site-audit", siteId],
     queryFn: async () => {
       const res = await authFetch(`/sites/${siteId}/site-audit/`);
@@ -157,6 +165,33 @@ export function SiteAuditPage() {
     },
     staleTime: 60 * 1000, // 1 min
   });
+
+  const fastQuery = useQuery<AuditPayload>({
+    queryKey: ["site-audit", siteId, "fast"],
+    queryFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/site-audit/?fast=1`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur audit site");
+      }
+      return res.json();
+    },
+    staleTime: 60 * 1000,
+    // Once the full payload is in hand there's nothing left to fast-load.
+    enabled: !!siteId && !fullQuery.data,
+  });
+
+  const data = fullQuery.data ?? fastQuery.data;
+  // Partial = we're showing the fast payload while the full one is still in
+  // flight. Drives the per-card spinners on PageSpeed + backlinks + the score.
+  const isPartial = !fullQuery.data && !!data?.partial;
+  const isLoading = !data && (fullQuery.isLoading || fastQuery.isLoading);
+  const isError = !data && !isLoading;
+  const isRefetching = fullQuery.isRefetching;
+  const refetch = () => {
+    fullQuery.refetch();
+    fastQuery.refetch();
+  };
 
   // Strategic opportunities count - tiny GET, used to render the teaser
   // card. Doesn't block the page; if it 404s we just hide the teaser.
@@ -177,6 +212,11 @@ export function SiteAuditPage() {
   if (isLoading) {
     return (
       <div className="space-y-4 max-w-6xl">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Analyse de ton site en cours - on rassemble ton score, tes positions
+          et ton declin...
+        </div>
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-48 w-full" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -271,6 +311,12 @@ export function SiteAuditPage() {
               <div className={`text-sm font-medium ${scoreColor(data.composite_score)}`}>
                 {scoreLabel(data.composite_score)}
               </div>
+              {isPartial && (
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
+                  <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                  Score preliminaire - PageSpeed et liens se calculent encore
+                </div>
+              )}
             </div>
             <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
               {data.score_components.map((c) => (
@@ -450,7 +496,12 @@ export function SiteAuditPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {data.pagespeed.error ? (
+            {data.pagespeed.pending ? (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-6">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyse PageSpeed en cours (~20-30s)...
+              </div>
+            ) : data.pagespeed.error ? (
               <p className="text-sm text-muted-foreground">{data.pagespeed.error}</p>
             ) : "avg" in data.pagespeed ? (
               <>
@@ -507,7 +558,12 @@ export function SiteAuditPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {data.backlinks.error ? (
+            {data.backlinks.pending ? (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-6">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyse des liens en cours...
+              </div>
+            ) : data.backlinks.error ? (
               <p className="text-sm text-muted-foreground">{data.backlinks.error}</p>
             ) : (
               <>
