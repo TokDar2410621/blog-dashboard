@@ -36,6 +36,7 @@ export const siteSchema = z.object({
   competitors: z.string().optional(),
   vercel_deploy_hook: z.string().optional(),
   gsc_property_url: z.string().optional(),
+  gsc_connected: z.boolean().optional(),
   api_key: z.string().optional(),
   is_hosted: z.boolean().optional(),
   is_active: z.boolean().optional(),

@@ -5,6 +5,7 @@ from blog.models import BlogPost, Category, Tag
 
 class SiteSerializer(serializers.ModelSerializer):
     is_hosted = serializers.BooleanField(read_only=True)
+    gsc_connected = serializers.SerializerMethodField()
 
     class Meta:
         model = Site
@@ -15,7 +16,7 @@ class SiteSerializer(serializers.ModelSerializer):
                   'author_image_url', 'author_linkedin', 'author_twitter',
                   'author_website',
                   'public_blog_domain', 'theme_config',
-                  'vercel_deploy_hook', 'gsc_property_url',
+                  'vercel_deploy_hook', 'gsc_property_url', 'gsc_connected',
                   'api_key', 'is_hosted', 'is_active',
                   'created_at', 'updated_at',
                   'blog_config']
@@ -23,6 +24,13 @@ class SiteSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'database_url': {'required': False, 'allow_blank': True},
         }
+
+    def get_gsc_connected(self, obj):
+        # True once the OAuth refresh token is stored. The token itself stays
+        # server-side (never serialized); this boolean is what lets the
+        # settings UI render a "connected" state instead of forever offering
+        # the "Connect" button.
+        return bool(obj.gsc_refresh_token)
 
     def create(self, validated_data):
         validated_data['owner'] = self.context['request'].user

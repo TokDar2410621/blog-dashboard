@@ -552,6 +552,17 @@ export async function submitGSCOAuthCallback(
   return res.json();
 }
 
+export async function disconnectGSC(siteId: number): Promise<{ success: boolean }> {
+  const res = await authFetch(`/sites/${siteId}/gsc/disconnect/`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(err.error || "GSC disconnect failed", res.status);
+  }
+  return res.json();
+}
+
 export async function fetchGSCQueries(
   siteId: number,
   slug: string,

@@ -17,9 +17,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitGSCOAuthCallback, ApiError } from "@/lib/api-client";
+import { QK } from "@/lib/constants";
 
 /** Decode a URL-safe base64 string (no padding) - mirrors the backend's
  *  `urlsafe_b64encode(str(site_id)).rstrip('=')`. */
@@ -38,6 +40,7 @@ function decodeStateToSiteId(state: string): number | null {
 export function GSCCallbackPage() {
   const params = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState(true);
   // StrictMode runs effects twice in dev, which would burn a single-use OAuth code.
   const exchangeStarted = useRef(false);
@@ -71,6 +74,11 @@ export function GSCCallbackPage() {
 
     submitGSCOAuthCallback(siteId, code, state)
       .then(() => {
+        // The site query is cached with a 5-min staleTime, so without an
+        // explicit invalidation the settings page would keep showing the
+        // pre-connection (disconnected) state for minutes after redirect.
+        queryClient.invalidateQueries({ queryKey: QK.site(siteId) });
+        queryClient.invalidateQueries({ queryKey: QK.SITES });
         toast.success("Google Search Console connecté");
         router.replace(`/dashboard/${siteId}/parametres/gsc`);
       })
@@ -83,7 +91,7 @@ export function GSCCallbackPage() {
         router.replace(`/dashboard/${siteId}/parametres/gsc`);
       })
       .finally(() => setPending(false));
-  }, [params, router]);
+  }, [params, router, queryClient]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">

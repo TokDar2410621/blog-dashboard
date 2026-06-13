@@ -7440,6 +7440,24 @@ class GSCOAuthCallbackView(APIView):
             )
 
 
+class GSCDisconnectView(APIView):
+    """DELETE /api/sites/<site_id>/gsc/
+
+    Clears the stored OAuth refresh token so the integration card flips back
+    to the "not connected" state. The gsc_property_url string the user typed
+    is left intact (it's not sensitive and is annoying to retype); only the
+    Google grant is removed, letting them re-link a different account.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, site_id):
+        site = get_site_for_user(request, site_id)
+        site.gsc_refresh_token = ''
+        site.gsc_oauth_verifier_pending = ''
+        site.save(update_fields=['gsc_refresh_token', 'gsc_oauth_verifier_pending'])
+        return Response({'success': True})
+
+
 class GSCQueriesView(APIView):
     """GET /api/sites/<site_id>/gsc/queries/?slug=<slug>&days=28
 

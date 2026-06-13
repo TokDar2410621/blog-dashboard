@@ -2,9 +2,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSite, useUpdateSite } from "@/hooks/useDashboard";
-import { authFetch, fetchGSCOAuthUrl, ApiError } from "@/lib/api-client";
+import { authFetch, fetchGSCOAuthUrl, disconnectGSC, ApiError } from "@/lib/api-client";
+import { QK } from "@/lib/constants";
 import { toast } from "sonner";
 import {
   SettingsContext,
@@ -19,6 +20,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const siteId = params?.siteId;
   const { data: site, isLoading } = useSite();
   const updateSite = useUpdateSite();
+  const queryClient = useQueryClient();
 
   // General
   const [name, setName] = useState("");
@@ -54,6 +56,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // GSC
   const [gscPropertyUrl, setGscPropertyUrl] = useState("");
   const [gscConnecting, setGscConnecting] = useState(false);
+  const [gscDisconnecting, setGscDisconnecting] = useState(false);
+  const gscConnected = !!site?.gsc_connected;
 
   // Integrations
   const [vercelDeployHook, setVercelDeployHook] = useState("");
@@ -335,6 +339,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // --- GSC disconnect ---
+  const handleDisconnectGsc = async () => {
+    const numericSiteId = Number(siteId);
+    if (!numericSiteId) return;
+    setGscDisconnecting(true);
+    try {
+      await disconnectGSC(numericSiteId);
+      await queryClient.invalidateQueries({ queryKey: QK.site(numericSiteId) });
+      queryClient.invalidateQueries({ queryKey: QK.SITES });
+      toast.success("Google Search Console déconnecté");
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Déconnexion impossible";
+      toast.error(msg);
+    } finally {
+      setGscDisconnecting(false);
+    }
+  };
+
   // --- Centralised save ---
   const handleSave = async () => {
     try {
@@ -402,7 +429,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     scanBranding,
     gscPropertyUrl, setGscPropertyUrl,
     gscConnecting,
+    gscConnected,
+    gscDisconnecting,
     handleConnectGsc,
+    handleDisconnectGsc,
     vercelDeployHook, setVercelDeployHook,
     knowledgeBase, setKnowledgeBase,
     competitors, setCompetitors,

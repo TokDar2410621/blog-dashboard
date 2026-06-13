@@ -35,7 +35,7 @@ from .views import (
     PublicSiteView, PublicSiteByDomainView, PublicPostsView, PublicPostDetailView,
     PublicTranslationsView, PublicCategoriesView,
     PublicLandingsView, PublicLandingDetailView,
-    GSCOAuthUrlView, GSCOAuthCallbackView, GSCQueriesView,
+    GSCOAuthUrlView, GSCOAuthCallbackView, GSCDisconnectView, GSCQueriesView,
     AutopilotConfigView, AutopilotRunView,
 )
 from .api_v1 import (
@@ -168,6 +168,7 @@ urlpatterns = [
     # Google Search Console integration
     path('sites/<int:site_id>/gsc/oauth-url/', GSCOAuthUrlView.as_view(), name='gsc-oauth-url'),
     path('sites/<int:site_id>/gsc/oauth-callback/', GSCOAuthCallbackView.as_view(), name='gsc-oauth-callback'),
+    path('sites/<int:site_id>/gsc/disconnect/', GSCDisconnectView.as_view(), name='gsc-disconnect'),
     path('sites/<int:site_id>/gsc/queries/', GSCQueriesView.as_view(), name='gsc-queries'),
     # Proof loop (baseline + attribution)
     path('sites/<int:site_id>/proof/baseline/', ProofBaselineView.as_view(), name='site-proof-baseline'),

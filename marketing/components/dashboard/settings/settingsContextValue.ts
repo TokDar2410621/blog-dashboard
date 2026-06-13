@@ -73,7 +73,10 @@ export type SettingsContextValue = {
   // GSC
   gscPropertyUrl: string; setGscPropertyUrl: (v: string) => void;
   gscConnecting: boolean;
+  gscConnected: boolean;
+  gscDisconnecting: boolean;
   handleConnectGsc: () => Promise<void>;
+  handleDisconnectGsc: () => Promise<void>;
 
   // Integrations
   vercelDeployHook: string; setVercelDeployHook: (v: string) => void;
