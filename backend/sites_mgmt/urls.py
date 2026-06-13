@@ -24,6 +24,7 @@ from .views import (
     PostFeedbackView, SiteAuditAggregatorView,
     BlogDomainProvisionView, BlogDomainStatusView, BlogDomainRemoveView,
     PublicAuditView, PublicLeadCaptureView, PublicAuditStatsView,
+    PublicReportView,
     PublicUnsubscribeView, PublicUnsubscribeOneClickView,
     WPConnectorView,
     SiteSitemapView, SiteRSSView,
@@ -151,6 +152,7 @@ urlpatterns = [
     path('public/audit/', PublicAuditView.as_view(), name='public-audit'),
     path('public/leads/', PublicLeadCaptureView.as_view(), name='public-lead-capture'),
     path('public/audit-stats/', PublicAuditStatsView.as_view(), name='public-audit-stats'),
+    path('public/report/<uuid:token>/', PublicReportView.as_view(), name='public-report'),
     path('public/unsubscribe/', PublicUnsubscribeView.as_view(), name='public-unsubscribe'),
     path('public/unsubscribe/one-click/', PublicUnsubscribeOneClickView.as_view(), name='public-unsubscribe-one-click'),
     # WordPress plugin 1-click connector

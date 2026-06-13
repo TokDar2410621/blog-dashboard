@@ -406,6 +406,12 @@ class Lead(models.Model):
         null=True, blank=True,
         help_text="Composite SEO score at the moment of capture, for cohort analysis.",
     )
+    report_token = models.UUIDField(
+        null=True, blank=True, db_index=True,
+        help_text="Token of the PublicAuditReport captured with this audit, so "
+                  "the J+0 email can link to the shareable report page "
+                  "(gridar.app/rapport/<token>).",
+    )
     unsubscribed_at = models.DateTimeField(
         null=True, blank=True, db_index=True,
         help_text="Loi 25 / RGPD: timestamp of the opt-out. Set on EVERY Lead "
@@ -432,6 +438,34 @@ class Lead(models.Model):
 
     def __str__(self):
         return f"{self.email} ({self.domain_audited or 'no domain'})"
+
+
+class PublicAuditReport(models.Model):
+    """A persisted snapshot of a public /audit run, addressable by a stable
+    shareable token.
+
+    The public audit endpoint only caches results by domain for 1h; this gives
+    each audit a permanent, shareable URL (gridar.app/rapport/<token>) that the
+    visitor can pass around and that the J+0 email links to.
+    """
+    token = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False, db_index=True,
+    )
+    domain = models.CharField(max_length=255, db_index=True)
+    payload = models.JSONField(
+        default=dict,
+        help_text="Full audit report (score, pagespeed, keyword positions, "
+                  "recos, crawl) exactly as returned by the public audit.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Rapport d'audit public (partageable)"
+        verbose_name_plural = "Rapports d'audit publics (partageables)"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.domain} ({self.token})"
 
 
 class LeadEmailSent(models.Model):

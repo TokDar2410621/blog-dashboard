@@ -97,12 +97,18 @@ class StepDef(NamedTuple):
     subject: str   # Resend's subject; can include {placeholders} from lead
 
     def render(self, lead) -> dict:
+        audit_url = f'https://gridar.app/audit?domain={lead.domain_audited}'
+        # Shareable report page captured at audit time. Falls back to the audit
+        # form for old leads that have no token.
+        report_token = getattr(lead, 'report_token', None)
+        report_url = f'https://gridar.app/rapport/{report_token}' if report_token else audit_url
         ctx = {
             'lead': lead,
             'first_name': (lead.email.split('@')[0].split('.')[0] or 'toi').capitalize(),
             'domain': lead.domain_audited or 'ton site',
             'score': lead.score_at_capture,
-            'audit_url': f'https://gridar.app/audit?domain={lead.domain_audited}',
+            'audit_url': audit_url,
+            'report_url': report_url,
             'signup_url': 'https://gridar.app/login',
             'unsubscribe_url': unsubscribe_url_for(lead.email),
         }

@@ -10173,6 +10173,15 @@ class PublicAuditView(APIView):
             # revealed after the visitor leaves their email.
         }
 
+        # Persist a permanent, shareable copy of this audit. The cache above is
+        # per-domain and expires in 1h; this row gives the audit a stable URL
+        # (gridar.app/rapport/<token>) that the J+0 email links to and that the
+        # visitor can share. report_token rides along in the cached payload so
+        # the lead-capture step and the SPA both know the share URL.
+        from .models import PublicAuditReport
+        report = PublicAuditReport.objects.create(domain=domain, payload=payload)
+        payload['report_token'] = str(report.token)
+
         cache.set(cache_key, payload, timeout=3600)
         return Response(payload)
 
@@ -10204,12 +10213,15 @@ class PublicLeadCaptureView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Reach into the cache to grab the composite_score for cohort analysis.
+        # Reach into the cache for the score (cohort analysis) and the
+        # report_token, so the J+0 email can link to the shareable report page.
         score = None
+        report_token = None
         if domain:
             cached = cache.get(f'public-audit:v2:{domain}')
             if cached:
                 score = cached.get('composite_score')
+                report_token = cached.get('report_token')
 
         lead = Lead.objects.create(
             email=email,
@@ -10221,6 +10233,7 @@ class PublicLeadCaptureView(APIView):
             locale=request.headers.get('Accept-Language', '')[:10],
             consented_marketing=consented,
             score_at_capture=score,
+            report_token=report_token,
         )
 
         # Fire the transactional J+0 ("here's your full report") email
@@ -10240,6 +10253,36 @@ class PublicLeadCaptureView(APIView):
             'ok': True,
             'message': 'Email enregistre. Le rapport complet est maintenant visible.',
         }, status=status.HTTP_201_CREATED)
+
+
+class PublicReportView(APIView):
+    """GET /api/public/report/<token>/
+
+    Returns a persisted public-audit report by its shareable token. No auth so
+    the link works for anyone the visitor shares it with (the token is a random
+    UUID, not enumerable). Backs the gridar.app/rapport/<token> page.
+    """
+    authentication_classes = []  # public, mirror PublicAuditView
+    permission_classes = []
+    throttle_classes = [PublicAuditThrottle]
+
+    def get(self, request, token):
+        from .models import PublicAuditReport
+
+        report = PublicAuditReport.objects.filter(token=token).first()
+        if not report:
+            return Response(
+                {'error': 'Rapport introuvable.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        data = dict(report.payload or {})
+        # Authoritative values from the row (the stored payload predates the
+        # token, and its audited_at is the compute time - close enough, but we
+        # return the row's identity explicitly).
+        data['domain'] = report.domain
+        data['report_token'] = str(report.token)
+        data['audited_at'] = report.created_at.isoformat()
+        return Response(data)
 
 
 class PublicUnsubscribeView(APIView):
