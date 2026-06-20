@@ -7,6 +7,8 @@
  * only caches by domain for 1h).
  */
 
+import type { FullReport } from "@/components/audit/FullReportSections";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
 const REVALIDATE_SECONDS = 3600;
 
@@ -30,6 +32,11 @@ export type PublicReport = {
   top_keywords_estimated: { keyword: string; position: number | null }[];
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
   report_token: string;
+  // Present once a lead has been captured for this audit. The enrichment
+  // (competitors, untapped keywords, schema, CWV, decay, article plan,
+  // backlinks) is persisted on the report payload server-side.
+  full_report_gated?: boolean;
+  full_report?: FullReport;
 };
 
 export async function fetchPublicReport(token: string): Promise<PublicReport | null> {

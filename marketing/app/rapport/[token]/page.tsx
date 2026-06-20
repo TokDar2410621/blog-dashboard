@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { GridarMark } from "@/components/GridarMark";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { FullReportSections } from "@/components/audit/FullReportSections";
 import { fetchPublicReport } from "@/lib/report-api";
 
 export const revalidate = 3600;
@@ -218,6 +219,14 @@ export default async function ReportPage({ params }: PageProps) {
               ))}
             </div>
           </section>
+        )}
+
+        {/* Full enriched report (present once a lead was captured) */}
+        {data.full_report && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-3">Rapport complet</h2>
+            <FullReportSections report={data.full_report} domain={data.domain} />
+          </div>
         )}
 
         {/* CTA */}
