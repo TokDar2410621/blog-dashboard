@@ -9994,6 +9994,515 @@ def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
     return candidates
 
 
+def _enrich_public_audit_payload(domain: str, payload: dict) -> dict:
+    """Run the 7 expensive enrichments that turn the partial public audit into
+    a real full report - called from PublicLeadCaptureView after the visitor
+    leaves their email.
+
+    Each section is best-effort: any exception is caught and reported as
+    {error, fallback_data} on that section so a single failure never blanks
+    the whole report. All HTTP-bound sections run in parallel under a single
+    ThreadPoolExecutor so we stay under ~20s wall-clock.
+
+    Returns a dict to merge into payload['full_report'] - the caller is
+    responsible for persisting + cache-invalidating.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    serper_key = os.environ.get('SERPER_API_KEY')
+    pagespeed_key = (
+        os.environ.get('PAGESPEED_API_KEY')
+        or os.environ.get('GOOGLE_PAGESPEED_API_KEY')
+    )
+    anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+
+    positions = payload.get('top_keywords_estimated') or []
+    recos = payload.get('recos_partial') or []
+    homepage_url = f'https://{domain}'
+
+    # Top 3 keywords (priority: existing rankings first since they already
+    # have SERP intel, then unranked) used by competitors + untapped sections.
+    seed_keywords = [p['keyword'] for p in positions if p.get('keyword')][:5]
+
+    # ---------- 1. Competitors ----------
+    def section_competitors():
+        if not serper_key or not seed_keywords:
+            return {'error': 'Pas de clés ou keywords disponibles', 'items': []}
+        try:
+            competitor_domains: list[str] = []
+            competitor_meta: dict[str, dict] = {}
+            for kw in seed_keywords[:3]:
+                r = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={'X-API-KEY': serper_key,
+                             'Content-Type': 'application/json'},
+                    json={'q': kw, 'num': 10, 'hl': 'fr', 'gl': 'ca'},
+                    timeout=8,
+                )
+                if r.status_code != 200:
+                    continue
+                for item in (r.json().get('organic') or [])[:10]:
+                    link = (item.get('link') or '').lower()
+                    if not link:
+                        continue
+                    try:
+                        host = urlparse(link).netloc.replace('www.', '')
+                    except Exception:
+                        continue
+                    if not host or domain in host or host in domain:
+                        continue
+                    # Skip well-known aggregators that aren't real competitors.
+                    if any(s in host for s in (
+                        'wikipedia.', 'youtube.com', 'facebook.com',
+                        'instagram.com', 'linkedin.com', 'reddit.com',
+                        'amazon.', 'pinterest.com', 'tiktok.com',
+                    )):
+                        continue
+                    if host not in competitor_meta:
+                        competitor_meta[host] = {
+                            'domain': host,
+                            'title': item.get('title', '')[:160],
+                            'sample_url': item.get('link'),
+                            'position_count': 0,
+                        }
+                    competitor_meta[host]['position_count'] += 1
+                    if host not in competitor_domains:
+                        competitor_domains.append(host)
+            ranked = sorted(
+                competitor_meta.values(),
+                key=lambda c: -c['position_count'],
+            )[:3]
+            # PageSpeed on competitor #1 only - keeps the wall-clock budget.
+            if ranked and pagespeed_key:
+                top = ranked[0]
+                try:
+                    r = http_requests.get(
+                        'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+                        params={
+                            'url': f"https://{top['domain']}",
+                            'key': pagespeed_key,
+                            'strategy': 'mobile',
+                            'category': ['performance', 'seo'],
+                        },
+                        timeout=25,
+                    )
+                    if r.status_code == 200:
+                        cats = r.json().get('lighthouseResult', {}).get('categories', {})
+                        perf = int((cats.get('performance', {}).get('score') or 0) * 100)
+                        seo = int((cats.get('seo', {}).get('score') or 0) * 100)
+                        top['pagespeed_score'] = (perf + seo) // 2
+                    else:
+                        top['pagespeed_score'] = None
+                except Exception:
+                    top['pagespeed_score'] = None
+            for c in ranked:
+                c.setdefault('pagespeed_score', None)
+            return {'items': ranked}
+        except Exception as e:
+            return {'error': f'Competitors: {str(e)[:120]}', 'items': []}
+
+    # ---------- 2. Untapped keywords ----------
+    def section_untapped():
+        if not serper_key or not seed_keywords:
+            return {'error': 'Pas de clés ou keywords disponibles', 'items': []}
+        try:
+            suggestions: dict[str, dict] = {}
+            for kw in seed_keywords[:3]:
+                r = http_requests.post(
+                    'https://google.serper.dev/search',
+                    headers={'X-API-KEY': serper_key,
+                             'Content-Type': 'application/json'},
+                    json={'q': kw, 'num': 10, 'hl': 'fr', 'gl': 'ca'},
+                    timeout=8,
+                )
+                if r.status_code != 200:
+                    continue
+                body = r.json()
+                # PAA + related searches as candidate untapped queries.
+                cands = []
+                for paa in (body.get('peopleAlsoAsk') or []):
+                    q = (paa.get('question') or '').strip()
+                    if q:
+                        cands.append(q)
+                for rel in (body.get('relatedSearches') or []):
+                    q = (rel.get('query') or '').strip()
+                    if q:
+                        cands.append(q)
+                # Top organic competitor that ranks for the seed - used as
+                # competitor_in_top10 hint for any sibling untapped query.
+                organic = body.get('organic') or []
+                top_comp = None
+                for item in organic[:10]:
+                    link = (item.get('link') or '').lower()
+                    try:
+                        host = urlparse(link).netloc.replace('www.', '')
+                    except Exception:
+                        continue
+                    if host and domain not in host:
+                        top_comp = host
+                        break
+                # Heuristic 3-tier "volume" based on how prominently PAA
+                # surfaced it (no real volume API in this tier).
+                for idx, q in enumerate(cands):
+                    if q.lower() in suggestions:
+                        continue
+                    stars = 3 if idx < 2 else (2 if idx < 5 else 1)
+                    suggestions[q.lower()] = {
+                        'keyword': q,
+                        'volume_estimate': stars,
+                        'competitor_in_top10': top_comp,
+                    }
+            # Drop any suggestion the visitor's domain already ranks for.
+            ranked_kws = {
+                (p['keyword'] or '').lower()
+                for p in positions if p.get('position') and p['position'] <= 50
+            }
+            items = [
+                s for k, s in suggestions.items() if k not in ranked_kws
+            ][:10]
+            return {'items': items}
+        except Exception as e:
+            return {'error': f'Untapped: {str(e)[:120]}', 'items': []}
+
+    # ---------- 3. Schema.org audit ----------
+    def section_schema():
+        try:
+            crawl = _crawl_homepage(homepage_url)
+            if crawl.get('error'):
+                return {
+                    'error': crawl['error'],
+                    'present': [], 'missing_recommended': [], 'score': 0,
+                }
+            # Re-fetch raw HTML (cheap, same URL, but _crawl_homepage strips it).
+            r = http_requests.get(
+                homepage_url, timeout=8,
+                headers={'User-Agent': 'Mozilla/5.0 GridarAudit/1.0'},
+                allow_redirects=True,
+            )
+            html = r.text if r.ok else ''
+            known = [
+                'Article', 'BlogPosting', 'FAQPage', 'Product',
+                'Organization', 'BreadcrumbList', 'Person', 'LocalBusiness',
+                'WebSite', 'WebPage',
+            ]
+            present = []
+            html_lower = html.lower()
+            for schema in known:
+                # Match both JSON-LD ("@type": "Article") and microdata
+                # (itemtype="https://schema.org/Article").
+                if (
+                    f'"{schema.lower()}"' in html_lower
+                    or f'schema.org/{schema.lower()}' in html_lower
+                ):
+                    present.append(schema)
+            # Heuristic site-type detection -> recommended schemas.
+            site_type_hint = ' '.join([
+                (crawl.get('title') or ''),
+                (crawl.get('meta_description') or ''),
+                (crawl.get('body_snippet') or '')[:500],
+            ]).lower()
+            recommended = ['Organization', 'WebSite']
+            if any(k in site_type_hint for k in ('blog', 'article', 'guide')):
+                recommended += ['BlogPosting', 'Article', 'FAQPage', 'BreadcrumbList']
+            if any(k in site_type_hint for k in ('boutique', 'shop', 'achat',
+                                                  'panier', 'product', 'buy')):
+                recommended += ['Product', 'BreadcrumbList']
+            if any(k in site_type_hint for k in ('restaurant', 'adresse',
+                                                  'horaire', 'local')):
+                recommended += ['LocalBusiness']
+            recommended = list(dict.fromkeys(recommended))
+            missing = [s for s in recommended if s not in present]
+            score = (
+                int((len(present) / len(recommended)) * 100)
+                if recommended else 0
+            )
+            score = min(score, 100)
+            return {
+                'present': present,
+                'missing_recommended': missing,
+                'score': score,
+            }
+        except Exception as e:
+            return {
+                'error': f'Schema: {str(e)[:120]}',
+                'present': [], 'missing_recommended': [], 'score': 0,
+            }
+
+    # ---------- 4. CWV desktop vs mobile ----------
+    def section_cwv():
+        mobile = payload.get('pagespeed') or {}
+        if not pagespeed_key:
+            return {'error': 'PAGESPEED_API_KEY non configuree',
+                    'mobile': mobile, 'desktop': {}, 'gap_pp': None,
+                    'advice': ''}
+        try:
+            r = http_requests.get(
+                'https://www.googleapis.com/pagespeedonline/v5/runPagespeed',
+                params={
+                    'url': homepage_url, 'key': pagespeed_key,
+                    'strategy': 'desktop',
+                    'category': ['performance', 'seo', 'accessibility'],
+                },
+                timeout=25,
+            )
+            if r.status_code != 200:
+                return {'error': f'PageSpeed desktop {r.status_code}',
+                        'mobile': mobile, 'desktop': {}, 'gap_pp': None,
+                        'advice': ''}
+            cats = r.json().get('lighthouseResult', {}).get('categories', {})
+            perf = int((cats.get('performance', {}).get('score') or 0) * 100)
+            seo = int((cats.get('seo', {}).get('score') or 0) * 100)
+            a11y = int((cats.get('accessibility', {}).get('score') or 0) * 100)
+            desktop = {
+                'performance': perf, 'seo': seo, 'accessibility': a11y,
+                'avg': (perf + seo + a11y) // 3,
+            }
+            gap = None
+            advice = ''
+            if 'avg' in mobile:
+                gap = desktop['avg'] - (mobile.get('avg') or 0)
+                if gap >= 20:
+                    advice = (
+                        "Ton site est nettement plus rapide sur desktop. "
+                        "Optimise les images mobile, défère le JS non critique, "
+                        "et active la compression Brotli/gzip."
+                    )
+                elif gap >= 5:
+                    advice = (
+                        "Écart modéré desktop vs mobile. "
+                        "Vise un perf mobile 80+ pour matcher l'expérience desktop."
+                    )
+                elif gap <= -5:
+                    advice = (
+                        "Surprise : ton mobile bat ton desktop. Vérifie "
+                        "ce qui se passe sur desktop (assets non-optimisés, "
+                        "scripts tiers lourds)."
+                    )
+                else:
+                    advice = "Bon équilibre mobile/desktop. Continue comme ça."
+            return {'mobile': mobile, 'desktop': desktop, 'gap_pp': gap,
+                    'advice': advice}
+        except Exception as e:
+            return {'error': f'CWV: {str(e)[:120]}',
+                    'mobile': mobile, 'desktop': {}, 'gap_pp': None,
+                    'advice': ''}
+
+    # ---------- 5. Decay candidates ----------
+    def section_decay():
+        try:
+            year_re = re.compile(r'\b20(1[5-9]|2[0-3])\b')
+            items = []
+            for p in positions:
+                kw = (p.get('keyword') or '')
+                m = year_re.search(kw)
+                if not m:
+                    continue
+                items.append({
+                    'keyword': kw,
+                    'year_detected': f'20{m.group(1)}',
+                    'advice': "Mettre à jour la date dans le titre + "
+                              "rafraîchir le contenu (cible 2026).",
+                })
+            return {'items': items}
+        except Exception as e:
+            return {'error': f'Decay: {str(e)[:120]}', 'items': []}
+
+    # ---------- 6. Article plan (5 articles) ----------
+    def section_article_plan(untapped_items: list[dict]):
+        # Build seed list of target keywords from untapped + visitor's own
+        # high-position ones (refresh angle).
+        targets = [u['keyword'] for u in (untapped_items or [])][:5]
+        if len(targets) < 5:
+            for p in positions:
+                kw = p.get('keyword')
+                if kw and kw not in targets:
+                    targets.append(kw)
+                if len(targets) >= 5:
+                    break
+        targets = targets[:5]
+        if not targets:
+            return {'error': 'Pas de keywords disponibles', 'items': []}
+
+        # Anthropic path - punchier titles.
+        if anthropic_key:
+            try:
+                prompt = (
+                    "Tu es un éditeur SEO FR-CA. Pour chaque keyword ci-dessous, "
+                    "propose un titre d'article percutant (max 70 caractères, "
+                    "ton direct, valeur explicite). Réponds en JSON pur, sans "
+                    "markdown, sous la forme [{\"keyword\":\"...\","
+                    "\"title\":\"...\",\"why\":\"...une phrase...\"}].\n\n"
+                    f"Keywords: {targets}"
+                )
+                r = http_requests.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': anthropic_key,
+                        'anthropic-version': '2023-06-01',
+                        'content-type': 'application/json',
+                    },
+                    json={
+                        'model': 'claude-haiku-4-5',
+                        'max_tokens': 1024,
+                        'messages': [{'role': 'user', 'content': prompt}],
+                    },
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    body = r.json()
+                    text = (body.get('content') or [{}])[0].get('text', '')
+                    import json as _json
+                    text = text.strip()
+                    if text.startswith('```'):
+                        text = re.sub(r'^```(?:json)?', '', text).strip()
+                        text = re.sub(r'```$', '', text).strip()
+                    parsed = _json.loads(text)
+                    items = []
+                    priorities = ['high', 'high', 'medium', 'medium', 'low']
+                    word_counts = [2400, 1800, 1800, 1200, 1200]
+                    for i, p in enumerate(parsed[:5]):
+                        items.append({
+                            'title': p.get('title', '')[:160],
+                            'target_keyword': p.get('keyword', targets[i] if i < len(targets) else ''),
+                            'why': p.get('why', '')[:200],
+                            'priority': priorities[i] if i < len(priorities) else 'low',
+                            'estimated_words': word_counts[i] if i < len(word_counts) else 1200,
+                        })
+                    if items:
+                        return {'items': items}
+            except Exception as e:
+                logger.warning('Article plan Anthropic fallback: %s', e)
+
+        # Heuristic fallback.
+        templates = [
+            ("Comment {kw} en 2026 : le guide complet",
+             "Cible un mot-clé à forte intention informationnelle.",
+             'high', 2400),
+            ("Le meilleur {kw} : 7 options comparées",
+             "Format comparatif idéal pour capturer l'intention commerciale.",
+             'high', 1800),
+            ("{kw} : erreurs courantes et comment les éviter",
+             "Article pratique qui capte les recherches longue-traîne.",
+             'medium', 1800),
+            ("{kw} : FAQ pour débutants",
+             "Format FAQ aimanté par Google + bon pour la position zéro.",
+             'medium', 1200),
+            ("Étude de cas : résultats avec {kw}",
+             "Preuves sociales + témoignages, taux de conversion élevé.",
+             'low', 1200),
+        ]
+        items = []
+        for i, target in enumerate(targets[:5]):
+            tmpl, why, pri, wc = templates[i % len(templates)]
+            items.append({
+                'title': tmpl.format(kw=target)[:160],
+                'target_keyword': target,
+                'why': why,
+                'priority': pri,
+                'estimated_words': wc,
+            })
+        return {'items': items}
+
+    # ---------- 7. Backlinks proxy ----------
+    def section_backlinks():
+        if not serper_key:
+            return {
+                'estimated_mentions': None,
+                'top_referring_domains': [],
+                'advice': "Connecte ton GSC dans Gridar pour analyser tes "
+                          "vrais backlinks.",
+            }
+        try:
+            r = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={'X-API-KEY': serper_key,
+                         'Content-Type': 'application/json'},
+                json={'q': f'"{domain}" -site:{domain}',
+                      'num': 30, 'hl': 'fr', 'gl': 'ca'},
+                timeout=8,
+            )
+            if r.status_code != 200:
+                return {
+                    'estimated_mentions': None,
+                    'top_referring_domains': [],
+                    'advice': "Connecte ton GSC dans Gridar pour analyser tes "
+                              "vrais backlinks.",
+                }
+            body = r.json()
+            organic = body.get('organic') or []
+            # Serper exposes the total result count under searchInformation
+            # for some queries; fall back to len(organic) otherwise.
+            total = (
+                body.get('searchInformation', {}).get('totalResults')
+                or body.get('credits') and None
+            )
+            try:
+                estimated = int(total) if total else len(organic)
+            except (TypeError, ValueError):
+                estimated = len(organic)
+            referring: dict[str, int] = {}
+            for item in organic:
+                link = (item.get('link') or '').lower()
+                try:
+                    host = urlparse(link).netloc.replace('www.', '')
+                except Exception:
+                    continue
+                if not host or domain in host:
+                    continue
+                referring[host] = referring.get(host, 0) + 1
+            top_refs = [
+                {'domain': h, 'mention_count': c}
+                for h, c in sorted(referring.items(),
+                                   key=lambda kv: -kv[1])[:5]
+            ]
+            return {
+                'estimated_mentions': estimated,
+                'top_referring_domains': top_refs,
+                'advice': ('' if top_refs else
+                           "On a besoin de ton GSC pour analyser tes vrais "
+                           "backlinks."),
+            }
+        except Exception as e:
+            return {
+                'error': f'Backlinks: {str(e)[:120]}',
+                'estimated_mentions': None,
+                'top_referring_domains': [],
+                'advice': "Connecte ton GSC dans Gridar pour analyser tes "
+                          "vrais backlinks.",
+            }
+
+    # Parallel fan-out for sections 1-5 + 7. Article plan runs after
+    # untapped resolves because it consumes those keywords.
+    enrich: dict = {}
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futures = {
+            pool.submit(section_competitors): 'competitors',
+            pool.submit(section_untapped): 'untapped_keywords',
+            pool.submit(section_schema): 'schema_audit',
+            pool.submit(section_cwv): 'cwv_breakdown',
+            pool.submit(section_decay): 'decay_candidates',
+            pool.submit(section_backlinks): 'backlinks_proxy',
+        }
+        for fut in as_completed(futures):
+            key = futures[fut]
+            try:
+                enrich[key] = fut.result()
+            except Exception as e:
+                logger.warning('Enrichment %s failed: %s', key, e)
+                enrich[key] = {'error': f'{key}: {str(e)[:120]}'}
+
+    # Article plan depends on untapped_keywords.
+    untapped_items = (enrich.get('untapped_keywords') or {}).get('items') or []
+    try:
+        enrich['article_plan'] = section_article_plan(untapped_items)
+    except Exception as e:
+        logger.warning('Article plan failed: %s', e)
+        enrich['article_plan'] = {'error': f'Article plan: {str(e)[:120]}',
+                                  'items': []}
+
+    return enrich
+
+
 class PublicAuditView(APIView):
     """POST /api/public/audit/ {domain}
 
@@ -10265,10 +10774,43 @@ class PublicLeadCaptureView(APIView):
         except Exception as e:
             logger.warning('J+0 send failed for lead %s: %s', lead.id, e)
 
-        return Response({
+        # Enrich the report with real data for the 7 "full report" sections
+        # the SPA used to fake with hardcoded teasers. Best-effort: failure
+        # here doesn't break the lead capture.
+        enriched_payload = None
+        if domain and report_token:
+            try:
+                from .models import PublicAuditReport
+                report = PublicAuditReport.objects.filter(token=report_token).first()
+                if report:
+                    base_payload = dict(report.payload or {})
+                    enrich = _enrich_public_audit_payload(domain, base_payload)
+                    base_payload['full_report'] = enrich
+                    base_payload['full_report_gated'] = False
+                    report.payload = base_payload
+                    report.save(update_fields=['payload'])
+                    # Refresh the 1h domain cache so anyone who re-hits
+                    # /api/public/audit/ for the same domain in the next
+                    # hour also sees the enriched version.
+                    cache.set(
+                        f'public-audit:v2:{domain}',
+                        base_payload, timeout=3600,
+                    )
+                    enriched_payload = base_payload
+            except Exception as e:
+                logger.warning(
+                    'Enrichment failed for lead %s (domain=%s): %s',
+                    lead.id, domain, e,
+                )
+
+        response_body = {
             'ok': True,
             'message': 'Email enregistre. Le rapport complet est maintenant visible.',
-        }, status=status.HTTP_201_CREATED)
+            'report_token': report_token,
+        }
+        if enriched_payload is not None:
+            response_body['payload'] = enriched_payload
+        return Response(response_body, status=status.HTTP_201_CREATED)
 
 
 class PublicReportView(APIView):
