@@ -14,7 +14,10 @@ import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { FullReportSections } from "@/components/audit/FullReportSections";
 import { fetchPublicReport } from "@/lib/report-api";
 
-export const revalidate = 3600;
+// Always render fresh: the report gains its enriched full_report at lead
+// capture, so a statically cached version would strand the email reader on an
+// empty report.
+export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ token: string }>;

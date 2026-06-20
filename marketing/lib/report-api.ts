@@ -10,7 +10,6 @@
 import type { FullReport } from "@/components/audit/FullReportSections";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
-const REVALIDATE_SECONDS = 3600;
 
 export type PublicReport = {
   domain: string;
@@ -40,8 +39,11 @@ export type PublicReport = {
 };
 
 export async function fetchPublicReport(token: string): Promise<PublicReport | null> {
+  // No caching: a report flips from "gated" to "enriched" at lead-capture time,
+  // so a cached pre-capture snapshot would leave the share page (and the J+0
+  // email link) showing an empty report. Always read the current state.
   const res = await fetch(`${API_URL}/api/public/report/${encodeURIComponent(token)}/`, {
-    next: { revalidate: REVALIDATE_SECONDS },
+    cache: "no-store",
   });
   if (res.status === 404 || res.status === 410) return null;
   if (!res.ok) {
