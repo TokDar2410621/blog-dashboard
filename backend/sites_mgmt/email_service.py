@@ -98,9 +98,23 @@ class StepDef(NamedTuple):
 
     def render(self, lead) -> dict:
         audit_url = f'https://gridar.app/audit?domain={lead.domain_audited}'
-        # Shareable report page captured at audit time. Falls back to the audit
-        # form for old leads that have no token.
+        # Shareable report page captured at audit time. If the lead was created
+        # before the cache-fallback fix (report_token=None), look up the latest
+        # PublicAuditReport for this domain so the email still links to a real
+        # /rapport/<token> page instead of dumping the reader on the audit form.
         report_token = getattr(lead, 'report_token', None)
+        if not report_token and lead.domain_audited:
+            from .models import PublicAuditReport
+            report = (
+                PublicAuditReport.objects
+                .filter(domain=lead.domain_audited)
+                .order_by('-created_at')
+                .first()
+            )
+            if report:
+                report_token = str(report.token)
+                lead.report_token = report.token
+                lead.save(update_fields=['report_token'])
         report_url = f'https://gridar.app/rapport/{report_token}' if report_token else audit_url
         ctx = {
             'lead': lead,

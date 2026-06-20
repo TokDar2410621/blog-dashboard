@@ -10215,6 +10215,10 @@ class PublicLeadCaptureView(APIView):
 
         # Reach into the cache for the score (cohort analysis) and the
         # report_token, so the J+0 email can link to the shareable report page.
+        # Cache has a 1h TTL; if the visitor types their email later (or after a
+        # server restart), fall back to the persisted PublicAuditReport row so
+        # the email always carries a working /rapport/<token> link instead of
+        # bouncing the reader back to the audit form.
         score = None
         report_token = None
         if domain:
@@ -10222,6 +10226,18 @@ class PublicLeadCaptureView(APIView):
             if cached:
                 score = cached.get('composite_score')
                 report_token = cached.get('report_token')
+            if not report_token:
+                from .models import PublicAuditReport
+                report = (
+                    PublicAuditReport.objects
+                    .filter(domain=domain)
+                    .order_by('-created_at')
+                    .first()
+                )
+                if report:
+                    report_token = str(report.token)
+                    if score is None:
+                        score = (report.payload or {}).get('composite_score')
 
         lead = Lead.objects.create(
             email=email,
