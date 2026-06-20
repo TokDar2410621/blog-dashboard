@@ -408,49 +408,103 @@ export function PublicAuditPage() {
 
                 <div className="relative pt-2">
                   {!leadCaptured && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-sm bg-background/40 rounded">
-                      <Lock className="h-6 w-6 text-primary" />
-                      <p className="text-sm font-medium">
-                        7 autres recos à débloquer
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Entre ton email plus bas pour les voir
-                      </p>
+                    <>
+                      {/* Screen: blurred teaser + lock overlay. The teasers are
+                          rendered but visually gated. */}
+                      <div className="print:hidden">
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 backdrop-blur-sm bg-background/40 rounded">
+                          <Lock className="h-6 w-6 text-primary" />
+                          <p className="text-sm font-medium">
+                            7 autres recos à débloquer
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Entre ton email plus bas pour les voir
+                          </p>
+                        </div>
+                        <div className="opacity-30 select-none">
+                          {[
+                            { label: "Analyse de tes 3 principaux concurrents sur Google", sev: "medium" as const },
+                            { label: "Liste des articles obsolètes à refresh en priorité", sev: "high" as const },
+                            { label: "10 mots-clés ciblés que tu ne touches pas encore", sev: "medium" as const },
+                            { label: "Backlinks: domaines référents + opportunités", sev: "low" as const },
+                            { label: "Plan de génération d'articles pour les 30 prochains jours", sev: "medium" as const },
+                            { label: "Schema.org + JSON-LD manquants sur tes pages clés", sev: "low" as const },
+                            { label: "Comparatif Core Web Vitals desktop vs mobile", sev: "low" as const },
+                          ].map((teaser, i) => (
+                            <div
+                              key={i}
+                              className={`border rounded p-2 flex items-center gap-2 text-sm mb-2 ${
+                                teaser.sev === "high"
+                                  ? "border-destructive/40 bg-destructive/5"
+                                  : teaser.sev === "medium"
+                                  ? "border-amber-500/40 bg-amber-500/5"
+                                  : "border-muted bg-muted/20"
+                              }`}
+                            >
+                              <AlertTriangle
+                                className={`h-4 w-4 shrink-0 ${
+                                  teaser.sev === "high"
+                                    ? "text-destructive"
+                                    : teaser.sev === "medium"
+                                    ? "text-amber-500"
+                                    : "text-muted-foreground"
+                                }`}
+                              />
+                              <span>{teaser.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Print: a single honest locked block. Browsers drop
+                          backdrop-filter and opacity inconsistently when
+                          rendering to PDF, which leaks the teasers in clear. */}
+                      <div className="hidden print:flex flex-col items-center justify-center gap-2 border border-dashed rounded p-6 text-center">
+                        <Lock className="h-6 w-6" />
+                        <p className="text-sm font-medium">
+                          7 autres recommandations sont verrouillées
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Débloque-les gratuitement en laissant ton email sur
+                          gridar.app/audit
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  {leadCaptured && (
+                    <div>
+                      {[
+                        { label: "Analyse de tes 3 principaux concurrents sur Google", sev: "medium" as const },
+                        { label: "Liste des articles obsolètes à refresh en priorité", sev: "high" as const },
+                        { label: "10 mots-clés ciblés que tu ne touches pas encore", sev: "medium" as const },
+                        { label: "Backlinks: domaines référents + opportunités", sev: "low" as const },
+                        { label: "Plan de génération d'articles pour les 30 prochains jours", sev: "medium" as const },
+                        { label: "Schema.org + JSON-LD manquants sur tes pages clés", sev: "low" as const },
+                        { label: "Comparatif Core Web Vitals desktop vs mobile", sev: "low" as const },
+                      ].map((teaser, i) => (
+                        <div
+                          key={i}
+                          className={`border rounded p-2 flex items-center gap-2 text-sm mb-2 ${
+                            teaser.sev === "high"
+                              ? "border-destructive/40 bg-destructive/5"
+                              : teaser.sev === "medium"
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : "border-muted bg-muted/20"
+                          }`}
+                        >
+                          <AlertTriangle
+                            className={`h-4 w-4 shrink-0 ${
+                              teaser.sev === "high"
+                                ? "text-destructive"
+                                : teaser.sev === "medium"
+                                ? "text-amber-500"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                          <span>{teaser.label}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  <div className={!leadCaptured ? "opacity-30 select-none" : ""}>
-                    {[
-                      { label: "Analyse de tes 3 principaux concurrents sur Google", sev: "medium" as const },
-                      { label: "Liste des articles obsolètes à refresh en priorité", sev: "high" as const },
-                      { label: "10 mots-clés ciblés que tu ne touches pas encore", sev: "medium" as const },
-                      { label: "Backlinks: domaines référents + opportunités", sev: "low" as const },
-                      { label: "Plan de génération d'articles pour les 30 prochains jours", sev: "medium" as const },
-                      { label: "Schema.org + JSON-LD manquants sur tes pages clés", sev: "low" as const },
-                      { label: "Comparatif Core Web Vitals desktop vs mobile", sev: "low" as const },
-                    ].map((teaser, i) => (
-                      <div
-                        key={i}
-                        className={`border rounded p-2 flex items-center gap-2 text-sm mb-2 ${
-                          teaser.sev === "high"
-                            ? "border-destructive/40 bg-destructive/5"
-                            : teaser.sev === "medium"
-                            ? "border-amber-500/40 bg-amber-500/5"
-                            : "border-muted bg-muted/20"
-                        }`}
-                      >
-                        <AlertTriangle
-                          className={`h-4 w-4 shrink-0 ${
-                            teaser.sev === "high"
-                              ? "text-destructive"
-                              : teaser.sev === "medium"
-                              ? "text-amber-500"
-                              : "text-muted-foreground"
-                          }`}
-                        />
-                        <span>{teaser.label}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </CardContent>
             </Card>
