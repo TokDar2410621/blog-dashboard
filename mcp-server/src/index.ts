@@ -345,6 +345,12 @@ const PlagiarismArgs = z
 const GscQueriesArgs = z
   .object({
     site_id: z.number().int().positive(),
+    slug: z
+      .string()
+      .min(1)
+      .describe(
+        "Article slug to pull queries for. Required: GSC filters rows to that single page URL.",
+      ),
     days: z.number().int().min(1).max(90).optional(),
     limit: z.number().int().min(1).max(500).optional(),
   })
@@ -400,9 +406,12 @@ const ProofShareToggleArgs = z
 
 const KeywordResearchArgs = z
   .object({
-    seed: z.string().optional().describe("Seed keyword to expand from"),
+    seed: z.string().min(1).describe("Seed keyword to expand from (required)"),
     language: z.enum(["fr", "en", "es"]).optional(),
-    country: z.string().optional().describe("ISO 3166-1 alpha-2, e.g. 'ca'"),
+    country: z
+      .string()
+      .optional()
+      .describe("ISO 3166-1 alpha-2, e.g. 'ca' (reserved; not used by backend yet)"),
   })
   .strict();
 
@@ -916,10 +925,15 @@ const tools: ToolDef[] = [
   {
     name: "gridar_gsc_queries",
     description:
-      "Pull top GSC queries (impressions / clicks / position) for a site over the last N days. Site must have GSC connected.",
+      "Pull top GSC queries (impressions / clicks / position) for a single article page over the last N days. Requires the article `slug`; the site must have GSC connected.",
     schema: GscQueriesArgs,
     handler: (input) =>
-      getGscQueries(input.site_id, input.days ?? 28, input.limit ?? 50),
+      getGscQueries(
+        input.site_id,
+        input.slug,
+        input.days ?? 28,
+        input.limit ?? 50,
+      ),
   },
   // --- Autopilot ----------------------------------------------------------
   {

@@ -387,9 +387,18 @@ export async function checkPlagiarism(body: { content: string }) {
   });
 }
 
-export async function getGscQueries(siteId: number, days = 28, limit = 50) {
+export async function getGscQueries(
+  siteId: number,
+  slug: string,
+  days = 28,
+  limit = 50,
+) {
+  // Backend (GSCQueriesView) requires `slug` — it filters GSC rows to the
+  // single article page URL (property URL + slug). Without it the API 400s
+  // with "slug is required." `limit` is accepted but ignored server-side
+  // (rowLimit is hardcoded to 25); kept for forward-compat.
   return request<Record<string, unknown>>(
-    `/sites/${siteId}/gsc-queries/?days=${days}&limit=${limit}`,
+    `/sites/${siteId}/gsc-queries/?slug=${encodeURIComponent(slug)}&days=${days}&limit=${limit}`,
   );
 }
 
@@ -490,9 +499,16 @@ export async function keywordResearch(body: {
   language?: "fr" | "en" | "es";
   country?: string;
 }) {
+  // Backend (KeywordResearchView) reads `seed_keyword` + `language` from the
+  // POST body. The tool exposes the nicer `seed` alias, so remap it here or
+  // the seed never reaches the server ("Le mot-cle de depart est requis").
+  // `country` is not consumed server-side, so it is intentionally dropped.
   return request<Record<string, unknown>>(`/keyword-research/`, {
     method: "POST",
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      seed_keyword: body.seed,
+      language: body.language,
+    }),
   });
 }
 

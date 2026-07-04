@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import secrets
+import unicodedata
 from datetime import timedelta
 
 import requests
@@ -1326,29 +1327,73 @@ class V1PAAView(BaseV1View):
 # Topic Cluster Planner (2026-06-08)
 # --------------------------------------------------------------------------
 
-# Intent classification regex (FR + EN + ES). The first match wins, in order:
-# transactional -> commercial -> informational -> navigational -> local.
+def _normalize_intent_kw(keyword: str) -> str:
+    """Lowercase, strip accents, and flatten apostrophes to spaces so the
+    lexical intent patterns (written in plain ASCII) match FR/EN/ES keywords
+    regardless of accents or curly/straight apostrophes.
+
+    "logiciel qui gère mon SEO au Québec" -> "logiciel qui gere mon seo au quebec"
+    "qu'est-ce que le SEO"                 -> "qu est-ce que le seo"
+    """
+    k = (keyword or '').strip().lower()
+    if not k:
+        return ''
+    k = ''.join(
+        c for c in unicodedata.normalize('NFKD', k)
+        if not unicodedata.combining(c)
+    )
+    # curly/straight apostrophes and backticks -> space (so "s'abonner"
+    # normalizes to "s abonner", matching the phrase patterns below)
+    k = re.sub(r"[‘’ʼ'`]", ' ', k)
+    # collapse repeated whitespace
+    k = re.sub(r'\s+', ' ', k).strip()
+    return k
+
+
+# navigational: brand / account / login destinations (FR + EN + ES)
+_NAV_PATTERN = re.compile(
+    r'\b(login|log in|sign in|signin|log on|logon|connexion|se connecter|'
+    r'mon compte|mon espace|espace client|espace membre|dashboard|'
+    r'tableau de bord|page d accueil|iniciar sesion|mi cuenta)\b',
+    re.IGNORECASE,
+)
+
+# Intent classification regex (FR + EN + ES). Matched against the *normalized*
+# keyword. First match wins, in precedence order:
+#   transactional -> navigational -> commercial -> informational -> local.
+# Informational also acts as the 0.5 fallback when nothing matches.
 # These are simple lexical signals; LLM is used as backup in propose_strategy.
 _INTENT_PATTERNS = [
-    # transactional: explicit purchase / quote / hire / service intent
+    # transactional: imminent purchase / quote / hire / subscribe / download
     ('transactional', re.compile(
-        r'\b(achat|acheter|prix|tarif|devis|commande|commander|reserver|reservation|'
-        r'service|services|agence|agency|cabinet|consultant|consultation|'
-        r'engager|embaucher|hire|buy|purchase|order|book|pricing|quote|'
-        r'comprar|precio|tarifa|reservar)\b',
+        r'\b(achat|acheter|prix|tarif|tarifs|cout|couts|coute|combien coute|'
+        r'devis|commande|commander|reserver|reservation|service|services|'
+        r'agence|agency|cabinet|consultant|consultation|engager|embaucher|'
+        r'hire|buy|purchase|order|book|pricing|quote|'
+        r's abonner|abonnement|souscrire|souscription|inscription|s inscrire|'
+        r'inscrire|essai|essai gratuit|demo|telecharger|download|descargar|'
+        r'creer un compte|comprar|precio|tarifa|reservar|suscribir|'
+        r'suscribirse)\b',
         re.IGNORECASE,
     )),
-    # commercial: comparison / review / best-of intent
+    # navigational: someone looking for a specific login / account / brand page
+    ('navigational', _NAV_PATTERN),
+    # commercial: comparing / evaluating tools & software before buying
     ('commercial', re.compile(
-        r'\b(vs|versus|comparatif|comparaison|review|reviews|avis|test|'
-        r'meilleur|meilleurs|meilleure|best|top|alternative|alternatives|'
-        r'comparison|opinion|opiniones|mejor|mejores)\b',
+        r'\b(logiciel|logiciels|outil|outils|application|applications|appli|'
+        r'plateforme|plateformes|solution|solutions|saas|software|tool|tools|'
+        r'platform|meilleur|meilleure|meilleurs|meilleures|best|top|'
+        r'comparatif|comparatifs|comparaison|comparaisons|comparison|vs|'
+        r'versus|alternative|alternatives|avis|review|reviews|test|note|'
+        r'notation|classement|opinion|opiniones|mejor|mejores)\b'
+        r'|quel(?:le|les|s)?\b.*\bchoisir\b',
         re.IGNORECASE,
     )),
-    # informational: how / what / why / guide
+    # informational: how / what / why / guide / definition
     ('informational', re.compile(
-        r'\b(comment|pourquoi|quoi|quelle|quel|guide|tutoriel|tutorial|how|'
-        r'what|why|when|where|definition|signification|explained|que es|'
+        r'\b(comment|pourquoi|quoi|quelle|quel|qu est-ce que|c est quoi|'
+        r'guide|tutoriel|tutorial|exemple|exemples|liste de|conseils|astuces|'
+        r'how|what|why|when|where|definition|signification|explained|que es|'
         r'como|por que)\b',
         re.IGNORECASE,
     )),
@@ -1365,9 +1410,10 @@ def _classify_intent_regex(keyword: str) -> tuple[str, float]:
     """Return (intent, confidence) from lexical regex match.
 
     Confidence is 0.85 for a strong regex match, 0.5 if nothing matches
-    (default to 'informational').
+    (default to 'informational'). Precedence: transactional > navigational >
+    commercial > informational > local.
     """
-    k = (keyword or '').strip()
+    k = _normalize_intent_kw(keyword)
     if not k:
         return ('informational', 0.0)
     for intent, pattern in _INTENT_PATTERNS:
@@ -1377,12 +1423,16 @@ def _classify_intent_regex(keyword: str) -> tuple[str, float]:
 
 
 def _is_navigational(keyword: str, site_name: str | None = None) -> bool:
-    """Crude brand-detection: True if the keyword matches a known brand
-    (the user's own site name, or a single-token brand-shaped string)."""
+    """Crude brand/destination detection: True if the keyword matches a known
+    brand (the user's own site name, a login/account destination, or a single
+    brand-shaped token)."""
     k = (keyword or '').strip().lower()
     if not k:
         return False
     if site_name and site_name.lower() in k:
+        return True
+    # Explicit login / account / dashboard destinations
+    if _NAV_PATTERN.search(_normalize_intent_kw(keyword)):
         return True
     # Single CamelCase / lowercase token = likely a brand name
     if ' ' not in k and len(k) <= 20 and not any(c.isdigit() for c in k):
@@ -1429,13 +1479,15 @@ class V1ClassifyIntentView(BaseV1View):
 
 def _propose_structure_for_intent(intent: str, keyword: str) -> str:
     """Map (intent, keyword shape) to a proposed_structure enum."""
-    k = (keyword or '').lower()
+    k = _normalize_intent_kw(keyword)
     if intent == 'transactional':
+        # imminent purchase -> service/product landing
         return 'single_landing'
     if intent == 'commercial':
-        if ' vs ' in k or ' versus ' in k:
-            return 'comparison_table'
-        return 'pillar_cluster'
+        # comparing/evaluating tools -> a comparison/positioning LANDING,
+        # never a blog article. "X vs Y" and "best X software" both map to a
+        # landing page (page_subtype 'comparison'), not a pillar_cluster.
+        return 'comparison_table'
     if intent == 'local':
         return 'local_landing'
     if intent == 'navigational':

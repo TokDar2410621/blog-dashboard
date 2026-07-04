@@ -26,10 +26,18 @@ export type FaqItem = {
   answer: string;
 };
 
-export type SocialProofItem = {
-  type?: "testimonial" | "logo" | "stat";
-  [key: string]: unknown;
-};
+// A social-proof entry is either a plain string (e.g. "Conçu au Saguenay ...")
+// or a structured object. The renderer normalizes both to a display string.
+export type SocialProofItem =
+  | string
+  | {
+      type?: "testimonial" | "logo" | "stat";
+      text?: string;
+      label?: string;
+      title?: string;
+      value?: string;
+      [key: string]: unknown;
+    };
 
 export type Landing = {
   id: number;

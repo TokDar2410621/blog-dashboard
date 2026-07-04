@@ -45,7 +45,16 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { Landing, ValueProp, FaqItem } from "@/lib/landing-api";
+import type { Landing, ValueProp, FaqItem, SocialProofItem } from "@/lib/landing-api";
+
+// Normalize a social-proof entry (string OR object) to a display string.
+function socialProofText(item: SocialProofItem): string {
+  if (typeof item === "string") return item;
+  if (item && typeof item === "object") {
+    return item.text || item.label || item.title || item.value || "";
+  }
+  return "";
+}
 
 // String -> icon map. Falls back to Sparkles. Keeps the model's `icon` field
 // a free-form string while still type-safe at render time.
@@ -144,6 +153,9 @@ export function LandingRenderer({
 }) {
   const primaryJsonLd = buildPrimaryJsonLd(landing, canonicalUrl);
   const faqJsonLd = buildFaqJsonLd(landing.faq || []);
+  const socialProofs = (landing.social_proof || [])
+    .map(socialProofText)
+    .filter((t) => t.trim().length > 0);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -195,6 +207,26 @@ export function LandingRenderer({
           </div>
         )}
       </section>
+
+      {/* Social proof - trust signals band. Renders only when non-empty so
+          landings without social_proof are visually unchanged. */}
+      {socialProofs.length > 0 && (
+        <section className="relative z-10 max-w-4xl mx-auto px-6 pb-2">
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {socialProofs.map((text, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-3 rounded-lg border border-white/10 bg-zinc-900/40 px-4 py-3"
+              >
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="text-sm text-zinc-300 leading-relaxed">
+                  {text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Value props */}
       {landing.value_props?.length > 0 && (
