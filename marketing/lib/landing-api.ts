@@ -11,7 +11,11 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
 const GRIDAR_SITE_ID = Number(process.env.NEXT_PUBLIC_GRIDAR_SITE_ID || 6);
-const REVALIDATE_SECONDS = 3600;
+// Short revalidate so a newly published landing (or a slug fetched as 404
+// before it existed) surfaces within minutes instead of staying cached for an
+// hour. Landings are pre-rendered via generateStaticParams at build; this only
+// governs the between-build refresh window.
+const REVALIDATE_SECONDS = 300;
 
 export const LANDING_SITE_ID = GRIDAR_SITE_ID;
 
