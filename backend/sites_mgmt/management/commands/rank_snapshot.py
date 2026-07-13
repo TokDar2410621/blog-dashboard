@@ -18,6 +18,19 @@ from sites_mgmt.models import Site, TrackedKeyword, SerpRank
 logger = logging.getLogger(__name__)
 
 
+def _host(u):
+    """Registrable host of a URL or domain: strip scheme, path and leading www.
+
+    Used for an EXACT host comparison so a result URL only counts when it is
+    genuinely the tracked site, not merely a URL that mentions the domain in its
+    path (e.g. a directory listing or an archive link).
+    """
+    h = (u or '').lower().strip()
+    h = h.split('://', 1)[-1]
+    h = h.split('/', 1)[0]
+    return h[4:] if h.startswith('www.') else h
+
+
 class Command(BaseCommand):
     help = (
         'Take a SerpRank snapshot for every active tracked keyword. '
@@ -73,6 +86,7 @@ class Command(BaseCommand):
                 ('es', 'es') if tk.language == 'es' else ('fr', 'ca')
             )
             site_domain = (site.domain or '').lower().replace('https://', '').replace('http://', '').rstrip('/')
+            site_host = _host(site_domain)
             target_url_norm = (tk.target_url or '').lower().rstrip('/')
 
             try:
@@ -108,7 +122,7 @@ class Command(BaseCommand):
                 if target_url_norm and url.rstrip('/') == target_url_norm:
                     best_hit = (idx, item, True)
                     break
-                if site_domain and site_domain in url:
+                if site_host and _host(url) == site_host:
                     best_hit = best_hit or (idx, item, False)
 
             if best_hit:

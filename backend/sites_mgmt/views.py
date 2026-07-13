@@ -10617,8 +10617,13 @@ class PublicAuditView(APIView):
                         return {'keyword': kw, 'position': None}
                     organic = (r.json().get('organic') or [])
                     pos = None
+                    dom = domain[4:] if domain.startswith('www.') else domain
                     for idx, item in enumerate(organic):
-                        if domain in (item.get('link') or '').lower():
+                        link = (item.get('link') or '').lower()
+                        host = link.split('://', 1)[-1].split('/', 1)[0]
+                        if host.startswith('www.'):
+                            host = host[4:]
+                        if host and host == dom:
                             pos = item.get('position') or idx + 1
                             break
                     return {'keyword': kw, 'position': pos}
