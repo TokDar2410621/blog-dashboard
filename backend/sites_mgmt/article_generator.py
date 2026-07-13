@@ -715,7 +715,7 @@ Sois factuel et precis.'''}]}],
                 'content-type': 'application/json'
             },
             json={
-                'model': 'claude-sonnet-4-20250514',
+                'model': 'claude-sonnet-5',
                 'max_tokens': max_tokens,
                 'messages': [{'role': 'user', 'content': prompt}]
             },

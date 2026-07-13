@@ -315,7 +315,7 @@ def build_strategic_prompt(
 ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 # Matches landing_generator + article_generator. Sonnet is plenty for the
 # structured-JSON task here and keeps the per-refresh cost predictable.
-STRATEGIC_MODEL = 'claude-sonnet-4-20250514'
+STRATEGIC_MODEL = 'claude-sonnet-5'
 
 
 def call_claude_for_opportunity(prompt: str) -> Optional[dict]:

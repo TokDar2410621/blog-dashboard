@@ -1621,7 +1621,7 @@ Pour commercial avec "vs", propose une comparison_table.
                 'content-type': 'application/json',
             },
             json={
-                'model': 'claude-sonnet-4-20250514',
+                'model': 'claude-sonnet-5',
                 'max_tokens': 1500,
                 'messages': [{'role': 'user', 'content': prompt}],
             },

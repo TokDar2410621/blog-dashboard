@@ -6500,7 +6500,7 @@ Reponds UNIQUEMENT en JSON, schema strict, dans le meme ordre que la liste:
                     'content-type': 'application/json',
                 },
                 json={
-                    'model': 'claude-sonnet-4-20250514',
+                    'model': 'claude-sonnet-5',
                     'max_tokens': 2000,
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
@@ -8793,7 +8793,7 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
                     'content-type': 'application/json',
                 },
                 json={
-                    'model': 'claude-sonnet-4-20250514',
+                    'model': 'claude-sonnet-5',
                     'max_tokens': 600,
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
@@ -9148,7 +9148,7 @@ Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
                     'content-type': 'application/json',
                 },
                 json={
-                    'model': 'claude-sonnet-4-20250514',
+                    'model': 'claude-sonnet-5',
                     'max_tokens': 1500,
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
