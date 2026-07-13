@@ -31,6 +31,37 @@ def _host(u):
     return h[4:] if h.startswith('www.') else h
 
 
+def _serper_organic(keyword, hl, gl, api_key, tries=3):
+    """Largest organic result set from up to `tries` Serper calls, plus an ok flag.
+
+    Serper intermittently returns a TRUNCATED SERP (e.g. 3 results instead of the
+    full page). A single call then misses a genuinely-ranking site, making a
+    position flicker between its real rank and 'not ranked'. Retrying when the
+    set looks short and keeping the largest result set makes each snapshot a
+    faithful read instead of noise.
+    """
+    best, ok = [], False
+    for _ in range(tries):
+        try:
+            resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={'X-API-KEY': api_key, 'Content-Type': 'application/json'},
+                json={'q': keyword, 'num': 100, 'hl': hl, 'gl': gl},
+                timeout=15,
+            )
+        except Exception:
+            continue
+        if resp.status_code != 200:
+            continue
+        ok = True
+        org = (resp.json() or {}).get('organic') or []
+        if len(org) > len(best):
+            best = org
+        if len(org) >= 10:  # a healthy set; no need to retry
+            break
+    return best, ok
+
+
 class Command(BaseCommand):
     help = (
         'Take a SerpRank snapshot for every active tracked keyword. '
@@ -89,31 +120,13 @@ class Command(BaseCommand):
             site_host = _host(site_domain)
             target_url_norm = (tk.target_url or '').lower().rstrip('/')
 
-            try:
-                resp = http_requests.post(
-                    'https://google.serper.dev/search',
-                    headers={
-                        'X-API-KEY': api_key,
-                        'Content-Type': 'application/json',
-                    },
-                    json={'q': tk.keyword, 'num': 100, 'hl': hl, 'gl': gl},
-                    timeout=15,
-                )
-            except Exception as e:
+            organic, ok = _serper_organic(tk.keyword, hl, gl, api_key)
+            if not ok:
                 errors += 1
                 self.stderr.write(self.style.WARNING(
-                    f"  Serper error for [{site.name}] '{tk.keyword}': {e}"
+                    f"  Serper failed for [{site.name}] '{tk.keyword}'"
                 ))
                 continue
-
-            if resp.status_code != 200:
-                errors += 1
-                self.stderr.write(self.style.WARNING(
-                    f"  Serper status {resp.status_code} for [{site.name}] '{tk.keyword}'"
-                ))
-                continue
-
-            organic = (resp.json() or {}).get('organic') or []
             best_hit = None
             for idx, item in enumerate(organic, start=1):
                 url = (item.get('link') or '').lower()
