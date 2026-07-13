@@ -668,7 +668,7 @@ class ArticleGenerator:
         self.log(f'[SEARCH] Gemini: "{query}"')
 
         response = requests.post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
             params={'key': os.environ['GEMINI_API_KEY']},
             headers={'Content-Type': 'application/json'},
             json={
