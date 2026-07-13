@@ -77,6 +77,12 @@ import {
   SerpFeatureIcons,
   type SerpFeatures,
 } from "@/components/keywords/SerpFeatureIcons";
+import {
+  describeLastChecked,
+  rankState,
+  positionColor,
+  type RankDisplay,
+} from "@/lib/rank-display";
 
 type Latest = {
   position: number | null;
@@ -97,7 +103,7 @@ type Tracked = {
   is_active: boolean;
   created_at: string;
   latest: Latest;
-};
+} & RankDisplay;
 
 type Snapshot = {
   position: number | null;
@@ -364,9 +370,20 @@ export default function KeywordTrackerPage() {
       format: (_v, row) => row.latest?.title ?? "",
     },
     {
-      key: "latest",
-      label: "Dernier snapshot",
-      format: (_v, row) => row.latest?.recorded_at ?? "",
+      key: "stable_position",
+      label: "Position stable",
+      format: (v) => (v == null ? "" : `#${v}`),
+    },
+    { key: "is_stable", label: "Stable" },
+    {
+      key: "best_seen",
+      label: "Meilleure vue",
+      format: (v) => (v == null ? "" : `#${v}`),
+    },
+    {
+      key: "last_checked",
+      label: "Derniere verif.",
+      format: (v) => (v ? String(v) : ""),
     },
     { key: "is_active", label: "Actif" },
     { key: "created_at", label: "Date d'ajout" },
@@ -495,13 +512,15 @@ export default function KeywordTrackerPage() {
 
   const heroKpis = useMemo(() => {
     const total = trackedList.length;
-    const ranked = trackedList
-      .map((k) => k.latest?.position)
+    // Honnete : on ne compte que les positions CONSISTANTES (is_stable), pas un
+    // #1 bruite vu une seule fois. Un mot-cle qui vacille ne gonfle pas les KPI.
+    const stableRanked = trackedList
+      .map((k) => (k.is_stable ? k.stable_position : null))
       .filter((p): p is number => typeof p === "number");
-    const avgPosition = ranked.length
-      ? ranked.reduce((a, b) => a + b, 0) / ranked.length
+    const avgPosition = stableRanked.length
+      ? stableRanked.reduce((a, b) => a + b, 0) / stableRanked.length
       : null;
-    const top10Count = ranked.filter((p) => p <= 10).length;
+    const top10Count = stableRanked.filter((p) => p <= 10).length;
 
     // Share of voice : mock deterministic per siteId, 15-30%.
     const seed = siteId
@@ -591,7 +610,7 @@ export default function KeywordTrackerPage() {
           value={heroKpis.top10Count}
           icon={TrendingUp}
           sparkline={heroKpis.sparks.top10}
-          description="Mots-cles dans les 10 premiers"
+          description="Positions stables dans le top 10"
         />
         <StatsCard
           title="Alertes 7j"
@@ -868,9 +887,9 @@ export default function KeywordTrackerPage() {
                   <TableHead>Mot-clé</TableHead>
                   <TableHead className="w-24">Intent</TableHead>
                   <TableHead className="w-16">Langue</TableHead>
-                  <TableHead className="w-24 text-center">Position</TableHead>
+                  <TableHead className="w-28 text-center">Position</TableHead>
                   <TableHead className="w-28">SERP</TableHead>
-                  <TableHead>Dernier snapshot</TableHead>
+                  <TableHead>Derniere verif.</TableHead>
                   <TableHead className="w-20"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -919,37 +938,13 @@ export default function KeywordTrackerPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          {k.latest ? (
-                            k.latest.position !== null ? (
-                              <span
-                                className={`text-xl font-bold ${
-                                  k.latest.position <= 3
-                                    ? "text-green-600"
-                                    : k.latest.position <= 10
-                                    ? "text-emerald-600"
-                                    : k.latest.position <= 30
-                                    ? "text-amber-600"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                #{k.latest.position}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">
-                                Hors top 100
-                              </span>
-                            )
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
+                          <KeywordRankCell tracked={k} />
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <SerpFeatureIcons features={mockSerpFeatures(k.id)} />
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {k.latest
-                            ? new Date(k.latest.recorded_at).toLocaleString("fr-CA")
-                            : "Jamais"}
+                        <TableCell>
+                          <LastCheckedLabel iso={k.last_checked} samples={k.samples} />
                         </TableCell>
                         <TableCell>
                           <Button
@@ -1053,6 +1048,67 @@ export default function KeywordTrackerPage() {
   );
 }
 
+
+/**
+ * Position affichee de facon honnete : #X uniquement si la position est
+ * consistante (is_stable). Sinon on avoue l'instabilite plutot que de mentir
+ * avec un #1 vu une seule fois. best_seen est montre en secondaire.
+ */
+function KeywordRankCell({ tracked }: { tracked: Tracked }) {
+  const state = rankState(tracked);
+  switch (state.kind) {
+    case "none":
+      return <span className="text-xs text-muted-foreground">Jamais releve</span>;
+    case "unranked":
+      return <span className="text-xs text-muted-foreground">Hors top 100</span>;
+    case "stable":
+      return (
+        <span className={`text-xl font-bold ${positionColor(state.position)}`}>
+          #{state.position}
+        </span>
+      );
+    case "unstable":
+      return (
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            <AlertTriangle className="h-3 w-3" />A confirmer
+          </span>
+          {state.bestSeen != null && (
+            <span className="text-[10px] text-muted-foreground">
+              deja vu #{state.bestSeen}
+            </span>
+          )}
+        </div>
+      );
+  }
+}
+
+/** Date de derniere verification, en ambre si trop vieille. */
+function LastCheckedLabel({
+  iso,
+  samples,
+}: {
+  iso: string | null;
+  samples: number;
+}) {
+  if (!iso || samples === 0) {
+    return <span className="text-xs text-muted-foreground">Jamais verifie</span>;
+  }
+  const info = describeLastChecked(iso);
+  return (
+    <span
+      title={info.full}
+      className={`inline-flex items-center gap-1 text-xs ${
+        info.isStale
+          ? "text-amber-600 dark:text-amber-400"
+          : "text-muted-foreground"
+      }`}
+    >
+      {info.isStale && <AlertTriangle className="h-3 w-3 shrink-0" />}
+      Verifie {info.label}
+    </span>
+  );
+}
 
 function RankChart({ snapshots }: { snapshots: Snapshot[] }) {
   // Map: x = recorded date (ms), y = position (null → not in top 100, plotted at 101 as ceiling)

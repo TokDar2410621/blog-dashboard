@@ -595,9 +595,13 @@ class V1BriefView(BaseV1View):
 class V1KeywordsView(BaseV1View):
     """GET /api/v1/sites/<id>/keywords/ - list tracked keywords + latest rank."""
     def get(self, request, site_id):
+        from .rank_display import keyword_display_rank, DEFAULT_WINDOW
+
         site = self.get_user_site(request, site_id)
         items = list(TrackedKeyword.objects.filter(site=site, is_active=True))
+        # One bulk query for both the latest reading and the stability window.
         latest_map = {}
+        snaps_map = {}
         if items:
             ids = [k.id for k in items]
             for snap in (
@@ -606,24 +610,28 @@ class V1KeywordsView(BaseV1View):
             ):
                 if snap.tracked_id not in latest_map:
                     latest_map[snap.tracked_id] = snap
-        return Response({
-            'results': [
-                {
-                    'id': k.id,
-                    'keyword': k.keyword,
-                    'language': k.language,
-                    'target_url': k.target_url,
-                    'latest_position': (
-                        latest_map[k.id].position if k.id in latest_map else None
-                    ),
-                    'latest_recorded_at': (
-                        latest_map[k.id].recorded_at.isoformat()
-                        if k.id in latest_map else None
-                    ),
-                }
-                for k in items
-            ]
-        })
+                bucket = snaps_map.setdefault(snap.tracked_id, [])
+                if len(bucket) < DEFAULT_WINDOW:
+                    bucket.append(snap)
+        results = []
+        for k in items:
+            row = {
+                'id': k.id,
+                'keyword': k.keyword,
+                'language': k.language,
+                'target_url': k.target_url,
+                'latest_position': (
+                    latest_map[k.id].position if k.id in latest_map else None
+                ),
+                'latest_recorded_at': (
+                    latest_map[k.id].recorded_at.isoformat()
+                    if k.id in latest_map else None
+                ),
+            }
+            # Stability-aware honest rank (same shape as the dashboard endpoints).
+            row.update(keyword_display_rank(k, snapshots=snaps_map.get(k.id)))
+            results.append(row)
+        return Response({'results': results})
 
 
 class V1RankSnapshotView(BaseV1View):

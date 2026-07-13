@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { describeLastChecked, rankState } from "@/lib/rank-display";
 
 type ScoreComponent = { name: string; score: number; weight: number };
 type Reco = {
@@ -51,6 +52,13 @@ type KeywordRow = {
   position: number | null;
   is_target_match: boolean | null;
   recorded_at: string | null;
+  // Bloc de position stable (fenetre glissante) renvoye par le backend.
+  stable_position: number | null;
+  is_stable: boolean;
+  found_ratio: number;
+  last_checked: string | null;
+  best_seen: number | null;
+  samples: number;
 };
 type DecayItem = {
   url: string;
@@ -81,6 +89,8 @@ type AuditPayload = {
     total?: number;
     top_10_count?: number;
     top_10_pct?: number;
+    stable_ranked_count?: number;
+    last_checked?: string | null;
     rows?: KeywordRow[];
     error?: string;
   };
@@ -141,6 +151,66 @@ function severityIcon(s: Reco["severity"]) {
     default:
       return <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />;
   }
+}
+
+/** Petite ligne "Verifie il y a X jours", en ambre si trop vieux. */
+function AuditLastCheckedNote({ iso }: { iso: string | null }) {
+  if (!iso) return null;
+  const info = describeLastChecked(iso);
+  return (
+    <div
+      title={info.full}
+      className={`inline-flex items-center gap-1 text-[11px] ${
+        info.isStale
+          ? "text-amber-600 dark:text-amber-400"
+          : "text-muted-foreground"
+      }`}
+    >
+      {info.isStale && <AlertTriangle className="h-3 w-3 shrink-0" />}
+      Verifie {info.label}
+    </div>
+  );
+}
+
+/**
+ * Position honnete d'un mot-cle dans l'audit : #X seulement si consistant,
+ * "a confirmer" (avec best_seen) si ca vacille, "non classe" sinon.
+ */
+function AuditKeywordRank({ kw }: { kw: KeywordRow }) {
+  const state = rankState(kw);
+  if (state.kind === "stable") {
+    const color =
+      state.position <= 10
+        ? "text-emerald-500"
+        : state.position <= 30
+        ? "text-amber-500"
+        : "text-muted-foreground";
+    return (
+      <span className={`font-mono text-xs shrink-0 ml-2 ${color}`}>
+        #{state.position}
+      </span>
+    );
+  }
+  if (state.kind === "unstable") {
+    return (
+      <span className="shrink-0 ml-2 inline-flex items-center gap-1">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+          a confirmer
+        </span>
+        {state.bestSeen != null && (
+          <span className="font-mono text-[10px] text-muted-foreground">
+            #{state.bestSeen}
+          </span>
+        )}
+      </span>
+    );
+  }
+  // none | unranked
+  return (
+    <span className="font-mono text-xs shrink-0 ml-2 text-muted-foreground">
+      non classe
+    </span>
+  );
 }
 
 export function SiteAuditPage() {
@@ -445,34 +515,24 @@ export function SiteAuditPage() {
               </div>
             ) : (
               <>
-                <div className="flex items-baseline gap-3 mb-3">
+                <div className="flex items-baseline gap-3 mb-1">
                   <span className="text-2xl font-bold tabular-nums">
                     {data.keywords.top_10_count}/{data.keywords.total}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    dans le top 10 ({Math.round(data.keywords.top_10_pct || 0)}%)
+                    dans le top 10 stable (
+                    {Math.round(data.keywords.top_10_pct || 0)}%)
                   </span>
                 </div>
-                <div className="space-y-1 max-h-64 overflow-y-auto">
+                <AuditLastCheckedNote iso={data.keywords.last_checked ?? null} />
+                <div className="mt-3 space-y-1 max-h-64 overflow-y-auto">
                   {(data.keywords.rows || []).map((kw) => (
                     <div
                       key={kw.id}
                       className="flex items-center justify-between text-sm border-b border-border/30 py-1.5"
                     >
                       <span className="truncate">{kw.keyword}</span>
-                      <span
-                        className={`font-mono text-xs shrink-0 ml-2 ${
-                          kw.position == null
-                            ? "text-muted-foreground"
-                            : kw.position <= 10
-                            ? "text-emerald-500"
-                            : kw.position <= 30
-                            ? "text-amber-500"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {kw.position == null ? "non classe" : `#${kw.position}`}
-                      </span>
+                      <AuditKeywordRank kw={kw} />
                     </div>
                   ))}
                 </div>

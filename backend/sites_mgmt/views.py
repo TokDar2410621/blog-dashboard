@@ -36,6 +36,7 @@ from .models import (
 )
 from .db_utils import ensure_site_connection, test_site_connection
 from .blog_adapter import detect_blog_tables, setup_blog_views
+from .rank_display import keyword_display_rank, DEFAULT_WINDOW
 
 logger = logging.getLogger(__name__)
 
@@ -6275,8 +6276,16 @@ class RedirectDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _serialize_tracked_keyword(tk, latest=None):
-    """Serialize a TrackedKeyword with its latest snapshot for list views."""
+def _serialize_tracked_keyword(tk, latest=None, snapshots=None):
+    """Serialize a TrackedKeyword with its latest snapshot for list views.
+
+    `latest` (the single most-recent snapshot) is kept untouched for backward
+    compatibility. On top of it we expose a stability-aware rank
+    (`stable_position` / `is_stable` / `found_ratio` / `last_checked` /
+    `best_seen` / `samples`) so the UI can avoid presenting one noisy reading as
+    a stable fact. Pass `snapshots` (newest-first) from a bulk query in list
+    views to skip the per-keyword lookup.
+    """
     base = {
         'id': tk.id,
         'keyword': tk.keyword,
@@ -6296,6 +6305,7 @@ def _serialize_tracked_keyword(tk, latest=None):
         }
     else:
         base['latest'] = None
+    base.update(keyword_display_rank(tk, snapshots=snapshots))
     return base
 
 
@@ -6308,8 +6318,10 @@ class TrackedKeywordsView(APIView):
         keywords = list(
             TrackedKeyword.objects.filter(site=site).order_by('-created_at')
         )
-        # Fetch latest snapshot per keyword in a single query
+        # Fetch the recent snapshot window per keyword in a single query, so
+        # both the latest reading AND the stability computation stay N+1-free.
         latest_map = {}
+        snaps_map = {}
         if keywords:
             ids = [k.id for k in keywords]
             for snap in (
@@ -6318,9 +6330,14 @@ class TrackedKeywordsView(APIView):
             ):
                 if snap.tracked_id not in latest_map:
                     latest_map[snap.tracked_id] = snap
+                bucket = snaps_map.setdefault(snap.tracked_id, [])
+                if len(bucket) < DEFAULT_WINDOW:
+                    bucket.append(snap)
         return Response({
             'results': [
-                _serialize_tracked_keyword(k, latest_map.get(k.id))
+                _serialize_tracked_keyword(
+                    k, latest_map.get(k.id), snaps_map.get(k.id)
+                )
                 for k in keywords
             ],
         })
@@ -9308,34 +9325,63 @@ class SiteAuditAggregatorView(APIView):
 
         def task_keywords():
             try:
+                tracked_list = list(
+                    TrackedKeyword.objects.filter(site=site, is_active=True)
+                )
+                # One bulk query for the recent snapshot window of every keyword.
+                snaps_map = {}
+                latest_overall = None
+                if tracked_list:
+                    ids = [t.id for t in tracked_list]
+                    for snap in (
+                        SerpRank.objects.filter(tracked_id__in=ids)
+                        .order_by('tracked_id', '-recorded_at')
+                    ):
+                        bucket = snaps_map.setdefault(snap.tracked_id, [])
+                        if len(bucket) < DEFAULT_WINDOW:
+                            bucket.append(snap)
+                        if latest_overall is None or snap.recorded_at > latest_overall:
+                            latest_overall = snap.recorded_at
+
                 rows = []
                 top_10_count = 0
-                tracked_qs = TrackedKeyword.objects.filter(
-                    site=site, is_active=True
-                )
-                for tk in tracked_qs:
-                    latest = (
-                        SerpRank.objects.filter(tracked=tk)
-                        .order_by('-recorded_at').first()
-                    )
+                stable_ranked_count = 0
+                for tk in tracked_list:
+                    snaps = snaps_map.get(tk.id) or []
+                    latest = snaps[0] if snaps else None
+                    disp = keyword_display_rank(tk, snapshots=snaps)
                     pos = latest.position if latest else None
-                    if pos is not None and pos <= 10:
-                        top_10_count += 1
-                    rows.append({
+                    # Honest top-10: count a keyword ONLY when it is consistently
+                    # ranked (is_stable) AND its stable position is <= 10 - a
+                    # single noisy #1 snapshot no longer inflates the score.
+                    if disp['is_stable'] and disp['stable_position'] is not None:
+                        stable_ranked_count += 1
+                        if disp['stable_position'] <= 10:
+                            top_10_count += 1
+                    row = {
                         'id': tk.id,
                         'keyword': tk.keyword,
                         'language': tk.language,
                         'position': pos,
                         'is_target_match': latest.is_target_match if latest else None,
                         'recorded_at': latest.recorded_at.isoformat() if latest else None,
-                    })
-                # Sort: top-ranking first, untracked last
-                rows.sort(key=lambda r: (r['position'] is None, r['position'] or 999))
+                    }
+                    row.update(disp)
+                    rows.append(row)
+                # Sort: consistently-ranked keywords first (by stable position),
+                # then the unstable/unranked ones (fall back to latest position).
+                rows.sort(key=lambda r: (
+                    not (r['is_stable'] and r['stable_position'] is not None),
+                    r['stable_position'] if r['stable_position'] is not None
+                    else (r['position'] if r['position'] is not None else 999),
+                ))
                 total = len(rows)
                 return {
                     'total': total,
                     'top_10_count': top_10_count,
                     'top_10_pct': (top_10_count / total * 100) if total else 0,
+                    'stable_ranked_count': stable_ranked_count,
+                    'last_checked': latest_overall.isoformat() if latest_overall else None,
                     'rows': rows[:20],  # cap for prompt size
                 }
             except Exception as e:
