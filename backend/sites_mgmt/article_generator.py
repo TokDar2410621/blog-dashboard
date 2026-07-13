@@ -583,15 +583,31 @@ class ArticleGenerator:
     def search_web(self, query, method):
         if method == 'gemini':
             return self.search_with_gemini(query)
-        return self.search_with_serper(query)
+        # Serper by default, with automatic fallback to Gemini when Serper is
+        # unavailable (most commonly HTTP 400 "Not enough credits"). Keeps
+        # generation working even when the Serper account is empty.
+        try:
+            return self.search_with_serper(query)
+        except Exception as serper_err:
+            self.log(f'[WARN] Serper indisponible ({serper_err}). Bascule sur Gemini.')
+            try:
+                return self.search_with_gemini(query)
+            except Exception as gemini_err:
+                raise RuntimeError(
+                    f'Recherche web indisponible. Serper: {serper_err}. '
+                    f'Gemini: {gemini_err}. Verifie les credits Serper ou la cle Gemini.'
+                )
 
     def search_with_serper(self, query):
         self.log(f'[SEARCH] Serper: "{query}"')
 
+        serper_key = os.environ.get('SERPER_API_KEY')
+        if not serper_key:
+            raise RuntimeError('SERPER_API_KEY manquante')
         response = requests.post(
             'https://google.serper.dev/search',
             headers={
-                'X-API-KEY': os.environ['SERPER_API_KEY'],
+                'X-API-KEY': serper_key,
                 'Content-Type': 'application/json'
             },
             json={'q': query, 'gl': 'fr', 'hl': 'fr', 'num': 10},
@@ -620,7 +636,7 @@ class ArticleGenerator:
             img_response = requests.post(
                 'https://google.serper.dev/images',
                 headers={
-                    'X-API-KEY': os.environ['SERPER_API_KEY'],
+                    'X-API-KEY': serper_key,
                     'Content-Type': 'application/json'
                 },
                 json={'q': query + ' AI', 'gl': 'fr', 'num': 10},
