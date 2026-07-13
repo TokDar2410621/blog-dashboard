@@ -723,7 +723,20 @@ Sois factuel et precis.'''}]}],
         )
         response.raise_for_status()
         data = response.json()
-        return data['content'][0]['text']
+        blocks = data.get('content') or []
+        texts = [
+            b.get('text', '')
+            for b in blocks
+            if isinstance(b, dict) and b.get('type') == 'text'
+        ]
+        result = ''.join(texts).strip()
+        if not result:
+            raise RuntimeError(
+                'Reponse Claude vide ou inattendue '
+                f"(stop_reason={data.get('stop_reason')}, "
+                f"blocks={[b.get('type') for b in blocks if isinstance(b, dict)]})"
+            )
+        return result
 
     # === TOPIC ANALYSIS ===
 
