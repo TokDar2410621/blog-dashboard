@@ -31,6 +31,7 @@ import {
   Lightbulb,
   Layers,
   Globe,
+  Wrench,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,29 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
   lead_magnet: "Lead magnet",
 };
 
+// Page types whose value IS an interactive tool (configurator, calculator,
+// quiz, live tool). Gridar generates landing/article COPY, not a working
+// widget - so when one of these has no existing asset to lean on
+// (asset_match === false), "Créer cette page" would ship a landing that
+// promises a tool that doesn't exist. Those are routed to the "à construire"
+// section, where the honest deliverable is the build prompt for the user's
+// dev / AI (build_opportunity_prompt already asks it to implement the
+// mechanism, not just describe it). Content page types (guide, comparatif,
+// service, landing locale, lead magnet) stay directly generatable.
+const INTERACTIVE_PAGE_TYPES = new Set([
+  "tool_landing",
+  "calculator",
+  "quiz_landing",
+]);
+
+function requiresCustomAsset(
+  concept: StrategicOpportunity["concept"] | undefined,
+): boolean {
+  if (!concept) return false;
+  return concept.asset_match === false &&
+    INTERACTIVE_PAGE_TYPES.has(concept.page_type);
+}
+
 function formatRange(range: [number, number]): string {
   const [lo, hi] = range;
   if (lo <= 0 && hi <= 0) return "0";
@@ -121,9 +145,11 @@ function formatRange(range: [number, number]): string {
 function OpportunityCard({
   opp,
   siteId,
+  needsCustomAsset = false,
 }: {
   opp: StrategicOpportunity;
   siteId: number;
+  needsCustomAsset?: boolean;
 }) {
   const qc = useQueryClient();
 
@@ -411,6 +437,33 @@ function OpportunityCard({
               )}
               Restaurer
             </Button>
+          ) : needsCustomAsset ? (
+            // Gridar can't auto-generate the interactive asset this concept
+            // needs, so the honest primary action is the build prompt for the
+            // user's dev / AI - not "Créer cette page" (which would ship a
+            // landing promising a tool that doesn't exist).
+            <>
+              <Button
+                onClick={() => promptMutation.mutate()}
+                disabled={promptMutation.isPending}
+                title="Colle ce prompt à ton dev ou à ton IA de code (Lovable, v0, Cursor...) : il construit l'outil ET la page dans ton propre codebase. Gridar ne génère pas l'outil interactif."
+              >
+                {promptMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Wrench className="h-4 w-4 mr-2" />
+                )}
+                Obtenir le prompt de création
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => dismissMutation.mutate()}
+                disabled={dismissMutation.isPending}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Pas pertinent
+              </Button>
+            </>
           ) : (
             <>
               <Button
@@ -440,7 +493,10 @@ function OpportunityCard({
               </Button>
             </>
           )}
-          {!isDismissed && (
+          {/* Generic prompt-copy button. Suppressed on "à construire" cards that
+              are still open - those already show the build prompt as the
+              primary action above. Kept for done/actionable cards. */}
+          {!isDismissed && !(needsCustomAsset && !isDone) && (
             <Button
               variant="outline"
               onClick={() => promptMutation.mutate()}
@@ -585,6 +641,14 @@ export default function OpportunitiesPage() {
   const isLoading = opportunitiesQuery.isLoading;
   const isEmpty = !isLoading && items.length === 0;
 
+  // Split by whether Gridar can actually deliver the page one-click, or whether
+  // the concept needs a custom interactive asset built first (see
+  // requiresCustomAsset). Keeps the two very different kinds of work honest and
+  // visually separate instead of blending "click to generate" with "you need a
+  // dev".
+  const actionable = items.filter((o) => !requiresCustomAsset(o.concept));
+  const needsAsset = items.filter((o) => requiresCustomAsset(o.concept));
+
   return (
     <div className="space-y-6">
       <PageBreadcrumb trail={[{ label: "Opportunités SEO" }]} />
@@ -679,10 +743,66 @@ export default function OpportunitiesPage() {
       )}
 
       {!isLoading && items.length > 0 && (
-        <div className="space-y-4">
-          {items.map((opp) => (
-            <OpportunityCard key={opp.id} opp={opp} siteId={sid} />
-          ))}
+        <div className="space-y-10">
+          {actionable.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.05] p-4">
+                <Sparkles className="h-5 w-5 shrink-0 text-emerald-400 mt-0.5" />
+                <div>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    Actionnable avec Gridar
+                    <Badge
+                      variant="outline"
+                      className="border-emerald-500/30 text-emerald-400"
+                    >
+                      {actionable.length}
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Gridar génère ces pages directement. Clique sur « Créer
+                    cette page » et la landing est produite dans ton dashboard.
+                  </p>
+                </div>
+              </div>
+              {actionable.map((opp) => (
+                <OpportunityCard key={opp.id} opp={opp} siteId={sid} />
+              ))}
+            </section>
+          )}
+
+          {needsAsset.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-4">
+                <Wrench className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    Nécessite un asset à construire
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500/30 text-amber-400"
+                    >
+                      {needsAsset.length}
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+                    Bonnes idées stratégiques, mais le mécanisme (configurateur,
+                    calculateur, outil interactif) doit être développé. Gridar
+                    ne génère pas l'outil lui-même. Utilise « Obtenir le prompt
+                    de création » pour confier la construction à ton dev ou à
+                    ton IA de code (Lovable, v0, Cursor…).
+                  </p>
+                </div>
+              </div>
+              {needsAsset.map((opp) => (
+                <OpportunityCard
+                  key={opp.id}
+                  opp={opp}
+                  siteId={sid}
+                  needsCustomAsset
+                />
+              ))}
+            </section>
+          )}
         </div>
       )}
     </div>
