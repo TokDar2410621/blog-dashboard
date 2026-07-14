@@ -342,6 +342,10 @@ def call_claude_for_opportunity(prompt: str) -> Optional[dict]:
             json={
                 'model': STRATEGIC_MODEL,
                 'max_tokens': 1200,
+                # Sonnet 5 enables adaptive thinking by default; disable it so
+                # the whole token budget goes to the JSON output (thinking would
+                # otherwise risk truncating it).
+                'thinking': {'type': 'disabled'},
                 'messages': [{'role': 'user', 'content': prompt}],
             },
             timeout=90,

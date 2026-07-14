@@ -6519,12 +6519,20 @@ Reponds UNIQUEMENT en JSON, schema strict, dans le meme ordre que la liste:
                 json={
                     'model': 'claude-sonnet-5',
                     'max_tokens': 2000,
+                    # Disable Sonnet 5's default adaptive thinking so `content`
+                    # leads with the JSON text block.
+                    'thinking': {'type': 'disabled'},
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
                 timeout=45,
             )
             resp.raise_for_status()
-            text = resp.json()['content'][0]['text']
+            _body = resp.json()
+            text = next(
+                (b.get('text', '') for b in (_body.get('content') or [])
+                 if b.get('type') == 'text'),
+                '',
+            )
         except http_requests.RequestException as e:
             return Response(
                 {'error': f'Erreur Claude: {e}'},
@@ -8812,12 +8820,20 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
                 json={
                     'model': 'claude-sonnet-5',
                     'max_tokens': 600,
+                    # Disable Sonnet 5's default adaptive thinking so `content`
+                    # leads with the JSON text block.
+                    'thinking': {'type': 'disabled'},
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
                 timeout=30,
             )
             resp.raise_for_status()
-            text = resp.json()['content'][0]['text']
+            _body = resp.json()
+            text = next(
+                (b.get('text', '') for b in (_body.get('content') or [])
+                 if b.get('type') == 'text'),
+                '',
+            )
         except http_requests.RequestException as e:
             return Response(
                 {'error': f'Erreur Claude: {e}'},
@@ -9167,12 +9183,20 @@ Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
                 json={
                     'model': 'claude-sonnet-5',
                     'max_tokens': 1500,
+                    # Disable Sonnet 5's default adaptive thinking so `content`
+                    # leads with the JSON text block.
+                    'thinking': {'type': 'disabled'},
                     'messages': [{'role': 'user', 'content': prompt}],
                 },
                 timeout=45,
             )
             resp.raise_for_status()
-            text = resp.json()['content'][0]['text']
+            _body = resp.json()
+            text = next(
+                (b.get('text', '') for b in (_body.get('content') or [])
+                 if b.get('type') == 'text'),
+                '',
+            )
         except http_requests.RequestException as e:
             return Response(
                 {'error': f'Erreur Claude: {e}'},

@@ -1631,12 +1631,20 @@ Pour commercial avec "vs", propose une comparison_table.
             json={
                 'model': 'claude-sonnet-5',
                 'max_tokens': 1500,
+                # Disable Sonnet 5's default adaptive thinking so `content`
+                # leads with the JSON text block (see landing_generator).
+                'thinking': {'type': 'disabled'},
                 'messages': [{'role': 'user', 'content': prompt}],
             },
             timeout=60,
         )
         resp.raise_for_status()
-        text = resp.json()['content'][0]['text']
+        _body = resp.json()
+        text = next(
+            (b.get('text', '') for b in (_body.get('content') or [])
+             if b.get('type') == 'text'),
+            '',
+        )
         import re as _re
         match = _re.search(r'\{[\s\S]*\}', text)
         if not match:

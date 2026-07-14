@@ -717,6 +717,10 @@ Sois factuel et precis.'''}]}],
             json={
                 'model': 'claude-sonnet-5',
                 'max_tokens': max_tokens,
+                # Sonnet 5 enables adaptive thinking by default; disable it so
+                # the whole token budget goes to the article output (thinking
+                # would otherwise risk truncating long articles).
+                'thinking': {'type': 'disabled'},
                 'messages': [{'role': 'user', 'content': prompt}]
             },
             timeout=120,

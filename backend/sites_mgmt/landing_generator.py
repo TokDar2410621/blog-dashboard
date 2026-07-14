@@ -64,12 +64,23 @@ class LandingGenerator:
             json={
                 'model': DEFAULT_MODEL,
                 'max_tokens': max_tokens,
+                # Sonnet 5 runs adaptive thinking by default when `thinking` is
+                # omitted, which prepends a thinking block to `content` (so the
+                # old content[0]['text'] KeyError'd). We want the JSON directly,
+                # not reasoning, so disable it and keep the full token budget.
+                'thinking': {'type': 'disabled'},
                 'messages': [{'role': 'user', 'content': prompt}],
             },
             timeout=120,
         )
         resp.raise_for_status()
-        return resp.json()['content'][0]['text']
+        body = resp.json()
+        for block in body.get('content') or []:
+            if block.get('type') == 'text':
+                return block.get('text') or ''
+        raise LandingGeneratorError(
+            f"Claude returned no text block (stop_reason={body.get('stop_reason')!r})."
+        )
 
     # ------------------------------------------------------------------
     # Public API
