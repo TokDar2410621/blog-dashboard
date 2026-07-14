@@ -24,6 +24,7 @@ from .views import (
     PostFeedbackView, SiteAuditAggregatorView,
     BlogDomainProvisionView, BlogDomainStatusView, BlogDomainRemoveView,
     PublicAuditView, PublicLeadCaptureView, PublicAuditStatsView,
+    PublicPositionCheckView,
     PublicReportView,
     PublicUnsubscribeView, PublicUnsubscribeOneClickView,
     WPConnectorView,
@@ -150,6 +151,7 @@ urlpatterns = [
     path('sites/<int:site_id>/blog-domain/', BlogDomainRemoveView.as_view(), name='blog-domain-remove'),
     # Public audit lead magnet (no auth)
     path('public/audit/', PublicAuditView.as_view(), name='public-audit'),
+    path('public/position-check/', PublicPositionCheckView.as_view(), name='public-position-check'),
     path('public/leads/', PublicLeadCaptureView.as_view(), name='public-lead-capture'),
     path('public/audit-stats/', PublicAuditStatsView.as_view(), name='public-audit-stats'),
     path('public/report/<uuid:token>/', PublicReportView.as_view(), name='public-report'),

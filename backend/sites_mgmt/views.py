@@ -10770,6 +10770,196 @@ class PublicAuditView(APIView):
         return Response(payload)
 
 
+def _strip_accents(text: str) -> str:
+    """montréal -> montreal. Lets us match user-typed city names regardless
+    of accents/casing against the ASCII keys of the QC city table."""
+    import unicodedata
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', text or '')
+        if not unicodedata.combining(c)
+    )
+
+
+# Quebec cities -> Serper `location` string. Keys are accent-stripped + lower
+# so 'Montréal', 'montreal', 'MONTREAL' all resolve. Value = (location, label).
+# The label is echoed back to the caller as the normalised city. Quebec City
+# uses Google's canonical geo name ('Quebec City, ...') since a bare 'Quebec,
+# Quebec, Canada' is not a recognised Google location and would be ignored.
+_QC_CITY_LOCATIONS = {
+    'montreal': ('Montreal, Quebec, Canada', 'Montreal'),
+    'quebec': ('Quebec City, Quebec, Canada', 'Quebec'),
+    'quebec city': ('Quebec City, Quebec, Canada', 'Quebec'),
+    'ville de quebec': ('Quebec City, Quebec, Canada', 'Quebec'),
+    'gatineau': ('Gatineau, Quebec, Canada', 'Gatineau'),
+    'laval': ('Laval, Quebec, Canada', 'Laval'),
+    'longueuil': ('Longueuil, Quebec, Canada', 'Longueuil'),
+    'sherbrooke': ('Sherbrooke, Quebec, Canada', 'Sherbrooke'),
+    'trois-rivieres': ('Trois-Rivieres, Quebec, Canada', 'Trois-Rivieres'),
+    'trois rivieres': ('Trois-Rivieres, Quebec, Canada', 'Trois-Rivieres'),
+    'saguenay': ('Saguenay, Quebec, Canada', 'Saguenay'),
+    'levis': ('Levis, Quebec, Canada', 'Levis'),
+    'terrebonne': ('Terrebonne, Quebec, Canada', 'Terrebonne'),
+}
+# Fallback when the city is empty/unknown: province-wide SERP.
+_QC_DEFAULT_LOCATION = ('Quebec, Canada', 'Quebec')
+
+
+def _resolve_qc_location(raw_city: str):
+    """(location, label, key) for a user-typed QC city, or the province-wide
+    default. `key` is used in the cache key."""
+    key = _strip_accents(raw_city or '').strip().lower()
+    if key in _QC_CITY_LOCATIONS:
+        loc, label = _QC_CITY_LOCATIONS[key]
+        return loc, label, key
+    loc, label = _QC_DEFAULT_LOCATION
+    return loc, label, 'quebec-ca'
+
+
+def _result_host(link: str) -> str:
+    """Registrable host of a SERP result URL: strip scheme, path and www."""
+    h = (link or '').lower().strip()
+    h = h.split('://', 1)[-1]
+    h = h.split('/', 1)[0]
+    return h[4:] if h.startswith('www.') else h
+
+
+def _serper_geo_organic(keyword: str, location: str, api_key: str, tries: int = 3):
+    """Largest organic result set from up to `tries` geolocated Serper calls,
+    plus an ok flag.
+
+    Serper intermittently returns a TRUNCATED SERP (e.g. 3 results instead of
+    100). A single call then misses a genuinely-ranking site. Retrying while
+    the set looks short (<10) and keeping the largest response makes the check
+    a faithful read instead of noise. `ok` is True as soon as one call returns
+    200, so a real empty SERP is distinguishable from an API failure.
+    """
+    best, ok = [], False
+    for _ in range(tries):
+        try:
+            resp = http_requests.post(
+                'https://google.serper.dev/search',
+                headers={'X-API-KEY': api_key, 'Content-Type': 'application/json'},
+                json={
+                    'q': keyword,
+                    'gl': 'ca',
+                    'hl': 'fr',
+                    'num': 100,
+                    'location': location,
+                },
+                timeout=15,
+            )
+        except Exception:
+            continue
+        if resp.status_code != 200:
+            continue
+        ok = True
+        org = (resp.json() or {}).get('organic') or []
+        if len(org) > len(best):
+            best = org
+        if len(org) >= 10:  # a healthy set; stop early
+            break
+    return best, ok
+
+
+class PublicPositionCheckView(APIView):
+    """POST /api/public/position-check/ {url, keyword, city}
+
+    Public lead-gen engine for the free "où je me classe sur Google" tool on
+    gridar.app. Given a URL, a keyword and a Quebec city, returns the site's
+    geolocated Google.ca organic rank (1-100) and the top-3 competitors that
+    show up for that keyword in that city.
+
+    No auth (public), throttled per IP, and cached 10 min per (host, keyword,
+    city) so repeated checks don't re-spend Serper credits.
+    """
+    # authentication_classes = [] kills DRF SessionAuthentication which would
+    # otherwise enforce its own CSRF check on this POST and 403 unauthenticated
+    # visitors. Same pattern as PublicAuditView.
+    authentication_classes = []
+    permission_classes = []  # public
+    throttle_classes = [PublicAuditThrottle]
+
+    def post(self, request):
+        raw_url = (request.data.get('url') or '').strip()
+        keyword = (request.data.get('keyword') or '').strip()
+        raw_city = (request.data.get('city') or '').strip()
+
+        if not raw_url:
+            return Response(
+                {'error': 'URL manquante. Ex: tondomaine.com'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not keyword:
+            return Response(
+                {'error': 'Mot-cle manquant.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        host = _normalize_audit_domain(raw_url)
+        if not host:
+            return Response(
+                {'error': 'URL invalide. Ex: tondomaine.com'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        location, city_label, city_key = _resolve_qc_location(raw_city)
+
+        cache_key = f'public-poscheck:v1:{host}:{keyword.lower()}:{city_key}'
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        api_key = os.environ.get('SERPER_API_KEY')
+        if not api_key:
+            return Response(
+                {'error': 'Verification temporairement indisponible, reessaie dans un instant.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        organic, ok = _serper_geo_organic(keyword, location, api_key)
+        if not ok:
+            return Response(
+                {'error': 'Verification temporairement indisponible, reessaie dans un instant.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        # Find the submitted site by EXACT host match (strip www) so a mere
+        # mention of the domain in another result's path never counts.
+        position = None
+        matched_url = ''
+        for idx, item in enumerate(organic):
+            link = item.get('link') or ''
+            if _result_host(link) == host:
+                position = item.get('position') or (idx + 1)
+                matched_url = link
+                break
+
+        top3 = []
+        for idx, item in enumerate(organic[:3]):
+            link = item.get('link') or ''
+            top3.append({
+                'position': item.get('position') or (idx + 1),
+                'domain': _result_host(link),
+                'url': link,
+                'title': item.get('title') or '',
+            })
+
+        payload = {
+            'found': position is not None,
+            'position': position,
+            'keyword': keyword,
+            'city': city_label,
+            'checked_domain': host,
+            'matched_url': matched_url,
+            'total_results': len(organic),
+            'top3': top3,
+        }
+
+        # Cache only successful reads (10 min) to cap Serper spend.
+        cache.set(cache_key, payload, timeout=600)
+        return Response(payload)
+
+
 class PublicLeadCaptureView(APIView):
     """POST /api/public/leads/ {email, domain, consented_marketing?}
 

@@ -18,6 +18,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/docs`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE}/api-docs`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE}/audit`, changeFrequency: "weekly", priority: 0.8 },
+    {
+      url: `${SITE}/suivi-position-google-canada`,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
     { url: `${SITE}/privacy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE}/terms`, changeFrequency: "yearly", priority: 0.3 },
   ];
