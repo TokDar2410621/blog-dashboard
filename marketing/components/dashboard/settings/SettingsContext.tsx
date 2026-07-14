@@ -395,8 +395,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         },
       });
       toast.success("Paramètres sauvegardés !");
-    } catch {
-      toast.error("Erreur lors de la sauvegarde");
+    } catch (e) {
+      // Surface the real reason instead of a useless generic toast. A 404 here
+      // almost always means the site was deleted/recreated under a new id and
+      // the browser is on a stale /dashboard/<oldId> URL.
+      const msg =
+        e instanceof ApiError
+          ? e.status === 404
+            ? "Ce site n'existe plus. Reviens à la liste des sites et rouvre-le (l'URL pointe sur un ancien id)."
+            : `Sauvegarde refusée - ${e.message}`
+          : e instanceof Error
+            ? e.message
+            : "Erreur lors de la sauvegarde";
+      toast.error(msg);
     }
   };
 

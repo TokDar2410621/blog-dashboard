@@ -432,7 +432,7 @@ class V1GenerateView(BaseV1View):
                 status=422,
             )
 
-        alias = None if (site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
+        alias = None if (site.is_hosted or site.is_wordpress or site.is_shopify or site.is_webflow) else ensure_site_connection(site)
 
         # Enforce article quota (monthly first, then top-up credits).
         from .quota import check_article_quota, consume_article

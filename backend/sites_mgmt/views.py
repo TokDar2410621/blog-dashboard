@@ -104,7 +104,13 @@ class SiteViewSet(viewsets.ModelViewSet):
     def init_db(self, request, pk=None):
         """Create blog tables in the site's database."""
         site = self.get_object()
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             out = StringIO()
             call_command('migrate', 'blog', database=alias, stdout=out, stderr=out)
@@ -119,7 +125,13 @@ class SiteViewSet(viewsets.ModelViewSet):
     def detect_blog(self, request, pk=None):
         """Auto-detect blog tables in the site's database."""
         site = self.get_object()
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             result = detect_blog_tables(alias)
             return Response(result)
@@ -133,7 +145,13 @@ class SiteViewSet(viewsets.ModelViewSet):
     def setup_blog(self, request, pk=None):
         """Create SQL views mapping custom blog tables to standard blog_* names."""
         site = self.get_object()
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         config = request.data.get('config') or site.blog_config
         if not config:
@@ -867,7 +885,13 @@ class SiteCannibalizationView(APIView):
                 .values('title', 'slug', 'excerpt', 'language')
             posts = list(qs)
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             qs = BlogPost.objects.using(alias).filter(status='published') \
                 .values('title', 'slug', 'excerpt', 'language')
             posts = list(qs)
@@ -3324,7 +3348,13 @@ class HreflangCheckView(APIView):
                 )
             return list(qs)
 
-        rows = _all_published()
+        try:
+            rows = _all_published()
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Per-group mode
         if translation_group:
@@ -3446,7 +3476,13 @@ class BulkSEOAuditView(APIView):
                 for p in qs
             ]
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             qs = BlogPost.objects.using(alias).filter(status='published')
             if language_filter:
                 qs = qs.filter(language=language_filter)
@@ -4283,7 +4319,13 @@ class BrokenLinksView(APIView):
                 for p in qs
             ]
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             qs = BlogPost.objects.using(alias).filter(status='published')
             if language_filter:
                 qs = qs.filter(language=language_filter)
@@ -5282,7 +5324,13 @@ class WeeklyDigestView(APIView):
                 site=site, status='published'
             ).count()
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             week_qs = BlogPost.objects.using(alias).filter(
                 status='published', published_at__gte=week_ago.date()
             )
@@ -5667,7 +5715,13 @@ class LinkGraphView(APIView):
                 for p in qs
             ]
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             qs = BlogPost.objects.using(alias).filter(status='published')
             if language:
                 qs = qs.filter(language=language)
@@ -5824,7 +5878,13 @@ class TopicClusterView(APIView):
                 for p in qs
             ]
         else:
-            alias = ensure_site_connection(site)
+            try:
+                alias = ensure_site_connection(site)
+            except ValueError:
+                return Response(
+                    {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             qs = BlogPost.objects.using(alias).filter(status='published')
             if language:
                 qs = qs.filter(language=language)
@@ -6926,7 +6986,13 @@ class PublicPostsView(APIView):
                 'previous': page - 1 if page > 1 else None,
             })
 
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         posts = (
             BlogPost.objects.using(alias)
             .filter(status='published')
@@ -7008,7 +7074,13 @@ class PublicPostDetailView(APIView):
             HostedPost.objects.filter(pk=post.pk).update(view_count=post.view_count + 1)
             return Response(_serialize_hosted_post(post))
 
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         post = (
             BlogPost.objects.using(alias)
             .select_related('category').prefetch_related('tags')
@@ -7066,7 +7138,13 @@ class PublicTranslationsView(APIView):
                 'translations': [serialize(p, p.pk == post.pk) for p in translations],
             })
 
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         post = get_object_or_404(BlogPost.objects.using(alias), slug=slug, status='published')
         translations = BlogPost.objects.using(alias).filter(
             translation_group=post.translation_group,
@@ -7185,7 +7263,13 @@ class PublicCategoriesView(APIView):
                 for c in cats
             ])
 
-        alias = ensure_site_connection(site)
+        try:
+            alias = ensure_site_connection(site)
+        except ValueError:
+            return Response(
+                {'error': "Cette action nécessite une base de données externe configurée pour ce site."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         cats = Category.objects.using(alias).all()
         return Response([
             {

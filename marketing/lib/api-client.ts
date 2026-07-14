@@ -306,6 +306,27 @@ export async function fetchSite(id: number): Promise<Site> {
   return siteSchema.parse(data);
 }
 
+// Turn a DRF error body into a readable, French-first message instead of raw
+// JSON. Handles {detail}, {error}, non_field_errors, and per-field
+// {field: ["msg", ...]} validation shapes so a single bad field (e.g. an
+// invalid URLField) tells the user exactly which field and why, rather than
+// a useless generic "Erreur".
+function formatDrfError(err: unknown, status: number): string {
+  if (err && typeof err === "object") {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj.detail === "string" && obj.detail) return obj.detail;
+    if (typeof obj.error === "string" && obj.error) return obj.error;
+    const parts: string[] = [];
+    for (const [key, val] of Object.entries(obj)) {
+      const msg = Array.isArray(val) ? val.join(" ") : String(val);
+      if (!msg) continue;
+      parts.push(key === "non_field_errors" ? msg : `${key} : ${msg}`);
+    }
+    if (parts.length) return parts.join(" · ");
+  }
+  return `Erreur ${status}`;
+}
+
 export async function updateSite(id: number, data: Record<string, unknown>): Promise<Site> {
   const res = await authFetch(`/sites/${id}/`, {
     method: "PATCH",
@@ -313,7 +334,7 @@ export async function updateSite(id: number, data: Record<string, unknown>): Pro
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new ApiError(JSON.stringify(err), res.status, "VALIDATION_ERROR");
+    throw new ApiError(formatDrfError(err, res.status), res.status, "VALIDATION_ERROR", err);
   }
   const json = await res.json();
   return siteSchema.parse(json);
