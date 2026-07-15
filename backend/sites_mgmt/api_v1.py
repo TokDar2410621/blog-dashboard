@@ -3551,6 +3551,24 @@ class V1StrategicOpportunityActionView(BaseV1View):
                     'note': 'Page deja creee.',
                 })
 
+            # Landings are only hosted-servable. On a non-hosted site (external
+            # Postgres or a connected CMS) a generated HostedLanding would be
+            # stranded in Gridar's DB and never reach the client's real site -
+            # the "black hole". Instead of faking success, tell the user why and
+            # point them to the build prompt, which the UI exposes as the
+            # primary action for external sites.
+            if not site.is_hosted:
+                return Response({
+                    'error': (
+                        "Ce site n'est pas heberge chez Gridar : il utilise un "
+                        "stockage externe. Gridar ne peut pas publier une landing "
+                        "directement dessus. Utilise \"Obtenir le prompt de "
+                        "creation\" pour batir cette page sur ton propre site."
+                    ),
+                    'delivery': 'external',
+                    'reason': 'not_hosted',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Map page_type -> LandingGenerator page_subtype.
             page_type = (op.concept or {}).get('page_type') or 'service_page'
             subtype_map = {

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
+import { useSite } from "@/hooks/useDashboard";
 import {
   ApiError,
   listStrategicOpportunities,
@@ -146,10 +147,12 @@ function OpportunityCard({
   opp,
   siteId,
   needsCustomAsset = false,
+  siteIsExternal = false,
 }: {
   opp: StrategicOpportunity;
   siteId: number;
   needsCustomAsset?: boolean;
+  siteIsExternal?: boolean;
 }) {
   const qc = useQueryClient();
 
@@ -271,6 +274,11 @@ function OpportunityCard({
   const isDone = opp.status === "done";
   const isDismissed = opp.status === "dismissed";
   const pageTypeLabel = PAGE_TYPE_LABELS[concept?.page_type] || "Page";
+  // The build prompt is the primary (and only honest) deliverable when either
+  // the concept needs a custom interactive asset, OR the whole site is external
+  // (Gridar can't publish a landing on a non-hosted site - "Créer cette page"
+  // would only strand a draft in Gridar's DB).
+  const needsPrompt = needsCustomAsset || siteIsExternal;
 
   return (
     <Card className={`relative ${priorityClasses(opp.priority)}`}>
@@ -415,9 +423,22 @@ function OpportunityCard({
           </p>
         )}
 
+        {/* External-site note: tell the user why, and point to the prompt. */}
+        {siteIsExternal && (
+          <p className="flex items-start gap-2 text-xs text-amber-400/90">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Site externe : Gridar ne publie pas cette landing ici. Le prompt de
+              création la construit sur ton propre site.
+              {isDone &&
+                " (Une version brouillon a été générée côté Gridar, non publiée.)"}
+            </span>
+          </p>
+        )}
+
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 pt-2">
-          {isDone && opp.generated_landing_slug ? (
+          {isDone && opp.generated_landing_slug && !siteIsExternal ? (
             <Button asChild variant="outline">
               <Link href={`/dashboard/${siteId}/parametres/general`}>
                 <ExternalLink className="h-4 w-4 mr-2" />
@@ -437,16 +458,16 @@ function OpportunityCard({
               )}
               Restaurer
             </Button>
-          ) : needsCustomAsset ? (
-            // Gridar can't auto-generate the interactive asset this concept
-            // needs, so the honest primary action is the build prompt for the
-            // user's dev / AI - not "Créer cette page" (which would ship a
-            // landing promising a tool that doesn't exist).
+          ) : needsPrompt ? (
+            // No honest one-click publish here: either the concept needs a
+            // custom interactive asset, or the site is external (Gridar can't
+            // publish a landing on it). The build prompt is the real deliverable
+            // - it constructs the page in the user's own site/codebase.
             <>
               <Button
                 onClick={() => promptMutation.mutate()}
                 disabled={promptMutation.isPending}
-                title="Colle ce prompt à ton dev ou à ton IA de code (Lovable, v0, Cursor...) : il construit l'outil ET la page dans ton propre codebase. Gridar ne génère pas l'outil interactif."
+                title="Colle ce prompt à ton dev ou à ton IA de code (Lovable, v0, Cursor...) : il construit la page directement dans ton propre site."
               >
                 {promptMutation.isPending ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -455,14 +476,16 @@ function OpportunityCard({
                 )}
                 Obtenir le prompt de création
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => dismissMutation.mutate()}
-                disabled={dismissMutation.isPending}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Pas pertinent
-              </Button>
+              {!isDone && (
+                <Button
+                  variant="outline"
+                  onClick={() => dismissMutation.mutate()}
+                  disabled={dismissMutation.isPending}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Pas pertinent
+                </Button>
+              )}
             </>
           ) : (
             <>
@@ -496,7 +519,7 @@ function OpportunityCard({
           {/* Generic prompt-copy button. Suppressed on "à construire" cards that
               are still open - those already show the build prompt as the
               primary action above. Kept for done/actionable cards. */}
-          {!isDismissed && !(needsCustomAsset && !isDone) && (
+          {!isDismissed && !(needsPrompt && !isDone) && (
             <Button
               variant="outline"
               onClick={() => promptMutation.mutate()}
@@ -611,6 +634,7 @@ export default function OpportunitiesPage() {
   const siteId = params?.siteId;
   const sid = Number(siteId);
   const qc = useQueryClient();
+  const { data: site } = useSite();
   const [showDismissed, setShowDismissed] = useState(false);
 
   const opportunitiesQuery = useQuery({
@@ -641,11 +665,19 @@ export default function OpportunitiesPage() {
   const isLoading = opportunitiesQuery.isLoading;
   const isEmpty = !isLoading && items.length === 0;
 
+  // is_hosted === false means the site stores content externally (external
+  // Postgres or a connected CMS). Gridar can't publish a landing there, so the
+  // whole "Créer cette page" one-click path is dishonest for these sites - the
+  // prompt is the real deliverable. undefined (site still loading) is treated
+  // as hosted to avoid a flash of the external UI.
+  const siteIsExternal = site?.is_hosted === false;
+
   // Split by whether Gridar can actually deliver the page one-click, or whether
   // the concept needs a custom interactive asset built first (see
   // requiresCustomAsset). Keeps the two very different kinds of work honest and
   // visually separate instead of blending "click to generate" with "you need a
-  // dev".
+  // dev". Only relevant for hosted sites - external sites get one prompt-first
+  // section.
   const actionable = items.filter((o) => !requiresCustomAsset(o.concept));
   const needsAsset = items.filter((o) => requiresCustomAsset(o.concept));
 
@@ -742,7 +774,33 @@ export default function OpportunitiesPage() {
         </Card>
       )}
 
-      {!isLoading && items.length > 0 && (
+      {!isLoading && items.length > 0 && (siteIsExternal ? (
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-4">
+            <Globe className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+            <div>
+              <h2 className="font-semibold text-sm">
+                Site externe - livraison par prompt
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5 max-w-2xl">
+                Ce site n'est pas hébergé chez Gridar (stockage externe). Gridar
+                ne publie pas les landings directement dessus. Pour chaque
+                opportunité, clique « Obtenir le prompt de création » : colle-le
+                dans ton IA de code ou donne-le à ton dev, et la page se
+                construit sur ton propre site.
+              </p>
+            </div>
+          </div>
+          {items.map((opp) => (
+            <OpportunityCard
+              key={opp.id}
+              opp={opp}
+              siteId={sid}
+              siteIsExternal
+            />
+          ))}
+        </div>
+      ) : (
         <div className="space-y-10">
           {actionable.length > 0 && (
             <section className="space-y-4">
@@ -804,7 +862,7 @@ export default function OpportunitiesPage() {
             </section>
           )}
         </div>
-      )}
+      ))}
     </div>
   );
 }
