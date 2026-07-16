@@ -289,7 +289,12 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
             "4. Les blocs JSON-LD fournis a la fin doivent etre injectes TELS "
             "QUELS dans le <head>.\n"
             "5. Adapte les couleurs et la typo au design system existant du "
-            "site. Ne change pas l'ordre des sections."
+            "site. Ne change pas l'ordre des sections.\n"
+            "6. Animations : reprends le style de motion deja present sur le "
+            "site (apparitions au scroll, transitions, effets de survol) pour "
+            "que la page paraisse native, pas collee. Reste sobre et "
+            "performant : respecte prefers-reduced-motion et n'introduis aucun "
+            "decalage de mise en page (CLS)."
         )
         sections.append(
             "## Meta SEO (head)\n"
@@ -395,7 +400,11 @@ def build_landing_prompt(landing, site, stack: str = 'generic') -> str:
             "4. The JSON-LD blocks at the end must be injected VERBATIM in "
             "<head>.\n"
             "5. Match the site's existing design system for colors and type. "
-            "Do not reorder sections."
+            "Do not reorder sections.\n"
+            "6. Animations: reuse the site's existing motion style (scroll "
+            "reveals, transitions, hover effects) so the page feels native, not "
+            "pasted in. Keep it subtle and performant: honour "
+            "prefers-reduced-motion and cause no layout shift (CLS)."
         )
         sections.append(
             "## SEO meta (head)\n"
@@ -600,6 +609,18 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
             "le brief."
         )
         sections.append(
+            "## Style visuel et animations\n"
+            "- Reprends le design system du site (couleurs, typo, composants, "
+            "espacements) : la page doit sembler faite maison, pas generique.\n"
+            "- Anime la page dans le MEME style que le reste du site "
+            "(apparitions au scroll, transitions douces, effets de survol sur "
+            "les cartes et le CTA) pour qu'elle paraisse native. Sobre et "
+            "coherent, jamais gratuit.\n"
+            "- Performance et accessibilite : respecte prefers-reduced-motion "
+            "et n'introduis aucun decalage de mise en page (CLS), qui nuirait "
+            "au SEO."
+        )
+        sections.append(
             "## Meta SEO\n"
             f"- `<title>` : moins de 60 caracteres, contient \"{opportunity.keyword}\"\n"
             "- `<meta name=\"description\">` : 140 a 160 caracteres\n"
@@ -680,6 +701,17 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
             f"\"{opportunity.keyword}\" actually ask, with complete answers "
             "(2-4 sentences).\n"
             "5. **Final CTA** aligned with the conversion path from the brief."
+        )
+        sections.append(
+            "## Visual style and animations\n"
+            "- Reuse the site's design system (colors, type, components, "
+            "spacing): the page must look hand-made, not generic.\n"
+            "- Animate the page in the SAME style as the rest of the site "
+            "(scroll reveals, smooth transitions, hover effects on cards and "
+            "the CTA) so it feels native. Subtle and coherent, never "
+            "gratuitous.\n"
+            "- Performance and accessibility: honour prefers-reduced-motion and "
+            "introduce no layout shift (CLS), which would hurt SEO."
         )
         sections.append(
             "## SEO meta\n"
