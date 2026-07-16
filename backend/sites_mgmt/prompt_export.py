@@ -77,8 +77,10 @@ _DOMAIN_PLACEHOLDER_EN = 'YOUR-DOMAIN.example'
 
 
 def _site_domain(site, lang: str) -> tuple[str, bool]:
-    """Return (domain, is_real)."""
-    domain = (site.domain or '').strip().rstrip('/')
+    """Return (domain, is_real). Hostnames are case-insensitive; lowercase it so
+    the canonical / og:url the client's AI injects verbatim never carries a
+    capitalized host (e.g. 'Fdkbois.com')."""
+    domain = (site.domain or '').strip().rstrip('/').lower()
     if domain:
         return domain, True
     placeholder = _DOMAIN_PLACEHOLDER_FR if lang == 'fr' else _DOMAIN_PLACEHOLDER_EN
@@ -553,10 +555,16 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
         )
         if fr:
             kw_block += (
-                "\n- IMPORTANT : redige en francais QUEBECOIS. Ecris "
-                "\"magasinage\" (pas \"shopping\"), \"fin de semaine\" (pas "
-                "\"week-end\"), \"courriel\" (pas \"mail\"). Le lectorat est "
-                "au Quebec."
+                "\n- IMPORTANT (localisation) : redige dans la variante de "
+                "francais du MARCHE VISE par le mot-cle et le domaine, pas une "
+                "variante par defaut. Utilise le vocabulaire, la devise et les "
+                "conventions locales de ce marche. Reperes : cible Quebec -> "
+                "francais quebecois (magasinage, courriel, fin de semaine), "
+                "dollars CAD ; cible France -> francais de France, euros ; "
+                "cible Afrique francophone (Cameroun, Cote d'Ivoire, Senegal...) "
+                "-> francais standard local, francs CFA (FCFA). En cas de doute "
+                "sur le pays, deduis-le de la geographie citee dans le mot-cle "
+                "et le contenu."
             )
         sections.append(kw_block)
 
@@ -611,7 +619,8 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
             "- [ ] Le hook du brief est visible dans le hero\n"
             "- [ ] Le mecanisme de capture est implemente (pas juste mentionne)\n"
             "- [ ] JSON-LD " + schema_type + " + FAQPage presents dans le head\n"
-            "- [ ] Lexique quebecois respecte (zero \"week-end\", zero \"shopping\")"
+            "- [ ] Vocabulaire, devise et conventions adaptes au marche vise "
+            "(pas une variante de francais par defaut)"
         )
     else:
         sections.append(
