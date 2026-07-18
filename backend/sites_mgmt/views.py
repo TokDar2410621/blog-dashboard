@@ -10745,6 +10745,21 @@ class PublicAuditView(APIView):
         crawl = results.get('crawl', {})
         ps = results.get('pagespeed', {})
 
+        # Google Business Profile verdict, in parallel with the keyword position
+        # checks below (both only need the crawl to be done). Read-only via
+        # Serper Maps; for a local trade the profile is often the real ceiling.
+        import threading
+        gbp_result = {}
+
+        def _gbp_task():
+            try:
+                gbp_result.update(_gbp_diagnosis(domain, crawl))
+            except Exception as e:  # noqa: BLE001
+                gbp_result['error'] = str(e)[:80]
+
+        gbp_thread = threading.Thread(target=_gbp_task, daemon=True)
+        gbp_thread.start()
+
         # Extract 7-10 candidate keywords from all the crawled signals.
         keywords_to_check = _extract_candidate_keywords(crawl, max_kws=10)
 
@@ -10823,11 +10838,16 @@ class PublicAuditView(APIView):
                 'message': f"Impossible de crawler ton site : {crawl['error']}. Verifie qu'il est en ligne.",
             })
 
+        # Collect the GBP verdict (started in parallel above) before we build
+        # the payload. Bounded join so a slow Serper Maps never hangs the audit.
+        gbp_thread.join(timeout=22)
+
         payload = {
             'domain': domain,
             'audited_at': datetime.utcnow().isoformat(),
             'composite_score': composite_score,
             'pagespeed': ps,
+            'gbp': gbp_result or None,
             'crawl': {
                 'title': crawl.get('title'),
                 'h1': crawl.get('h1'),
@@ -10905,6 +10925,169 @@ def _result_host(link: str) -> str:
     h = h.split('://', 1)[-1]
     h = h.split('/', 1)[0]
     return h[4:] if h.startswith('www.') else h
+
+
+# ---------------------------------------------------------------------------
+# Google Business Profile diagnosis (read-only, via Serper Maps).
+# No GBP access needed: we read the public local pack. Finds the site's own
+# listing by matching the listing website to the audited domain, then
+# benchmarks it against the local pack for its own category + city. This is the
+# "verdict de ta fiche" block of the public audit - for a local trade the
+# profile is usually the real ceiling, before any content.
+# ---------------------------------------------------------------------------
+
+def _gbp_search_queries(crawl: dict, domain: str) -> list:
+    """Ordered Serper Maps queries to locate the site's own listing.
+
+    We do NOT trust a single 'business name' guess: QC titles read
+    'Trade City | Brand' and a naive split mangles hyphenated names
+    (Saint-Hyacinthe becomes 'Hyacinthe'). Instead we try the full title, then
+    each strong-separator segment longest-first (the brand is usually the long
+    one, not the short one), then the bare domain label. _gbp_diagnosis matches
+    the returned listings by website, so a fuzzy query is fine.
+    """
+    import re
+    src = (crawl.get('title') or '').strip() or (crawl.get('h1') or '').strip()
+    # Strong separators only: pipe, en/em dash, middot, colon, and a SPACED
+    # hyphen (' - '). Never a bare hyphen, so 'Saint-Hyacinthe' stays intact.
+    segs = [s.strip() for s in re.split(r'[|–—·:]', src.replace(' - ', '|')) if s.strip()]
+    segs.sort(key=len, reverse=True)
+    dom = domain[4:] if domain.startswith('www.') else domain
+    label = dom.rsplit('.', 1)[0].split('.')[-1]  # constructioncbrodeur
+    out = []
+    for q in [src] + segs + [label]:
+        q = (q or '').strip()
+        if q and q.lower() not in [o.lower() for o in out]:
+            out.append(q)
+    return out[:4]
+
+
+def _gbp_city_from_address(address: str) -> str:
+    """'123 rue X, Saint-Hyacinthe, QC J2S 0A3, Canada' -> 'Saint-Hyacinthe'.
+
+    Canonical CA form is [..., City, 'PROV POSTAL', 'Country'], so the city is
+    the third-last comma segment.
+    """
+    parts = [p.strip() for p in (address or '').split(',') if p.strip()]
+    return parts[-3] if len(parts) >= 3 else ''
+
+
+def _serper_maps(query: str, serper_key: str, gl: str = 'ca', hl: str = 'fr',
+                 tries: int = 2) -> list:
+    """Local places for a Serper Maps query, or [] on any failure."""
+    for _ in range(tries):
+        try:
+            r = http_requests.post(
+                'https://google.serper.dev/maps',
+                headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
+                json={'q': query, 'gl': gl, 'hl': hl},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                return (r.json() or {}).get('places') or []
+        except Exception:  # noqa: BLE001
+            continue
+    return []
+
+
+def _gbp_diagnosis(domain: str, crawl: dict) -> dict:
+    """Read-only Google Business Profile verdict for the audited domain.
+
+    Returns {'available': False} when Serper is not configured. Never invents:
+    when no local listing links back to the site, returns found=False so the UI
+    says 'we could not locate your profile' honestly (that itself is a signal).
+    """
+    serper_key = os.environ.get('SERPER_API_KEY')
+    if not serper_key:
+        return {'available': False}
+    dom = domain[4:] if domain.startswith('www.') else domain
+
+    own = None
+    for q in _gbp_search_queries(crawl, domain):
+        for p in _serper_maps(q, serper_key):
+            if _result_host(p.get('website') or '') == dom:
+                own = p
+                break
+        if own:
+            break
+
+    if not own:
+        return {
+            'available': True, 'found': False, 'verdict': 'absent',
+            'verdict_text': (
+                "On n'a pas trouve de fiche Google Business reliee a ton site. "
+                "Soit tu n'en as pas de verifiee, soit elle ne pointe pas vers "
+                "ton site. Pour un metier local, c'est souvent le vrai plafond, "
+                "avant meme une ligne de contenu."
+            ),
+        }
+
+    city = _gbp_city_from_address(own.get('address') or '')
+    category = own.get('type') or (own.get('types') or [''])[0] or ''
+    own_rating = own.get('rating') or 0
+    own_reviews = own.get('ratingCount') or 0
+
+    pack = []
+    if category and city:
+        for p in _serper_maps(f'{category} {city}', serper_key):
+            if _result_host(p.get('website') or '') == dom:
+                continue
+            pack.append({
+                'name': p.get('title'),
+                'rating': p.get('rating'),
+                'reviews': p.get('ratingCount') or 0,
+            })
+            if len(pack) >= 3:
+                break
+    pack_top_reviews = max([c['reviews'] for c in pack], default=0)
+
+    signals = [{'key': 'found', 'status': 'ok', 'label': 'Fiche trouvee',
+                'detail': own.get('title') or ''}]
+    if pack_top_reviews and own_reviews < pack_top_reviews * 0.5:
+        signals.append({'key': 'reviews', 'status': 'bad', 'label': 'Avis',
+                        'detail': f"{own_reviews} avis, contre jusqu'a {pack_top_reviews} pour le pack local."})
+    elif own_reviews < 10:
+        signals.append({'key': 'reviews', 'status': 'warn', 'label': 'Avis',
+                        'detail': f"{own_reviews} avis, c'est mince pour convaincre."})
+    else:
+        signals.append({'key': 'reviews', 'status': 'ok', 'label': 'Avis',
+                        'detail': f"{own_reviews} avis."})
+    if own_rating and own_rating < 4.0:
+        signals.append({'key': 'rating', 'status': 'warn', 'label': 'Note',
+                        'detail': f"{own_rating}/5, sous la barre de confiance de 4.0."})
+    else:
+        signals.append({'key': 'rating', 'status': 'ok', 'label': 'Note',
+                        'detail': f"{own_rating or '-'}/5."})
+    signals.append({'key': 'photo',
+                    'status': 'ok' if own.get('thumbnailUrl') else 'warn',
+                    'label': 'Photos',
+                    'detail': 'Photo presente.' if own.get('thumbnailUrl') else 'Aucune photo detectee.'})
+    signals.append({'key': 'hours',
+                    'status': 'ok' if own.get('openingHours') else 'warn',
+                    'label': 'Heures',
+                    'detail': 'Heures affichees.' if own.get('openingHours') else 'Heures manquantes.'})
+
+    n_bad = sum(1 for s in signals if s['status'] == 'bad')
+    n_warn = sum(1 for s in signals if s['status'] == 'warn')
+    if n_bad or n_warn >= 2:
+        verdict, verdict_text = 'weak', (
+            "Ta fiche existe mais elle est sous le pack local. C'est ton vrai "
+            "plafond : on regle la fiche avant une ligne de contenu."
+        )
+    else:
+        verdict, verdict_text = 'strong', (
+            "Ta fiche tient la route. Le contenu devient alors ta prochaine "
+            "marche pour capter les recherches que la fiche ne prend pas."
+        )
+
+    return {
+        'available': True, 'found': True, 'verdict': verdict,
+        'verdict_text': verdict_text,
+        'business': {'name': own.get('title'), 'rating': own_rating,
+                     'reviews': own_reviews, 'category': category, 'city': city},
+        'pack': pack,
+        'signals': signals,
+    }
 
 
 def _serper_geo_organic(keyword: str, location: str, api_key: str, tries: int = 3):
