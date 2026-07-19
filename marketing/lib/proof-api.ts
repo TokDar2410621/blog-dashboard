@@ -29,6 +29,13 @@ export type ProofTopGainer = {
   top_queries: ProofQueryRow[];
 };
 
+// Complete per-post row: winners AND flops. The public proof page renders the
+// full list, so `impressions_gained` can be zero or negative.
+export type ProofPostRow = ProofTopGainer & {
+  indexed: boolean;
+  published_at: string | null;
+};
+
 export type ProofPublicSummary = {
   site_id: number;
   site_name: string;
@@ -36,6 +43,9 @@ export type ProofPublicSummary = {
   posts_with_attribution: number;
   total_impressions_gained: number;
   total_clicks_gained: number;
+  // Complete list (flops included) - what the public page must show.
+  posts: ProofPostRow[];
+  // Winners only, for the owner's dashboard highlight.
   top_gainers: ProofTopGainer[];
 };
 

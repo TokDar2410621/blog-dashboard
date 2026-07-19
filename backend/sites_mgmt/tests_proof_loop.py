@@ -256,6 +256,32 @@ class SiteSummaryTest(TestCase):
         self.assertEqual(summary['total_impressions_gained'], 300 + 600 + 900)
         self.assertEqual(summary['top_gainers'][0]['impressions_gained'], 900)
         self.assertEqual(summary['top_gainers'][0]['horizon'], 60)
+        # The complete list is present and matches the attributed posts.
+        self.assertEqual(len(summary['posts']), 3)
+
+    def test_summary_excludes_pre_gridar_posts(self):
+        # A page that existed before Gridar (is_pre_gridar baseline) and later
+        # gets an attribution must NOT be counted as a Gridar-generated gain.
+        pre = _make_post(self.site, slug='pre',
+                         published_at=date.today() - timedelta(days=90))
+        ArticleBaseline.objects.create(
+            site=self.site, post=pre, is_pre_gridar=True,
+            period_start=date.today() - timedelta(days=120),
+            period_end=date.today() - timedelta(days=90),
+            impressions=0, clicks=0,
+        )
+        ArticleAttribution.objects.create(
+            post=pre, days_since_publish=30,
+            period_start=date.today() - timedelta(days=60),
+            period_end=date.today() - timedelta(days=30),
+            indexed=True, impressions=500, clicks=20, avg_position=8.0,
+            delta_vs_baseline={'impressions': 500, 'clicks': 20, 'avg_position': None},
+        )
+        summary = proof_loop.site_proof_summary(self.site)
+        self.assertEqual(summary['total_impressions_gained'], 0)
+        self.assertEqual(summary['posts_with_attribution'], 0)
+        self.assertEqual(summary['posts'], [])
+        self.assertEqual(summary['top_gainers'], [])
 
 
 class ShareTokenTest(TestCase):

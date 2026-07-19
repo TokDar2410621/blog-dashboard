@@ -100,41 +100,57 @@ export default async function ProofPage({ params }: PageProps) {
               </div>
             </section>
 
-            {data.top_gainers.length > 0 && (
+            {data.posts.length > 0 && (
               <section className="mb-12">
                 <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-400 mb-4">
-                  Top articles gagnants
+                  Tous les articles mesures
                 </h2>
                 <ul className="space-y-3">
-                  {data.top_gainers.map((g) => (
-                    <li
-                      key={g.post_id}
-                      className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-zinc-100 truncate">{g.title}</p>
-                          {g.top_queries.length > 0 && (
-                            <p className="text-xs text-zinc-500 mt-2 truncate">
-                              Top requete : <span className="text-zinc-300">{g.top_queries[0].query}</span>
-                              {g.top_queries[0].position !== null && (
-                                <span className="text-zinc-500"> · position {g.top_queries[0].position.toFixed(1)}</span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-emerald-400 font-semibold">
-                            +{formatNumber(g.impressions_gained)}
+                  {data.posts.map((p) => {
+                    const win = p.impressions_gained > 0;
+                    const lose = p.impressions_gained < 0;
+                    return (
+                      <li
+                        key={p.post_id}
+                        className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-zinc-100 truncate">{p.title}</p>
+                            {p.top_queries.length > 0 ? (
+                              <p className="text-xs text-zinc-500 mt-2 truncate">
+                                Top requete : <span className="text-zinc-300">{p.top_queries[0].query}</span>
+                                {p.top_queries[0].position !== null && (
+                                  <span className="text-zinc-500"> · position {p.top_queries[0].position.toFixed(1)}</span>
+                                )}
+                              </p>
+                            ) : (
+                              !p.indexed && (
+                                <p className="text-xs text-zinc-600 mt-2">Pas encore indexe par Google</p>
+                              )
+                            )}
                           </div>
-                          <div className="text-xs text-zinc-500">
-                            mesure J+{g.horizon}
+                          <div className="text-right shrink-0">
+                            <div
+                              className={`font-semibold ${
+                                win ? "text-emerald-400" : lose ? "text-red-400" : "text-zinc-500"
+                              }`}
+                            >
+                              {win ? "+" : ""}
+                              {formatNumber(p.impressions_gained)}
+                            </div>
+                            <div className="text-xs text-zinc-500">mesure J+{p.horizon}</div>
                           </div>
                         </div>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
+                <p className="text-xs text-zinc-600 mt-4">
+                  Liste complete, mesuree par Search Console. Les articles a plat ou en
+                  baisse sont affiches comme les gagnants : une preuve qui cache ses zeros
+                  n&apos;en est pas une.
+                </p>
               </section>
             )}
           </>

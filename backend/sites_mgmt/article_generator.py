@@ -149,7 +149,7 @@ class ArticleGenerator:
     """Generates articles for a specific site using dynamic DB connections."""
 
     def __init__(self, alias, knowledge_base='', wp_site=None, shopify_site=None,
-                 webflow_site=None, site=None, default_status='published'):
+                 webflow_site=None, site=None, default_status='draft'):
         """alias: Django DB alias for external Postgres mode (None for WP/hosted/Shopify/Webflow).
         wp_site: Site model instance when the site is in WordPress mode.
         shopify_site: Site model instance when the site is in Shopify mode.
@@ -158,8 +158,10 @@ class ArticleGenerator:
             description, competitors to avoid) into the generation prompt so the
             article anchors to the client's brand instead of citing generic
             competitors without self-reference.
-        default_status: 'published' (default) or 'draft'. Autopilot passes
-            'draft' so the user reviews before publishing.
+        default_status: 'draft' (default) or 'published'. Draft by default so
+            nothing goes live without the user's explicit OK; the user reviews,
+            then publishes. Autopilot passes 'published' only when the site has
+            autopilot_auto_publish on.
         """
         self.alias = alias
         self.knowledge_base = knowledge_base
@@ -2000,12 +2002,11 @@ Reponds UNIQUEMENT avec le markdown rafraichi complet (avec le H1 s'il etait pre
         post.content = refreshed
         post.excerpt = new_excerpt
         post.reading_time = new_reading_time
-        # Bump published_at so the article surfaces as freshly updated. Default
-        # to today; caller may override via new_published_at for testing.
-        post.published_at = new_published_at or date.today()
-        # If the post was a draft, treat the refresh as a (re)publish.
-        if post.status == 'draft':
-            post.status = 'published'
+        # Bump published_at so an already-live article surfaces as freshly
+        # updated. A draft stays a draft: refreshing content the user has not
+        # approved must never silently publish it.
+        if post.status == 'published':
+            post.published_at = new_published_at or date.today()
         post.save()
 
         self.log(f'[REFRESH] HostedPost #{post.id} updated (published_at={post.published_at})')

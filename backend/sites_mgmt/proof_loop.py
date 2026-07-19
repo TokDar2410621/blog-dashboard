@@ -285,12 +285,25 @@ def snapshot_attribution(post: HostedPost, days_since_publish: int,
 def site_proof_summary(site: Site) -> dict:
     """Aggregate the site-level delta for the dashboard card and public page.
 
-    Returns a dict with totals + top-5 posts by impressions gained.
-    Excludes posts whose baseline is_pre_gridar (we don't want to count
-    Gridar's own improvement of pre-existing content as 'Gridar-generated').
+    Honesty invariants (the public proof board depends on these):
+      - Pre-Gridar baselines are EXCLUDED: we never count our improvement of a
+        page that existed before Gridar as a Gridar-generated gain. The queryset
+        used to leak these despite the docstring; now it truly filters them.
+      - `posts` is the COMPLETE per-post list (winners, flat AND losers), most
+        recent first. The public page renders it in full: a proof board that
+        hides its zeros is not proof.
+      - `total_*` sum every delta, including negatives.
+      - `top_gainers` (winners, top 5) is kept for the owner's dashboard
+        highlight only, never as the public evidence.
     """
+    pre_gridar_post_ids = set(
+        ArticleBaseline.objects
+        .filter(site=site, is_pre_gridar=True, post__isnull=False)
+        .values_list('post_id', flat=True)
+    )
     attributions = (ArticleAttribution.objects
                     .filter(post__site=site)
+                    .exclude(post_id__in=pre_gridar_post_ids)
                     .select_related('post')
                     .order_by('post_id', '-days_since_publish'))
     latest_per_post = {}
@@ -300,24 +313,31 @@ def site_proof_summary(site: Site) -> dict:
 
     total_impressions_gained = 0
     total_clicks_gained = 0
-    top_gainers = []
+    posts = []
     for attribution in latest_per_post.values():
         delta = attribution.delta_vs_baseline or {}
         impr_delta = int(delta.get('impressions') or 0)
         click_delta = int(delta.get('clicks') or 0)
         total_impressions_gained += impr_delta
         total_clicks_gained += click_delta
-        if impr_delta > 0:
-            top_gainers.append({
-                'post_id': attribution.post_id,
-                'title': attribution.post.title,
-                'slug': attribution.post.slug,
-                'horizon': attribution.days_since_publish,
-                'impressions_gained': impr_delta,
-                'clicks_gained': click_delta,
-                'top_queries': attribution.top_queries[:3],
-            })
-    top_gainers.sort(key=lambda x: -x['impressions_gained'])
+        published_at = attribution.post.published_at
+        posts.append({
+            'post_id': attribution.post_id,
+            'title': attribution.post.title,
+            'slug': attribution.post.slug,
+            'horizon': attribution.days_since_publish,
+            'impressions_gained': impr_delta,
+            'clicks_gained': click_delta,
+            'indexed': attribution.indexed,
+            'published_at': published_at.isoformat() if published_at else None,
+            'top_queries': (attribution.top_queries or [])[:3],
+        })
+    # Complete list, most recent first: winners AND flops, nothing hidden.
+    posts.sort(key=lambda x: (x['published_at'] or ''), reverse=True)
+    top_gainers = sorted(
+        (p for p in posts if p['impressions_gained'] > 0),
+        key=lambda x: -x['impressions_gained'],
+    )[:5]
 
     return {
         'site_id': site.id,
@@ -325,7 +345,8 @@ def site_proof_summary(site: Site) -> dict:
         'posts_with_attribution': len(latest_per_post),
         'total_impressions_gained': total_impressions_gained,
         'total_clicks_gained': total_clicks_gained,
-        'top_gainers': top_gainers[:5],
+        'posts': posts,
+        'top_gainers': top_gainers,
     }
 
 
