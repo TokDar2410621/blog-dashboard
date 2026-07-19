@@ -11,6 +11,30 @@ import type { FullReport } from "@/components/audit/FullReportSections";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.gridar.app";
 
+export type GbpSignal = {
+  key: string;
+  status: "ok" | "warn" | "bad";
+  label: string;
+  detail: string;
+};
+
+export type GbpVerdict = {
+  available: boolean;
+  found?: boolean;
+  verdict?: "absent" | "weak" | "strong";
+  verdict_text?: string;
+  business?: {
+    name: string;
+    rating: number;
+    reviews: number;
+    category: string;
+    city: string;
+  };
+  pack?: { name: string; rating: number | null; reviews: number }[];
+  signals?: GbpSignal[];
+  error?: string;
+};
+
 export type PublicReport = {
   domain: string;
   audited_at: string | null;
@@ -30,6 +54,9 @@ export type PublicReport = {
   };
   top_keywords_estimated: { keyword: string; position: number | null }[];
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
+  // Read-only Google Business Profile verdict (via Serper Maps, no GBP access).
+  // For a local trade the profile is usually the real ceiling before content.
+  gbp?: GbpVerdict | null;
   report_token: string;
   // Present once a lead has been captured for this audit. The enrichment
   // (competitors, untapped keywords, schema, CWV, decay, article plan,

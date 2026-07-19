@@ -28,6 +28,8 @@ import {
   FullReportSections,
   type FullReport,
 } from "@/components/audit/FullReportSections";
+import { GbpVerdictSection } from "@/components/audit/GbpVerdictSection";
+import type { GbpVerdict } from "@/lib/report-api";
 
 // Empty base = same-origin via Next.js rewrites (see next.config.ts).
 // Keeps auth cookies on gridar.app so logged-in visitors hit /api/public/* without a cross-origin hop.
@@ -52,6 +54,7 @@ type AuditResult = {
   };
   top_keywords_estimated: { keyword: string; position: number | null }[];
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
+  gbp?: GbpVerdict | null;
   full_report_gated: boolean;
   report_token?: string;
   full_report?: FullReport;
@@ -316,6 +319,8 @@ export function PublicAuditPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <GbpVerdictSection gbp={result.gbp} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>

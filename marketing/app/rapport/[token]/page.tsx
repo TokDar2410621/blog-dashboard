@@ -12,6 +12,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { FullReportSections } from "@/components/audit/FullReportSections";
+import { GbpVerdictSection } from "@/components/audit/GbpVerdictSection";
 import { fetchPublicReport } from "@/lib/report-api";
 
 // Always render fresh: the report gains its enriched full_report at lead
@@ -121,6 +122,12 @@ export default async function ReportPage({ params }: PageProps) {
             {scoreLabel(data.composite_score)}
           </div>
         </section>
+
+        {data.gbp && (
+          <div className="dark mb-6">
+            <GbpVerdictSection gbp={data.gbp} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           {/* PageSpeed */}
