@@ -66,6 +66,7 @@ from .api_v1 import (
     V1StrategicOpportunitiesView, V1StrategicOpportunitiesRefreshView,
     V1StrategicOpportunityActionView,
     V1LandingPromptView, V1OpportunityPromptView,
+    V1BuildQueueView, V1BuildQueueMarkBuiltView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -276,6 +277,10 @@ urlpatterns = [
     path('v1/sites/<int:site_id>/landings/<int:landing_id>/prompt/',
          V1LandingPromptView.as_view(),
          name='v1-landing-prompt'),
+    path('v1/sites/<int:site_id>/build-queue/',
+         V1BuildQueueView.as_view(), name='v1-build-queue'),
+    path('v1/sites/<int:site_id>/build-queue/mark-built/',
+         V1BuildQueueMarkBuiltView.as_view(), name='v1-build-queue-mark-built'),
     path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/<str:action>/',
          V1StrategicOpportunityActionView.as_view(),
          name='v1-strategic-opportunity-action'),

@@ -925,3 +925,53 @@ export async function exportPagePrompt(
     400,
   );
 }
+
+export type BuildQueueLanding = {
+  kind: "landing";
+  opportunity_id: number;
+  keyword: string;
+  intent: string;
+  priority: string;
+  page_type: string | null;
+  suggested_title: string | null;
+  suggested_slug: string;
+  concept: Record<string, unknown>;
+  build_prompt: string;
+};
+
+export type BuildQueueArticle = {
+  kind: "article";
+  post_id: number;
+  title: string;
+  slug: string;
+  language: string;
+  excerpt: string;
+  content: string;
+};
+
+export type BuildQueueResponse = {
+  site_id: number;
+  stack: string;
+  landings: BuildQueueLanding[];
+  articles: BuildQueueArticle[];
+  counts: { landings: number; articles: number };
+  note: string;
+};
+
+export async function pullBuildQueue(
+  siteId: number,
+  opts: { stack?: PromptStack } = {},
+) {
+  const qs = opts.stack ? `?stack=${opts.stack}` : "";
+  return request<BuildQueueResponse>(`/sites/${siteId}/build-queue/${qs}`);
+}
+
+export async function markPageBuilt(
+  siteId: number,
+  body: { kind: "landing" | "article"; id: number; url: string },
+) {
+  return request<{ ok: boolean; kind: string; id: number; url: string; status?: string }>(
+    `/sites/${siteId}/build-queue/mark-built/`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}

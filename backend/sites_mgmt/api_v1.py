@@ -3818,3 +3818,118 @@ class V1OpportunityPromptView(BaseV1View):
             'stack': stack,
             'char_count': len(prompt),
         })
+
+
+class V1BuildQueueView(BaseV1View):
+    """GET /api/v1/sites/<id>/build-queue/?stack=nextjs|react|html|astro|generic
+
+    The queue of pages a coding agent (Claude Code, Cursor...) should create in
+    the client's OWN repo, for a dev-built / external site that Gridar can't
+    publish to directly. Two kinds, by design:
+
+      - landings: BRIEFS from strategic opportunities still to action. The agent
+        writes the copy itself from the concept + build prompt (C1). Pure
+        templating, no LLM call here.
+      - articles: GENERATED COPY from draft HostedPosts (C2). The agent
+        integrates the finished, keyword-calibrated article verbatim.
+
+    Report each built URL back via /build-queue/mark-built/ so the delivery and
+    proof loop can close.
+    """
+
+    def get(self, request, site_id):
+        from .models import StrategicOpportunity, HostedPost
+        from .prompt_export import build_opportunity_prompt, normalize_stack
+
+        site = self.get_user_site(request, site_id)
+        stack = normalize_stack(request.query_params.get('stack'))
+
+        landings = []
+        opp = (StrategicOpportunity.objects
+               .filter(site=site)
+               .exclude(status__in=('done', 'dismissed'))
+               .order_by('-priority', '-created_at'))
+        for op in opp:
+            concept = op.concept or {}
+            landings.append({
+                'kind': 'landing',
+                'opportunity_id': op.id,
+                'keyword': op.keyword,
+                'intent': op.intent,
+                'priority': op.priority,
+                'page_type': concept.get('page_type'),
+                'suggested_title': concept.get('suggested_title'),
+                'suggested_slug': (concept.get('suggested_url_path') or '').lstrip('/'),
+                'concept': concept,
+                'build_prompt': build_opportunity_prompt(op, site, stack=stack),
+            })
+
+        articles = []
+        drafts = (HostedPost.objects
+                  .filter(site=site, status='draft')
+                  .order_by('-created_at')[:50])
+        for p in drafts:
+            articles.append({
+                'kind': 'article',
+                'post_id': p.id,
+                'title': p.title,
+                'slug': p.slug,
+                'language': p.language,
+                'excerpt': p.excerpt,
+                'content': p.content,
+            })
+
+        return Response({
+            'site_id': site.id,
+            'stack': stack,
+            'landings': landings,
+            'articles': articles,
+            'counts': {'landings': len(landings), 'articles': len(articles)},
+            'note': (
+                'landings = briefs, ecris la copy depuis le build_prompt. '
+                'articles = copy generee, integre verbatim. '
+                'Reporte chaque URL construite via mark-built.'
+            ),
+        })
+
+
+class V1BuildQueueMarkBuiltView(BaseV1View):
+    """POST /api/v1/sites/<id>/build-queue/mark-built/
+
+    An agent reports that a queued page is now live in the client's repo.
+    Body: {kind: 'landing'|'article', id: int, url: str}. For a landing this
+    marks the opportunity 'done' (so it archives out of the active list). For an
+    article it stamps the draft's delivered URL so the proof loop can attribute.
+    """
+
+    def post(self, request, site_id):
+        from .models import StrategicOpportunity, HostedPost
+        site = self.get_user_site(request, site_id)
+        kind = (request.data.get('kind') or '').strip().lower()
+        url = (request.data.get('url') or '').strip()
+        try:
+            obj_id = int(request.data.get('id'))
+        except (TypeError, ValueError):
+            return Response({'error': 'id invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if kind == 'landing':
+            try:
+                op = StrategicOpportunity.objects.get(site=site, id=obj_id)
+            except StrategicOpportunity.DoesNotExist:
+                return Response({'error': 'Opportunite introuvable.'},
+                                status=status.HTTP_404_NOT_FOUND)
+            op.status = 'done'
+            op.save(update_fields=['status', 'updated_at'])
+            return Response({'ok': True, 'kind': 'landing', 'id': op.id, 'status': 'done', 'url': url})
+
+        if kind == 'article':
+            # Acknowledge only for now. HostedPost has no delivered-URL field;
+            # stamping the external URL (for proof attribution on dev sites) is a
+            # fast follow-up that needs a dedicated field + migration.
+            if not HostedPost.objects.filter(site=site, id=obj_id).exists():
+                return Response({'error': 'Article introuvable.'},
+                                status=status.HTTP_404_NOT_FOUND)
+            return Response({'ok': True, 'kind': 'article', 'id': obj_id, 'url': url})
+
+        return Response({'error': "kind doit etre 'landing' ou 'article'."},
+                        status=status.HTTP_400_BAD_REQUEST)

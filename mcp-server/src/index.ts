@@ -20,6 +20,8 @@ import {
   actionStrategicOpportunity,
   addMemory,
   exportPagePrompt,
+  pullBuildQueue,
+  markPageBuilt,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -549,6 +551,46 @@ const ExportPagePromptArgs = z
         "Provide exactly one of landing_id or opportunity_id, not both, not neither.",
     },
   );
+
+const PullBuildQueueArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    stack: z
+      .enum([
+        "nextjs",
+        "react",
+        "html",
+        "astro",
+        "wordpress",
+        "webflow",
+        "generic",
+      ])
+      .optional()
+      .describe(
+        "Adapts the landing build prompts to the target stack. Default: generic.",
+      ),
+  })
+  .strict();
+
+const MarkPageBuiltArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    kind: z
+      .enum(["landing", "article"])
+      .describe("What was built: a landing or a blog article."),
+    id: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        "opportunity_id for a landing, post_id for an article (from the build queue).",
+      ),
+    url: z
+      .string()
+      .url()
+      .describe("The live URL of the page you built in the client's site."),
+  })
+  .strict();
 
 const CreateLandingArgs = z
   .object({
@@ -1145,6 +1187,25 @@ const tools: ToolDef[] = [
         landing_id: input.landing_id,
         opportunity_id: input.opportunity_id,
         stack: input.stack,
+      }),
+  },
+  {
+    name: "gridar_pull_build_queue",
+    description:
+      "Pull the QUEUE of pages a coding agent should create in the client's OWN repo, for a dev-built / external site Gridar cannot publish to directly (e.g. a custom Next.js app). Returns two kinds. `landings` = BRIEFS from strategic opportunities still to action: each carries the strategic concept plus a ready-to-use `build_prompt`; YOU write the landing copy from that brief in the client's codebase (C1). `articles` = GENERATED COPY from draft articles: each carries the finished, keyword-calibrated title/slug/excerpt/content; integrate it VERBATIM, do not rewrite it (C2). Pure read, no LLM call, no quota. Optional `stack` (nextjs, react, html, astro, wordpress, webflow, generic) adapts the landing build prompts. Typical loop: gridar_pull_build_queue -> build each page in the repo -> gridar_mark_page_built for each. Returns {landings, articles, counts, note}.",
+    schema: PullBuildQueueArgs,
+    handler: (input) => pullBuildQueue(input.site_id, { stack: input.stack }),
+  },
+  {
+    name: "gridar_mark_page_built",
+    description:
+      "Report that a queued page from gridar_pull_build_queue is now LIVE in the client's site, so Gridar can close the delivery loop. Pass `kind` ('landing' or 'article'), `id` (opportunity_id for a landing, post_id for an article), and the live `url`. For a landing this marks the opportunity done so it archives out of the active list. Call it once per page after you deploy it.",
+    schema: MarkPageBuiltArgs,
+    handler: (input) =>
+      markPageBuilt(input.site_id, {
+        kind: input.kind,
+        id: input.id,
+        url: input.url,
       }),
   },
 ];
