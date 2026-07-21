@@ -576,14 +576,19 @@ const MarkPageBuiltArgs = z
   .object({
     site_id: z.number().int().positive(),
     kind: z
-      .enum(["landing", "article"])
-      .describe("What was built: a landing or a blog article."),
+      .enum(["landing", "article", "article_brief"])
+      .describe(
+        "What was built, matching the queue entry: 'landing' (a landing brief), " +
+          "'article' (a mode=ready article with generated copy), or " +
+          "'article_brief' (a mode=brief article you wrote yourself).",
+      ),
     id: z
       .number()
       .int()
       .positive()
       .describe(
-        "opportunity_id for a landing, post_id for an article (from the build queue).",
+        "The queue entry's id: opportunity_id for 'landing' and 'article_brief', " +
+          "post_id for 'article'.",
       ),
     url: z
       .string()
@@ -1192,14 +1197,14 @@ const tools: ToolDef[] = [
   {
     name: "gridar_pull_build_queue",
     description:
-      "Pull the QUEUE of pages a coding agent should create in the client's OWN repo, for a dev-built / external site Gridar cannot publish to directly (e.g. a custom Next.js app). Returns two kinds. `landings` = BRIEFS from strategic opportunities still to action: each carries the strategic concept plus a ready-to-use `build_prompt`; YOU write the landing copy from that brief in the client's codebase (C1). `articles` = GENERATED COPY from draft articles: each carries the finished, keyword-calibrated title/slug/excerpt/content; integrate it VERBATIM, do not rewrite it (C2). Pure read, no LLM call, no quota. Optional `stack` (nextjs, react, html, astro, wordpress, webflow, generic) adapts the landing build prompts. Typical loop: gridar_pull_build_queue -> build each page in the repo -> gridar_mark_page_built for each. Returns {landings, articles, counts, note}.",
+      "Pull the QUEUE of pages a coding agent should create in the client's OWN repo, for a dev-built / external site Gridar cannot publish to directly (e.g. a custom Next.js app). `landings` = BRIEFS from strategic opportunities: each carries the strategic concept plus a ready-to-use `build_prompt`; YOU write the landing copy from that brief (C1). `articles` come in two modes (field `mode`): mode=`ready` = GENERATED COPY (post_id, finished keyword-calibrated title/slug/excerpt/content) that you integrate VERBATIM (C2); mode=`brief` = an informational-article BRIEF (opportunity_id, `build_prompt`) that YOU write the article from, used as a fallback when Gridar has no generated copy yet. Pure read, no LLM call, no quota. Optional `stack` (nextjs, react, html, astro, wordpress, webflow, generic) adapts the build prompts. Loop: gridar_pull_build_queue -> build each page -> gridar_mark_page_built (kind 'article' for a ready article via post_id, 'article_brief' for a brief article via opportunity_id, 'landing' for a landing). Returns {delivery_mode, landings, articles, counts, note}.",
     schema: PullBuildQueueArgs,
     handler: (input) => pullBuildQueue(input.site_id, { stack: input.stack }),
   },
   {
     name: "gridar_mark_page_built",
     description:
-      "Report that a queued page from gridar_pull_build_queue is now LIVE in the client's site, so Gridar can close the delivery loop. Pass `kind` ('landing' or 'article'), `id` (opportunity_id for a landing, post_id for an article), and the live `url`. For a landing this marks the opportunity done so it archives out of the active list. Call it once per page after you deploy it.",
+      "Report that a queued page from gridar_pull_build_queue is now LIVE in the client's site, so Gridar can close the delivery loop. Pass `kind`, the matching `id`, and the live `url`. kind='landing' (id=opportunity_id) and kind='article_brief' (id=opportunity_id, an article you wrote from a brief) mark the opportunity done so it archives out. kind='article' (id=post_id, a mode=ready article) stamps the delivered URL so the proof loop can attribute positions. Call it once per page after you deploy it.",
     schema: MarkPageBuiltArgs,
     handler: (input) =>
       markPageBuilt(input.site_id, {

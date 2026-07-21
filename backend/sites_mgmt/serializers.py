@@ -16,6 +16,7 @@ class SiteSerializer(serializers.ModelSerializer):
                   'author_image_url', 'author_linkedin', 'author_twitter',
                   'author_website',
                   'business_model', 'primary_cta_text', 'primary_cta_url',
+                  'delivery_mode',
                   'public_blog_domain', 'theme_config',
                   'vercel_deploy_hook', 'gsc_property_url', 'gsc_connected',
                   'api_key', 'is_hosted', 'is_active',

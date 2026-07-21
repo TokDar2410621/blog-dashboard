@@ -57,6 +57,7 @@ export const siteSchema = z.object({
     .optional(),
   primary_cta_text: z.string().optional(),
   primary_cta_url: z.string().optional(),
+  delivery_mode: z.enum(["auto", "agent"]).optional(),
   autopilot_mode: z
     .enum(["refresh_first", "create_only", "balanced"])
     .optional(),

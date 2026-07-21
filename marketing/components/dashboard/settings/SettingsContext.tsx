@@ -27,6 +27,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [domain, setDomain] = useState("");
   const [description, setDescription] = useState("");
   const [businessModel, setBusinessModel] = useState<string>("personal_blog");
+  const [deliveryMode, setDeliveryMode] = useState<string>("auto");
 
   // CTA
   const [primaryCtaText, setPrimaryCtaText] = useState("");
@@ -87,6 +88,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setDefaultAuthor(site.default_author || "");
       setDefaultLanguage(site.default_language || "fr");
       setBusinessModel(site.business_model || "personal_blog");
+      setDeliveryMode(site.delivery_mode || "auto");
       setAuthorRole(site.author_role || "");
       setAuthorBio(site.author_bio || "");
       setAuthorCredentials(site.author_credentials || "");
@@ -378,6 +380,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         default_author: defaultAuthor,
         default_language: defaultLanguage,
         business_model: businessModel,
+        delivery_mode: deliveryMode,
         author_role: authorRole,
         author_bio: authorBio,
         author_credentials: authorCredentials,
@@ -420,6 +423,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     domain, setDomain,
     description, setDescription,
     businessModel, setBusinessModel,
+    deliveryMode, setDeliveryMode,
     primaryCtaText, setPrimaryCtaText,
     primaryCtaUrl, setPrimaryCtaUrl,
     availableLanguages, toggleLanguage,

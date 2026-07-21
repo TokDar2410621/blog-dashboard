@@ -1494,7 +1494,62 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
 
     # === SAVE ===
 
+    def _stage_hosted_draft(self, title, slug, excerpt, content, category_name,
+                            tags, reading_time, cover_image):
+        """Stage a generated article as a HostedPost DRAFT for agent delivery.
+
+        The article is built on the client's OWN site by an agent (build-queue),
+        so we never publish it on a Gridar URL and never push to a CMS/external
+        DB. We also skip the 'A lire aussi' block: internal links belong in the
+        client's repo, not pointed at Gridar URLs.
+        """
+        from .models import HostedPost, HostedCategory, HostedTag
+
+        lang = getattr(self, 'language', 'fr')
+        if HostedPost.objects.filter(site=self.site, slug=slug, language=lang).exists():
+            slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
+
+        hosted_category = None
+        if category_name:
+            hosted_category, _ = HostedCategory.objects.get_or_create(
+                site=self.site,
+                slug=slugify(category_name),
+                defaults={'name': category_name},
+            )
+
+        post = HostedPost.objects.create(
+            site=self.site,
+            title=title[:200],
+            slug=slug,
+            excerpt=excerpt,
+            content=content,
+            author=getattr(self.site, 'default_author', '') or 'Admin',
+            category=hosted_category,
+            cover_image=cover_image or '',
+            reading_time=reading_time,
+            featured=False,
+            status='draft',
+            published_at=None,
+            language=lang,
+        )
+        for tag_name in tags:
+            t, _ = HostedTag.objects.get_or_create(site=self.site, name=tag_name)
+            post.tags.add(t)
+
+        self.log(f'[OK] Article stage pour livraison agent (HostedPost draft #{post.id})')
+        return post
+
     def save_article(self, title, slug, excerpt, content, category_name, tags, reading_time, cover_image):
+        # Agent-delivered site: never push to a CMS / external DB. Stage the
+        # article as a HostedPost DRAFT so the build-queue can hand it to an
+        # agent that builds it in the client's own repo. Wins over every other
+        # storage mode below.
+        if self.site is not None and getattr(self.site, 'delivery_mode', 'auto') == 'agent':
+            return self._stage_hosted_draft(
+                title, slug, excerpt, content, category_name,
+                tags, reading_time, cover_image,
+            )
+
         # WordPress mode: push to WP REST API instead of saving locally.
         if self.wp_site is not None:
             from .wordpress_adapter import WordPressClient, WordPressError

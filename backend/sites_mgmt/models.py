@@ -216,6 +216,23 @@ class Site(models.Model):
         help_text="Mapping de nos champs vers les slugs Webflow. Format: {title, slug, body, summary, image, status}. Auto-détecté à la connexion."
     )
 
+    # ── Mode de livraison ─────────────────────────────────────────────
+    DELIVERY_AUTO = 'auto'
+    DELIVERY_AGENT = 'agent'
+    DELIVERY_MODE_CHOICES = [
+        (DELIVERY_AUTO, "Automatique (Gridar héberge, ou pousse au CMS / à la DB externe)"),
+        (DELIVERY_AGENT, "Via un agent (le contenu est construit dans le repo du client)"),
+    ]
+    delivery_mode = models.CharField(
+        max_length=10, choices=DELIVERY_MODE_CHOICES, default=DELIVERY_AUTO,
+        verbose_name="Mode de livraison",
+        help_text="'agent' = site dev/custom que Gridar ne publie pas "
+                  "directement (Next.js maison, etc.). Les articles sont mis en "
+                  "staging (brouillon HostedPost) et servis dans la build-queue "
+                  "pour qu'un agent les pose dans le repo du client, plutôt que "
+                  "poussés vers un CMS ou une DB externe.",
+    )
+
     # ── Intégrations externes ─────────────────────────────────────────
     vercel_deploy_hook = models.URLField(
         max_length=500, blank=True, default='',
@@ -353,6 +370,13 @@ class Site(models.Model):
             and not self.is_shopify
             and not self.is_webflow
         )
+
+    @property
+    def is_agent_delivered(self):
+        """Dev/custom site Gridar can't publish to: content is staged and built
+        in the client's own repo by an agent (build-queue), never pushed to a
+        CMS/external DB nor published on a Gridar URL."""
+        return self.delivery_mode == self.DELIVERY_AGENT
 
     @property
     def author_for_articles(self):

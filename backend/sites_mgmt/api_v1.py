@@ -3820,6 +3820,23 @@ class V1OpportunityPromptView(BaseV1View):
         })
 
 
+_ARTICLE_PAGE_TYPES = {
+    'blog_article', 'article', 'blog', 'blog_post', 'guide', 'how_to',
+    'howto', 'tutorial', 'faq', 'glossary',
+}
+
+
+def _opportunity_is_article(op):
+    """True when a strategic opportunity is really an informational blog article
+    (served as a brief) rather than a conversion landing."""
+    intent = (getattr(op, 'intent', '') or '').strip().lower()
+    if intent in ('informational', 'info', 'information'):
+        return True
+    concept = op.concept if isinstance(op.concept, dict) else {}
+    page_type = (concept.get('page_type') or '').strip().lower()
+    return page_type in _ARTICLE_PAGE_TYPES
+
+
 class V1BuildQueueView(BaseV1View):
     """GET /api/v1/sites/<id>/build-queue/?stack=nextjs|react|html|astro|generic
 
@@ -3839,31 +3856,52 @@ class V1BuildQueueView(BaseV1View):
 
     def get(self, request, site_id):
         from .models import StrategicOpportunity, HostedPost
-        from .prompt_export import build_opportunity_prompt, normalize_stack
+        from .prompt_export import (
+            build_opportunity_prompt, build_article_brief_prompt, normalize_stack,
+        )
 
         site = self.get_user_site(request, site_id)
         stack = normalize_stack(request.query_params.get('stack'))
 
         landings = []
+        article_briefs = []
         opp = (StrategicOpportunity.objects
                .filter(site=site)
                .exclude(status__in=('done', 'dismissed'))
                .order_by('-priority', '-created_at'))
         for op in opp:
             concept = op.concept or {}
-            landings.append({
-                'kind': 'landing',
-                'opportunity_id': op.id,
-                'keyword': op.keyword,
-                'intent': op.intent,
-                'priority': op.priority,
-                'page_type': concept.get('page_type'),
-                'suggested_title': concept.get('suggested_title'),
-                'suggested_slug': (concept.get('suggested_url_path') or '').lstrip('/'),
-                'concept': concept,
-                'build_prompt': build_opportunity_prompt(op, site, stack=stack),
-            })
+            if _opportunity_is_article(op):
+                # Informational intent = a blog article, not a conversion
+                # landing. Serve it as a BRIEF the agent writes from (fallback
+                # for when Gridar has no generated copy yet).
+                article_briefs.append({
+                    'kind': 'article',
+                    'mode': 'brief',
+                    'opportunity_id': op.id,
+                    'keyword': op.keyword,
+                    'intent': op.intent,
+                    'language': op.language or 'fr',
+                    'suggested_title': concept.get('suggested_title'),
+                    'suggested_slug': (concept.get('suggested_url_path') or '').lstrip('/'),
+                    'build_prompt': build_article_brief_prompt(op, site, stack=stack),
+                })
+            else:
+                landings.append({
+                    'kind': 'landing',
+                    'opportunity_id': op.id,
+                    'keyword': op.keyword,
+                    'intent': op.intent,
+                    'priority': op.priority,
+                    'page_type': concept.get('page_type'),
+                    'suggested_title': concept.get('suggested_title'),
+                    'suggested_slug': (concept.get('suggested_url_path') or '').lstrip('/'),
+                    'concept': concept,
+                    'build_prompt': build_opportunity_prompt(op, site, stack=stack),
+                })
 
+        # Ready-to-integrate copy (C2) comes first: prefer Gridar's calibrated
+        # article over a brief when it exists. Undelivered drafts only.
         articles = []
         drafts = (HostedPost.objects
                   .filter(site=site, status='draft', external_url='')
@@ -3871,6 +3909,7 @@ class V1BuildQueueView(BaseV1View):
         for p in drafts:
             articles.append({
                 'kind': 'article',
+                'mode': 'ready',
                 'post_id': p.id,
                 'title': p.title,
                 'slug': p.slug,
@@ -3878,16 +3917,25 @@ class V1BuildQueueView(BaseV1View):
                 'excerpt': p.excerpt,
                 'content': p.content,
             })
+        articles.extend(article_briefs)
 
+        n_ready = sum(1 for a in articles if a.get('mode') == 'ready')
         return Response({
             'site_id': site.id,
             'stack': stack,
+            'delivery_mode': site.delivery_mode,
             'landings': landings,
             'articles': articles,
-            'counts': {'landings': len(landings), 'articles': len(articles)},
+            'counts': {
+                'landings': len(landings),
+                'articles': len(articles),
+                'articles_ready': n_ready,
+                'articles_brief': len(article_briefs),
+            },
             'note': (
                 'landings = briefs, ecris la copy depuis le build_prompt. '
-                'articles = copy generee, integre verbatim. '
+                "articles mode=ready = copy generee, integre verbatim ; "
+                "mode=brief = ecris l'article depuis le build_prompt. "
                 'Reporte chaque URL construite via mark-built.'
             ),
         })
@@ -3897,9 +3945,13 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
     """POST /api/v1/sites/<id>/build-queue/mark-built/
 
     An agent reports that a queued page is now live in the client's repo.
-    Body: {kind: 'landing'|'article', id: int, url: str}. For a landing this
-    marks the opportunity 'done' (so it archives out of the active list). For an
-    article it stamps the draft's delivered URL so the proof loop can attribute.
+    Body: {kind: 'landing'|'article'|'article_brief', id: int, url: str}.
+      - 'landing' (id = opportunity_id): marks the opportunity 'done' so it
+        archives out of the active list.
+      - 'article' (id = post_id, mode=ready in the queue): stamps the draft's
+        delivered URL so the proof loop can attribute positions.
+      - 'article_brief' (id = opportunity_id, mode=brief in the queue): the
+        agent wrote the article from a brief; marks the opportunity 'done'.
     """
 
     def post(self, request, site_id):
@@ -3912,7 +3964,9 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
         except (TypeError, ValueError):
             return Response({'error': 'id invalide.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if kind == 'landing':
+        # Opportunity-backed entries: a landing, or an article written from a
+        # brief (both close the opportunity, which then archives out).
+        if kind in ('landing', 'article_brief'):
             try:
                 op = StrategicOpportunity.objects.get(site=site, id=obj_id)
             except StrategicOpportunity.DoesNotExist:
@@ -3920,7 +3974,7 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
                                 status=status.HTTP_404_NOT_FOUND)
             op.status = 'done'
             op.save(update_fields=['status', 'updated_at'])
-            return Response({'ok': True, 'kind': 'landing', 'id': op.id, 'status': 'done', 'url': url})
+            return Response({'ok': True, 'kind': kind, 'id': op.id, 'status': 'done', 'url': url})
 
         if kind == 'article':
             if not url:
@@ -3942,5 +3996,5 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
             return Response({'ok': True, 'kind': 'article', 'id': post.id,
                              'url': url, 'delivered': True})
 
-        return Response({'error': "kind doit etre 'landing' ou 'article'."},
+        return Response({'error': "kind doit etre 'landing', 'article' ou 'article_brief'."},
                         status=status.HTTP_400_BAD_REQUEST)

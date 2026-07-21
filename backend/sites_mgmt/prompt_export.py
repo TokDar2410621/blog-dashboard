@@ -736,3 +736,183 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
         )
 
     return '\n\n'.join(sections)
+
+
+def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str:
+    """Brief for an INFORMATIONAL blog article an agent writes in the client's
+    own repo (build-queue fallback when Gridar has no generated copy yet).
+
+    Distinct from build_opportunity_prompt: this asks for an SEO blog article
+    that answers a search intent and earns trust (E-E-A-T), not a conversion
+    landing. The agent both writes the copy and builds the page.
+    """
+    lang = (opportunity.language or 'fr')[:2]
+    fr = lang == 'fr'
+    domain, domain_is_real = _site_domain(site, lang)
+    concept = opportunity.concept if isinstance(opportunity.concept, dict) else {}
+
+    suggested = concept.get('suggested_url_path')
+    suggested = suggested.strip() if isinstance(suggested, str) else ''
+    if suggested:
+        base = suggested if suggested.startswith('/') else '/' + suggested
+    else:
+        base = '/blog/' + (slugify(opportunity.keyword) or 'article')
+    url_path = base
+    slug = url_path.lstrip('/')
+    canonical = f'https://{domain}{url_path}'
+    title = concept.get('suggested_title') or opportunity.keyword
+
+    sections: list[str] = []
+
+    if fr:
+        sections.append(
+            f"# Mission : ecrire un article de blog SEO sur {domain}\n\n"
+            "Tu es redacteur SEO et developpeur. Tu vas ECRIRE ET INTEGRER un "
+            f"article de blog informationnel pour {site.name or domain}. Ici il "
+            "n'y a pas de copy pre-generee : tu rediges l'article toi-meme a "
+            "partir de ce brief, puis tu construis la page dans le repo."
+        )
+        site_block = (
+            "## Le site\n"
+            f"- Nom : {site.name or '(sans nom)'}\n"
+            f"- Domaine : {domain}\n"
+            f"- Modele d'affaires : {site.business_model or 'inconnu'}\n"
+        )
+        if (site.description or '').strip():
+            site_block += f"- Description : {site.description.strip()}\n"
+        sections.append(site_block.rstrip())
+
+        sections.append(
+            "## Le mot-cle cible\n"
+            f"- \"{opportunity.keyword}\" (intent : {opportunity.intent})\n"
+            f"- Titre suggere : {title}\n"
+            f"- Langue de redaction : {lang}\n"
+            "- IMPORTANT (localisation) : redige dans la variante de francais du "
+            "MARCHE VISE par le mot-cle et le domaine (Quebec -> quebecois, CAD ; "
+            "France -> francais de France, EUR ; Afrique francophone -> francais "
+            "standard local, FCFA). Deduis le pays de la geographie citee."
+        )
+        sections.append(
+            "## Structure attendue\n"
+            "1. **H1** qui contient le mot-cle, puis une intro (2-3 phrases) qui "
+            "repond tout de suite a l'intention de recherche.\n"
+            "2. **1000 a 1800 mots** de contenu utile, hierarchie h2/h3 propre, "
+            "le mot-cle et ses variantes dans plusieurs h2.\n"
+            "3. **Preuves E-E-A-T** : exemples concrets, chiffres, cas locaux, "
+            "experience reelle du metier. Zero remplissage generique.\n"
+            "4. **FAQ** : 4 a 6 vraies questions que se posent les gens qui "
+            f"cherchent \"{opportunity.keyword}\", reponses completes.\n"
+            "5. **Liens internes** : place 2-3 liens vers d'autres pages "
+            "pertinentes du site (utilise des chemins relatifs, laisse un "
+            "commentaire si tu n'es pas sur de l'URL exacte).\n"
+            "6. **CTA doux** en fin d'article vers l'offre du site, sans casser "
+            "le ton informationnel."
+        )
+        sections.append(
+            "## Style visuel et animations\n"
+            "- Reprends le design system du blog (couleurs, typo, composants). "
+            "L'article doit paraitre natif, pas un template generique.\n"
+            "- Anime dans le MEME style que le reste du site (apparitions au "
+            "scroll, transitions douces). Sobre et coherent.\n"
+            "- Respecte prefers-reduced-motion et n'introduis aucun CLS."
+        )
+        sections.append(
+            "## Meta SEO\n"
+            f"- `<title>` : moins de 60 caracteres, contient \"{opportunity.keyword}\"\n"
+            "- `<meta name=\"description\">` : 140 a 160 caracteres\n"
+            f"- `<link rel=\"canonical\" href=\"{canonical}\">`\n"
+            "- JSON-LD : un bloc `Article` (headline, description, author, "
+            "datePublished) + un bloc `FAQPage` sur tes questions/reponses, "
+            "dans des balises `<script type=\"application/ld+json\">`."
+            + ('' if domain_is_real else (
+                "\n- ATTENTION : le domaine n'est pas configure dans Gridar. "
+                f"Remplace `{domain}` par le vrai domaine PARTOUT avant publication."
+            ))
+        )
+        sections.append(
+            "## Specifique a ton stack\n" + _stack_block(stack, slug, lang)
+        )
+        sections.append(
+            "## Checklist avant de terminer\n"
+            f"- [ ] L'URL est `{url_path}`\n"
+            "- [ ] Un seul h1, il contient le mot-cle\n"
+            "- [ ] Contenu original, preuves E-E-A-T, aucun remplissage\n"
+            "- [ ] JSON-LD Article + FAQPage presents dans le head\n"
+            "- [ ] Vocabulaire, devise et conventions adaptes au marche vise"
+        )
+    else:
+        sections.append(
+            f"# Mission: write an SEO blog article on {domain}\n\n"
+            "You are an SEO writer and a developer. You will WRITE AND INTEGRATE "
+            f"an informational blog article for {site.name or domain}. There is "
+            "no pre-generated copy here: you write the article yourself from this "
+            "brief, then build the page in the repo."
+        )
+        site_block = (
+            "## The site\n"
+            f"- Name: {site.name or '(unnamed)'}\n"
+            f"- Domain: {domain}\n"
+            f"- Business model: {site.business_model or 'unknown'}\n"
+        )
+        if (site.description or '').strip():
+            site_block += f"- Description: {site.description.strip()}\n"
+        sections.append(site_block.rstrip())
+
+        sections.append(
+            "## Target keyword\n"
+            f"- \"{opportunity.keyword}\" (intent: {opportunity.intent})\n"
+            f"- Suggested title: {title}\n"
+            f"- Writing language: {lang}\n"
+            "- IMPORTANT (localization): write in the French/English variant of "
+            "the MARKET the keyword and domain target, not a default variant. "
+            "Match local vocabulary, currency and conventions."
+        )
+        sections.append(
+            "## Expected structure\n"
+            "1. **H1** containing the keyword, then a 2-3 sentence intro that "
+            "answers the search intent right away.\n"
+            "2. **1000 to 1800 words** of useful content, clean h2/h3 hierarchy, "
+            "keyword and variants across several h2s.\n"
+            "3. **E-E-A-T proof**: concrete examples, numbers, local cases, real "
+            "trade experience. No generic filler.\n"
+            "4. **FAQ**: 4 to 6 real questions searchers of "
+            f"\"{opportunity.keyword}\" ask, with complete answers.\n"
+            "5. **Internal links**: place 2-3 links to other relevant pages "
+            "(relative paths; leave a comment if unsure of the exact URL).\n"
+            "6. **Soft CTA** at the end toward the site's offer, without breaking "
+            "the informational tone."
+        )
+        sections.append(
+            "## Visual style and animations\n"
+            "- Reuse the blog's design system (colors, type, components). The "
+            "article must look native, not a generic template.\n"
+            "- Animate in the SAME style as the rest of the site (scroll "
+            "reveals, smooth transitions). Subtle and coherent.\n"
+            "- Honour prefers-reduced-motion and introduce no CLS."
+        )
+        sections.append(
+            "## SEO meta\n"
+            f"- `<title>`: under 60 characters, contains \"{opportunity.keyword}\"\n"
+            "- `<meta name=\"description\">`: 140 to 160 characters\n"
+            f"- `<link rel=\"canonical\" href=\"{canonical}\">`\n"
+            "- JSON-LD: one `Article` block (headline, description, author, "
+            "datePublished) + one `FAQPage` block from your Q&As, inside "
+            "`<script type=\"application/ld+json\">` tags."
+            + ('' if domain_is_real else (
+                "\n- WARNING: the domain is not configured in Gridar. Replace "
+                f"`{domain}` with the real domain EVERYWHERE before publishing."
+            ))
+        )
+        sections.append(
+            "## Stack-specific instructions\n" + _stack_block(stack, slug, lang)
+        )
+        sections.append(
+            "## Final checklist\n"
+            f"- [ ] URL is `{url_path}`\n"
+            "- [ ] Exactly one h1, containing the keyword\n"
+            "- [ ] Original content, E-E-A-T proof, no filler\n"
+            "- [ ] JSON-LD Article + FAQPage present in head\n"
+            "- [ ] Vocabulary, currency and conventions match the target market"
+        )
+
+    return '\n\n'.join(sections)

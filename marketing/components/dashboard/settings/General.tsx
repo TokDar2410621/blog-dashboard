@@ -1,6 +1,6 @@
 "use client";
 
-import { Settings, Rocket } from "lucide-react";
+import { Settings, Rocket, Bot } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ export default function General() {
     domain, setDomain,
     description, setDescription,
     businessModel, setBusinessModel,
+    deliveryMode, setDeliveryMode,
   } = useSettings();
 
   return (
@@ -82,6 +83,41 @@ export default function General() {
           <p className="text-xs text-muted-foreground">
             SaaS pousse comparatifs + use-cases. E-commerce pousse buying guides.
             Agence pousse case studies. Média pousse evergreen long-form.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Bot className="h-5 w-5" />
+            Mode de livraison
+          </CardTitle>
+          <CardDescription>
+            Comment le contenu généré arrive sur le site. Choisis
+            &laquo;&nbsp;Via un agent&nbsp;&raquo; pour un site fait main (Next.js,
+            React, etc.) que Gridar ne peut pas publier directement.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label className="text-sm">Livraison</Label>
+          <select
+            value={deliveryMode}
+            onChange={(e) => setDeliveryMode(e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+          >
+            <option value="auto">
+              Automatique - Gridar héberge, ou pousse au CMS / à la DB externe
+            </option>
+            <option value="agent">
+              Via un agent - le contenu est construit dans le repo du client
+            </option>
+          </select>
+          <p className="text-xs text-muted-foreground">
+            En mode agent, les articles sont mis en attente (staging) et servis
+            dans la build-queue : un agent (Claude Code, etc.) les récupère et
+            les pose dans ton repo, plutôt que Gridar ne les pousse à un CMS ou
+            une DB. Les landings restent livrées en briefs.
           </p>
         </CardContent>
       </Card>

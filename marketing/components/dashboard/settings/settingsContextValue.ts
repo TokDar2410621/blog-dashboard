@@ -43,6 +43,7 @@ export type SettingsContextValue = {
   domain: string; setDomain: (v: string) => void;
   description: string; setDescription: (v: string) => void;
   businessModel: string; setBusinessModel: (v: string) => void;
+  deliveryMode: string; setDeliveryMode: (v: string) => void;
 
   // CTA
   primaryCtaText: string; setPrimaryCtaText: (v: string) => void;
