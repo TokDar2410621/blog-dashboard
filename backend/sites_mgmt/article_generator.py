@@ -1506,8 +1506,13 @@ Exemples: "D'ailleurs, j'ai ecrit un article complet sur [ce sujet](/blog/slug).
         from .models import HostedPost, HostedCategory, HostedTag
 
         lang = getattr(self, 'language', 'fr')
-        if HostedPost.objects.filter(site=self.site, slug=slug, language=lang).exists():
-            slug = f"{slug}-{date.today().strftime('%Y%m%d')}"
+        # unique_together is (site, slug) - NOT scoped by language - so de-dup on
+        # (site, slug) with a counting loop, mirroring generate_sister_article.
+        base_slug = slug
+        suffix = 2
+        while HostedPost.objects.filter(site=self.site, slug=slug).exists():
+            slug = f"{base_slug}-{suffix}"
+            suffix += 1
 
         hosted_category = None
         if category_name:

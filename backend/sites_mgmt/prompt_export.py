@@ -738,29 +738,26 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
     return '\n\n'.join(sections)
 
 
-def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str:
+def build_article_brief_prompt(keyword, site, stack: str = 'generic',
+                               language: str = 'fr', intent: str = 'info',
+                               suggested_title=None) -> str:
     """Brief for an INFORMATIONAL blog article an agent writes in the client's
     own repo (build-queue fallback when Gridar has no generated copy yet).
 
+    Sourced from an info-intent tracked keyword, so it takes primitives (the
+    keyword string, language, intent) rather than a strategic opportunity.
     Distinct from build_opportunity_prompt: this asks for an SEO blog article
     that answers a search intent and earns trust (E-E-A-T), not a conversion
     landing. The agent both writes the copy and builds the page.
     """
-    lang = (opportunity.language or 'fr')[:2]
+    lang = (language or 'fr')[:2]
     fr = lang == 'fr'
     domain, domain_is_real = _site_domain(site, lang)
-    concept = opportunity.concept if isinstance(opportunity.concept, dict) else {}
 
-    suggested = concept.get('suggested_url_path')
-    suggested = suggested.strip() if isinstance(suggested, str) else ''
-    if suggested:
-        base = suggested if suggested.startswith('/') else '/' + suggested
-    else:
-        base = '/blog/' + (slugify(opportunity.keyword) or 'article')
-    url_path = base
+    url_path = '/blog/' + (slugify(keyword) or 'article')
     slug = url_path.lstrip('/')
     canonical = f'https://{domain}{url_path}'
-    title = concept.get('suggested_title') or opportunity.keyword
+    title = suggested_title or keyword
 
     sections: list[str] = []
 
@@ -784,7 +781,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
 
         sections.append(
             "## Le mot-cle cible\n"
-            f"- \"{opportunity.keyword}\" (intent : {opportunity.intent})\n"
+            f"- \"{keyword}\" (intent : {intent})\n"
             f"- Titre suggere : {title}\n"
             f"- Langue de redaction : {lang}\n"
             "- IMPORTANT (localisation) : redige dans la variante de francais du "
@@ -801,7 +798,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
             "3. **Preuves E-E-A-T** : exemples concrets, chiffres, cas locaux, "
             "experience reelle du metier. Zero remplissage generique.\n"
             "4. **FAQ** : 4 a 6 vraies questions que se posent les gens qui "
-            f"cherchent \"{opportunity.keyword}\", reponses completes.\n"
+            f"cherchent \"{keyword}\", reponses completes.\n"
             "5. **Liens internes** : place 2-3 liens vers d'autres pages "
             "pertinentes du site (utilise des chemins relatifs, laisse un "
             "commentaire si tu n'es pas sur de l'URL exacte).\n"
@@ -818,7 +815,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
         )
         sections.append(
             "## Meta SEO\n"
-            f"- `<title>` : moins de 60 caracteres, contient \"{opportunity.keyword}\"\n"
+            f"- `<title>` : moins de 60 caracteres, contient \"{keyword}\"\n"
             "- `<meta name=\"description\">` : 140 a 160 caracteres\n"
             f"- `<link rel=\"canonical\" href=\"{canonical}\">`\n"
             "- JSON-LD : un bloc `Article` (headline, description, author, "
@@ -860,7 +857,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
 
         sections.append(
             "## Target keyword\n"
-            f"- \"{opportunity.keyword}\" (intent: {opportunity.intent})\n"
+            f"- \"{keyword}\" (intent: {intent})\n"
             f"- Suggested title: {title}\n"
             f"- Writing language: {lang}\n"
             "- IMPORTANT (localization): write in the French/English variant of "
@@ -876,7 +873,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
             "3. **E-E-A-T proof**: concrete examples, numbers, local cases, real "
             "trade experience. No generic filler.\n"
             "4. **FAQ**: 4 to 6 real questions searchers of "
-            f"\"{opportunity.keyword}\" ask, with complete answers.\n"
+            f"\"{keyword}\" ask, with complete answers.\n"
             "5. **Internal links**: place 2-3 links to other relevant pages "
             "(relative paths; leave a comment if unsure of the exact URL).\n"
             "6. **Soft CTA** at the end toward the site's offer, without breaking "
@@ -892,7 +889,7 @@ def build_article_brief_prompt(opportunity, site, stack: str = 'generic') -> str
         )
         sections.append(
             "## SEO meta\n"
-            f"- `<title>`: under 60 characters, contains \"{opportunity.keyword}\"\n"
+            f"- `<title>`: under 60 characters, contains \"{keyword}\"\n"
             "- `<meta name=\"description\">`: 140 to 160 characters\n"
             f"- `<link rel=\"canonical\" href=\"{canonical}\">`\n"
             "- JSON-LD: one `Article` block (headline, description, author, "

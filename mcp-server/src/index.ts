@@ -578,17 +578,17 @@ const MarkPageBuiltArgs = z
     kind: z
       .enum(["landing", "article", "article_brief"])
       .describe(
-        "What was built, matching the queue entry: 'landing' (a landing brief), " +
-          "'article' (a mode=ready article with generated copy), or " +
-          "'article_brief' (a mode=brief article you wrote yourself).",
+        "Echo the queue entry's own `kind`: 'landing' (a landing brief), " +
+          "'article' (a generated-copy article), or 'article_brief' (an article " +
+          "you wrote from a brief).",
       ),
     id: z
       .number()
       .int()
       .positive()
       .describe(
-        "The queue entry's id: opportunity_id for 'landing' and 'article_brief', " +
-          "post_id for 'article'.",
+        "Echo the queue entry's own `id` (opportunity_id for 'landing', post_id " +
+          "for 'article', tracked_keyword_id for 'article_brief').",
       ),
     url: z
       .string()
@@ -1197,14 +1197,14 @@ const tools: ToolDef[] = [
   {
     name: "gridar_pull_build_queue",
     description:
-      "Pull the QUEUE of pages a coding agent should create in the client's OWN repo, for a dev-built / external site Gridar cannot publish to directly (e.g. a custom Next.js app). `landings` = BRIEFS from strategic opportunities: each carries the strategic concept plus a ready-to-use `build_prompt`; YOU write the landing copy from that brief (C1). `articles` come in two modes (field `mode`): mode=`ready` = GENERATED COPY (post_id, finished keyword-calibrated title/slug/excerpt/content) that you integrate VERBATIM (C2); mode=`brief` = an informational-article BRIEF (opportunity_id, `build_prompt`) that YOU write the article from, used as a fallback when Gridar has no generated copy yet. Pure read, no LLM call, no quota. Optional `stack` (nextjs, react, html, astro, wordpress, webflow, generic) adapts the build prompts. Loop: gridar_pull_build_queue -> build each page -> gridar_mark_page_built (kind 'article' for a ready article via post_id, 'article_brief' for a brief article via opportunity_id, 'landing' for a landing). Returns {delivery_mode, landings, articles, counts, note}.",
+      "Pull the QUEUE of pages a coding agent should create in the client's OWN repo, for a dev-built / external site Gridar cannot publish to directly (e.g. a custom Next.js app). Every entry carries its own `kind` and `id` - echo those back to gridar_mark_page_built. `landings` (kind='landing') = page briefs from strategic opportunities: write the copy from `build_prompt` (C1). `articles` hold two kinds: kind='article' = GENERATED COPY (finished keyword-calibrated title/slug/excerpt/content) you integrate VERBATIM (C2); kind='article_brief' = an informational-article brief (from an info-intent tracked keyword) you write the article from, a fallback when Gridar has no generated copy yet. Pure read, no LLM call, no quota. Optional `stack` (nextjs, react, html, astro, wordpress, webflow, generic) adapts the build prompts. Loop: gridar_pull_build_queue -> build each page -> gridar_mark_page_built with that entry's kind + id + the live url. Returns {delivery_mode, landings, articles, counts, note}.",
     schema: PullBuildQueueArgs,
     handler: (input) => pullBuildQueue(input.site_id, { stack: input.stack }),
   },
   {
     name: "gridar_mark_page_built",
     description:
-      "Report that a queued page from gridar_pull_build_queue is now LIVE in the client's site, so Gridar can close the delivery loop. Pass `kind`, the matching `id`, and the live `url`. kind='landing' (id=opportunity_id) and kind='article_brief' (id=opportunity_id, an article you wrote from a brief) mark the opportunity done so it archives out. kind='article' (id=post_id, a mode=ready article) stamps the delivered URL so the proof loop can attribute positions. Call it once per page after you deploy it.",
+      "Report that a queued page from gridar_pull_build_queue is now LIVE in the client's site, so Gridar can close the delivery loop. Echo the queue entry's own `kind` and `id`, plus the live `url`. kind='landing' (id=opportunity_id) marks the opportunity done so it archives out. kind='article' (id=post_id, a generated-copy article) stamps the delivered URL so the proof loop can attribute positions. kind='article_brief' (id=tracked_keyword_id, an article you wrote from a brief) stamps the keyword's target URL, dropping it from the queue and feeding rank tracking. Call it once per page after you deploy it.",
     schema: MarkPageBuiltArgs,
     handler: (input) =>
       markPageBuilt(input.site_id, {
