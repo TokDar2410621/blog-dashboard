@@ -62,6 +62,7 @@ from .api_v1 import (
     V1CheckRenderabilityView, V1LinkOpportunitiesView,
     V1SerpAnalyzeView,
     V1AiVisibilitySummaryView, V1AiVisibilityPromptsView, V1AiVisibilityRunView,
+    V1AiVisibilitySuggestView,
     V1StrategicOpportunitiesView, V1StrategicOpportunitiesRefreshView,
     V1StrategicOpportunityActionView,
     V1LandingPromptView, V1OpportunityPromptView,
@@ -258,6 +259,7 @@ urlpatterns = [
     path('v1/sites/<int:site_id>/ai-visibility/summary/', V1AiVisibilitySummaryView.as_view(), name='v1-ai-visibility-summary'),
     path('v1/sites/<int:site_id>/ai-visibility/prompts/', V1AiVisibilityPromptsView.as_view(), name='v1-ai-visibility-prompts'),
     path('v1/sites/<int:site_id>/ai-visibility/run/', V1AiVisibilityRunView.as_view(), name='v1-ai-visibility-run'),
+    path('v1/sites/<int:site_id>/ai-visibility/suggest/', V1AiVisibilitySuggestView.as_view(), name='v1-ai-visibility-suggest'),
     # Strategic Opportunities (2026-06-09)
     path('v1/sites/<int:site_id>/strategic-opportunities/',
          V1StrategicOpportunitiesView.as_view(),

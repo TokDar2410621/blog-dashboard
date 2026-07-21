@@ -67,9 +67,11 @@ import {
   createAiVisibilityPrompt,
   listAiVisibilityPrompts,
   runAiVisibility,
+  suggestAiVisibilityPrompts,
   type AiVisibilityEngine,
   type AiVisibilitySummary,
   type AiVisibilityPrompt,
+  type AiVisibilityPromptSuggestion,
 } from "@/lib/api-client";
 
 // Mock sparklines so the hero strip isn't empty before the user runs any check.
@@ -231,6 +233,37 @@ export default function AiVisibilityPage() {
     onError: (err: Error) => {
       toast.error(err.message || "Echec de la creation du prompt.");
     },
+  });
+
+  // AI-suggested prompts: Claude proposes questions a prospect would ask an LLM,
+  // adapted to the site's market. The user reviews and adds the ones they want.
+  const [suggestions, setSuggestions] = useState<AiVisibilityPromptSuggestion[]>([]);
+
+  const suggestMutation = useMutation({
+    mutationFn: () => suggestAiVisibilityPrompts(sid),
+    onSuccess: (data) => {
+      setSuggestions(data.prompts || []);
+      if (!data.prompts?.length) toast("Aucune suggestion generee.");
+    },
+    onError: (err: Error) =>
+      toast.error(err.message || "Echec des suggestions."),
+  });
+
+  const addSuggestionMutation = useMutation({
+    mutationFn: (s: AiVisibilityPromptSuggestion) =>
+      createAiVisibilityPrompt(sid, {
+        prompt: s.prompt,
+        target_intent: s.target_intent,
+        language: (["fr", "en", "es"].includes(s.language)
+          ? s.language
+          : "fr") as "fr" | "en" | "es",
+      }),
+    onSuccess: (_data, s) => {
+      toast.success("Prompt ajoute.");
+      setSuggestions((prev) => prev.filter((x) => x.prompt !== s.prompt));
+      qc.invalidateQueries({ queryKey: ["ai-visibility-prompts", sid] });
+    },
+    onError: (err: Error) => toast.error(err.message || "Echec de l'ajout."),
   });
 
   const runAllMutation = useMutation({
@@ -434,14 +467,31 @@ export default function AiVisibilityPage() {
       {/* Add prompt form */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Ajouter un prompt a tracker
-          </CardTitle>
-          <CardDescription>
-            Une question que tes prospects poseraient a un LLM. Exemple : "Quel
-            est le meilleur outil SEO IA pour PME au Quebec ?"
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Ajouter un prompt a tracker
+              </CardTitle>
+              <CardDescription className="mt-1">
+                Une question que tes prospects poseraient a un LLM. Exemple :
+                "Quel est le meilleur outil SEO IA pour PME au Quebec ?"
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => suggestMutation.mutate()}
+              disabled={suggestMutation.isPending}
+            >
+              {suggestMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Suggerer des prompts
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -506,6 +556,31 @@ export default function AiVisibilityPage() {
               </Button>
             </div>
           </div>
+
+          {suggestions.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Suggestions IA - clique pour ajouter :
+              </p>
+              {suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => addSuggestionMutation.mutate(s)}
+                  disabled={addSuggestionMutation.isPending}
+                  className="w-full text-left flex items-start gap-2 rounded-md border border-border/60 bg-card hover:border-emerald-500/50 p-2.5 transition-colors disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4 mt-0.5 shrink-0 text-emerald-400" />
+                  <span className="flex-1 min-w-0">
+                    <span className="text-sm">{s.prompt}</span>
+                    <span className="block text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                      {s.target_intent}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

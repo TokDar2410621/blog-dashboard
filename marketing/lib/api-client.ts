@@ -1046,6 +1046,32 @@ export async function createAiVisibilityPrompt(
   return res.json();
 }
 
+export type AiVisibilityPromptSuggestion = {
+  prompt: string;
+  target_intent: string;
+  language: string;
+};
+
+export async function suggestAiVisibilityPrompts(
+  siteId: number,
+  body: { count?: number } = {},
+): Promise<{ prompts: AiVisibilityPromptSuggestion[] }> {
+  const res = await authFetch(`/v1/sites/${siteId}/ai-visibility/suggest/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ApiError(
+      typeof err.error === "string" ? err.error : "AI prompt suggestion failed",
+      res.status,
+      "AI_PROMPT_SUGGEST_FAILED",
+      err,
+    );
+  }
+  return res.json();
+}
+
 export async function runAiVisibility(
   siteId: number,
   body: { prompt_id?: number } = {},

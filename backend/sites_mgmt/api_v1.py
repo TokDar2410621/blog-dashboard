@@ -3388,6 +3388,121 @@ class V1AiVisibilityRunView(BaseV1View):
         }, status=status.HTTP_201_CREATED)
 
 
+class V1AiVisibilitySuggestView(BaseV1View):
+    """POST /api/v1/sites/<id>/ai-visibility/suggest/
+
+    Ask Claude for prompts a real prospect would type into an LLM (ChatGPT,
+    Perplexity, Gemini...) and for which THIS site would deserve to be cited,
+    so the user can track their AI visibility on them. Returns candidates for
+    review; never auto-creates. Body: {count?: int} (default 6, max 12).
+    Response: {prompts: [{prompt, target_intent, language}, ...]}.
+    """
+    def post(self, request, site_id):
+        import json as _json
+        import re
+        site = self.get_user_site(request, site_id)
+
+        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not anthropic_key:
+            return Response({'error': 'ANTHROPIC_API_KEY non configuree.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            count = int(request.data.get('count') or 6)
+        except (TypeError, ValueError):
+            count = 6
+        count = max(3, min(12, count))
+
+        language = (site.default_language or 'fr').lower()[:2]
+        if language not in ('fr', 'en', 'es'):
+            language = 'fr'
+
+        from .models import TrackedKeyword
+        kws = list(
+            TrackedKeyword.objects.filter(site=site, is_active=True)
+            .order_by('-updated_at').values_list('keyword', flat=True)[:12]
+        )
+        kw_block = '\n'.join(f'- {k}' for k in kws) or '(aucun mot-cle tracke)'
+        valid_intents = [c[0] for c in AiVisibilityPrompt.TARGET_INTENT_CHOICES]
+
+        prompt = f"""Tu es strategiste en visibilite sur les moteurs IA (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). Genere {count} questions qu'un PROSPECT reel taperait a un LLM et pour lesquelles CE site meriterait d'etre cite dans la reponse.
+
+SITE
+- Nom: {site.name or '(sans nom)'}
+- Domaine: {site.domain or '(non renseigne)'}
+- Modele d'affaires: {site.business_model or 'inconnu'}
+- Description: {(site.description or '').strip() or '(non renseignee)'}
+
+MOTS-CLES TRACKES (contexte du marche vise):
+{kw_block}
+
+REGLES
+- Ecris comme un vrai humain PARLE a une IA, pas un mot-cle SEO. Ex: "quel est le meilleur couvreur a Saint-Hyacinthe pour une toiture plate?" plutot que "couvreur toiture plate".
+- Varie les intentions: informationnel, commercial/comparatif, transactionnel, local.
+- Redige dans la variante de francais du MARCHE vise (deduis-la du domaine et des mots-cles: Quebec, France, Afrique francophone...), pas une variante par defaut.
+- Chaque question doit pouvoir mener a une reponse ou ce site serait une bonne source.
+
+REPONDS EN JSON STRICT (pas de markdown):
+{{"prompts": [{{"prompt": "...", "target_intent": "informational|commercial|transactional|navigational|local"}}, ...]}}
+"""
+
+        try:
+            resp = http_requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers={
+                    'x-api-key': anthropic_key,
+                    'anthropic-version': '2023-06-01',
+                    'content-type': 'application/json',
+                },
+                json={
+                    'model': 'claude-sonnet-5',
+                    'max_tokens': 1200,
+                    'thinking': {'type': 'disabled'},
+                    'messages': [{'role': 'user', 'content': prompt}],
+                },
+                timeout=45,
+            )
+            resp.raise_for_status()
+            _body = resp.json()
+            text = next(
+                (b.get('text', '') for b in (_body.get('content') or [])
+                 if b.get('type') == 'text'),
+                '',
+            )
+        except http_requests.RequestException as e:
+            return Response({'error': f'Erreur Claude: {e}'},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return Response({'error': 'Reponse Claude non parsable', 'raw': text[:500]},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        try:
+            parsed = _json.loads(match.group())
+        except _json.JSONDecodeError:
+            return Response({'error': 'JSON Claude invalide', 'raw': text[:500]},
+                            status=status.HTTP_502_BAD_GATEWAY)
+
+        seen = set()
+        out = []
+        for item in (parsed.get('prompts') or []):
+            if not isinstance(item, dict):
+                continue
+            p = (item.get('prompt') or '').strip()
+            key = p.lower()
+            if not p or key in seen:
+                continue
+            intent = (item.get('target_intent') or '').strip().lower()
+            if intent not in valid_intents:
+                intent = 'informational'
+            seen.add(key)
+            out.append({'prompt': p[:500], 'target_intent': intent, 'language': language})
+            if len(out) >= count:
+                break
+
+        return Response({'prompts': out})
+
+
 # ===========================================================================
 # Strategic Opportunities (2026-06-09)
 # ===========================================================================
