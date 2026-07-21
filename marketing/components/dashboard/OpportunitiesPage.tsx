@@ -635,12 +635,12 @@ export default function OpportunitiesPage() {
   const sid = Number(siteId);
   const qc = useQueryClient();
   const { data: site } = useSite();
-  const [showDismissed, setShowDismissed] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const opportunitiesQuery = useQuery({
-    queryKey: ["opportunities", sid, { dismissed: showDismissed }],
+    queryKey: ["opportunities", sid, { archived: showArchived }],
     queryFn: () =>
-      listStrategicOpportunities(sid, { includeDismissed: showDismissed }),
+      listStrategicOpportunities(sid, { includeArchived: showArchived }),
     enabled: !Number.isNaN(sid),
   });
 
@@ -701,9 +701,9 @@ export default function OpportunitiesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowDismissed((v) => !v)}
+            onClick={() => setShowArchived((v) => !v)}
           >
-            {showDismissed ? "Masquer les écartées" : "Voir les écartées"}
+            {showArchived ? "Masquer les archivées" : "Voir les archivées"}
           </Button>
           <Button
             onClick={() => refreshMutation.mutate()}

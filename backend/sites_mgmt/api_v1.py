@@ -3517,15 +3517,23 @@ class V1StrategicOpportunitiesView(BaseV1View):
     """GET /api/v1/sites/<id>/strategic-opportunities/
 
     Returns the current list ordered by priority then created_at desc. Does
-    NOT trigger Claude - call /refresh/ for that. Dismissed rows are hidden
-    by default; pass ?include_dismissed=1 to see them.
+    NOT trigger Claude - call /refresh/ for that. Archived rows (status 'done',
+    i.e. a page was already created, and 'dismissed') are hidden by default so
+    the list stays focused on what is left to action; pass ?include_archived=1
+    to bring both back. ?include_dismissed=1 is kept for backward compat.
     """
 
     def get(self, request, site_id):
         from .models import StrategicOpportunity
         site = self.get_user_site(request, site_id)
-        include_dismissed = request.query_params.get('include_dismissed') == '1'
+        include_archived = request.query_params.get('include_archived') == '1'
+        include_dismissed = (
+            include_archived
+            or request.query_params.get('include_dismissed') == '1'
+        )
         qs = StrategicOpportunity.objects.filter(site=site)
+        if not include_archived:
+            qs = qs.exclude(status='done')
         if not include_dismissed:
             qs = qs.exclude(status='dismissed')
         results = []

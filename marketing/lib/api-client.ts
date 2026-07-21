@@ -1153,9 +1153,14 @@ export type StrategicOpportunity = {
 
 export async function listStrategicOpportunities(
   siteId: number,
-  options: { includeDismissed?: boolean } = {},
+  options: { includeDismissed?: boolean; includeArchived?: boolean } = {},
 ): Promise<{ results: StrategicOpportunity[]; count: number }> {
-  const qs = options.includeDismissed ? "?include_dismissed=1" : "";
+  // Archived = created ('done') + dismissed, both hidden by default.
+  const qs = options.includeArchived
+    ? "?include_archived=1"
+    : options.includeDismissed
+      ? "?include_dismissed=1"
+      : "";
   const res = await authFetch(
     `/v1/sites/${siteId}/strategic-opportunities/${qs}`,
   );
