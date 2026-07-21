@@ -3866,7 +3866,7 @@ class V1BuildQueueView(BaseV1View):
 
         articles = []
         drafts = (HostedPost.objects
-                  .filter(site=site, status='draft')
+                  .filter(site=site, status='draft', external_url='')
                   .order_by('-created_at')[:50])
         for p in drafts:
             articles.append({
@@ -3923,13 +3923,24 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
             return Response({'ok': True, 'kind': 'landing', 'id': op.id, 'status': 'done', 'url': url})
 
         if kind == 'article':
-            # Acknowledge only for now. HostedPost has no delivered-URL field;
-            # stamping the external URL (for proof attribution on dev sites) is a
-            # fast follow-up that needs a dedicated field + migration.
-            if not HostedPost.objects.filter(site=site, id=obj_id).exists():
+            if not url:
+                return Response(
+                    {'error': "url requise pour un article (l'URL live sur le site du client)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                post = HostedPost.objects.get(site=site, id=obj_id)
+            except HostedPost.DoesNotExist:
                 return Response({'error': 'Article introuvable.'},
                                 status=status.HTTP_404_NOT_FOUND)
-            return Response({'ok': True, 'kind': 'article', 'id': obj_id, 'url': url})
+            # Stamp the delivered URL: the article is now live on the client's
+            # OWN site. This drops it out of the build queue and lets the proof
+            # loop attribute positions to the real external URL.
+            post.external_url = url
+            post.delivered_at = timezone.now()
+            post.save(update_fields=['external_url', 'delivered_at', 'updated_at'])
+            return Response({'ok': True, 'kind': 'article', 'id': post.id,
+                             'url': url, 'delivered': True})
 
         return Response({'error': "kind doit etre 'landing' ou 'article'."},
                         status=status.HTTP_400_BAD_REQUEST)

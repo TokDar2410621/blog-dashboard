@@ -649,6 +649,19 @@ class HostedPost(models.Model):
                   "dict otherwise. Re-computed on every save so editing the FAQ "
                   "in the editor keeps the markup in sync.",
     )
+    external_url = models.URLField(
+        max_length=500, blank=True, default='',
+        help_text="Live URL when this draft was built and published on the "
+                  "client's OWN site by an agent (build-queue delivery). Empty "
+                  "for Gridar-hosted posts and undelivered drafts. Its presence "
+                  "means the article is live externally, so it drops out of the "
+                  "build queue and can be tracked for proof attribution.",
+    )
+    delivered_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When an agent reported this draft live on the client's "
+                  "external site via gridar_mark_page_built.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
