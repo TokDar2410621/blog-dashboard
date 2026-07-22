@@ -738,9 +738,16 @@ def build_opportunity_prompt(opportunity, site, stack: str = 'generic') -> str:
     return '\n\n'.join(sections)
 
 
+def article_url_path(keyword: str) -> str:
+    """Canonical blog path a brief tells the agent to build the article at.
+    Shared so a cluster's mesh links point at the exact same slugs."""
+    return '/blog/' + (slugify(keyword) or 'article')
+
+
 def build_article_brief_prompt(keyword, site, stack: str = 'generic',
                                language: str = 'fr', intent: str = 'info',
-                               suggested_title=None) -> str:
+                               suggested_title=None, role: str = 'article',
+                               internal_links=None) -> str:
     """Brief for an INFORMATIONAL blog article an agent writes in the client's
     own repo (build-queue fallback when Gridar has no generated copy yet).
 
@@ -749,12 +756,16 @@ def build_article_brief_prompt(keyword, site, stack: str = 'generic',
     Distinct from build_opportunity_prompt: this asks for an SEO blog article
     that answers a search intent and earns trust (E-E-A-T), not a conversion
     landing. The agent both writes the copy and builds the page.
+
+    role: 'pillar' frames it as the cluster's hub page; 'article' (default) is a
+    standalone/spoke article. internal_links: list of {title, path, role} to
+    weave in as a mandatory internal mesh (spokes -> pillar, pillar -> spokes).
     """
     lang = (language or 'fr')[:2]
     fr = lang == 'fr'
     domain, domain_is_real = _site_domain(site, lang)
 
-    url_path = '/blog/' + (slugify(keyword) or 'article')
+    url_path = article_url_path(keyword)
     slug = url_path.lstrip('/')
     canonical = f'https://{domain}{url_path}'
     title = suggested_title or keyword
@@ -911,5 +922,45 @@ def build_article_brief_prompt(keyword, site, stack: str = 'generic',
             "- [ ] JSON-LD Article + FAQPage present in head\n"
             "- [ ] Vocabulary, currency and conventions match the target market"
         )
+
+    # Internal mesh (topic cluster): weave links so authority flows spokes <->
+    # pillar. Inserted after the checklist, same section for both languages.
+    links = [l for l in (internal_links or []) if l.get('path')]
+    if links:
+        if fr:
+            head = (
+                "## Maillage interne (OBLIGATOIRE)\n"
+                + ("Cet article est le PILIER du cluster. Ajoute une section "
+                   "\"Dans ce guide\" qui renvoie vers CHACUN de ces articles "
+                   "satellites, et cite-les aussi en contexte dans le corps :\n"
+                   if role == 'pillar'
+                   else "Ajoute un lien contextuel (ancre naturelle dans le "
+                        "corps, pas en pied de page) vers le PILIER du cluster :\n")
+            )
+            rows = '\n'.join(
+                f"- [{l.get('title') or l.get('keyword')}]({l['path']})"
+                + (" (pilier)" if l.get('role') == 'pillar' else "")
+                for l in links
+            )
+            tail = ("\n- Ancres descriptives (le mot-cle cible du lien), jamais "
+                    "\"cliquez ici\". Liens en chemin relatif.")
+        else:
+            head = (
+                "## Internal mesh (REQUIRED)\n"
+                + ("This article is the cluster PILLAR. Add a \"In this guide\" "
+                   "section linking to EACH of these spoke articles, and cite "
+                   "them in context in the body too:\n"
+                   if role == 'pillar'
+                   else "Add one contextual link (natural in-body anchor, not a "
+                        "footer) to the cluster PILLAR:\n")
+            )
+            rows = '\n'.join(
+                f"- [{l.get('title') or l.get('keyword')}]({l['path']})"
+                + (" (pillar)" if l.get('role') == 'pillar' else "")
+                for l in links
+            )
+            tail = ("\n- Descriptive anchors (the link's target keyword), never "
+                    "\"click here\". Relative paths.")
+        sections.append(head + rows + tail)
 
     return '\n\n'.join(sections)

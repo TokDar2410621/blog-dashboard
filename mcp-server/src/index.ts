@@ -23,6 +23,7 @@ import {
   pullBuildQueue,
   markPageBuilt,
   clusterMap,
+  buildCluster,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -601,6 +602,32 @@ const MarkPageBuiltArgs = z
 const ClusterMapArgs = z
   .object({
     site_id: z.number().int().positive(),
+  })
+  .strict();
+
+const BuildClusterArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    pillar_keyword: z
+      .string()
+      .min(1)
+      .describe("The cluster's pillar (broad topic) keyword."),
+    spokes: z
+      .array(z.string().min(1))
+      .describe("The supporting subtopic keywords (spokes) of the cluster."),
+    stack: z
+      .enum([
+        "nextjs",
+        "react",
+        "html",
+        "astro",
+        "wordpress",
+        "webflow",
+        "generic",
+      ])
+      .optional()
+      .describe("Adapts the build prompts to the target stack. Default: generic."),
+    language: z.string().optional(),
   })
   .strict();
 
@@ -1223,9 +1250,22 @@ const tools: ToolDef[] = [
   {
     name: "gridar_cluster_map",
     description:
-      "See the site's TOPIC CLUSTERS: groups the site's known keywords (tracked keywords + strategic opportunities) into clusters, each with one `pillar` (the broad topic page) and its `spokes` (supporting subtopics). Each keyword carries `covered` (true if a page already exists for it) and each cluster carries `missing` (how many pages are still to build). Pure read, deterministic, no LLM call, no quota. Use it to plan topic authority, then build a cluster's missing pages (pillar + spokes) with the generation tools. Returns {clusters, total_keywords, clustered, unclustered}.",
+      "See the site's TOPIC CLUSTERS: groups the site's known keywords (tracked keywords + strategic opportunities) into clusters, each with one `pillar` (the broad topic page) and its `spokes` (supporting subtopics). Each keyword carries `covered` (true if a page already exists for it) and each cluster carries `missing` (how many pages are still to build). Pure read, deterministic, no LLM call, no quota. Use it to plan topic authority, then build a cluster with gridar_build_cluster. Returns {clusters, total_keywords, clustered, unclustered}.",
     schema: ClusterMapArgs,
     handler: (input) => clusterMap(input.site_id),
+  },
+  {
+    name: "gridar_build_cluster",
+    description:
+      "Build a whole TOPIC CLUSTER at once: returns the coordinated set of build prompts for the `pillar` page + each `spoke` article, with the INTERNAL MESH baked into every prompt (the pillar links to every spoke, each spoke links back to the pillar). Pass `pillar_keyword` and the `spokes` keywords (e.g. from gridar_cluster_map). Each returned page carries kind='article_brief' and its `id` (tracked_keyword_id): build it in the repo, then report it with gridar_mark_page_built(kind='article_brief', id, url). No LLM call here, no quota - YOU (the agent) write the copy from each prompt. Optional `stack` adapts the prompts. Returns {pillar, spokes, counts, note}.",
+    schema: BuildClusterArgs,
+    handler: (input) =>
+      buildCluster(input.site_id, {
+        pillar_keyword: input.pillar_keyword,
+        spokes: input.spokes,
+        stack: input.stack,
+        language: input.language,
+      }),
   },
 ];
 

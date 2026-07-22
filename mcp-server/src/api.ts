@@ -1037,3 +1037,34 @@ export type ClusterMapResponse = {
 export async function clusterMap(siteId: number) {
   return request<ClusterMapResponse>(`/sites/${siteId}/clusters/`);
 }
+
+export type ClusterBuildPage = {
+  kind: "article_brief";
+  id: number;
+  tracked_keyword_id: number;
+  role: "pillar" | "spoke";
+  keyword: string;
+  slug: string;
+  build_prompt: string;
+};
+
+export type ClusterBuildResponse = {
+  site_id: number;
+  stack: string;
+  language: string;
+  delivery_mode: "auto" | "agent";
+  pillar: ClusterBuildPage;
+  spokes: ClusterBuildPage[];
+  counts: { pillar: number; spokes: number };
+  note: string;
+};
+
+export async function buildCluster(
+  siteId: number,
+  body: { pillar_keyword: string; spokes: string[]; stack?: PromptStack; language?: string },
+) {
+  return request<ClusterBuildResponse>(`/sites/${siteId}/clusters/build/`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}

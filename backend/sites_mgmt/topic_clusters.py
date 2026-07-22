@@ -194,3 +194,99 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
         'clustered': clustered_count,
         'unclustered': len(records) - clustered_count,
     }
+
+
+def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
+                  language=None) -> dict:
+    """Build the coordinated prompt bundle for a whole topic cluster: the pillar
+    page + each spoke article, with the internal mesh baked into every prompt
+    (pillar -> all spokes, each spoke -> pillar).
+
+    Ensures a TrackedKeyword exists for each keyword so the agent closes the loop
+    via mark-built (kind='article_brief', id=tracked_keyword_id). No LLM call -
+    the agent writes the copy - so it works even while generation is capped.
+    """
+    from .models import TrackedKeyword
+    from .prompt_export import (
+        build_article_brief_prompt, article_url_path, normalize_stack,
+    )
+
+    stack = normalize_stack(stack)
+    lang = (language or getattr(site, 'default_language', None) or 'fr')[:2]
+
+    pillar_keyword = (pillar_keyword or '').strip()
+    if not pillar_keyword:
+        raise ValueError('pillar_keyword est requis.')
+
+    # Dedup spokes; drop any equal to the pillar.
+    seen = {_strip_accents(pillar_keyword).strip()}
+    uniq_spokes = []
+    for s in (spoke_keywords or []):
+        s = (s or '').strip()
+        k = _strip_accents(s).strip()
+        if k and k not in seen:
+            seen.add(k)
+            uniq_spokes.append(s)
+
+    def _ensure_kw(keyword):
+        tk, _ = TrackedKeyword.objects.get_or_create(
+            site=site, keyword=keyword, language=lang,
+            defaults={'intent': 'info', 'is_active': True},
+        )
+        return tk
+
+    pillar_tk = _ensure_kw(pillar_keyword)
+    pillar_path = article_url_path(pillar_keyword)
+
+    spoke_entries = [
+        {'keyword': s, 'tk': _ensure_kw(s), 'path': article_url_path(s)}
+        for s in uniq_spokes
+    ]
+
+    # Mesh: pillar -> every spoke; each spoke -> the pillar.
+    spoke_links = [
+        {'title': e['keyword'], 'path': e['path'], 'role': 'spoke'}
+        for e in spoke_entries
+    ]
+    pillar_link = [{'title': pillar_keyword, 'path': pillar_path, 'role': 'pillar'}]
+
+    pillar_out = {
+        'kind': 'article_brief',
+        'id': pillar_tk.id,
+        'tracked_keyword_id': pillar_tk.id,
+        'role': 'pillar',
+        'keyword': pillar_keyword,
+        'slug': pillar_path.lstrip('/'),
+        'build_prompt': build_article_brief_prompt(
+            pillar_keyword, site, stack=stack, language=lang, intent='info',
+            role='pillar', internal_links=spoke_links,
+        ),
+    }
+
+    spokes_out = [{
+        'kind': 'article_brief',
+        'id': e['tk'].id,
+        'tracked_keyword_id': e['tk'].id,
+        'role': 'spoke',
+        'keyword': e['keyword'],
+        'slug': e['path'].lstrip('/'),
+        'build_prompt': build_article_brief_prompt(
+            e['keyword'], site, stack=stack, language=lang, intent='info',
+            role='article', internal_links=pillar_link,
+        ),
+    } for e in spoke_entries]
+
+    return {
+        'stack': stack,
+        'language': lang,
+        'delivery_mode': site.delivery_mode,
+        'pillar': pillar_out,
+        'spokes': spokes_out,
+        'counts': {'pillar': 1, 'spokes': len(spokes_out)},
+        'note': (
+            "Construis le pilier PUIS chaque spoke dans le repo. Le maillage "
+            "interne (pilier <-> spokes) est deja specifie dans chaque prompt. "
+            "Reporte chaque page via mark-built (kind='article_brief', "
+            "id=tracked_keyword_id, url)."
+        ),
+    }

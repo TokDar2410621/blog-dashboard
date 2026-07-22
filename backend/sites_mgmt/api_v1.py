@@ -4022,3 +4022,39 @@ class V1ClusterMapView(BaseV1View):
         result = build_cluster_map(site)
         result['site_id'] = site.id
         return Response(result)
+
+
+class V1ClusterBuildView(BaseV1View):
+    """POST /api/v1/sites/<id>/clusters/build/
+
+    Body: {pillar_keyword: str, spokes: [str], stack?: str, language?: str}
+
+    Builds the coordinated prompt bundle for a whole topic cluster: the pillar
+    page + each spoke article, with the internal mesh baked into every prompt
+    (pillar -> spokes, each spoke -> pillar). Each page is tied to a tracked
+    keyword so the agent closes the loop via mark-built (kind='article_brief').
+    No LLM call, so it works even while generation is capped. Returns
+    {pillar, spokes, counts, note}.
+    """
+
+    def post(self, request, site_id):
+        from .topic_clusters import build_cluster
+        site = self.get_user_site(request, site_id)
+        pillar_keyword = (request.data.get('pillar_keyword') or '').strip()
+        if not pillar_keyword:
+            return Response({'error': 'pillar_keyword est requis.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        spokes = request.data.get('spokes') or []
+        if not isinstance(spokes, list):
+            return Response({'error': 'spokes doit etre une liste de mots-cles.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        stack = request.data.get('stack') or 'generic'
+        language = request.data.get('language')
+        try:
+            bundle = build_cluster(
+                site, pillar_keyword, spokes, stack=stack, language=language,
+            )
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        bundle['site_id'] = site.id
+        return Response(bundle)
