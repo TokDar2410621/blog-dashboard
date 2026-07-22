@@ -118,8 +118,11 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
         shared = [s for s in r['stems'] if stem_df[s] >= 2]
         if not shared:
             continue  # nothing in common with any other keyword -> unclustered
-        # Rarest shared stem = most specific subtopic; tie -> longer stem.
-        anchor_stem = min(shared, key=lambda s: (stem_df[s], -len(s)))
+        # Rarest shared stem = most specific subtopic; tie -> longer stem, then
+        # the stem itself so the key is a TOTAL order. Without the final `s`,
+        # min() falls back to set-iteration order (hash-seed dependent) and the
+        # clustering becomes non-deterministic across process restarts.
+        anchor_stem = min(shared, key=lambda s: (stem_df[s], -len(s), s))
         groups[anchor_stem].append(i)
 
     # 3) Coverage: a keyword is "covered" if a page slug matches it, or a
@@ -184,8 +187,10 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
             'spokes': spokes_out,
         })
 
-    # Biggest, least-covered clusters first (most opportunity).
-    clusters.sort(key=lambda c: (c['missing'], c['size']), reverse=True)
+    # Biggest, least-covered clusters first (most opportunity). Anchor as final
+    # tie-break so equal (missing, size) clusters keep a stable, deterministic
+    # order regardless of dict iteration.
+    clusters.sort(key=lambda c: (-c['missing'], -c['size'], c['anchor']))
     clusters = clusters[:max_clusters]
 
     return {
@@ -212,36 +217,43 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
     )
 
     stack = normalize_stack(stack)
-    lang = (language or getattr(site, 'default_language', None) or 'fr')[:2]
+    fallback_lang = (language or getattr(site, 'default_language', None) or 'fr')[:2]
 
     pillar_keyword = (pillar_keyword or '').strip()
     if not pillar_keyword:
         raise ValueError('pillar_keyword est requis.')
 
-    # Dedup spokes; drop any equal to the pillar.
-    seen = {_strip_accents(pillar_keyword).strip()}
-    uniq_spokes = []
-    for s in (spoke_keywords or []):
-        s = (s or '').strip()
-        k = _strip_accents(s).strip()
-        if k and k not in seen:
-            seen.add(k)
-            uniq_spokes.append(s)
-
     def _ensure_kw(keyword):
+        """Reuse the keyword's already-tracked language when it exists (so a
+        multilingual site never gets a wrong-language brief or a duplicate
+        row); otherwise fall back to the cluster language."""
+        existing = (TrackedKeyword.objects
+                    .filter(site=site, keyword=keyword)
+                    .order_by('id').first())
+        kw_lang = existing.language if existing else fallback_lang
         tk, _ = TrackedKeyword.objects.get_or_create(
-            site=site, keyword=keyword, language=lang,
+            site=site, keyword=keyword, language=kw_lang,
             defaults={'intent': 'info', 'is_active': True},
         )
         return tk
 
-    pillar_tk = _ensure_kw(pillar_keyword)
+    # Dedup on the SLUG - what actually becomes the page URL. Two keywords that
+    # slugify to the same path ('sur mesure' vs 'sur-mesure') would build the
+    # same page and self-link the mesh, so keep only the first per slug.
     pillar_path = article_url_path(pillar_keyword)
+    seen_slugs = {slugify(pillar_keyword)}
+    pillar_tk = _ensure_kw(pillar_keyword)
 
-    spoke_entries = [
-        {'keyword': s, 'tk': _ensure_kw(s), 'path': article_url_path(s)}
-        for s in uniq_spokes
-    ]
+    spoke_entries = []
+    for s in (spoke_keywords or []):
+        s = (s or '').strip()
+        sl = slugify(s)
+        if not sl or sl in seen_slugs:
+            continue
+        seen_slugs.add(sl)
+        spoke_entries.append({
+            'keyword': s, 'tk': _ensure_kw(s), 'path': article_url_path(s),
+        })
 
     # Mesh: pillar -> every spoke; each spoke -> the pillar.
     spoke_links = [
@@ -256,10 +268,11 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
         'tracked_keyword_id': pillar_tk.id,
         'role': 'pillar',
         'keyword': pillar_keyword,
+        'language': pillar_tk.language,
         'slug': pillar_path.lstrip('/'),
         'build_prompt': build_article_brief_prompt(
-            pillar_keyword, site, stack=stack, language=lang, intent='info',
-            role='pillar', internal_links=spoke_links,
+            pillar_keyword, site, stack=stack, language=pillar_tk.language,
+            intent='info', role='pillar', internal_links=spoke_links,
         ),
     }
 
@@ -269,16 +282,17 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
         'tracked_keyword_id': e['tk'].id,
         'role': 'spoke',
         'keyword': e['keyword'],
+        'language': e['tk'].language,
         'slug': e['path'].lstrip('/'),
         'build_prompt': build_article_brief_prompt(
-            e['keyword'], site, stack=stack, language=lang, intent='info',
-            role='article', internal_links=pillar_link,
+            e['keyword'], site, stack=stack, language=e['tk'].language,
+            intent='info', role='article', internal_links=pillar_link,
         ),
     } for e in spoke_entries]
 
     return {
         'stack': stack,
-        'language': lang,
+        'language': pillar_tk.language,
         'delivery_mode': site.delivery_mode,
         'pillar': pillar_out,
         'spokes': spokes_out,

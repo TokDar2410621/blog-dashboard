@@ -4045,8 +4045,8 @@ class V1ClusterBuildView(BaseV1View):
             return Response({'error': 'pillar_keyword est requis.'},
                             status=status.HTTP_400_BAD_REQUEST)
         spokes = request.data.get('spokes') or []
-        if not isinstance(spokes, list):
-            return Response({'error': 'spokes doit etre une liste de mots-cles.'},
+        if not isinstance(spokes, list) or not all(isinstance(x, str) for x in spokes):
+            return Response({'error': 'spokes doit etre une liste de chaines (mots-cles).'},
                             status=status.HTTP_400_BAD_REQUEST)
         stack = request.data.get('stack') or 'generic'
         language = request.data.get('language')

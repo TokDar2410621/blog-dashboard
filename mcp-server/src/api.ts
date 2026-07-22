@@ -1044,6 +1044,7 @@ export type ClusterBuildPage = {
   tracked_keyword_id: number;
   role: "pillar" | "spoke";
   keyword: string;
+  language: string;
   slug: string;
   build_prompt: string;
 };
