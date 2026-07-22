@@ -49,6 +49,12 @@ def _tokens(keyword: str) -> set[str]:
     return {w for w in words if len(w) >= 3 and w not in _STOP and not w.isdigit()}
 
 
+def _stem(token: str) -> str:
+    """Light prefix stem so 'menuiserie'/'menuisier'/'menuisiers' collapse to
+    the same topic anchor ('menui'). Short tokens are kept whole."""
+    return token[:5] if len(token) > 5 else token
+
+
 def _pillar_title(keyword: str, language: str) -> str:
     kw = keyword.strip()
     if (language or 'fr')[:2] == 'fr':
@@ -91,31 +97,30 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
                .exclude(status='dismissed')):
         _add(op.keyword, op.language, op.intent, 'opportunity')
 
-    # 2) Union-find on shared significant tokens -> connected components.
-    parent = list(range(len(records)))
-
-    def _find(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    def _union(i, j):
-        ri, rj = _find(i), _find(j)
-        if ri != rj:
-            parent[max(ri, rj)] = min(ri, rj)
-
-    token_to_idx = defaultdict(list)
-    for i, r in enumerate(records):
+    # 2) Anchor each keyword on its RAREST shared stem. Union-find on any shared
+    #    token collapses everything through ubiquitous geo/theme tokens
+    #    ("yaounde", "cameroun") into one useless blob. The rarest stem that
+    #    still appears in >=2 keywords is the SUBTOPIC (cuisine, dressing,
+    #    menuiserie), not the location - exactly the topic-cluster anchor.
+    for r in records:
+        stem_to_tok = {}
         for t in r['tokens']:
-            token_to_idx[t].append(i)
-    for idxs in token_to_idx.values():
-        for j in idxs[1:]:
-            _union(idxs[0], j)
+            stem_to_tok.setdefault(_stem(t), t)  # first full token wins per stem
+        r['stem_to_tok'] = stem_to_tok
+        r['stems'] = set(stem_to_tok)
+
+    stem_df = Counter()
+    for r in records:
+        stem_df.update(r['stems'])
 
     groups = defaultdict(list)
-    for i in range(len(records)):
-        groups[_find(i)].append(i)
+    for i, r in enumerate(records):
+        shared = [s for s in r['stems'] if stem_df[s] >= 2]
+        if not shared:
+            continue  # nothing in common with any other keyword -> unclustered
+        # Rarest shared stem = most specific subtopic; tie -> longer stem.
+        anchor_stem = min(shared, key=lambda s: (stem_df[s], -len(s)))
+        groups[anchor_stem].append(i)
 
     # 3) Coverage: a keyword is "covered" if a page slug matches it, or a
     #    tracked keyword already points at a target_url.
@@ -137,15 +142,18 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
     # 4) Shape clusters (size >= min), pillar = broadest keyword.
     clusters = []
     clustered_count = 0
-    for idxs in groups.values():
+    for anchor_stem, idxs in groups.items():
         if len(idxs) < min_cluster_size:
             continue
         members = [records[i] for i in idxs]
         clustered_count += len(members)
-        counter = Counter()
-        for m in members:
-            counter.update(m['tokens'])
-        anchor = counter.most_common(1)[0][0] if counter else ''
+        # Display anchor = the most common FULL token behind the anchor stem
+        # (e.g. stem 'menui' -> 'menuiserie'), never the ubiquitous geo token.
+        tok_counter = Counter(
+            m['stem_to_tok'][anchor_stem]
+            for m in members if anchor_stem in m['stem_to_tok']
+        )
+        anchor = tok_counter.most_common(1)[0][0] if tok_counter else anchor_stem
         # Broadest keyword = fewest tokens, then shortest string.
         pillar = min(members, key=lambda m: (len(m['tokens']), len(m['keyword'])))
         spokes = [m for m in members if m is not pillar]
