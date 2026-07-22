@@ -4005,3 +4005,20 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
 
         return Response({'error': "kind doit etre 'landing', 'article' ou 'article_brief'."},
                         status=status.HTTP_400_BAD_REQUEST)
+
+
+class V1ClusterMapView(BaseV1View):
+    """GET /api/v1/sites/<id>/clusters/
+
+    Site-wide topic cluster map: groups the site's known keywords (tracked +
+    strategic opportunities) into topic clusters (one pillar + N spokes) and
+    flags which keywords already have a page. Deterministic, no LLM call, no
+    quota. Feed a cluster to the build endpoint to generate the whole thing.
+    """
+
+    def get(self, request, site_id):
+        from .topic_clusters import build_cluster_map
+        site = self.get_user_site(request, site_id)
+        result = build_cluster_map(site)
+        result['site_id'] = site.id
+        return Response(result)

@@ -22,6 +22,7 @@ import {
   exportPagePrompt,
   pullBuildQueue,
   markPageBuilt,
+  clusterMap,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -594,6 +595,12 @@ const MarkPageBuiltArgs = z
       .string()
       .url()
       .describe("The live URL of the page you built in the client's site."),
+  })
+  .strict();
+
+const ClusterMapArgs = z
+  .object({
+    site_id: z.number().int().positive(),
   })
   .strict();
 
@@ -1212,6 +1219,13 @@ const tools: ToolDef[] = [
         id: input.id,
         url: input.url,
       }),
+  },
+  {
+    name: "gridar_cluster_map",
+    description:
+      "See the site's TOPIC CLUSTERS: groups the site's known keywords (tracked keywords + strategic opportunities) into clusters, each with one `pillar` (the broad topic page) and its `spokes` (supporting subtopics). Each keyword carries `covered` (true if a page already exists for it) and each cluster carries `missing` (how many pages are still to build). Pure read, deterministic, no LLM call, no quota. Use it to plan topic authority, then build a cluster's missing pages (pillar + spokes) with the generation tools. Returns {clusters, total_keywords, clustered, unclustered}.",
+    schema: ClusterMapArgs,
+    handler: (input) => clusterMap(input.site_id),
   },
 ];
 

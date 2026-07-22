@@ -999,3 +999,41 @@ export async function markPageBuilt(
     { method: "POST", body: JSON.stringify(body) },
   );
 }
+
+// ── Topic clusters ────────────────────────────────────────────────────────
+
+export type ClusterSpoke = {
+  keyword: string;
+  language: string;
+  intent: string;
+  source: string;
+  covered: boolean;
+};
+
+export type TopicCluster = {
+  anchor: string;
+  size: number;
+  missing: number;
+  pillar: {
+    keyword: string;
+    language: string;
+    intent: string;
+    suggested_title: string;
+    suggested_slug: string;
+    source: string;
+    covered: boolean;
+  };
+  spokes: ClusterSpoke[];
+};
+
+export type ClusterMapResponse = {
+  site_id: number;
+  clusters: TopicCluster[];
+  total_keywords: number;
+  clustered: number;
+  unclustered: number;
+};
+
+export async function clusterMap(siteId: number) {
+  return request<ClusterMapResponse>(`/sites/${siteId}/clusters/`);
+}
