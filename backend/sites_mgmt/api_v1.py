@@ -4050,9 +4050,11 @@ class V1ClusterBuildView(BaseV1View):
                             status=status.HTTP_400_BAD_REQUEST)
         stack = request.data.get('stack') or 'generic'
         language = request.data.get('language')
+        pillar_slug = request.data.get('pillar_slug')
         try:
             bundle = build_cluster(
                 site, pillar_keyword, spokes, stack=stack, language=language,
+                pillar_slug=pillar_slug,
             )
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -28,6 +28,8 @@ import {
   AlertCircle,
   Hexagon,
   List as ListIcon,
+  Layers,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
@@ -57,6 +59,21 @@ type ClusterResult = {
   clusters: Cluster[];
   unassigned: { slug: string; title: string }[];
   message?: string;
+};
+
+type ClusterBuildPage = {
+  role: "pillar" | "spoke";
+  exists: boolean;
+  keyword: string;
+  slug: string;
+  build_prompt?: string;
+};
+
+type ClusterBuild = {
+  pillar: ClusterBuildPage;
+  spokes: ClusterBuildPage[];
+  counts: { pillar: number; spokes: number };
+  note: string;
 };
 
 export function TopicClustersPage() {
@@ -97,6 +114,48 @@ export function TopicClustersPage() {
     onSuccess: (d) => setData(d),
     onError: (err: Error) => toast.error(err.message),
   });
+
+  // "Construire tout le cluster": generate the coordinated build bundle (pillar
+  // + every missing spoke) with the internal mesh baked into each prompt. The
+  // existing pillar is linked, not rebuilt. No LLM/quota - the agent writes it.
+  const [buildResult, setBuildResult] = useState<{
+    idx: number;
+    bundle: ClusterBuild;
+  } | null>(null);
+
+  const buildMutation = useMutation({
+    mutationFn: async (vars: { idx: number; cluster: Cluster }) => {
+      const c = vars.cluster;
+      const spokeTitles = [
+        ...c.suggested_new_articles.map((s) => s.title),
+        ...c.spokes.filter((s) => !s.exists).map((s) => s.title),
+      ];
+      const res = await authFetch(`/sites/${siteId}/clusters/build/`, {
+        method: "POST",
+        body: JSON.stringify({
+          pillar_keyword: c.pillar?.title || c.theme,
+          pillar_slug: c.pillar?.exists ? c.pillar.slug : undefined,
+          spokes: spokeTitles,
+          language,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur lors de la construction");
+      }
+      const bundle = (await res.json()) as ClusterBuild;
+      return { idx: vars.idx, bundle };
+    },
+    onSuccess: (r) => setBuildResult(r),
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const copyPrompt = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => toast.success("Prompt copié"),
+      () => toast.error("Copie impossible"),
+    );
+  };
 
   /**
    * Map the backend cluster shape to the hex grid shape consumed by TopicalMap.
@@ -388,6 +447,75 @@ export function TopicClustersPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Build the whole cluster at once (pillar linked, spokes
+                    generated) with the internal mesh baked in. */}
+                {(cluster.suggested_new_articles.length > 0 ||
+                  cluster.spokes.some((s) => !s.exists)) && (
+                  <div className="pt-1 border-t">
+                    <Button
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => buildMutation.mutate({ idx, cluster })}
+                      disabled={buildMutation.isPending}
+                    >
+                      {buildMutation.isPending &&
+                      buildMutation.variables?.idx === idx ? (
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      ) : (
+                        <Layers className="h-3 w-3 mr-1" />
+                      )}
+                      Construire tout le cluster (maillage inclus)
+                    </Button>
+                  </div>
+                )}
+
+                {buildResult?.idx === idx && (
+                  <div className="border rounded-lg p-3 bg-muted/30 space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        <Layers className="h-4 w-4" />
+                        Bundle du cluster (maillage pilier ↔ spokes inclus)
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {buildResult.bundle.pillar.exists
+                          ? "pilier existant lié"
+                          : "pilier à construire"}{" "}
+                        · {buildResult.bundle.spokes.length} article(s)
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {buildResult.bundle.note}
+                    </p>
+                    {[buildResult.bundle.pillar, ...buildResult.bundle.spokes]
+                      .filter((p) => p.build_prompt)
+                      .map((p, i) => (
+                        <div
+                          key={i}
+                          className="border rounded p-2 bg-background flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {p.role === "pillar" ? "Pilier" : "Spoke"} ·{" "}
+                              {p.keyword}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">
+                              /{p.slug}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0"
+                            onClick={() => copyPrompt(p.build_prompt as string)}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copier le prompt
+                          </Button>
+                        </div>
+                      ))}
                   </div>
                 )}
               </CardContent>

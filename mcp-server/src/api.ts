@@ -1039,14 +1039,16 @@ export async function clusterMap(siteId: number) {
 }
 
 export type ClusterBuildPage = {
-  kind: "article_brief";
-  id: number;
-  tracked_keyword_id: number;
   role: "pillar" | "spoke";
+  exists: boolean;
   keyword: string;
   language: string;
   slug: string;
-  build_prompt: string;
+  // Present only for pages to BUILD (an existing pillar omits them).
+  kind?: "article_brief";
+  id?: number;
+  tracked_keyword_id?: number;
+  build_prompt?: string;
 };
 
 export type ClusterBuildResponse = {
@@ -1062,7 +1064,7 @@ export type ClusterBuildResponse = {
 
 export async function buildCluster(
   siteId: number,
-  body: { pillar_keyword: string; spokes: string[]; stack?: PromptStack; language?: string },
+  body: { pillar_keyword: string; spokes: string[]; stack?: PromptStack; language?: string; pillar_slug?: string },
 ) {
   return request<ClusterBuildResponse>(`/sites/${siteId}/clusters/build/`, {
     method: "POST",

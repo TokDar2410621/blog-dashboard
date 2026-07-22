@@ -628,6 +628,13 @@ const BuildClusterArgs = z
       .optional()
       .describe("Adapts the build prompts to the target stack. Default: generic."),
     language: z.string().optional(),
+    pillar_slug: z
+      .string()
+      .optional()
+      .describe(
+        "If the pillar already exists as an article, its slug. Then the pillar " +
+          "is not rebuilt - spokes just link to it. Omit to build the pillar too.",
+      ),
   })
   .strict();
 
@@ -1265,6 +1272,7 @@ const tools: ToolDef[] = [
         spokes: input.spokes,
         stack: input.stack,
         language: input.language,
+        pillar_slug: input.pillar_slug,
       }),
   },
 ];

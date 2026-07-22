@@ -202,7 +202,7 @@ def build_cluster_map(site, min_cluster_size: int = 2, max_clusters: int = 40) -
 
 
 def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
-                  language=None) -> dict:
+                  language=None, pillar_slug=None) -> dict:
     """Build the coordinated prompt bundle for a whole topic cluster: the pillar
     page + each spoke article, with the internal mesh baked into every prompt
     (pillar -> all spokes, each spoke -> pillar).
@@ -210,6 +210,11 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
     Ensures a TrackedKeyword exists for each keyword so the agent closes the loop
     via mark-built (kind='article_brief', id=tracked_keyword_id). No LLM call -
     the agent writes the copy - so it works even while generation is capped.
+
+    pillar_slug: when the pillar ALREADY exists as an article (e.g. wired from
+    the Gemini topic-cluster map's existing pillar), pass its slug - the pillar
+    is NOT rebuilt, the spokes just link to it at /blog/<slug>. Omit it to build
+    the pillar too.
     """
     from .models import TrackedKeyword
     from .prompt_export import (
@@ -237,12 +242,22 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
         )
         return tk
 
-    # Dedup on the SLUG - what actually becomes the page URL. Two keywords that
-    # slugify to the same path ('sur mesure' vs 'sur-mesure') would build the
-    # same page and self-link the mesh, so keep only the first per slug.
-    pillar_path = article_url_path(pillar_keyword)
-    seen_slugs = {slugify(pillar_keyword)}
-    pillar_tk = _ensure_kw(pillar_keyword)
+    # Pillar path: an existing pillar keeps its own slug (spokes just link to
+    # it, it is not rebuilt); otherwise we build it at its article path.
+    pillar_slug = (pillar_slug or '').strip()
+    pillar_exists = bool(pillar_slug)
+    if pillar_exists:
+        pillar_path = '/blog/' + (slugify(pillar_slug) or 'pilier')
+        pillar_tk = None
+        pillar_lang = fallback_lang
+    else:
+        pillar_path = article_url_path(pillar_keyword)
+        pillar_tk = _ensure_kw(pillar_keyword)
+        pillar_lang = pillar_tk.language
+
+    # Dedup spokes on the SLUG - two keywords slugifying to the same path (or to
+    # the pillar's) would build the same page and self-link the mesh.
+    seen_slugs = {pillar_path.lstrip('/').split('/')[-1]}
 
     spoke_entries = []
     for s in (spoke_keywords or []):
@@ -262,25 +277,37 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
     ]
     pillar_link = [{'title': pillar_keyword, 'path': pillar_path, 'role': 'pillar'}]
 
-    pillar_out = {
-        'kind': 'article_brief',
-        'id': pillar_tk.id,
-        'tracked_keyword_id': pillar_tk.id,
-        'role': 'pillar',
-        'keyword': pillar_keyword,
-        'language': pillar_tk.language,
-        'slug': pillar_path.lstrip('/'),
-        'build_prompt': build_article_brief_prompt(
-            pillar_keyword, site, stack=stack, language=pillar_tk.language,
-            intent='info', role='pillar', internal_links=spoke_links,
-        ),
-    }
+    if pillar_exists:
+        # Existing pillar: no rebuild, spokes just link to it.
+        pillar_out = {
+            'role': 'pillar',
+            'exists': True,
+            'keyword': pillar_keyword,
+            'language': pillar_lang,
+            'slug': pillar_path.lstrip('/'),
+        }
+    else:
+        pillar_out = {
+            'kind': 'article_brief',
+            'id': pillar_tk.id,
+            'tracked_keyword_id': pillar_tk.id,
+            'role': 'pillar',
+            'exists': False,
+            'keyword': pillar_keyword,
+            'language': pillar_lang,
+            'slug': pillar_path.lstrip('/'),
+            'build_prompt': build_article_brief_prompt(
+                pillar_keyword, site, stack=stack, language=pillar_lang,
+                intent='info', role='pillar', internal_links=spoke_links,
+            ),
+        }
 
     spokes_out = [{
         'kind': 'article_brief',
         'id': e['tk'].id,
         'tracked_keyword_id': e['tk'].id,
         'role': 'spoke',
+        'exists': False,
         'keyword': e['keyword'],
         'language': e['tk'].language,
         'slug': e['path'].lstrip('/'),
@@ -292,11 +319,14 @@ def build_cluster(site, pillar_keyword, spoke_keywords, stack='generic',
 
     return {
         'stack': stack,
-        'language': pillar_tk.language,
+        'language': pillar_lang,
         'delivery_mode': site.delivery_mode,
         'pillar': pillar_out,
         'spokes': spokes_out,
-        'counts': {'pillar': 1, 'spokes': len(spokes_out)},
+        'counts': {
+            'pillar': 0 if pillar_exists else 1,
+            'spokes': len(spokes_out),
+        },
         'note': (
             "Construis le pilier PUIS chaque spoke dans le repo. Le maillage "
             "interne (pilier <-> spokes) est deja specifie dans chaque prompt. "
