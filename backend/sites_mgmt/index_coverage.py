@@ -112,8 +112,12 @@ def _fetch_sitemap_urls(base_url: str, cap: int = 500) -> list[str]:
     return out
 
 
-def _serper_site_urls(domain: str, pages: int = 3, num: int = 100) -> set[str]:
-    """Collect the URLs Google surfaces for `site:<domain>` (normalized)."""
+def _serper_site_urls(domain: str, pages: int = 8, num: int = 10) -> set[str]:
+    """Collect the URLs Google surfaces for `site:<domain>` (normalized).
+
+    num stays at 10: Serper rejects num>10 on the current plan ("Query pattern
+    not allowed for free accounts"), so we page through results instead.
+    """
     api_key = os.environ.get('SERPER_API_KEY')
     if not api_key or not domain:
         return set()
