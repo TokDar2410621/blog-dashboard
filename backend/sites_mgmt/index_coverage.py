@@ -152,6 +152,38 @@ def _serper_site_urls(domain: str, pages: int = 8, num: int = 10) -> set[str]:
     return found
 
 
+def _resolve_gsc_property(service, site) -> str:
+    """The GSC property (siteUrl) to inspect against, matching how the user
+    actually verified it.
+
+    The stored gsc_property_url is often a URL-prefix ('https://site.com/') that
+    is NOT a verified property when the user set up a DOMAIN property
+    ('sc-domain:site.com'). URL Inspection is strict about ownership, so we map
+    to a property the token actually owns (403 'You do not own this site'
+    otherwise). Falls back to the stored value if the listing fails.
+    """
+    stored = (site.gsc_property_url or '').strip()
+    try:
+        entries = service.sites().list().execute().get('siteEntry', []) or []
+    except Exception as exc:
+        logger.info('index_coverage: sites().list failed: %s', exc)
+        return stored
+    owned = {
+        e.get('siteUrl') for e in entries
+        if e.get('permissionLevel') in ('siteOwner', 'siteFullUser')
+    }
+    if stored in owned:
+        return stored
+    host = urlparse(stored if stored.startswith('http') else 'https://' + stored).netloc.lower()
+    host = host.split(':')[0]
+    if host.startswith('www.'):
+        host = host[4:]
+    for candidate in (f'sc-domain:{host}', f'https://{host}/', f'http://{host}/'):
+        if candidate in owned:
+            return candidate
+    return stored
+
+
 def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> dict:
     """Authoritative per-URL index status via GSC URL Inspection. Returns
     {norm_url: {verdict, coverage_state, indexed, robots, last_crawl}}. Best
@@ -160,7 +192,7 @@ def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> dict:
     service = _build_gsc_service(site)
     if service is None:
         return {}
-    site_url = site.gsc_property_url
+    site_url = _resolve_gsc_property(service, site)
     out: dict = {}
     for url in urls[:cap]:
         try:
