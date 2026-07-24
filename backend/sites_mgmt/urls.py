@@ -67,7 +67,7 @@ from .api_v1 import (
     V1StrategicOpportunityActionView,
     V1LandingPromptView, V1OpportunityPromptView,
     V1BuildQueueView, V1BuildQueueMarkBuiltView, V1ClusterMapView,
-    V1ClusterBuildView,
+    V1ClusterBuildView, V1IndexCoverageView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -286,6 +286,8 @@ urlpatterns = [
          V1ClusterMapView.as_view(), name='v1-clusters'),
     path('v1/sites/<int:site_id>/clusters/build/',
          V1ClusterBuildView.as_view(), name='v1-clusters-build'),
+    path('v1/sites/<int:site_id>/index-coverage/',
+         V1IndexCoverageView.as_view(), name='v1-index-coverage'),
     path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/<str:action>/',
          V1StrategicOpportunityActionView.as_view(),
          name='v1-strategic-opportunity-action'),

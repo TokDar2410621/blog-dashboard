@@ -24,6 +24,7 @@ import {
   markPageBuilt,
   clusterMap,
   buildCluster,
+  indexCoverage,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -602,6 +603,22 @@ const MarkPageBuiltArgs = z
 const ClusterMapArgs = z
   .object({
     site_id: z.number().int().positive(),
+  })
+  .strict();
+
+const IndexCoverageArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    max_inspect: z
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe(
+        "How many expected pages to check with the authoritative GSC URL " +
+          "Inspection API (rate-limited). Default 25. Ignored when GSC is not connected.",
+      ),
   })
   .strict();
 
@@ -1274,6 +1291,13 @@ const tools: ToolDef[] = [
         language: input.language,
         pillar_slug: input.pillar_slug,
       }),
+  },
+  {
+    name: "gridar_index_coverage",
+    description:
+      "Check which of a site's pages Google has actually INDEXED. Cross-references the site's expected pages (its sitemap.xml, or the pages Gridar knows about) against `site:<domain>` (works on ANY site, no auth, approximate) and, when GSC is connected, the AUTHORITATIVE GSC URL Inspection status plus the REASON a page is not indexed (crawled-not-indexed, blocked by robots, noindex, canonical, etc.). No LLM, no quota. Returns {coverage_pct, indexed_count, not_indexed, orphans, pages, gsc_used, ...}. Great for spotting pages that exist but Google never indexed.",
+    schema: IndexCoverageArgs,
+    handler: (input) => indexCoverage(input.site_id, input.max_inspect),
   },
 ];
 

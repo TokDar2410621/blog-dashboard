@@ -1071,3 +1071,36 @@ export async function buildCluster(
     body: JSON.stringify(body),
   });
 }
+
+// ── Index coverage ─────────────────────────────────────────────────────────
+
+export type IndexCoveragePage = {
+  url: string;
+  indexed: boolean;
+  reason: string;
+  source: "gsc" | "serper";
+};
+
+export type IndexCoverageResponse = {
+  site_id: number;
+  domain: string;
+  sitemap_found: boolean;
+  method: "gsc+serper" | "serper";
+  gsc_used: boolean;
+  total_expected: number;
+  indexed_count: number;
+  not_indexed_count: number;
+  coverage_pct: number | null;
+  google_knows_count: number;
+  inspected: number;
+  pages: IndexCoveragePage[];
+  not_indexed: IndexCoveragePage[];
+  orphans: string[];
+  note: string;
+  error?: string;
+};
+
+export async function indexCoverage(siteId: number, maxInspect?: number) {
+  const qs = maxInspect != null ? `?max_inspect=${maxInspect}` : "";
+  return request<IndexCoverageResponse>(`/sites/${siteId}/index-coverage/${qs}`);
+}

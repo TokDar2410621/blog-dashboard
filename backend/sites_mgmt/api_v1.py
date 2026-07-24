@@ -4060,3 +4060,24 @@ class V1ClusterBuildView(BaseV1View):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         bundle['site_id'] = site.id
         return Response(bundle)
+
+
+class V1IndexCoverageView(BaseV1View):
+    """GET /api/v1/sites/<id>/index-coverage/?max_inspect=25
+
+    Which of the site's expected pages Google has actually indexed. Cross-refs
+    the sitemap (or Gridar-known pages) against `site:<domain>` (works on any
+    site) and, when GSC is connected, the authoritative GSC URL Inspection
+    status + the reason a page is not indexed. No LLM, no quota.
+    """
+
+    def get(self, request, site_id):
+        from .index_coverage import index_coverage
+        site = self.get_user_site(request, site_id)
+        try:
+            max_inspect = max(0, min(int(request.query_params.get('max_inspect') or 25), 100))
+        except (TypeError, ValueError):
+            max_inspect = 25
+        result = index_coverage(site, max_inspect=max_inspect)
+        result['site_id'] = site.id
+        return Response(result)
