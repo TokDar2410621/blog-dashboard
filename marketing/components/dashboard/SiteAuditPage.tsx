@@ -10,7 +10,7 @@
  */
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { authFetch, listStrategicOpportunities } from "@/lib/api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,18 @@ import {
 } from "@/components/ui/tooltip";
 import { describeLastChecked, rankState } from "@/lib/rank-display";
 
+type IndexCoverage = {
+  domain: string;
+  coverage_pct: number | null;
+  total_expected: number;
+  indexed_count: number;
+  not_indexed_count: number;
+  google_knows_count: number;
+  gsc_used: boolean;
+  sitemap_found: boolean;
+  not_indexed: { url: string; reason: string; source: string }[];
+  note: string;
+};
 type ScoreComponent = { name: string; score: number; weight: number };
 type Reco = {
   severity: "high" | "medium" | "low";
@@ -262,6 +274,19 @@ export function SiteAuditPage() {
     fullQuery.refetch();
     fastQuery.refetch();
   };
+
+  // Index coverage fires external calls (sitemap + Serper site: + GSC), so it
+  // runs on-demand via a button - not part of the auto-loaded audit payload.
+  const indexMutation = useMutation({
+    mutationFn: async () => {
+      const res = await authFetch(`/sites/${siteId}/index-coverage/?max_inspect=20`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erreur indexation");
+      }
+      return (await res.json()) as IndexCoverage;
+    },
+  });
 
   // Strategic opportunities count - tiny GET, used to render the teaser
   // card. Doesn't block the page; if it 404s we just hide the teaser.
@@ -726,6 +751,132 @@ export function SiteAuditPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Indexation - on-demand (external calls) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Indexation Google
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!indexMutation.data && !indexMutation.isPending && !indexMutation.isError && (
+            <div className="text-sm text-muted-foreground space-y-3">
+              <p>
+                Combien de tes pages Google a-t-il vraiment indexees ? On croise
+                ton sitemap avec ce que Google montre (site:) et, si GSC est
+                connecte, le statut exact + la raison de non-indexation.
+              </p>
+              <Button size="sm" onClick={() => indexMutation.mutate()}>
+                <Search className="h-3.5 w-3.5 mr-1.5" />
+                Verifier l&apos;indexation
+              </Button>
+            </div>
+          )}
+          {indexMutation.isPending && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Analyse en cours (sitemap + Google)...
+            </div>
+          )}
+          {indexMutation.isError && (
+            <div className="text-sm space-y-2">
+              <p className="text-destructive">
+                {(indexMutation.error as Error)?.message || "Erreur"}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => indexMutation.mutate()}>
+                Reessayer
+              </Button>
+            </div>
+          )}
+          {indexMutation.data && (() => {
+            const d = indexMutation.data;
+            const pct = d.coverage_pct;
+            const pctColor =
+              pct == null
+                ? ""
+                : pct >= 80
+                ? "text-emerald-500"
+                : pct >= 50
+                ? "text-amber-500"
+                : "text-destructive";
+            return (
+              <div className="space-y-3">
+                <div className="flex items-baseline gap-6 flex-wrap">
+                  <div>
+                    <div className={`text-3xl font-bold tabular-nums ${pctColor}`}>
+                      {pct == null ? "-" : `${pct}%`}
+                    </div>
+                    <div className="text-[10px] uppercase text-muted-foreground">
+                      Couverture
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-emerald-500 tabular-nums">
+                      {d.indexed_count}
+                    </div>
+                    <div className="text-[10px] uppercase text-muted-foreground">
+                      Indexees
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-destructive tabular-nums">
+                      {d.not_indexed_count}
+                    </div>
+                    <div className="text-[10px] uppercase text-muted-foreground">
+                      Pas indexees
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold tabular-nums">
+                      {d.google_knows_count}
+                    </div>
+                    <div className="text-[10px] uppercase text-muted-foreground">
+                      Vues par Google
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{d.note}</p>
+                {!d.gsc_used && (
+                  <Link href={`${base}/parametres/gsc`}>
+                    <Button size="sm" variant="outline">
+                      Connecter GSC pour le statut exact + la raison
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                    </Button>
+                  </Link>
+                )}
+                {d.not_indexed.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium mb-1">
+                      Pages pas indexees ({d.not_indexed.length})
+                    </div>
+                    <div className="space-y-1 max-h-52 overflow-y-auto">
+                      {d.not_indexed.slice(0, 15).map((p) => (
+                        <div
+                          key={p.url}
+                          className="text-xs border-b border-border/30 py-1"
+                        >
+                          <div className="truncate font-mono">{p.url}</div>
+                          <div className="text-muted-foreground">{p.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => indexMutation.mutate()}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Relancer
+                </Button>
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       {!data.gsc_connected && (
         <div className="text-xs text-muted-foreground text-center pt-4">
