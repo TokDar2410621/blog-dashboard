@@ -35,7 +35,9 @@ def _public_base(site):
     if not raw.startswith(('http://', 'https://')):
         raw = 'https://' + raw
     parsed = urlparse(raw)
-    host = (parsed.netloc or '').lower().lstrip('www.')
+    host = (parsed.netloc or '').lower().split(':')[0]
+    if host.startswith('www.'):
+        host = host[4:]  # NOT lstrip('www.') - that strips any leading w/. chars
     base = f'{parsed.scheme}://{parsed.netloc}'
     return base.rstrip('/'), host
 
@@ -140,7 +142,9 @@ def _serper_site_urls(domain: str, pages: int = 8, num: int = 10) -> set[str]:
             break
         for row in organic:
             link = row.get('link') or ''
-            host = (urlparse(link).netloc or '').lower().lstrip('www.')
+            host = (urlparse(link).netloc or '').lower().split(':')[0]
+            if host.startswith('www.'):
+                host = host[4:]
             if host and (host == domain or host.endswith('.' + domain)):
                 found.add(_norm_url(link))
         if len(organic) < num:
