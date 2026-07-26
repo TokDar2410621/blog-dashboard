@@ -25,6 +25,8 @@ import {
   clusterMap,
   buildCluster,
   indexCoverage,
+  indexNowSetup,
+  indexNowSubmit,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -603,6 +605,25 @@ const MarkPageBuiltArgs = z
 const ClusterMapArgs = z
   .object({
     site_id: z.number().int().positive(),
+  })
+  .strict();
+
+const IndexNowSetupArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+  })
+  .strict();
+
+const IndexNowSubmitArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    urls: z
+      .array(z.string().url())
+      .optional()
+      .describe(
+        "URLs to submit (all on the site's own host). Omit to submit the " +
+          "site's sitemap URLs.",
+      ),
   })
   .strict();
 
@@ -1298,6 +1319,20 @@ const tools: ToolDef[] = [
       "Check which of a site's pages Google has actually INDEXED. Cross-references the site's expected pages (its sitemap.xml, or the pages Gridar knows about) against `site:<domain>` (works on ANY site, no auth, approximate) and, when GSC is connected, the AUTHORITATIVE GSC URL Inspection status plus the REASON a page is not indexed (crawled-not-indexed, blocked by robots, noindex, canonical, etc.). No LLM, no quota. Returns {coverage_pct, indexed_count, not_indexed, orphans, pages, gsc_used, ...}. Great for spotting pages that exist but Google never indexed.",
     schema: IndexCoverageArgs,
     handler: (input) => indexCoverage(input.site_id, input.max_inspect),
+  },
+  {
+    name: "gridar_indexnow_setup",
+    description:
+      "Get the site's IndexNow key + the ownership file to host, so the site can submit URLs to Bing / Yandex / Seznam / Naver (NOT Google - Google does not support IndexNow). Returns {key, key_file_url, key_file_content, instructions}: host a text file containing the key at key_file_url (the domain root) once, then gridar_indexnow_submit works. Fast Bing indexing feeds ChatGPT Search / Copilot / DuckDuckGo (AI visibility). No LLM, no quota.",
+    schema: IndexNowSetupArgs,
+    handler: (input) => indexNowSetup(input.site_id),
+  },
+  {
+    name: "gridar_indexnow_submit",
+    description:
+      "Submit URLs to IndexNow (Bing / Yandex / Seznam / Naver, NOT Google) so they get crawled/indexed fast - useful for AI-search visibility. Pass `urls` (all must be on the site's own host), or omit to submit the site's sitemap URLs. Requires the ownership key file from gridar_indexnow_setup to be hosted first (else status 403). Returns {ok, status, reason, submitted, host}. No LLM, no quota.",
+    schema: IndexNowSubmitArgs,
+    handler: (input) => indexNowSubmit(input.site_id, input.urls),
   },
 ];
 

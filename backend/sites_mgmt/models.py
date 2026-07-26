@@ -259,6 +259,16 @@ class Site(models.Model):
             "Efface apres succes ou echec - jamais sensitif tout seul."
         )
     )
+    indexnow_key = models.CharField(
+        max_length=64, blank=True, default='',
+        verbose_name="IndexNow - cle",
+        help_text=(
+            "Cle IndexNow (hex) generee a la 1re utilisation. Le site heberge un "
+            "fichier <cle>.txt a sa racine pour prouver la propriete. Sert a "
+            "soumettre les URLs a Bing/Yandex/Seznam/Naver (pas Google). Non "
+            "sensible seule."
+        )
+    )
 
     # ── API publique ──────────────────────────────────────────────────
     api_key = models.CharField(

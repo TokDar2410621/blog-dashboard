@@ -4081,3 +4081,45 @@ class V1IndexCoverageView(BaseV1View):
         result = index_coverage(site, max_inspect=max_inspect)
         result['site_id'] = site.id
         return Response(result)
+
+
+class V1IndexNowView(BaseV1View):
+    """GET /api/v1/sites/<id>/indexnow/
+
+    The site's IndexNow key + the ownership file to host at the domain root, so
+    the site can submit URLs to Bing / Yandex / Seznam / Naver (not Google).
+    Generates + persists the key on first call. No LLM, no quota.
+    """
+
+    def get(self, request, site_id):
+        from .index_now import key_file_info
+        site = self.get_user_site(request, site_id)
+        info = key_file_info(site)
+        info['site_id'] = site.id
+        return Response(info)
+
+
+class V1IndexNowSubmitView(BaseV1View):
+    """POST /api/v1/sites/<id>/indexnow/submit/  {urls?: [str]}
+
+    Submit URLs to IndexNow. If `urls` is omitted, defaults to the site's
+    sitemap URLs. All URLs must be on the site's own host.
+    """
+
+    def post(self, request, site_id):
+        from .index_now import submit_urls
+        from .index_coverage import _fetch_sitemap_urls, _public_base
+        site = self.get_user_site(request, site_id)
+        urls = request.data.get('urls')
+        if not isinstance(urls, list) or not urls:
+            base, _ = _public_base(site)
+            urls = _fetch_sitemap_urls(base) if base else []
+            if not urls:
+                return Response(
+                    {'error': "Aucune URL a soumettre : fournis 'urls' ou "
+                              "configure un sitemap.xml pour ce site."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        result = submit_urls(site, [str(u) for u in urls])
+        result['site_id'] = site.id
+        return Response(result)

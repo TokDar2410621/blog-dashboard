@@ -1104,3 +1104,37 @@ export async function indexCoverage(siteId: number, maxInspect?: number) {
   const qs = maxInspect != null ? `?max_inspect=${maxInspect}` : "";
   return request<IndexCoverageResponse>(`/sites/${siteId}/index-coverage/${qs}`);
 }
+
+// ── IndexNow (Bing / Yandex / Seznam / Naver - NOT Google) ──────────────────
+
+export type IndexNowSetup = {
+  site_id: number;
+  key: string;
+  host: string;
+  key_file_url: string;
+  key_file_content: string;
+  instructions: string;
+};
+
+export type IndexNowSubmitResult = {
+  site_id: number;
+  ok: boolean;
+  status?: number;
+  reason?: string;
+  submitted: number;
+  skipped_wrong_host?: number;
+  host?: string;
+  engines?: string;
+  error?: string;
+};
+
+export async function indexNowSetup(siteId: number) {
+  return request<IndexNowSetup>(`/sites/${siteId}/indexnow/`);
+}
+
+export async function indexNowSubmit(siteId: number, urls?: string[]) {
+  return request<IndexNowSubmitResult>(`/sites/${siteId}/indexnow/submit/`, {
+    method: "POST",
+    body: JSON.stringify(urls && urls.length ? { urls } : {}),
+  });
+}
