@@ -47,21 +47,39 @@ def get_or_create_key(site) -> str:
     return key
 
 
+def hosted_public_url(site, slug: str) -> str:
+    """Public URL of a Gridar-hosted post (public-blog serves posts at /<slug>,
+    matching the site's sitemap)."""
+    host = _host(site)
+    return f'https://{host}/{slug}' if host and slug else ''
+
+
+def key_location(site) -> str:
+    """Fixed ownership-file URL. Gridar serves this automatically for hosted
+    sites (public-blog /indexnow-key.txt); external sites host it themselves."""
+    host = _host(site)
+    return f'https://{host}/indexnow-key.txt' if host else ''
+
+
 def key_file_info(site) -> dict:
     """Everything needed to host the ownership key file."""
     key = get_or_create_key(site)
     host = _host(site)
-    key_file_url = f'https://{host}/{key}.txt' if host else ''
+    url = key_location(site)
     return {
         'key': key,
         'host': host,
-        'key_file_url': key_file_url,
+        'key_file_url': url,
         'key_file_content': key,
+        'auto_served': bool(getattr(site, 'public_blog_domain', '')),
         'instructions': (
+            "Site heberge par Gridar : le fichier cle est servi automatiquement, "
+            "rien a faire."
+            if getattr(site, 'public_blog_domain', '') else
             f"Heberge un fichier texte contenant UNIQUEMENT la cle a l'URL "
-            f"{key_file_url or '<https://ton-domaine/<cle>.txt>'} (accessible en "
-            "public, content-type text/plain). Une fois en place, la soumission "
-            "IndexNow est validee automatiquement."
+            f"{url or '<https://ton-domaine/indexnow-key.txt>'} (public, "
+            "content-type text/plain). Une fois en place, la soumission IndexNow "
+            "est validee automatiquement."
         ),
     }
 
@@ -105,7 +123,7 @@ def submit_urls(site, urls) -> dict:
             json={
                 'host': host,
                 'key': key,
-                'keyLocation': f'https://{host}/{key}.txt',
+                'keyLocation': key_location(site),
                 'urlList': clean[:10000],
             },
             headers={'Content-Type': 'application/json; charset=utf-8'},
@@ -125,3 +143,26 @@ def submit_urls(site, urls) -> dict:
         'host': host,
         'engines': 'Bing, Yandex, Seznam, Naver (pas Google)',
     }
+
+
+def submit_one_safe(site, url: str) -> None:
+    """Best-effort, NON-BLOCKING single-URL ping for the auto-submit on delivery.
+
+    Fires the IndexNow POST on a daemon thread so a slow endpoint never delays
+    the delivery/publish response. The key is generated in the calling thread
+    first (the only DB write); the thread then does just the HTTP POST.
+    """
+    if not (url or '').strip() or not _host(site):
+        return
+    get_or_create_key(site)  # ensure the key exists here (DB write in-request)
+
+    import threading
+
+    def _run():
+        try:
+            submit_urls(site, [url])  # no DB write: key already set on `site`
+        except Exception as exc:  # noqa: BLE001
+            logger.info('IndexNow auto-submit skipped for site %s: %s',
+                        getattr(site, 'id', '?'), exc)
+
+    threading.Thread(target=_run, daemon=True).start()

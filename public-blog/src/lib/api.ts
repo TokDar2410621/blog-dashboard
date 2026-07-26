@@ -26,6 +26,8 @@ export type Site = {
     website?: string;
   };
   person_schema?: Record<string, unknown> | null;
+  // IndexNow ownership key (served at /indexnow-key.txt so Bing/Yandex can verify).
+  indexnow_key?: string;
   // Theme overrides (only present if Site.theme_config is set)
   theme_config?: {
     brand_color?: string;

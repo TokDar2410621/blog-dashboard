@@ -935,6 +935,9 @@ class V1ArticleMutateView(BaseV1View):
             post.published_at = _date.today()
             updated.append('published_at')
         post.save(update_fields=updated)
+        if post.status == 'published':
+            from .index_now import submit_one_safe, hosted_public_url
+            submit_one_safe(site, hosted_public_url(site, post.slug))  # auto-ping IndexNow
         return Response({'updated_fields': updated, 'slug': post.slug})
 
     def _patch_external(self, site, slug, fields):
@@ -3946,6 +3949,7 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
 
     def post(self, request, site_id):
         from .models import StrategicOpportunity, HostedPost, TrackedKeyword
+        from .index_now import submit_one_safe
         site = self.get_user_site(request, site_id)
         kind = (request.data.get('kind') or '').strip().lower()
         url = (request.data.get('url') or '').strip()
@@ -3962,6 +3966,7 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
                                 status=status.HTTP_404_NOT_FOUND)
             op.status = 'done'
             op.save(update_fields=['status', 'updated_at'])
+            submit_one_safe(site, url)  # auto-ping IndexNow (Bing/AI search)
             return Response({'ok': True, 'kind': kind, 'id': op.id, 'status': 'done', 'url': url})
 
         if kind == 'article':
@@ -3981,6 +3986,7 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
             post.external_url = url
             post.delivered_at = timezone.now()
             post.save(update_fields=['external_url', 'delivered_at', 'updated_at'])
+            submit_one_safe(site, url)  # auto-ping IndexNow (Bing/AI search)
             return Response({'ok': True, 'kind': 'article', 'id': post.id,
                              'url': url, 'delivered': True})
 
@@ -4000,6 +4006,7 @@ class V1BuildQueueMarkBuiltView(BaseV1View):
             # points SERP-rank tracking at the real live article.
             kw.target_url = url
             kw.save(update_fields=['target_url', 'updated_at'])
+            submit_one_safe(site, url)  # auto-ping IndexNow (Bing/AI search)
             return Response({'ok': True, 'kind': 'article_brief', 'id': kw.id,
                              'url': url, 'delivered': True})
 

@@ -6888,6 +6888,7 @@ def _serialize_public_site(site):
         'default_language': site.default_language,
         'available_languages': site.effective_languages,
         'theme_config': site.theme_config or None,
+        'indexnow_key': site.indexnow_key or '',
         'author': {
             'name': site.default_author or 'Admin',
             'role': site.author_role,
