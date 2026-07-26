@@ -161,6 +161,8 @@ def _check_for_decay_candidates(site: Site):
             scopes=GSC_SCOPES,
         )
         service = build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
+        from .proof_loop import resolve_gsc_property
+        resolve_gsc_property(service, site)  # URL-prefix -> owned domain property
 
         def _q(start_d, end_d):
             body = {

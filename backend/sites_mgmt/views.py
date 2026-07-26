@@ -6112,6 +6112,8 @@ class ContentDecayView(APIView):
                 credentials=creds,
                 cache_discovery=False,
             )
+            from .proof_loop import resolve_gsc_property
+            resolve_gsc_property(service, site)  # URL-prefix -> owned domain property
 
             def _query_period(start_d, end_d):
                 body = {
@@ -7535,6 +7537,18 @@ class GSCOAuthCallbackView(APIView):
             site.gsc_refresh_token = creds.refresh_token
             site.gsc_oauth_verifier_pending = ''
             site.save(update_fields=['gsc_refresh_token', 'gsc_oauth_verifier_pending'])
+            # Correct the stored property to the one the token actually owns:
+            # users often type a URL-prefix while their verified property is a
+            # domain property (sc-domain:), which 403s every GSC call.
+            try:
+                from googleapiclient.discovery import build as _gbuild
+                from .proof_loop import resolve_gsc_property
+                _svc = _gbuild('searchconsole', 'v1', credentials=creds,
+                               cache_discovery=False)
+                resolve_gsc_property(_svc, site)
+            except Exception:
+                logger.info("GSC connect: property auto-resolution skipped",
+                            exc_info=True)
             return Response({'success': True})
         except Exception as e:
             # Clear the verifier on failure so the next attempt gets a fresh
@@ -7645,6 +7659,8 @@ class GSCQueriesView(APIView):
                 credentials=creds,
                 cache_discovery=False,
             )
+            from .proof_loop import resolve_gsc_property
+            resolve_gsc_property(service, site)  # URL-prefix -> owned domain property
             body = {
                 'startDate': start.isoformat(),
                 'endDate': end.isoformat(),
