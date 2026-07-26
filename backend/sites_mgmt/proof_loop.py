@@ -109,60 +109,58 @@ def _build_gsc_service(site: Site):
         client_secret=client_secret,
         scopes=GSC_SCOPES,
     )
-    svc = build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
-    # Self-heal the stored property (URL-prefix -> owned domain property) so
-    # every downstream siteUrl= read is against a property the token owns.
-    resolve_gsc_property(svc, site)
-    return svc
+    return build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
 
 
-def resolve_gsc_property(service, site: Site, persist: bool = True) -> str:
-    """Return the GSC property (siteUrl) the token actually OWNS.
+def resolve_gsc_property(service, site: Site) -> str:
+    """Return the GSC property (siteUrl) the token can actually query.
 
     The stored gsc_property_url is often a URL-prefix ('https://site.com/') that
     is NOT a verified property when the user set up a DOMAIN property
     ('sc-domain:site.com'). Every GSC call (searchanalytics, urlInspection) is
-    strict about ownership and 403s ("You do not own this site") on a mismatch,
-    which silently breaks proof / decay / positions / index coverage. This maps
-    the stored value to a property the token owns and, on a mismatch, persists
-    the corrected value on the Site (self-heal) so later calls are correct too.
-    Falls back to the stored value if the listing fails.
+    strict about the property and 403s ("You do not own this site") on a
+    mismatch, which silently breaks proof / decay / positions / index coverage.
+
+    Resolution is IN-MEMORY only: it maps to a property the token holds and
+    returns it for use as siteUrl. It NEVER overwrites gsc_property_url, which
+    stays a valid URL used both for building the 'page' filter (keeps the real
+    host, incl. www) and for the writable settings field (an 'sc-domain:' value
+    would fail the URLField validator on the next save). Memoized on the
+    instance; falls back to the stored value if the listing fails.
     """
     from urllib.parse import urlparse
+    memo = getattr(site, '_gsc_resolved_property', None)
+    if memo is not None:
+        return memo
     stored = (site.gsc_property_url or '').strip()
-    if service is None:
-        return stored
-    try:
-        listing = service.sites().list().execute() or {}
-        entries = listing.get('siteEntry') or []
-        owned = {
-            e.get('siteUrl') for e in entries
-            if isinstance(e, dict)
-            and e.get('permissionLevel') in ('siteOwner', 'siteFullUser')
-        }
-    except Exception as exc:
-        logger.info('resolve_gsc_property: sites().list failed: %s', exc)
-        return stored
-    if stored and stored in owned:
-        return stored
-    # Derive the host from the stored value, or from the site domain when the
-    # user connected without typing a property.
-    host_src = stored or (getattr(site, 'domain', '') or '').strip()
-    host = urlparse(host_src if host_src.startswith('http') else 'https://' + host_src).netloc.lower()
-    host = host.split(':')[0]
-    if host.startswith('www.'):
-        host = host[4:]
     resolved = stored
-    for candidate in (f'sc-domain:{host}', f'https://{host}/', f'http://{host}/'):
-        if candidate in owned:
-            resolved = candidate
-            break
-    if resolved and resolved != stored and persist:
+    if service is not None:
         try:
-            type(site).objects.filter(pk=site.pk).update(gsc_property_url=resolved)
-            site.gsc_property_url = resolved  # keep the in-memory instance in sync
+            listing = service.sites().list().execute() or {}
+            entries = listing.get('siteEntry') or []
+            # Any access level can read Search Analytics; URL Inspection needs
+            # owner, but a non-owner call just 403s and degrades to site:.
+            owned = {
+                e.get('siteUrl') for e in entries
+                if isinstance(e, dict) and e.get('permissionLevel') in (
+                    'siteOwner', 'siteFullUser', 'siteRestrictedUser')
+            }
+            if not (stored and stored in owned):
+                host_src = stored or (getattr(site, 'domain', '') or '').strip()
+                host = urlparse(
+                    host_src if host_src.startswith('http') else 'https://' + host_src
+                ).netloc.lower().split(':')[0]
+                if host.startswith('www.'):
+                    host = host[4:]
+                for candidate in (f'sc-domain:{host}', f'https://{host}/',
+                                  f'https://www.{host}/', f'http://{host}/'):
+                    if candidate in owned:
+                        resolved = candidate
+                        break
         except Exception as exc:
-            logger.info('resolve_gsc_property: persist failed: %s', exc)
+            logger.info('resolve_gsc_property: sites().list failed: %s', exc)
+            resolved = stored
+    site._gsc_resolved_property = resolved
     return resolved
 
 
@@ -172,7 +170,7 @@ def _query_page_metrics(service, site: Site, page_url: str,
     (2) top N queries by impressions. Returns a dict, or {'indexed': False, ...}
     when the page has no GSC rows in the window.
     """
-    site_url = site.gsc_property_url
+    site_url = resolve_gsc_property(service, site)
     base_body = {
         'startDate': start.isoformat(),
         'endDate': end.isoformat(),

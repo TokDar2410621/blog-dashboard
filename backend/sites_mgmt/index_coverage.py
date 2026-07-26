@@ -156,11 +156,11 @@ def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> dict:
     """Authoritative per-URL index status via GSC URL Inspection. Returns
     {norm_url: {verdict, coverage_state, indexed, robots, last_crawl}}. Best
     effort per URL; skips silently when GSC is not connected."""
-    from .proof_loop import _build_gsc_service
-    service = _build_gsc_service(site)  # also resolves+persists the owned property
+    from .proof_loop import _build_gsc_service, resolve_gsc_property
+    service = _build_gsc_service(site)
     if service is None:
         return {}
-    site_url = site.gsc_property_url
+    site_url = resolve_gsc_property(service, site)  # owned property for siteUrl
     out: dict = {}
     for url in urls[:cap]:
         try:

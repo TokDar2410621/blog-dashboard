@@ -162,7 +162,7 @@ def _check_for_decay_candidates(site: Site):
         )
         service = build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
         from .proof_loop import resolve_gsc_property
-        resolve_gsc_property(service, site)  # URL-prefix -> owned domain property
+        gsc_site_url = resolve_gsc_property(service, site)  # owned property for siteUrl
 
         def _q(start_d, end_d):
             body = {
@@ -172,7 +172,7 @@ def _check_for_decay_candidates(site: Site):
                 'rowLimit': 1000,
             }
             return service.searchanalytics().query(
-                siteUrl=site.gsc_property_url, body=body
+                siteUrl=gsc_site_url, body=body
             ).execute()
 
         cur_resp = _q(cur_start, end)
