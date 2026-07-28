@@ -391,6 +391,11 @@ class V1GenerateView(BaseV1View):
     """POST /api/v1/sites/<id>/generate/ {topic, title?, type?, length?, language?, keywords?, brief?}"""
     def post(self, request, site_id):
         site = self.get_user_site(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         from .article_generator import ArticleGenerator
         from .db_utils import ensure_site_connection
 
@@ -489,6 +494,11 @@ class V1GenerateSisterArticleView(BaseV1View):
     """
     def post(self, request, site_id, slug):
         site = self.get_user_site(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         from .article_generator import ArticleGenerator
 
         if not site.is_hosted:
@@ -1777,6 +1787,11 @@ class V1ApproveStrategyView(BaseV1View):
 
     def post(self, request, site_id, strategy_id):
         site = self.get_user_site(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         try:
             strategy = KeywordStrategy.objects.get(site=site, id=int(strategy_id))
         except (KeywordStrategy.DoesNotExist, ValueError, TypeError):
@@ -1942,6 +1957,11 @@ class V1GenerateLandingView(BaseV1View):
 
     def post(self, request, site_id):
         site = self.get_user_site(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         if not site.is_hosted:
             return Response(
                 {'error': 'AI landing generation is only available on hosted sites.'},
@@ -3686,6 +3706,11 @@ class V1StrategicOpportunityActionView(BaseV1View):
             # the "black hole". Instead of faking success, tell the user why and
             # point them to the build prompt, which the UI exposes as the
             # primary action for external sites.
+            from .delivery import block_reason
+            _blk = block_reason(site)
+            if _blk:
+                return Response({'error': _blk, 'code': 'delivery_blocked'},
+                                status=status.HTTP_409_CONFLICT)
             if not site.is_hosted:
                 return Response({
                     'error': (

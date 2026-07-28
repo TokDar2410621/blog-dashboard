@@ -296,6 +296,13 @@ def run_one(site: Site, *, force: bool = False, user=None) -> RunResult:
     if not force and not is_due(site):
         return RunResult(ok=False, skipped_reason='not_due_yet')
 
+    # Delivery gate: if nothing reaches the live site, don't silently accumulate
+    # content in the black hole. Skip (even under force) with a clear reason.
+    from .delivery import block_reason
+    if block_reason(site):
+        logger.info('Autopilot skip site %s: no delivery path (black hole)', site.id)
+        return RunResult(ok=False, skipped_reason='delivery_blocked')
+
     mode = getattr(site, 'autopilot_mode', 'balanced') or 'balanced'
 
     # Decide whether this run should attempt a refresh.

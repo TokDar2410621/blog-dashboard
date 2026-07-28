@@ -9,6 +9,14 @@ is True precisely for the "nothing connected" black-hole case.
 from __future__ import annotations
 
 
+def block_reason(site) -> str:
+    """Blocker message if GENERATING for this site would be a dead end (no path
+    to the live site), else '' (empty = generation is fine). The single guard
+    every generation entry point calls to avoid the black hole."""
+    d = delivery_status(site)
+    return d['blocker'] if d['status'] == 'blocked' else ''
+
+
 def delivery_status(site) -> dict:
     """Return {status, method, label, blocker} for how content reaches the site.
 

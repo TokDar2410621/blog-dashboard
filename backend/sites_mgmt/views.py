@@ -1206,6 +1206,11 @@ class GenerateArticleView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         # Hosted mode + CMS modes (WordPress, Shopify, Webflow) don't open an
         # external Postgres connection - their content lives in our DB (hosted)
         # or in the remote CMS API.
@@ -1320,6 +1325,11 @@ class GenerateInlineView(APIView):
 
     def post(self, request, site_id):
         site = get_site_for_user(request, site_id)
+        from .delivery import block_reason
+        _blk = block_reason(site)
+        if _blk:
+            return Response({'error': _blk, 'code': 'delivery_blocked'},
+                            status=status.HTTP_409_CONFLICT)
         # Hosted mode + CMS modes don't open an external Postgres connection.
         if site.is_hosted or site.is_wordpress or site.is_shopify or site.is_webflow:
             alias = None
