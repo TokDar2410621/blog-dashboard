@@ -6580,34 +6580,11 @@ Reponds UNIQUEMENT en JSON, schema strict, dans le meme ordre que la liste:
 {{"classifications": [{{"id": <id>, "intent": "info|commercial|transactional|local"}}]}}
 """
 
-        try:
-            resp = http_requests.post(
-                'https://api.anthropic.com/v1/messages',
-                headers={
-                    'x-api-key': anthropic_key,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                },
-                json={
-                    'model': 'claude-sonnet-5',
-                    'max_tokens': 2000,
-                    # Disable Sonnet 5's default adaptive thinking so `content`
-                    # leads with the JSON text block.
-                    'thinking': {'type': 'disabled'},
-                    'messages': [{'role': 'user', 'content': prompt}],
-                },
-                timeout=45,
-            )
-            resp.raise_for_status()
-            _body = resp.json()
-            text = next(
-                (b.get('text', '') for b in (_body.get('content') or [])
-                 if b.get('type') == 'text'),
-                '',
-            )
-        except http_requests.RequestException as e:
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=2000, timeout=45)  # Anthropic -> DeepSeek
+        if not text:
             return Response(
-                {'error': f'Erreur Claude: {e}'},
+                {'error': 'Aucune reponse LLM (Anthropic + fallback DeepSeek indisponibles).'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -8908,34 +8885,11 @@ Reponds UNIQUEMENT en JSON valide, sans markdown:
 {{"competitors": ["NomMarque1", "NomMarque2", ...]}}
 """
 
-        try:
-            resp = http_requests.post(
-                'https://api.anthropic.com/v1/messages',
-                headers={
-                    'x-api-key': anthropic_key,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                },
-                json={
-                    'model': 'claude-sonnet-5',
-                    'max_tokens': 600,
-                    # Disable Sonnet 5's default adaptive thinking so `content`
-                    # leads with the JSON text block.
-                    'thinking': {'type': 'disabled'},
-                    'messages': [{'role': 'user', 'content': prompt}],
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            _body = resp.json()
-            text = next(
-                (b.get('text', '') for b in (_body.get('content') or [])
-                 if b.get('type') == 'text'),
-                '',
-            )
-        except http_requests.RequestException as e:
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=600, timeout=30)  # Anthropic -> DeepSeek
+        if not text:
             return Response(
-                {'error': f'Erreur Claude: {e}'},
+                {'error': 'Aucune reponse LLM (Anthropic + fallback DeepSeek indisponibles).'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -9271,34 +9225,11 @@ Reponds UNIQUEMENT en JSON valide, sans markdown, schema strict:
 {{"keywords": [{{"keyword": "<mot-cle>", "intent": "info|commercial|transactional|local", "why": "<1 phrase courte qui cite le contexte utilise>"}}]}}
 """
 
-        try:
-            resp = http_requests.post(
-                'https://api.anthropic.com/v1/messages',
-                headers={
-                    'x-api-key': anthropic_key,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                },
-                json={
-                    'model': 'claude-sonnet-5',
-                    'max_tokens': 1500,
-                    # Disable Sonnet 5's default adaptive thinking so `content`
-                    # leads with the JSON text block.
-                    'thinking': {'type': 'disabled'},
-                    'messages': [{'role': 'user', 'content': prompt}],
-                },
-                timeout=45,
-            )
-            resp.raise_for_status()
-            _body = resp.json()
-            text = next(
-                (b.get('text', '') for b in (_body.get('content') or [])
-                 if b.get('type') == 'text'),
-                '',
-            )
-        except http_requests.RequestException as e:
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=1500, timeout=45)  # Anthropic -> DeepSeek
+        if not text:
             return Response(
-                {'error': f'Erreur Claude: {e}'},
+                {'error': 'Aucune reponse LLM (Anthropic + fallback DeepSeek indisponibles).'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
@@ -10503,23 +10434,9 @@ def _enrich_public_audit_payload(domain: str, payload: dict) -> dict:
                     "\"title\":\"...\",\"why\":\"...une phrase...\"}].\n\n"
                     f"Keywords: {targets}"
                 )
-                r = http_requests.post(
-                    'https://api.anthropic.com/v1/messages',
-                    headers={
-                        'x-api-key': anthropic_key,
-                        'anthropic-version': '2023-06-01',
-                        'content-type': 'application/json',
-                    },
-                    json={
-                        'model': 'claude-haiku-4-5',
-                        'max_tokens': 1024,
-                        'messages': [{'role': 'user', 'content': prompt}],
-                    },
-                    timeout=15,
-                )
-                if r.status_code == 200:
-                    body = r.json()
-                    text = (body.get('content') or [{}])[0].get('text', '')
+                from .llm import call_llm
+                text = call_llm(prompt, max_tokens=1024, timeout=20)  # Anthropic -> DeepSeek
+                if text:
                     import json as _json
                     text = text.strip()
                     if text.startswith('```'):

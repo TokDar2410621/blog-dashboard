@@ -325,43 +325,11 @@ def call_claude_for_opportunity(prompt: str) -> Optional[dict]:
     malformed JSON). Mirrors LandingGenerator._call_claude on purpose so we
     don't depend on the anthropic Python SDK (it's not in requirements.txt).
     """
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        logger.warning('Strategic opportunity: ANTHROPIC_API_KEY missing.')
-        return None
-
+    from .llm import call_llm
     try:
-        import requests
-        resp = requests.post(
-            ANTHROPIC_API_URL,
-            headers={
-                'x-api-key': api_key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            },
-            json={
-                'model': STRATEGIC_MODEL,
-                'max_tokens': 1200,
-                # Sonnet 5 enables adaptive thinking by default; disable it so
-                # the whole token budget goes to the JSON output (thinking would
-                # otherwise risk truncating it).
-                'thinking': {'type': 'disabled'},
-                'messages': [{'role': 'user', 'content': prompt}],
-            },
-            timeout=90,
-        )
-        if not resp.ok:
-            logger.warning(
-                'Strategic Claude call HTTP %s: %s',
-                resp.status_code, resp.text[:300],
-            )
+        text = call_llm(prompt, max_tokens=1200)  # Anthropic -> DeepSeek fallback
+        if not text:
             return None
-        data = resp.json()
-        text = ''
-        for block in (data.get('content') or []):
-            if block.get('type') == 'text':
-                text += block.get('text') or ''
-        text = text.strip()
         # Strip accidental markdown fencing in case the model adds it.
         if text.startswith('```'):
             text = text.strip('`')

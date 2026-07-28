@@ -49,38 +49,14 @@ class LandingGenerator:
     # ------------------------------------------------------------------
 
     def _call_claude(self, prompt: str, max_tokens: int = 3000) -> str:
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        if not api_key:
+        # Anthropic (Claude) with an automatic DeepSeek fallback at the limit.
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=max_tokens, timeout=120)
+        if not text:
             raise LandingGeneratorError(
-                'ANTHROPIC_API_KEY missing - cannot generate landing.'
+                'Aucune reponse LLM (Anthropic + fallback DeepSeek indisponibles).'
             )
-        resp = requests.post(
-            ANTHROPIC_API_URL,
-            headers={
-                'x-api-key': api_key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            },
-            json={
-                'model': DEFAULT_MODEL,
-                'max_tokens': max_tokens,
-                # Sonnet 5 runs adaptive thinking by default when `thinking` is
-                # omitted, which prepends a thinking block to `content` (so the
-                # old content[0]['text'] KeyError'd). We want the JSON directly,
-                # not reasoning, so disable it and keep the full token budget.
-                'thinking': {'type': 'disabled'},
-                'messages': [{'role': 'user', 'content': prompt}],
-            },
-            timeout=120,
-        )
-        resp.raise_for_status()
-        body = resp.json()
-        for block in body.get('content') or []:
-            if block.get('type') == 'text':
-                return block.get('text') or ''
-        raise LandingGeneratorError(
-            f"Claude returned no text block (stop_reason={body.get('stop_reason')!r})."
-        )
+        return text
 
     # ------------------------------------------------------------------
     # Public API

@@ -1609,9 +1609,6 @@ def _call_claude_for_strategy(keyword: str, intent: str, site, serp_summary: str
     """Use Claude to enrich the proposed strategy with rationale + tuned
     proposed_pages. Falls back to defaults if Claude unavailable.
     """
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if not api_key:
-        return {}
     try:
         bm = site.business_model or 'agency'
         prompt = f"""Tu es expert SEO topic cluster.
@@ -1637,30 +1634,10 @@ Pour un intent transactional, propose UNE landing.
 Pour informational, propose 1 pillar landing + 3-5 articles cluster.
 Pour commercial avec "vs", propose une comparison_table.
 """
-        resp = requests.post(
-            'https://api.anthropic.com/v1/messages',
-            headers={
-                'x-api-key': api_key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            },
-            json={
-                'model': 'claude-sonnet-5',
-                'max_tokens': 1500,
-                # Disable Sonnet 5's default adaptive thinking so `content`
-                # leads with the JSON text block (see landing_generator).
-                'thinking': {'type': 'disabled'},
-                'messages': [{'role': 'user', 'content': prompt}],
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        _body = resp.json()
-        text = next(
-            (b.get('text', '') for b in (_body.get('content') or [])
-             if b.get('type') == 'text'),
-            '',
-        )
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=1500, timeout=60)  # Anthropic -> DeepSeek
+        if not text:
+            return {}
         import re as _re
         match = _re.search(r'\{[\s\S]*\}', text)
         if not match:
@@ -3428,11 +3405,6 @@ class V1AiVisibilitySuggestView(BaseV1View):
         import re
         site = self.get_user_site(request, site_id)
 
-        anthropic_key = os.environ.get('ANTHROPIC_API_KEY')
-        if not anthropic_key:
-            return Response({'error': 'ANTHROPIC_API_KEY non configuree.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
         try:
             count = int(request.data.get('count') or 6)
         except (TypeError, ValueError):
@@ -3472,31 +3444,10 @@ REPONDS EN JSON STRICT (pas de markdown):
 {{"prompts": [{{"prompt": "...", "target_intent": "informational|commercial|transactional|navigational|local"}}, ...]}}
 """
 
-        try:
-            resp = http_requests.post(
-                'https://api.anthropic.com/v1/messages',
-                headers={
-                    'x-api-key': anthropic_key,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                },
-                json={
-                    'model': 'claude-sonnet-5',
-                    'max_tokens': 1200,
-                    'thinking': {'type': 'disabled'},
-                    'messages': [{'role': 'user', 'content': prompt}],
-                },
-                timeout=45,
-            )
-            resp.raise_for_status()
-            _body = resp.json()
-            text = next(
-                (b.get('text', '') for b in (_body.get('content') or [])
-                 if b.get('type') == 'text'),
-                '',
-            )
-        except http_requests.RequestException as e:
-            return Response({'error': f'Erreur Claude: {e}'},
+        from .llm import call_llm
+        text = call_llm(prompt, max_tokens=1200, timeout=45)  # Anthropic -> DeepSeek
+        if not text:
+            return Response({'error': 'Aucune reponse LLM (Anthropic + fallback DeepSeek indisponibles).'},
                             status=status.HTTP_502_BAD_GATEWAY)
 
         match = re.search(r'\{[\s\S]*\}', text)

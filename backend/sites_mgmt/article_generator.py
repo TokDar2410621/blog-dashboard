@@ -709,38 +709,13 @@ Sois factuel et precis.'''}]}],
     # === CLAUDE API ===
 
     def call_claude(self, prompt, max_tokens=4000):
-        response = requests.post(
-            'https://api.anthropic.com/v1/messages',
-            headers={
-                'x-api-key': os.environ['ANTHROPIC_API_KEY'],
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json'
-            },
-            json={
-                'model': 'claude-sonnet-5',
-                'max_tokens': max_tokens,
-                # Sonnet 5 enables adaptive thinking by default; disable it so
-                # the whole token budget goes to the article output (thinking
-                # would otherwise risk truncating long articles).
-                'thinking': {'type': 'disabled'},
-                'messages': [{'role': 'user', 'content': prompt}]
-            },
-            timeout=120,
-        )
-        response.raise_for_status()
-        data = response.json()
-        blocks = data.get('content') or []
-        texts = [
-            b.get('text', '')
-            for b in blocks
-            if isinstance(b, dict) and b.get('type') == 'text'
-        ]
-        result = ''.join(texts).strip()
+        # Anthropic (Claude) with an automatic DeepSeek fallback when the
+        # account is at its usage limit. Kept named call_claude for callers.
+        from .llm import call_llm
+        result = call_llm(prompt, max_tokens=max_tokens, timeout=120)
         if not result:
             raise RuntimeError(
-                'Reponse Claude vide ou inattendue '
-                f"(stop_reason={data.get('stop_reason')}, "
-                f"blocks={[b.get('type') for b in blocks if isinstance(b, dict)]})"
+                'Reponse LLM vide (Anthropic + fallback DeepSeek indisponibles)'
             )
         return result
 
