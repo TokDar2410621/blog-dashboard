@@ -773,11 +773,14 @@ class V1SiteDetailView(BaseV1View):
     """GET /api/v1/sites/<id>/ - full site config + integration status."""
 
     def get(self, request, site_id):
+        from .delivery import delivery_status
         s = self.get_user_site(request, site_id)
         return Response({
             'id': s.id, 'name': s.name, 'domain': s.domain,
             'is_hosted': s.is_hosted, 'is_wordpress': s.is_wordpress,
             'is_shopify': s.is_shopify, 'is_webflow': s.is_webflow,
+            'delivery_mode': getattr(s, 'delivery_mode', 'auto'),
+            'delivery_status': delivery_status(s),
             'default_language': s.default_language,
             'available_languages': s.effective_languages,
             'public_blog_domain': s.public_blog_domain,

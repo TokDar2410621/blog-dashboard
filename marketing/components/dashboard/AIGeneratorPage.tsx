@@ -136,6 +136,11 @@ export function AIGeneratorPage() {
   // dry_run skips quota consumption, so don't gate it
   const cannotGenerate = !dryRun && quotaExhausted;
 
+  // Delivery gate: if there's no way for generated content to reach the live
+  // site, generating is a dead end (the "black hole"). Block it honestly.
+  const deliveryStatus = currentSite?.delivery_status;
+  const deliveryBlocked = deliveryStatus?.status === "blocked";
+
   // Inline error state when generation hits 402 quota_exceeded
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
@@ -222,6 +227,45 @@ export function AIGeneratorPage() {
       </div>
 
       <QuotaBanner />
+
+      {/* Delivery gate: honest about whether generated content can reach the site */}
+      {deliveryStatus && deliveryStatus.status !== "ready" && (
+        <div
+          className={`rounded-lg border p-4 ${
+            deliveryBlocked
+              ? "border-destructive/40 bg-destructive/5"
+              : "border-amber-500/40 bg-amber-500/5"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle
+              className={`h-5 w-5 shrink-0 mt-0.5 ${
+                deliveryBlocked ? "text-destructive" : "text-amber-600"
+              }`}
+            />
+            <div className="space-y-1.5 min-w-0">
+              <p className="font-medium text-sm">
+                {deliveryBlocked
+                  ? "Aucun chemin de livraison"
+                  : "Livraison non confirmée"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {deliveryStatus.blocker}
+              </p>
+              {deliveryBlocked && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => router.push(`${base}/parametres/integrations`)}
+                >
+                  Configurer la livraison
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content Brief - pre-writing brief (optional, fills the form when applied) */}
       <ContentBriefPanel
@@ -380,9 +424,11 @@ export function AIGeneratorPage() {
               className="w-full"
               size="lg"
               onClick={handleGenerate}
-              disabled={generateArticle.isPending || cannotGenerate}
+              disabled={generateArticle.isPending || cannotGenerate || deliveryBlocked}
               title={
-                cannotGenerate
+                deliveryBlocked
+                  ? "Aucun chemin de livraison : le contenu n'atteindrait pas ton site. Configure la livraison d'abord."
+                  : cannotGenerate
                   ? "Quota mensuel épuisé. Achète des crédits pour continuer."
                   : undefined
               }
@@ -391,6 +437,11 @@ export function AIGeneratorPage() {
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Génération en cours...
+                </>
+              ) : deliveryBlocked ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Livraison à configurer
                 </>
               ) : cannotGenerate ? (
                 <>

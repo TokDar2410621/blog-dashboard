@@ -6,6 +6,7 @@ from blog.models import BlogPost, Category, Tag
 class SiteSerializer(serializers.ModelSerializer):
     is_hosted = serializers.BooleanField(read_only=True)
     gsc_connected = serializers.SerializerMethodField()
+    delivery_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Site
@@ -16,7 +17,7 @@ class SiteSerializer(serializers.ModelSerializer):
                   'author_image_url', 'author_linkedin', 'author_twitter',
                   'author_website',
                   'business_model', 'primary_cta_text', 'primary_cta_url',
-                  'delivery_mode',
+                  'delivery_mode', 'delivery_status',
                   'public_blog_domain', 'theme_config',
                   'vercel_deploy_hook', 'gsc_property_url', 'gsc_connected',
                   'api_key', 'is_hosted', 'is_active',
@@ -26,6 +27,12 @@ class SiteSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'database_url': {'required': False, 'allow_blank': True},
         }
+
+    def get_delivery_status(self, obj):
+        # Can generated content actually reach this site's live pages, or would
+        # it fall into the black hole? Drives the "generation gated" UI.
+        from .delivery import delivery_status
+        return delivery_status(obj)
 
     def get_gsc_connected(self, obj):
         # True once the OAuth refresh token is stored. The token itself stays
