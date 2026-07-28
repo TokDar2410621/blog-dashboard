@@ -5869,12 +5869,10 @@ class TopicClusterView(APIView):
         except (TypeError, ValueError):
             limit = 80
 
+        # Gemini is preferred for clustering, but we fall back to the shared
+        # LLM (Claude -> DeepSeek) if it's missing/unavailable, so clustering
+        # survives any single provider being down.
         gemini_key = os.environ.get('GEMINI_API_KEY')
-        if not gemini_key:
-            return Response(
-                {'error': 'GEMINI_API_KEY non configuree'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
         # Fetch published articles
         if site.is_hosted:
@@ -5973,15 +5971,28 @@ Respond with JSON only, no markdown:
 Use slugs EXACTLY as provided. Don't invent slugs. Every article should be
 assigned to one cluster (pillar OR spoke). Skip the article if it's truly off-topic."""
 
-        try:
-            from google import genai
-
-            client = genai.Client(api_key=gemini_key)
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[prompt],
+        text = ''
+        if gemini_key:
+            try:
+                from google import genai
+                client = genai.Client(api_key=gemini_key)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=[prompt],
+                )
+                text = (response.text or '').strip()
+            except Exception as e:
+                logger.warning('Gemini clustering failed, trying LLM fallback: %s', e)
+                text = ''
+        if not text:
+            from .llm import call_llm
+            text = call_llm(prompt, max_tokens=2000, timeout=90)  # Claude -> DeepSeek
+        if not text:
+            return Response(
+                {'error': 'Clustering indisponible (Gemini + fallback LLM).'},
+                status=status.HTTP_502_BAD_GATEWAY,
             )
-            text = (response.text or '').strip()
+        try:
             if text.startswith('```'):
                 text = text.split('\n', 1)[1]
                 if text.endswith('```'):
@@ -5989,9 +6000,9 @@ assigned to one cluster (pillar OR spoke). Skip the article if it's truly off-to
                 text = text.strip()
             data = json.loads(text)
         except Exception as e:
-            logger.warning('Gemini topic clustering failed: %s', e)
+            logger.warning('Clustering parse failed: %s', e)
             return Response(
-                {'error': f'Erreur clustering: {str(e)}'},
+                {'error': f'Erreur clustering (parse): {str(e)}'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 

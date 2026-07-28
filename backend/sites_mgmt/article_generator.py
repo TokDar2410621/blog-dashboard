@@ -457,9 +457,9 @@ class ArticleGenerator:
 
         config = LENGTH_CONFIG[length]
 
-        # Validate API keys
-        if not os.environ.get('ANTHROPIC_API_KEY'):
-            raise ValueError('ANTHROPIC_API_KEY manquante')
+        # Validate API keys (either LLM provider works via the call_llm fallback)
+        if not (os.environ.get('ANTHROPIC_API_KEY') or os.environ.get('DEEPSEEK_API_KEY')):
+            raise ValueError('Aucune cle LLM (ANTHROPIC_API_KEY ou DEEPSEEK_API_KEY) configuree')
         if search_method == 'serper' and not os.environ.get('SERPER_API_KEY'):
             raise ValueError('SERPER_API_KEY manquante pour la recherche Serper')
         if search_method == 'gemini' and not os.environ.get('GEMINI_API_KEY'):
