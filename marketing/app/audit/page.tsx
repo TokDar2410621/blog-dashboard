@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Audit SEO gratuit - 30 secondes",
     description: "Entre ton domaine, recois ton score SEO + top mots-cles + recos. Sans inscription.",
-    url: "https://gridar.app/audit",
+    url: "https://www.gridar.app/audit",
     type: "website",
   },
 };

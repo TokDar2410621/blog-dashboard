@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://gridar.app"),
+  metadataBase: new URL("https://www.gridar.app"),
   title: {
     default: "Gridar - Le SEO en francais qui comprend le Quebec",
     template: "%s | Gridar",
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
   description:
     "SaaS SEO concu pour les PME quebecoises. Generation d'articles en lexique FR-CA, audit SEO automatique, suivi des positions Google. Arivex Studio.",
   applicationName: "Gridar",
-  authors: [{ name: "Arivex Studio", url: "https://gridar.app" }],
+  authors: [{ name: "Arivex Studio", url: "https://www.gridar.app" }],
   creator: "Arivex Studio",
   publisher: "Arivex Studio",
   openGraph: {
     type: "website",
     locale: "fr_CA",
-    url: "https://gridar.app",
+    url: "https://www.gridar.app",
     siteName: "Gridar",
     title: "Gridar - Le SEO en francais qui comprend le Quebec",
     description:

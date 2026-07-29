@@ -16,7 +16,7 @@ import type { Metadata } from "next";
 import { LandingRenderer } from "@/components/LandingRenderer";
 import { getLanding, listLandings } from "@/lib/landing-api";
 
-const SITE_BASE = "https://gridar.app";
+const SITE_BASE = "https://www.gridar.app";
 
 type Props = { params: Promise<{ slug: string }> };
 

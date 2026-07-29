@@ -13,7 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-const PAGE_URL = "https://gridar.app/suivi-position-google-canada";
+const PAGE_URL = "https://www.gridar.app/suivi-position-google-canada";
 
 export const metadata: Metadata = {
   title: { absolute: "Suivi position Google Canada gratuit | Gridar" },
@@ -110,7 +110,7 @@ const serviceJsonLd = {
   provider: {
     "@type": "Organization",
     name: "Gridar",
-    url: "https://gridar.app",
+    url: "https://www.gridar.app",
   },
   areaServed: {
     "@type": "AdministrativeArea",
