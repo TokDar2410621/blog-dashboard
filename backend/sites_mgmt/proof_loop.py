@@ -89,7 +89,13 @@ def _build_gsc_service(site: Site):
     import is local so the module is importable without google-api-python-client
     installed (dev / tests).
     """
-    if not site.gsc_property_url or not site.gsc_refresh_token:
+    # Only the refresh token is needed to AUTHENTICATE; the property (siteUrl)
+    # is a per-call argument that resolve_gsc_property discovers and persists.
+    # Gating on gsc_property_url here was a silent killer: the OAuth callback
+    # saves the token but never the property, so a site the user HAD connected
+    # (qrstudio.agency, constate le 2026-07-29) had every GSC feature dead
+    # without a word: index coverage, proof loop, decay, positions.
+    if not site.gsc_refresh_token:
         return None
     creds_cfg = _gsc_client_credentials()
     if not creds_cfg:
@@ -171,6 +177,25 @@ def resolve_gsc_property(service, site: Site) -> str:
                     if candidate in owned:
                         resolved = candidate
                         break
+                # AUTO-GUERISON : la propriete etait vide (le callback OAuth ne
+                # la remplissait pas) et on vient de la decouvrir -> on la
+                # PERSISTE, sinon chaque appel la redecouvre et tout ce qui
+                # gate sur gsc_property_url (GSCQueriesView, _gsc_canonical_site_url)
+                # reste casse. On stocke toujours la forme URL : le champ est un
+                # URLField, un 'sc-domain:...' echouerait au prochain save ;
+                # resolve_gsc_property remappe vers sc-domain en memoire.
+                if not stored and resolved:
+                    url_form = resolved if resolved.startswith('http') else f'https://{host}/'
+                    try:
+                        site.gsc_property_url = url_form
+                        site.save(update_fields=['gsc_property_url'])
+                        logger.info(
+                            'resolve_gsc_property: propriete GSC decouverte et persistee '
+                            'pour le site %s : %s (resolue: %s)', site.id, url_form, resolved)
+                    except Exception:
+                        logger.exception(
+                            'resolve_gsc_property: echec de persistance de la propriete site %s',
+                            site.id)
         except Exception as exc:
             logger.warning('resolve_gsc_property: sites().list failed (x2): %s', exc)
             resolved = stored
