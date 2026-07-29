@@ -7536,7 +7536,30 @@ class GSCOAuthCallbackView(APIView):
             site.gsc_refresh_token = creds.refresh_token
             site.gsc_oauth_verifier_pending = ''
             site.save(update_fields=['gsc_refresh_token', 'gsc_oauth_verifier_pending'])
-            return Response({'success': True})
+            # Renseigner la PROPRIETE tout de suite. Sans ca, le site restait
+            # "connecte" avec un jeton mais sans propriete, et tout ce qui gate
+            # sur gsc_property_url mourait en silence (constate le 2026-07-29
+            # sur qrstudio.agency : audit d'index, proof loop, decay, positions
+            # tous inertes alors que Darius avait bien connecte GSC).
+            propriete = ''
+            try:
+                from .proof_loop import _build_gsc_service, resolve_gsc_property
+                svc = _build_gsc_service(site)
+                if svc is not None:
+                    propriete = resolve_gsc_property(svc, site)  # decouvre ET persiste
+                    site.refresh_from_db(fields=['gsc_property_url'])
+            except Exception:
+                logger.exception('GSC callback: decouverte de la propriete impossible (site %s)', site.id)
+            return Response({
+                'success': True,
+                'gsc_property_url': site.gsc_property_url or '',
+                'propriete_resolue': propriete,
+                'avertissement': (
+                    "Jeton enregistre, mais aucune propriete Search Console verifiee ne "
+                    "correspond a ce domaine. Verifie la propriete dans Search Console avec "
+                    "le meme compte Google, puis reconnecte."
+                ) if not site.gsc_property_url else '',
+            })
         except Exception as e:
             # Clear the verifier on failure so the next attempt gets a fresh
             # one (the existing verifier is now associated with a consumed or
