@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Blog Gridar",
     description: "Tactiques SEO QC écrites avec Gridar.",
-    url: "https://gridar.app/blog",
+    url: "https://www.gridar.app/blog",
     type: "website",
   },
 };

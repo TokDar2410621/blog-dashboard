@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       title: post.title,
       description: post.excerpt,
-      url: `https://gridar.app/blog/${post.slug}`,
+      url: `https://www.gridar.app/blog/${post.slug}`,
       publishedTime: post.published_at || undefined,
       authors: post.author ? [post.author] : undefined,
       images: post.cover_image ? [{ url: post.cover_image }] : undefined,
@@ -134,10 +134,10 @@ export default async function BlogPostPage({ params }: PageProps) {
       name: "Arivex Studio",
       logo: {
         "@type": "ImageObject",
-        url: "https://gridar.app/brand/gridar-mark-512.png",
+        url: "https://www.gridar.app/brand/gridar-mark-512.png",
       },
     },
-    mainEntityOfPage: `https://gridar.app/blog/${post.slug}`,
+    mainEntityOfPage: `https://www.gridar.app/blog/${post.slug}`,
     inLanguage: "fr-CA",
     ...(post.cover_image && { image: post.cover_image }),
   };

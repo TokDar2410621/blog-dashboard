@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { fetchBlogPosts } from "@/lib/blog-api";
 import { listLandings } from "@/lib/landing-api";
 
-const SITE = "https://gridar.app";
+const SITE = "https://www.gridar.app";
 
 export const revalidate = 3600;
 
