@@ -83,10 +83,14 @@ def sync_blog_schema(alias, site=None):
             is_view = row[0] == 'VIEW'
 
             cursor.execute(
-                "SELECT column_name FROM information_schema.columns "
+                "SELECT column_name, is_nullable FROM information_schema.columns "
                 "WHERE table_name = %s", [table]
             )
-            existing = {r[0] for r in cursor.fetchall()}
+            nullability = {r[0]: r[1] for r in cursor.fetchall()}
+            existing = set(nullability)
+
+            if not is_view:
+                _drop_not_null_for_nullable_fields(cursor, model, table, nullability, alias)
 
             missing = [f for f in model._meta.fields if f.column not in existing]
             if not missing:
@@ -134,6 +138,33 @@ def sync_blog_schema(alias, site=None):
     except Exception:
         logger.exception("Failed to rebuild blog views on %s", alias)
         return False
+
+
+def _drop_not_null_for_nullable_fields(cursor, model, table, nullability, alias):
+    """Reconcile NULLABILITY on a real client table (never a view): a table
+    created by the site's own migrations can carry NOT NULL on columns the
+    Gridar model treats as nullable. Vecu : QRStudio (site 5) a
+    blog_blogpost.published_at NOT NULL ; chaque draft (published_at NULL) de
+    generate_article a fini en IntegrityError 500 pendant 9 jours (incident
+    2026-07-20). ADD COLUMN ne couvre pas ce cas : sans ce DROP NOT NULL, la
+    panne ne guerit jamais. DROP NOT NULL est additif et sans perte de donnees.
+
+    `nullability` is {column_name: 'YES'|'NO'} from information_schema."""
+    for field in model._meta.fields:
+        if field.null and nullability.get(field.column) == 'NO':
+            try:
+                cursor.execute(
+                    f'ALTER TABLE "{table}" ALTER COLUMN "{field.column}" DROP NOT NULL'
+                )
+                logger.info(
+                    "Dropped NOT NULL on %s.%s (%s): model allows null",
+                    table, field.column, alias,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to drop NOT NULL on %s.%s (%s)",
+                    table, field.column, alias,
+                )
 
 
 def _column_definition(field, conn):
