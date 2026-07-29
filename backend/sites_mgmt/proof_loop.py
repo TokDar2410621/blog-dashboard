@@ -132,11 +132,25 @@ def resolve_gsc_property(service, site: Site) -> str:
     memo = getattr(site, '_gsc_resolved_property', None)
     if memo is not None:
         return memo
+    # Failure fallback memoized SEPARATELY: a persistent outage (revoked token,
+    # API down) must not cost 2 failing HTTP calls per resolve inside per-post
+    # loops (capture_baseline resolves once per post: 30 posts = 60 calls).
+    # In-memory only, so a fresh request still retries a full resolution.
+    echec = getattr(site, '_gsc_resolve_failed_fallback', None)
+    if echec is not None:
+        return echec
     stored = (site.gsc_property_url or '').strip()
     resolved = stored
     if service is not None:
         try:
-            listing = service.sites().list().execute() or {}
+            # One retry: a transient sites().list failure used to silently fall
+            # back to the stored URL (often not a real property -> every GSC
+            # call 403s downstream, notably index_coverage's URL inspection).
+            try:
+                listing = service.sites().list().execute() or {}
+            except Exception as first_exc:
+                logger.info('resolve_gsc_property: sites().list failed once, retry: %s', first_exc)
+                listing = service.sites().list().execute() or {}
             entries = listing.get('siteEntry') or []
             # Any access level can read Search Analytics; URL Inspection needs
             # owner, but a non-owner call just 403s and degrades to site:.
@@ -158,8 +172,19 @@ def resolve_gsc_property(service, site: Site) -> str:
                         resolved = candidate
                         break
         except Exception as exc:
-            logger.info('resolve_gsc_property: sites().list failed: %s', exc)
+            logger.warning('resolve_gsc_property: sites().list failed (x2): %s', exc)
             resolved = stored
+            # A URL-prefix property string ALWAYS ends with '/': "https://x.com"
+            # is never a valid siteUrl, so at least normalize it. (May still not
+            # be the owned property; callers now surface that error instead of
+            # silently degrading.)
+            if resolved and not resolved.endswith('/') and not resolved.startswith('sc-domain:'):
+                resolved += '/'
+            # Memoized in the FAILURE sentinel (not the success memo): repeated
+            # resolves in this run reuse it without re-hitting the API, while a
+            # fresh request/instance retries the full resolution.
+            site._gsc_resolve_failed_fallback = resolved
+            return resolved
     site._gsc_resolved_property = resolved
     return resolved
 

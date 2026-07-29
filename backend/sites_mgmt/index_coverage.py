@@ -152,24 +152,39 @@ def _serper_site_urls(domain: str, pages: int = 8, num: int = 10) -> set[str]:
     return found
 
 
-def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> dict:
-    """Authoritative per-URL index status via GSC URL Inspection. Returns
-    {norm_url: {verdict, coverage_state, indexed, robots, last_crawl}}. Best
-    effort per URL; skips silently when GSC is not connected."""
+def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> tuple[dict, str | None, int, int]:
+    """Authoritative per-URL index status via GSC URL Inspection.
+
+    Returns (results, error, attempts, failures): results is {norm_url:
+    {verdict, coverage_state, indexed, robots, last_crawl}}; error is a short
+    human reason when the authoritative status is entirely MISSING, else None.
+    attempts/failures let the caller surface PARTIAL degradation too. The
+    caller must surface these: a silent fallback to `site:` once made a
+    healthy site (82% indexed per GSC) look 13% indexed, and the report
+    presented it as fact (vecu le 2026-07-29)."""
     from .proof_loop import _build_gsc_service, resolve_gsc_property
+    if not (getattr(site, 'gsc_property_url', '') and getattr(site, 'gsc_refresh_token', '')):
+        return {}, 'GSC non connectee pour ce site', 0, 0
     service = _build_gsc_service(site)
     if service is None:
-        return {}
+        return {}, 'Client OAuth GSC indisponible cote serveur', 0, 0
     site_url = resolve_gsc_property(service, site)  # owned property for siteUrl
     out: dict = {}
+    attempts = 0
+    failures = 0
+    first_err = ''
     for url in urls[:cap]:
+        attempts += 1
         try:
             resp = service.urlInspection().index().inspect(body={
                 'inspectionUrl': url,
                 'siteUrl': site_url,
             }).execute()
         except Exception as exc:
-            logger.info('index_coverage: URL inspect failed %s: %s', url, exc)
+            failures += 1
+            if not first_err:
+                first_err = str(exc)[:200]
+            logger.warning('index_coverage: URL inspect failed %s: %s', url, exc)
             continue
         idx = (resp.get('inspectionResult') or {}).get('indexStatusResult') or {}
         verdict = idx.get('verdict') or ''
@@ -180,7 +195,12 @@ def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> dict:
             'robots': idx.get('robotsTxtState') or '',
             'last_crawl': idx.get('lastCrawlTime') or '',
         }
-    return out
+    if not out and attempts:
+        return {}, (
+            'Inspection GSC en echec sur %d URL(s) (propriete "%s") : %s'
+            % (attempts, site_url, first_err or 'erreur inconnue')
+        ), attempts, failures
+    return out, None, attempts, failures
 
 
 def index_coverage(site, max_inspect: int = 25) -> dict:
@@ -208,9 +228,26 @@ def index_coverage(site, max_inspect: int = 25) -> dict:
     # 2) What Google surfaces (approximate, works everywhere).
     serper_indexed = _serper_site_urls(domain)
 
-    # 3) Authoritative per-URL status (only the expected set, capped).
-    gsc = _gsc_inspect_urls(site, [u for u, _ in expected_norm], cap=max_inspect)
+    # 3) Authoritative per-URL status (capped). Spend the inspection budget on
+    # the DOUBTFUL pages first: a page `site:` already surfaces is indexed with
+    # high confidence, inspecting it wastes the quota; the pages site: does NOT
+    # show are exactly the ones whose real status (and reason) we need.
+    doubtful = [u for u, n in expected_norm if n not in serper_indexed]
+    confirmed = [u for u, n in expected_norm if n in serper_indexed]
+    gsc, gsc_error, gsc_attempts, gsc_failures = _gsc_inspect_urls(
+        site, doubtful + confirmed, cap=max_inspect)
     gsc_used = bool(gsc)
+    gsc_connected = bool(
+        getattr(site, 'gsc_property_url', '') and getattr(site, 'gsc_refresh_token', '')
+    )
+    # Un echec PARTIEL est degrade aussi, jamais silencieux : les pages dont
+    # l'inspection a echoue retombent sur site: (sous-comptage) alors que le
+    # rapport porterait l'etiquette autoritative (le bug d'origine en miniature).
+    if gsc_used and gsc_failures:
+        gsc_error = (
+            'Inspection GSC partielle : %d echec(s) sur %d tentatives ; '
+            'les pages en echec retombent sur site:.' % (gsc_failures, gsc_attempts)
+        )
 
     # 4) Cross-reference each expected page.
     rows = []
@@ -241,11 +278,53 @@ def index_coverage(site, max_inspect: int = 25) -> dict:
     orphans = sorted(u for u in serper_indexed if u not in expected_set)
 
     total = len(expected_norm)
+    if gsc_used and not gsc_failures:
+        confidence = 'autoritatif'
+        note = (
+            "Statut autoritatif via GSC URL Inspection sur les pages inspectees ; "
+            "site: complete pour le reste."
+        )
+    elif gsc_used:
+        confidence = 'partiel'
+        note = (
+            "Statut autoritatif sur les pages inspectees, MAIS %d inspection(s) "
+            "en echec : ces pages-la retombent sur site: (sous-comptage possible)."
+            % gsc_failures
+        )
+    elif gsc_connected and gsc_error:
+        confidence = 'approximatif'
+        # GSC is connected but the authoritative check FAILED: say it loudly.
+        # These numbers rest on `site:` alone, which under-counts massively
+        # (site: showed 17 pages on a site GSC knew 141 indexed for).
+        note = (
+            "ATTENTION : GSC est connectee mais l'inspection a echoue (%s). "
+            "Ces chiffres reposent sur site: seulement et SOUS-ESTIMENT fortement "
+            "l'indexation reelle : n'en tire AUCUN verdict. Relance l'audit."
+            % gsc_error
+        )
+    elif gsc_connected:
+        # Connected, nothing failed: there was simply nothing to inspect
+        # (empty expected set, or max_inspect=0). No false alarm.
+        confidence = 'approximatif'
+        note = (
+            "GSC connectee ; aucune URL n'a ete inspectee (rien a inspecter ou "
+            "max_inspect=0). Statut estime via site: (approximatif)."
+        )
+    else:
+        confidence = 'approximatif'
+        note = (
+            "APPROXIMATIF : statut estime via site: uniquement, qui sous-compte. "
+            "Connecte GSC pour le statut exact (+ la raison de non-indexation)."
+        )
     return {
         'domain': domain,
         'sitemap_found': sitemap_found,
         'method': 'gsc+serper' if gsc_used else 'serper',
         'gsc_used': gsc_used,
+        'gsc_connected': gsc_connected,
+        'gsc_error': gsc_error,
+        'inspection_failures': gsc_failures,
+        'confidence': confidence,
         'total_expected': total,
         'indexed_count': indexed_count,
         'not_indexed_count': len(not_indexed),
@@ -255,13 +334,7 @@ def index_coverage(site, max_inspect: int = 25) -> dict:
         'pages': rows,
         'not_indexed': not_indexed,
         'orphans': orphans[:50],
-        'note': (
-            "Statut GSC autoritatif (+ raison) sur les pages inspectees ; "
-            "le reste est approxime via site:. Connecte GSC pour le statut exact."
-            if not gsc_used else
-            "Statut autoritatif via GSC URL Inspection sur les pages inspectees ; "
-            "site: complete pour le reste."
-        ),
+        'note': note,
     }
 
 
