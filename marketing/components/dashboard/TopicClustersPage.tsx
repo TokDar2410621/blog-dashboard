@@ -301,10 +301,10 @@ export function TopicClustersPage() {
               <span>
                 {data.clusters.length} clusters trouvés sur {data.article_count} articles analysés.
               </span>
-              {data.unassigned.length > 0 && (
+              {(data.unassigned || []).length > 0 && (
                 <span className="flex items-center gap-1 text-amber-600">
                   <AlertCircle className="h-4 w-4" />
-                  {data.unassigned.length} non rattachés
+                  {(data.unassigned || []).length} non rattachés
                 </span>
               )}
             </div>
@@ -523,7 +523,7 @@ export function TopicClustersPage() {
           ))}
 
           {/* Unassigned articles */}
-          {data.unassigned.length > 0 && (
+          {(data.unassigned || []).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -536,7 +536,7 @@ export function TopicClustersPage() {
               </CardHeader>
               <CardContent>
                 <ul className="text-sm space-y-1">
-                  {data.unassigned.map((u) => (
+                  {(data.unassigned || []).map((u) => (
                     <li key={u.slug}>
                       <Link
                         href={`${base}/articles/${u.slug}`}

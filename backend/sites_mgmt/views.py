@@ -5910,6 +5910,7 @@ class TopicClusterView(APIView):
                 'language': language,
                 'article_count': len(articles),
                 'clusters': [],
+                'unassigned': [],
                 'message': 'Pas assez d\'articles pour clusterer (3 minimum).',
             })
 
