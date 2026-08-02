@@ -792,6 +792,10 @@ export function SiteAuditPage() {
           )}
           {indexMutation.data && (() => {
             const d = indexMutation.data;
+            const derr = (d as { error?: string }).error;
+            if (derr) {
+              return <p className="text-sm text-muted-foreground">{derr}</p>;
+            }
             const pct = d.coverage_pct;
             const pctColor =
               pct == null
@@ -846,13 +850,13 @@ export function SiteAuditPage() {
                     </Button>
                   </Link>
                 )}
-                {d.not_indexed.length > 0 && (
+                {(d.not_indexed?.length ?? 0) > 0 && (
                   <div>
                     <div className="text-xs font-medium mb-1">
-                      Pages pas indexees ({d.not_indexed.length})
+                      Pages pas indexees ({d.not_indexed?.length ?? 0})
                     </div>
                     <div className="space-y-1 max-h-52 overflow-y-auto">
-                      {d.not_indexed.slice(0, 15).map((p) => (
+                      {(d.not_indexed || []).slice(0, 15).map((p) => (
                         <div
                           key={p.url}
                           className="text-xs border-b border-border/30 py-1"

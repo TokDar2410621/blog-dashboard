@@ -216,6 +216,9 @@ def index_coverage(site, max_inspect: int = 25) -> dict:
         return {
             'error': "Aucun domaine configure pour ce site.",
             'domain': '', 'expected': [], 'indexed_count': 0,
+            'not_indexed': [], 'not_indexed_count': 0,
+            'google_knows_count': 0, 'coverage_pct': None,
+            'gsc_used': False, 'note': "Aucun domaine configure pour ce site.",
         }
 
     # 1) Expected pages: sitemap first, else Gridar-known pages.

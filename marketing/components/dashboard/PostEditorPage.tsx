@@ -446,8 +446,13 @@ export function PostEditorPage({ slug }: { slug?: string }) {
       );
       if (!res.ok) throw new Error("Erreur génération");
       const data = await res.json();
-      setTagsInput(data.tags.join(", "));
-      toast.success(`${data.tags.length} tags générés`);
+      const tags = Array.isArray(data.tags) ? data.tags : [];
+      if (tags.length === 0) {
+        toast.info("Aucun tag généré");
+        return;
+      }
+      setTagsInput(tags.join(", "));
+      toast.success(`${tags.length} tags générés`);
     } catch (err) {
       toast.error("Erreur: " + (err instanceof Error ? err.message : "Inconnue"));
     } finally {

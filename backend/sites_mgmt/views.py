@@ -3278,6 +3278,16 @@ Respond with JSON only (no markdown code fences):
                     text = text[:-3]
                 text = text.strip()
             brief = json.loads(text)
+            if not isinstance(brief, dict):
+                brief = {}
+            # Le frontend accede a ces champs sans garde; garantir leur presence.
+            for _list_key in ('recommended_titles', 'outline', 'faq', 'entities',
+                              'schemas_suggested', 'eeat_signals'):
+                if not isinstance(brief.get(_list_key), list):
+                    brief[_list_key] = []
+            brief.setdefault('search_intent', '')
+            brief.setdefault('intent_explanation', '')
+            brief.setdefault('word_count_target', 0)
         except Exception as e:
             logger.warning('Gemini content brief failed: %s', e)
             return Response(
@@ -9644,7 +9654,7 @@ class SiteAuditAggregatorView(APIView):
                 'severity': 'high',
                 'message': f"{decay['decaying_count']} articles perdent du trafic - a refresh.",
                 'cta_label': 'Voir le declin',
-                'cta_href': f'/dashboard/{site.id}/content-decay',
+                'cta_href': f'/dashboard/{site.id}/decay',
             })
         if 'avg' in ps and ps['avg'] < 70:
             recos.append({
@@ -9665,7 +9675,7 @@ class SiteAuditAggregatorView(APIView):
                 'severity': 'medium',
                 'message': "Google Search Console non connecte - tu rates les vraies positions.",
                 'cta_label': 'Connecter GSC',
-                'cta_href': f'/dashboard/{site.id}/settings',
+                'cta_href': f'/dashboard/{site.id}/parametres/gsc',
             })
 
         payload = {

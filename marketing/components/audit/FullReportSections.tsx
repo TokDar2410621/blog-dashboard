@@ -252,7 +252,7 @@ export function FullReportSections({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {report.schema_audit?.error && !schema?.present.length && !schema?.missing_recommended.length ? (
+          {report.schema_audit?.error && !schema?.present?.length && !schema?.missing_recommended?.length ? (
             <p className="text-sm text-muted-foreground">
               {report.schema_audit.error}
             </p>
@@ -314,7 +314,7 @@ export function FullReportSections({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {report.cwv_breakdown?.error && !cwv?.desktop.avg ? (
+          {report.cwv_breakdown?.error && !cwv?.desktop?.avg ? (
             <p className="text-sm text-muted-foreground">
               {report.cwv_breakdown.error}
             </p>

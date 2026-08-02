@@ -65,7 +65,7 @@ export default function WeeklyDigestPage() {
   const siteId = params?.siteId;
   const base = `/dashboard/${siteId}`;
 
-  const { data, isLoading } = useQuery<Digest>({
+  const { data, isLoading, isError } = useQuery<Digest>({
     queryKey: ["weekly-digest", siteId],
     queryFn: async () => {
       const res = await authFetch(`/sites/${siteId}/weekly-digest/`);
@@ -99,6 +99,12 @@ export default function WeeklyDigestPage() {
       </div>
 
       {isLoading && <Skeleton className="h-96 w-full" />}
+
+      {isError && !isLoading && (
+        <div className="rounded-lg border border-border/50 py-10 text-center text-sm text-muted-foreground print:hidden">
+          Impossible de charger le rapport. Le site doit être hébergé ou avoir une base externe configurée. Réessaie plus tard.
+        </div>
+      )}
 
       {data && (
         <>

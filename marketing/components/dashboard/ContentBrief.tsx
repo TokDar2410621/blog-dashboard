@@ -192,7 +192,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                     Titres recommandés
                   </h4>
                   <div className="space-y-2">
-                    {data.brief.recommended_titles.map((title) => (
+                    {(data.brief.recommended_titles || []).map((title) => (
                       <button
                         type="button"
                         key={title}
@@ -216,7 +216,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                     Plan d&apos;article
                   </h4>
                   <ul className="space-y-1 text-sm">
-                    {data.brief.outline.map((h, i) => (
+                    {(data.brief.outline || []).map((h, i) => (
                       <li
                         key={i}
                         className={
@@ -244,7 +244,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                 </div>
 
                 {/* FAQ */}
-                {data.brief.faq.length > 0 && (
+                {(data.brief.faq?.length ?? 0) > 0 && (
                   <div>
                     <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-2">
                       FAQ (prêtes pour schema)
@@ -267,7 +267,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                 )}
 
                 {/* Entities */}
-                {data.brief.entities.length > 0 && (
+                {(data.brief.entities?.length ?? 0) > 0 && (
                   <div>
                     <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-2">
                       Entités à mentionner
@@ -286,7 +286,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                 )}
 
                 {/* Schemas */}
-                {data.brief.schemas_suggested.length > 0 && (
+                {(data.brief.schemas_suggested?.length ?? 0) > 0 && (
                   <div>
                     <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-2">
                       Schemas suggérés
@@ -305,7 +305,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                 )}
 
                 {/* EEAT */}
-                {data.brief.eeat_signals.length > 0 && (
+                {(data.brief.eeat_signals?.length ?? 0) > 0 && (
                   <div>
                     <h4 className="text-xs font-mono uppercase tracking-wide text-muted-foreground mb-2">
                       Signaux EEAT à inclure

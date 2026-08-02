@@ -101,7 +101,7 @@ export function LinkGraphPage() {
         </Card>
       )}
 
-      {data && (
+      {data && data.article_count > 0 && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>

@@ -136,7 +136,30 @@ export function AutopilotCard({ siteId }: { siteId: string | number }) {
     );
   }
 
-  const c = cfg.data!;
+  if (cfg.isError || !cfg.data) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Rocket className="h-5 w-5" />
+            Mode autopilote
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Impossible de charger la configuration autopilote.
+            </p>
+            <Button size="sm" variant="outline" onClick={() => cfg.refetch()}>
+              Réessayer
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const c = cfg.data;
   const isEnabled = pendingEnabled ?? c.enabled;
   const noKeywords = c.tracked_keywords_count === 0;
 
