@@ -102,6 +102,24 @@ class IndexCoverageGscFailureTests(TestCase):
         self.assertIn('OAuth', result['gsc_error'])
         self.assertIn('ATTENTION', result['note'])
 
+    def test_jeton_sans_propriete_ne_bloque_plus(self):
+        """Regression du 2026-07-29 : un site avec un JETON mais sans propriete
+        (bug du callback OAuth) etait declare "non connectee" et l'inspection
+        n'etait jamais TENTEE, donc l'auto-guerison de la propriete ne tournait
+        jamais : la 2e porte annulait le fix de la 1re. Gate = jeton seul."""
+        sp = _make_site(self.user, gsc=True, suffix='noprop')
+        sp.gsc_property_url = ''   # jeton OUI, propriete VIDE
+        sp.save()
+        svc = _fake_inspect_service(indexed_urls=set(EXPECTED))
+        with patch.object(ic, '_fetch_sitemap_urls', return_value=list(EXPECTED)), \
+             patch.object(ic, '_serper_site_urls', return_value=set()), \
+             patch.object(proof_loop, '_build_gsc_service', return_value=svc):
+            result = ic.index_coverage(sp, max_inspect=10)
+        self.assertTrue(result['gsc_connected'], "un jeton suffit a etre connecte")
+        self.assertTrue(result['gsc_used'], "l'inspection doit etre tentee malgre la propriete vide")
+        self.assertEqual(result['confidence'], 'autoritatif')
+        self.assertIsNone(result['gsc_error'])
+
     def test_gsc_non_connectee_note_normale(self):
         """Sans GSC : approximatif assume, pas d'ATTENTION (rien n'a echoue)."""
         site2 = _make_site(self.user, gsc=False, suffix='nogsc')

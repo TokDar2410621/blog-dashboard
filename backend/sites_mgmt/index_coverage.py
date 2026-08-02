@@ -163,8 +163,14 @@ def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> tuple[dict, str |
     healthy site (82% indexed per GSC) look 13% indexed, and the report
     presented it as fact (vecu le 2026-07-29)."""
     from .proof_loop import _build_gsc_service, resolve_gsc_property
-    if not (getattr(site, 'gsc_property_url', '') and getattr(site, 'gsc_refresh_token', '')):
-        return {}, 'GSC non connectee pour ce site', 0, 0
+    # Gate sur le JETON seul. Exiger aussi gsc_property_url sortait AVANT que
+    # resolve_gsc_property ait pu decouvrir et persister la propriete : un site
+    # connecte (jeton present, propriete vide a cause du bug du callback OAuth)
+    # restait declare "non connectee" et l'auto-guerison ne tournait jamais.
+    # Constate le 2026-07-29 sur qrstudio.agency, apres le fix du callback :
+    # cette 2e porte, oubliee, annulait la premiere.
+    if not getattr(site, 'gsc_refresh_token', ''):
+        return {}, 'GSC non connectee pour ce site (aucun jeton)', 0, 0
     service = _build_gsc_service(site)
     if service is None:
         return {}, 'Client OAuth GSC indisponible cote serveur', 0, 0
@@ -237,9 +243,10 @@ def index_coverage(site, max_inspect: int = 25) -> dict:
     gsc, gsc_error, gsc_attempts, gsc_failures = _gsc_inspect_urls(
         site, doubtful + confirmed, cap=max_inspect)
     gsc_used = bool(gsc)
-    gsc_connected = bool(
-        getattr(site, 'gsc_property_url', '') and getattr(site, 'gsc_refresh_token', '')
-    )
+    # "Connecte" = le site a un JETON. La propriete peut etre vide (bug du
+    # callback OAuth, corrige) : elle se decouvre a l'appel, ce n'est pas un
+    # critere de connexion.
+    gsc_connected = bool(getattr(site, 'gsc_refresh_token', ''))
     # Un echec PARTIEL est degrade aussi, jamais silencieux : les pages dont
     # l'inspection a echoue retombent sur site: (sous-comptage) alors que le
     # rapport porterait l'etiquette autoritative (le bug d'origine en miniature).
