@@ -7685,11 +7685,13 @@ class GSCQueriesView(APIView):
 
         if not slug:
             return Response({'error': 'slug is required.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not site.gsc_property_url:
-            return Response(
-                {'error': 'No GSC property URL configured for this site.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Gate sur le JETON seul. Exiger aussi gsc_property_url ici est la 3e
+        # porte de la meme famille que _build_gsc_service (proof_loop.py) et
+        # _gsc_inspect_urls (index_coverage.py) : le callback OAuth sauve le
+        # jeton mais jamais la propriete, et resolve_gsc_property sait
+        # desormais la decouvrir ET la persister. La bloquer ici avant que
+        # resolve_gsc_property ait pu tourner laissait un site connecte
+        # (qrstudio.agency) repondre 400 sur /gsc/queries/.
         if not site.gsc_refresh_token:
             return Response(
                 {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
@@ -7715,18 +7717,6 @@ class GSCQueriesView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        # Build a full page URL = canonical site URL + slug/
-        # For URL-prefix properties: uses the property URL directly.
-        # For Domain properties (sc-domain:...): uses Site.domain to build a
-        # real https://... URL since `sc-domain:...` isn't a valid page URL.
-        property_url = _gsc_canonical_site_url(site)
-        if not property_url:
-            return Response(
-                {'error': 'gsc_property_url ou Site.domain manquant.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        page_url = property_url + slug.strip('/') + '/'
-
         end = _date.today()
         start = end - timedelta(days=days)
 
@@ -7745,7 +7735,29 @@ class GSCQueriesView(APIView):
                 cache_discovery=False,
             )
             from .proof_loop import resolve_gsc_property
-            gsc_site_url = resolve_gsc_property(service, site)  # owned property for siteUrl
+            gsc_site_url = resolve_gsc_property(service, site)  # discovers AND persists when empty
+
+            # Build a full page URL = canonical site URL + slug/. Compute this
+            # AFTER resolve_gsc_property: the stored field may have been EMPTY
+            # coming in (the OAuth callback bug) and resolve_gsc_property just
+            # discovered and persisted it in-place on `site`. Last-resort
+            # fallback to Site.domain if no verified property was found at
+            # all, same safety net as _post_public_url in proof_loop.py.
+            property_url = _gsc_canonical_site_url(site)
+            if not property_url and site.domain:
+                property_url = f'https://{site.domain.strip("/")}/'
+            if not property_url:
+                return Response(
+                    {'error': (
+                        "Aucune propriete Search Console verifiee ne correspond a ce "
+                        "site pour le compte Google connecte, et aucun domaine n'est "
+                        "configure pour construire l'URL de page. Verifie la propriete "
+                        "dans Search Console avec le meme compte Google, puis reconnecte."
+                    )},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            page_url = property_url + slug.strip('/') + '/'
+
             body = {
                 'startDate': start.isoformat(),
                 'endDate': end.isoformat(),
