@@ -7,13 +7,17 @@ silencieusement "non connectee" : audit d'index, proof loop, decay, positions.
 
 Run: python manage.py test sites_mgmt.tests_gsc_property
 """
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .models import Site
 from . import proof_loop
+from .views import GSCQueriesView
 
 User = get_user_model()
 
@@ -106,3 +110,103 @@ class AutoGuerisonProprieteTests(TestCase):
         with patch.object(Site, 'save', side_effect=RuntimeError('db en lecture seule')):
             resolved = proof_loop.resolve_gsc_property(svc, self.site)
         self.assertEqual(resolved, 'sc-domain:qrstudio.agency')
+
+
+def _fake_googleapiclient_modules(listing, query_rows=()):
+    """Injecte un module `googleapiclient` factice dans sys.modules.
+
+    La lib google-api-python-client n'est PAS installee en dev (seul
+    google-auth l'est) : les imports locaux de GSCQueriesView.get()
+    ('from googleapiclient.discovery import build' etc.) levent sinon un
+    ImportError et la vue repond 503 avant meme d'atteindre le code teste.
+    Renvoie (dict pour patch.dict(sys.modules, ...), le MagicMock service).
+    """
+    service = MagicMock()
+    service.sites.return_value.list.return_value.execute.return_value = listing
+    service.searchanalytics.return_value.query.return_value.execute.return_value = {
+        'rows': list(query_rows),
+    }
+
+    discovery_mod = types.ModuleType('googleapiclient.discovery')
+    discovery_mod.build = MagicMock(return_value=service)
+
+    class _FakeHttpError(Exception):
+        pass
+
+    errors_mod = types.ModuleType('googleapiclient.errors')
+    errors_mod.HttpError = _FakeHttpError
+
+    root_mod = types.ModuleType('googleapiclient')
+    root_mod.discovery = discovery_mod
+    root_mod.errors = errors_mod
+
+    modules = {
+        'googleapiclient': root_mod,
+        'googleapiclient.discovery': discovery_mod,
+        'googleapiclient.errors': errors_mod,
+    }
+    return modules, service
+
+
+class GSCQueriesViewProprieteVideTests(TestCase):
+    """Regression : GSCQueriesView (backend/sites_mgmt/views.py) refusait avec
+    un HTTP 400 'No GSC property URL configured for this site.' des qu'un
+    site avait un jeton GSC valide mais gsc_property_url vide. C'est la 3e
+    porte de la meme famille que _build_gsc_service (proof_loop.py, corrigee
+    en PR #5) et _gsc_inspect_urls (index_coverage.py, corrigee en PR #6) : le
+    callback OAuth sauve le jeton mais jamais la propriete, et
+    resolve_gsc_property sait desormais la decouvrir ET la persister. Cette
+    3e porte, oubliee, laissait un site pourtant connecte (qrstudio.agency,
+    site 5) recevoir un 400 trompeur sur /gsc/queries/."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='u3', password='x')
+        self.site = Site.objects.create(
+            owner=self.user, name='QR', domain='qrstudio.agency',
+        )
+        self.site.gsc_refresh_token = 'fake-token'   # jeton OUI, propriete VIDE
+        self.site.gsc_property_url = ''
+        self.site.save()
+        self.factory = APIRequestFactory()
+
+    def _get(self, slug='mon-article'):
+        request = self.factory.get(f'/api/sites/{self.site.id}/gsc/queries/?slug={slug}')
+        force_authenticate(request, user=self.user)
+        return GSCQueriesView.as_view()(request, site_id=self.site.id)
+
+    def test_jeton_seul_ne_recoit_plus_400(self):
+        """Propriete VIDE + jeton present : plus de 400. resolve_gsc_property
+        decouvre la propriete du domaine, la persiste, et la requete GSC part
+        avec l'URL de page construite sur la propriete resolue."""
+        modules, _svc = _fake_googleapiclient_modules(
+            listing={'siteEntry': [{'siteUrl': 'https://qrstudio.agency/',
+                                     'permissionLevel': 'siteOwner'}]},
+            query_rows=[{'keys': ['seo local'], 'clicks': 3, 'impressions': 50,
+                         'ctr': 0.06, 'position': 4.2}],
+        )
+        with patch.dict(sys.modules, modules):
+            response = self._get()
+        self.assertEqual(response.status_code, 200, response.data)
+        self.site.refresh_from_db()
+        self.assertEqual(
+            self.site.gsc_property_url, 'https://qrstudio.agency/',
+            "la propriete decouverte doit avoir ete persistee (auto-guerison)")
+        self.assertEqual(response.data['page_url'], 'https://qrstudio.agency/mon-article/')
+        self.assertEqual(response.data['queries'][0]['query'], 'seo local')
+
+    def test_aucune_propriete_correspondante_erreur_explicite(self):
+        """Ni la propriete stockee (vide) ni aucune propriete du token ne
+        correspondent, et le site n'a pas de domaine pour se rabattre :
+        erreur EXPLICITE, plus le message trompeur d'avant qui laissait
+        croire qu'il suffisait de remplir un champ."""
+        self.site.domain = ''
+        self.site.save()
+        modules, _svc = _fake_googleapiclient_modules(
+            listing={'siteEntry': [{'siteUrl': 'sc-domain:autre-domaine.com',
+                                     'permissionLevel': 'siteOwner'}]},
+        )
+        with patch.dict(sys.modules, modules):
+            response = self._get()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Aucune propriete Search Console verifiee', response.data['error'])
+        self.assertNotIn('No GSC property URL configured', response.data['error'])
