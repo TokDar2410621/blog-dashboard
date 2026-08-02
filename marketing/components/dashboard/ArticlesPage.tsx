@@ -358,25 +358,27 @@ export default function ArticlesPage() {
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Modifier
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  const url = publicArticleUrl(post.slug);
-                                  if (!url) {
-                                    toast.error(
-                                      "Domaine du site non configuré"
+                              {site?.is_hosted && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const url = publicArticleUrl(post.slug);
+                                    if (!url) {
+                                      toast.error(
+                                        "Domaine du site non configuré"
+                                      );
+                                      return;
+                                    }
+                                    window.open(
+                                      url,
+                                      "_blank",
+                                      "noopener,noreferrer"
                                     );
-                                    return;
-                                  }
-                                  window.open(
-                                    url,
-                                    "_blank",
-                                    "noopener,noreferrer"
-                                  );
-                                }}
-                              >
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                Voir sur le site
-                              </DropdownMenuItem>
+                                  }}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Voir sur le site
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem
                                 className="text-destructive"
                                 onClick={() =>
