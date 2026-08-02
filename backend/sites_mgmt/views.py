@@ -7685,40 +7685,44 @@ class GSCQueriesView(APIView):
 
         if not slug:
             return Response({'error': 'slug is required.'}, status=status.HTTP_400_BAD_REQUEST)
-        if not site.gsc_property_url:
-            return Response(
-                {'error': 'No GSC property URL configured for this site.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Gate sur le JETON seul. Exiger aussi gsc_property_url sortait AVANT
+        # que resolve_gsc_property ait pu decouvrir et persister la propriete :
+        # un site connecte (jeton present, propriete vide a cause du bug du
+        # callback OAuth) restait declare "non configure" par cette 3e porte,
+        # oubliee lors des fix de _build_gsc_service et _gsc_inspect_urls
+        # (PR #5, #6). Constate le 2026-08-02 sur qrstudio.agency.
         if not site.gsc_refresh_token:
             return Response(
                 {'error': 'Reconnecte GSC', 'code': 'gsc_reauth_required'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        config = _gsc_client_config()
-        if not config:
+        from datetime import date as _date, timedelta
+
+        # _build_gsc_service gere deja l'absence des libs Google (import local,
+        # renvoie None au lieu de lever) : pas besoin d'un 2e garde ImportError
+        # ici, ca duplicait la logique sans jamais etre exercisable en test.
+        from .proof_loop import _build_gsc_service, resolve_gsc_property
+        service = _build_gsc_service(site)
+        if service is None:
             return Response(
-                {'error': 'GSC OAuth client not configured on the server.'},
+                {'error': 'Client OAuth GSC indisponible cote serveur.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        try:
-            from datetime import date as _date, timedelta
-            from google.oauth2.credentials import Credentials
-            from google.auth.exceptions import RefreshError
-            from googleapiclient.discovery import build
-            from googleapiclient.errors import HttpError
-        except ImportError:
+        gsc_site_url = resolve_gsc_property(service, site)  # decouvre + persiste au besoin
+        if not gsc_site_url:
             return Response(
-                {'error': 'Google API libraries are not installed.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                {
+                    'error': "Aucune propriete Search Console verifiee ne correspond a ce site.",
+                    'code': 'gsc_property_unresolved',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Build a full page URL = canonical site URL + slug/
-        # For URL-prefix properties: uses the property URL directly.
-        # For Domain properties (sc-domain:...): uses Site.domain to build a
-        # real https://... URL since `sc-domain:...` isn't a valid page URL.
+        # Page URL batie sur la propriete RESOLUE : resolve_gsc_property a pu
+        # persister site.gsc_property_url a l'instant (auto-guerison), donc ce
+        # champ n'est plus vide ici meme s'il l'etait avant l'appel.
         property_url = _gsc_canonical_site_url(site)
         if not property_url:
             return Response(
@@ -7730,22 +7734,12 @@ class GSCQueriesView(APIView):
         end = _date.today()
         start = end - timedelta(days=days)
 
+        # Import sur de reussir ici : _build_gsc_service a deja confirme que
+        # les libs Google sont installees (service n'est pas None).
+        from google.auth.exceptions import RefreshError
+        from googleapiclient.errors import HttpError
+
         try:
-            creds = Credentials(
-                token=None,
-                refresh_token=site.gsc_refresh_token,
-                token_uri=GSC_TOKEN_URI,
-                client_id=config['web']['client_id'],
-                client_secret=config['web']['client_secret'],
-                scopes=GSC_SCOPES,
-            )
-            service = build(
-                'searchconsole', 'v1',
-                credentials=creds,
-                cache_discovery=False,
-            )
-            from .proof_loop import resolve_gsc_property
-            gsc_site_url = resolve_gsc_property(service, site)  # owned property for siteUrl
             body = {
                 'startDate': start.isoformat(),
                 'endDate': end.isoformat(),

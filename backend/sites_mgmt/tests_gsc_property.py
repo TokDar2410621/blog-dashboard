@@ -11,11 +11,14 @@ from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from .models import Site
 from . import proof_loop
+from .views import GSCQueriesView
 
 User = get_user_model()
+factory = APIRequestFactory()
 
 
 def _listing(*site_urls, level='siteOwner'):
@@ -106,3 +109,57 @@ class AutoGuerisonProprieteTests(TestCase):
         with patch.object(Site, 'save', side_effect=RuntimeError('db en lecture seule')):
             resolved = proof_loop.resolve_gsc_property(svc, self.site)
         self.assertEqual(resolved, 'sc-domain:qrstudio.agency')
+
+
+class GscQueriesViewGateTests(TestCase):
+    """Verrouille la 3e porte : GSCQueriesView refusait encore avec un 400
+    'No GSC property URL configured' quand le jeton est present et la
+    propriete vide, alors que _build_gsc_service (PR #5) et _gsc_inspect_urls
+    (PR #6) avaient deja ete corriges pour ne gater que sur le jeton. Cette
+    3e porte annulait l'auto-guerison sur qrstudio.agency (site 5)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='u3', password='x')
+        self.site = Site.objects.create(owner=self.user, name='QR', domain='qrstudio.agency')
+        self.site.gsc_refresh_token = 'fake-token'   # jeton OUI, propriete VIDE
+        self.site.gsc_property_url = ''
+        self.site.save()
+
+    def _get(self, slug='mon-article'):
+        request = factory.get(
+            f'/api/sites/{self.site.id}/gsc/queries/', {'slug': slug})
+        force_authenticate(request, user=self.user)
+        return GSCQueriesView.as_view()(request, site_id=self.site.id)
+
+    def test_jeton_seul_ne_recoit_plus_lancien_400(self):
+        """Propriete vide + jeton present : plus de 400 'gsc_property_url
+        manquant'. La propriete se decouvre et se persiste au vol, puis
+        l'appel searchanalytics part avec la propriete resolue."""
+        svc = _svc(_listing('https://qrstudio.agency/'))
+        svc.searchanalytics.return_value.query.return_value.execute.return_value = {'rows': []}
+        with patch.object(proof_loop, '_build_gsc_service', return_value=svc):
+            response = self._get()
+        self.assertEqual(response.status_code, 200)
+        self.site.refresh_from_db()
+        self.assertEqual(self.site.gsc_property_url, 'https://qrstudio.agency/')
+
+    def test_aucune_propriete_resolue_renvoie_erreur_explicite_pas_lancien_400_trompeur(self):
+        """Le jeton ne possede aucune propriete correspondant au domaine du
+        site : erreur EXPLICITE (code gsc_property_unresolved), pas le vieux
+        message trompeur 'No GSC property URL configured'."""
+        svc = _svc(_listing('sc-domain:autre-domaine.com'))
+        with patch.object(proof_loop, '_build_gsc_service', return_value=svc):
+            response = self._get()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data.get('code'), 'gsc_property_unresolved')
+
+    def test_sans_jeton_401_avant_toute_resolution(self):
+        """Sans jeton, on sort en 401 sans meme tenter de construire le
+        client (la porte du jeton reste la premiere)."""
+        self.site.gsc_refresh_token = ''
+        self.site.save()
+        with patch.object(proof_loop, '_build_gsc_service') as build_mock:
+            response = self._get()
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data.get('code'), 'gsc_reauth_required')
+        build_mock.assert_not_called()
