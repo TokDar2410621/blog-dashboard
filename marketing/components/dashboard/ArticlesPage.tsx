@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, AlertCircle, Clock } from "lucide-react";
-import { useAllPosts, useDeletePost } from "@/hooks/useDashboard";
+import { useAllPosts, useDeletePost, useSite } from "@/hooks/useDashboard";
 import { TemplateSelector } from "@/components/dashboard/TemplateSelector";
 import { fetchProofAttribution, type ProofAttribution } from "@/lib/api-client";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -153,6 +153,16 @@ export default function ArticlesPage() {
   const params = useParams<{ siteId: string }>();
   const siteId = params?.siteId;
   const base = `/dashboard/${siteId}`;
+  const { data: site } = useSite();
+
+  // URL publique d'un article: {domaine public}/blog/{slug} (cf. _gridar_known_urls backend).
+  const publicArticleUrl = (slug: string): string | null => {
+    const raw = (site?.public_blog_domain || site?.domain || "")
+      .trim()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/+$/, "");
+    return raw ? `https://${raw}/blog/${slug}` : null;
+  };
 
   const posts: PostListItem[] = data?.results ?? [];
   const totalCount = data?.count ?? posts.length;
@@ -349,11 +359,20 @@ export default function ArticlesPage() {
                                 Modifier
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() =>
-                                  router.push(
-                                    `${base}/articles/${post.slug}`
-                                  )
-                                }
+                                onClick={() => {
+                                  const url = publicArticleUrl(post.slug);
+                                  if (!url) {
+                                    toast.error(
+                                      "Domaine du site non configuré"
+                                    );
+                                    return;
+                                  }
+                                  window.open(
+                                    url,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  );
+                                }}
                               >
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Voir sur le site

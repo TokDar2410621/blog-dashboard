@@ -1483,6 +1483,70 @@ class ServeImageView(APIView):
         return response
 
 
+def _serialize_uploaded_image(img, request):
+    """Shape an UploadedImage for the media gallery (matches the frontend which
+    reads secure_url/url/public_id/format)."""
+    url = request.build_absolute_uri(f'/api/images/{img.uid}/')
+    return {
+        'public_id': img.filename or str(img.uid),
+        'url': url,
+        'secure_url': url,
+        'format': (img.mime_type or '').split('/')[-1],
+        'created_at': img.created_at.isoformat(),
+    }
+
+
+class SiteImagesView(APIView):
+    """List the owner's uploaded images (media library) + upload a new one.
+
+    Images belong to the USER, not a site (UploadedImage has no site FK), so the
+    same library shows across the owner's sites; the site_id in the path only
+    namespaces the route the dashboard already calls (/sites/<id>/images/).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        get_site_for_user(request, site_id)  # 404 si le site n'appartient pas au user
+        images = UploadedImage.objects.filter(owner=request.user).order_by('-created_at')[:500]
+        return Response([_serialize_uploaded_image(img, request) for img in images])
+
+
+class SiteImageUploadView(APIView):
+    """Upload an image to the owner's media library via the site-scoped route
+    the dashboard uses (/sites/<id>/images/upload/)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, site_id):
+        get_site_for_user(request, site_id)  # 404 si le site n'appartient pas au user
+        file = request.FILES.get('image')
+        if not file:
+            return Response(
+                {'error': 'Aucun fichier envoye'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        allowed_types = ('image/jpeg', 'image/png', 'image/gif', 'image/webp')
+        if file.content_type not in allowed_types:
+            return Response(
+                {'error': 'Type de fichier non supporte (JPEG, PNG, GIF, WebP uniquement)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if file.size > 5 * 1024 * 1024:
+            return Response(
+                {'error': 'Fichier trop volumineux (max 5 Mo)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        img = UploadedImage.objects.create(
+            data=file.read(),
+            mime_type=file.content_type,
+            filename=file.name,
+            owner=request.user,
+        )
+        return Response(
+            _serialize_uploaded_image(img, request),
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class GenerateImageView(APIView):
     """Generate a blog cover image using Imagen 3."""
     permission_classes = [IsAuthenticated]
