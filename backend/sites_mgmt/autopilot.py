@@ -138,7 +138,7 @@ def _check_for_decay_candidates(site: Site):
 
     # Reuse GSC client config + URL canonicaliser from the views module.
     try:
-        from .views import _gsc_client_config, _gsc_canonical_site_url, GSC_TOKEN_URI, GSC_SCOPES
+        from .views import _gsc_client_config, _gsc_canonical_site_url, GSC_TOKEN_URI
     except ImportError:
         return []
 
@@ -152,13 +152,13 @@ def _check_for_decay_candidates(site: Site):
     prev_start = prev_end - timedelta(days=29)
 
     try:
+        # Pas de scopes= : voir proof_loop._build_gsc_service.
         creds = Credentials(
             token=None,
             refresh_token=site.gsc_refresh_token,
             token_uri=GSC_TOKEN_URI,
             client_id=config['web']['client_id'],
             client_secret=config['web']['client_secret'],
-            scopes=GSC_SCOPES,
         )
         service = build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
         from .proof_loop import resolve_gsc_property

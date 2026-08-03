@@ -69,6 +69,7 @@ from .api_v1 import (
     V1LandingPromptView, V1OpportunityPromptView,
     V1BuildQueueView, V1BuildQueueMarkBuiltView, V1ClusterMapView,
     V1ClusterBuildView, V1IndexCoverageView, V1IndexNowView, V1IndexNowSubmitView,
+    V1SitemapSubmitView,
 )
 from .views_proof import (
     ProofBaselineView, ProofAttributionView, ProofSummaryView,
@@ -295,6 +296,8 @@ urlpatterns = [
          V1IndexNowView.as_view(), name='v1-indexnow'),
     path('v1/sites/<int:site_id>/indexnow/submit/',
          V1IndexNowSubmitView.as_view(), name='v1-indexnow-submit'),
+    path('v1/sites/<int:site_id>/sitemap/submit/',
+         V1SitemapSubmitView.as_view(), name='v1-sitemap-submit'),
     path('v1/sites/<int:site_id>/strategic-opportunities/<int:op_id>/<str:action>/',
          V1StrategicOpportunityActionView.as_view(),
          name='v1-strategic-opportunity-action'),

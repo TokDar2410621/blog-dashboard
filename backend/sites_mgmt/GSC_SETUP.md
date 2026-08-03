@@ -16,10 +16,12 @@ set. Just update the existing client in Google Cloud Console:
 2. Enable the **Search Console API** for that project:
    `APIs & Services` -> `Library` -> search `Search Console API` -> `Enable`.
 3. Go to `APIs & Services` -> `OAuth consent screen` and **add the scope**
-   `https://www.googleapis.com/auth/webmasters.readonly`
-   to the list of scopes the app requests.
-   While the app is in `Testing` mode, add yourself (and any other owner) as
-   a **test user**.
+   `https://www.googleapis.com/auth/webmasters`
+   to the list of scopes the app requests. This is the FULL scope (read +
+   write): read powers the per-query metrics and the index audit, write powers
+   sitemap re-submission. It is a **sensitive** scope, so a consent screen
+   published to external users needs Google verification; in `Testing` mode
+   just add yourself (and any other owner) as a **test user**.
 4. Go to `APIs & Services` -> `Credentials`, open the existing OAuth client
    (the one used for login), and under **Authorized redirect URIs** add the
    GSC callback URL for each environment you run:
@@ -36,7 +38,7 @@ That's it. The backend will reuse `GOOGLE_OAUTH_CLIENT_ID` /
 Use this if you want isolation between login and Search Console (different
 test users, different consent screen, etc.). Create a dedicated OAuth client
 following the standard Google Cloud flow (Web application type, enable the
-Search Console API, add the `webmasters.readonly` scope, add a redirect URI
+Search Console API, add the `webmasters` scope, add a redirect URI
 ending in `/gsc/callback`), then override with these env vars:
 
 ```
@@ -118,8 +120,13 @@ All endpoints require authentication (JWT like the rest of the dashboard).
   database layer (Postgres TDE, Railway disk encryption, etc.). If you need
   application-level encryption, wrap `save`/property accessors with
   `cryptography.fernet.Fernet` using a key from `GSC_TOKEN_ENCRYPTION_KEY`.
-- Only the `webmasters.readonly` scope is requested - the dashboard cannot
-  modify Search Console data.
+- The `webmasters` scope is requested. Read covers metrics and the index
+  audit; write is used for exactly one thing, re-submitting a sitemap
+  (`POST /api/v1/sites/<id>/sitemap/submit/`). Nothing else in the codebase
+  writes to Search Console.
+- Sites connected BEFORE the scope was widened still hold a read-only refresh
+  token. Their reads keep working; a sitemap submit returns HTTP 409 with
+  `needs_reconnect: true`, which means reconnect that site's Search Console.
 - The refresh token is never exposed in any serializer. Only
   `gsc_property_url` is exposed on the Site API.
 

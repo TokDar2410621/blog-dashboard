@@ -6201,7 +6201,9 @@ class ContentDecayView(APIView):
                 token_uri=GSC_TOKEN_URI,
                 client_id=config['web']['client_id'],
                 client_secret=config['web']['client_secret'],
-                scopes=GSC_SCOPES,
+                # Pas de scopes= : voir proof_loop._build_gsc_service. Le scope vient du
+                # consentement ; le passer ici ne fait que declencher un WARNING sur les
+                # jetons emis avant l'elargissement du scope.
             )
             service = build(
                 'searchconsole', 'v1',
@@ -7367,7 +7369,7 @@ class PublicCategoriesView(APIView):
 #
 # Minimal setup (reuses the existing Google login OAuth client):
 #   - In Google Cloud Console, add the scope
-#     `https://www.googleapis.com/auth/webmasters.readonly` to the OAuth
+#     `https://www.googleapis.com/auth/webmasters` to the OAuth
 #     consent screen of the SAME client used for Google login.
 #   - Add `<frontend_origin>/gsc/callback` to its Authorized Redirect URIs.
 #   - No new env vars are needed: GSC will reuse GOOGLE_OAUTH_CLIENT_ID /
@@ -7381,7 +7383,11 @@ class PublicCategoriesView(APIView):
 #
 # See backend/sites_mgmt/GSC_SETUP.md for full setup instructions.
 
-GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
+# Scope COMPLET : voir le commentaire de proof_loop.GSC_SCOPES. `webmasters`
+# inclut tout ce que `webmasters.readonly` couvrait ; les jetons deja emis
+# restent valides en LECTURE, seule l'ECRITURE (sitemaps.submit) exige une
+# reconnexion, et le code le signale explicitement au lieu d'echouer sec.
+GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters']
 GSC_TOKEN_URI = 'https://oauth2.googleapis.com/token'
 GSC_AUTH_URI = 'https://accounts.google.com/o/oauth2/auth'
 
@@ -7580,7 +7586,7 @@ class GSCOAuthCallbackView(APIView):
             # When the GSC OAuth client is the same as the Google login
             # client (recommended setup), Google returns the union of all
             # scopes already granted to the user (openid + profile + email
-            # from login PLUS webmasters.readonly we just requested).
+            # from login PLUS webmasters we just requested).
             # oauthlib's strict scope-equality check rejects this. Telling
             # oauthlib to relax via env flag is the supported workaround -
             # the granted-scope set is still validated by Google itself on
@@ -7727,7 +7733,9 @@ class GSCQueriesView(APIView):
                 token_uri=GSC_TOKEN_URI,
                 client_id=config['web']['client_id'],
                 client_secret=config['web']['client_secret'],
-                scopes=GSC_SCOPES,
+                # Pas de scopes= : voir proof_loop._build_gsc_service. Le scope vient du
+                # consentement ; le passer ici ne fait que declencher un WARNING sur les
+                # jetons emis avant l'elargissement du scope.
             )
             service = build(
                 'searchconsole', 'v1',

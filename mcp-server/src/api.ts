@@ -1138,3 +1138,21 @@ export async function indexNowSubmit(siteId: number, urls?: string[]) {
     body: JSON.stringify(urls && urls.length ? { urls } : {}),
   });
 }
+
+export type SitemapSubmitResult = {
+  site_id: number;
+  ok: boolean;
+  sitemap: string;
+  property?: string;
+  needs_reconnect: boolean;
+  /** gsc_scope_readonly | gsc_reauth_required | gsc_not_owner | sitemap_hors_propriete */
+  code?: string;
+  error?: string;
+};
+
+export async function submitSitemap(siteId: number, sitemapUrl?: string) {
+  return request<SitemapSubmitResult>(`/sites/${siteId}/sitemap/submit/`, {
+    method: "POST",
+    body: JSON.stringify(sitemapUrl ? { sitemap_url: sitemapUrl } : {}),
+  });
+}
