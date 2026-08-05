@@ -4109,3 +4109,36 @@ class V1IndexNowSubmitView(BaseV1View):
         result = submit_urls(site, [str(u) for u in urls])
         result['site_id'] = site.id
         return Response(result)
+
+
+class V1SitemapSubmitView(BaseV1View):
+    """POST /api/v1/sites/<id>/sitemap/submit/  {sitemap_url?: str}
+
+    Re-soumet le sitemap du site a Google Search Console, ce qui force Google a
+    le RELIRE au lieu d'attendre son prochain passage. Sans `sitemap_url`, prend
+    `<host public>/sitemap.xml`. Exige que GSC soit connectee avec le scope
+    d'ecriture. Codes : 401 `gsc_reauth_required` (jeton mort), 409
+    `gsc_scope_readonly` (site connecte avant l'elargissement du scope), 400
+    sinon. Pas de LLM ; consomme le quota Search Console.
+    """
+
+    def post(self, request, site_id):
+        from .proof_loop import submit_sitemap
+        site = self.get_user_site(request, site_id)
+        demande = request.data.get('sitemap_url')
+        if demande is not None and not isinstance(demande, str):
+            return Response({'error': "sitemap_url doit etre une chaine."},
+                            status=status.HTTP_400_BAD_REQUEST)
+        result = submit_sitemap(site, demande or '')
+        result['site_id'] = site.id
+        if result.get('ok'):
+            return Response(result)
+        if result.get('code') == 'gsc_reauth_required':
+            # Meme contrat que les autres vues GSC du projet, que le frontend
+            # sait deja afficher (ContentDecayPage, MultiSiteHealthTable).
+            return Response(result, status=status.HTTP_401_UNAUTHORIZED)
+        # 409 quand c'est le jeton qui bloque : l'appelant a un geste a faire
+        # (reconnecter GSC), ce n'est ni sa requete ni une panne serveur.
+        code = (status.HTTP_409_CONFLICT if result.get('needs_reconnect')
+                else status.HTTP_400_BAD_REQUEST)
+        return Response(result, status=code)

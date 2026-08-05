@@ -25,7 +25,7 @@ Avantage business : tu sais quels articles convertissent vs ceux qui sont vus sa
 **Site Settings → onglet "Search Console" → bouton "Connecter Google Search Console"**
 
 1. Tu es redirigé vers Google : "Gridar demande l'accès à ton Search Console"
-2. Coche les permissions demandées : `webmasters.readonly`
+2. Google liste les permissions demandées : Search Console (lecture, plus la soumission de sitemaps)
 3. Autoriser → retour automatique sur Site Settings
 4. Le champ "Propriété GSC" devient un select avec tes propriétés disponibles
 5. Choisis celle qui matche ton domaine (ex : `https://tonsite.ca/` ou `sc-domain:tonsite.ca`)
@@ -86,10 +86,15 @@ Réponse :
 
 ## Permissions
 
-On demande **uniquement `webmasters.readonly`** (lecture seule). On ne peut pas :
-- Modifier ta propriété GSC
-- Soumettre / supprimer des sitemaps
-- Demander l'indexation d'URLs (use case sur la roadmap mais via une permission séparée)
+On demande le scope `webmasters`. Ce qu'on en fait, et rien d'autre :
+- **Lire** tes données Search Console : impressions, clics, CTR, position, statut d'indexation par URL
+- **Re-soumettre ton sitemap**, pour que Google le relise au lieu d'attendre son prochain passage (`POST /api/v1/sites/<id>/sitemap/submit/`, ou l'outil MCP `gridar_submit_sitemap`)
+
+Ce qu'on ne fait pas, même si le scope l'autorise techniquement : supprimer un sitemap, ajouter ou retirer une propriété, toucher à tes utilisateurs GSC. Aucun appel de ce genre n'existe dans le code.
+
+On ne peut pas non plus **demander l'indexation d'une URL** : Google ne fournit aucune API pour ça (l'Indexing API est réservée aux offres d'emploi et aux événements diffusés). Ça reste un geste manuel dans Search Console.
+
+Si tu as connecté Search Console avant août 2026, ton autorisation est en lecture seule. Tout continue de fonctionner ; seule la re-soumission de sitemap te répondra "reconnecte Search Console".
 
 Tu peux révoquer notre accès à n'importe quel moment :
 - Côté nous : Site Settings → Search Console → Déconnecter
@@ -129,4 +134,5 @@ Pas besoin de refaire l'OAuth N fois pour N sites.
 | "Propriété non trouvée" | Tu n'es pas Owner/Full sur la propriété | Demande l'accès au vrai propriétaire (souvent ton ancien dev/agence) |
 | "Token expiré" en bandeau | Refresh token invalidé | Reconnecte (Site Settings → bouton "Reconnecter") |
 | Pas de données affichées | Latence Google (2-3 jours) ou propriété trop récente | Patiente. GSC commence à reporter ~1 semaine après vérification de la propriété |
-| `403 insufficient_scope` | OAuth a refusé `webmasters.readonly` | Refait le flow OAuth, coche bien la permission |
+| `403 insufficient_scope` | OAuth a refusé la permission Search Console | Refais le flow OAuth et accepte la permission |
+| "Reconnecte Search Console" sur une soumission de sitemap | Autorisation accordée en lecture seule (connexion antérieure à août 2026) | Site Settings → Search Console → Reconnecter |

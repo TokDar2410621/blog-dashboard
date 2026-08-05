@@ -27,6 +27,7 @@ import {
   indexCoverage,
   indexNowSetup,
   indexNowSubmit,
+  submitSitemap,
   aiOverviewReadiness,
   aiVisibilitySummary,
   analyzeCompetitors,
@@ -623,6 +624,19 @@ const IndexNowSubmitArgs = z
       .describe(
         "URLs to submit (all on the site's own host). Omit to submit the " +
           "site's sitemap URLs.",
+      ),
+  })
+  .strict();
+
+const SitemapSubmitArgs = z
+  .object({
+    site_id: z.number().int().positive(),
+    sitemap_url: z
+      .string()
+      .url()
+      .optional()
+      .describe(
+        "Sitemap to submit. Omit for <public host>/sitemap.xml.",
       ),
   })
   .strict();
@@ -1333,6 +1347,13 @@ const tools: ToolDef[] = [
       "Submit URLs to IndexNow (Bing / Yandex / Seznam / Naver, NOT Google) so they get crawled/indexed fast - useful for AI-search visibility. Pass `urls` (all must be on the site's own host), or omit to submit the site's sitemap URLs. Requires the ownership key file from gridar_indexnow_setup to be hosted first (else status 403). Returns {ok, status, reason, submitted, host}. No LLM, no quota.",
     schema: IndexNowSubmitArgs,
     handler: (input) => indexNowSubmit(input.site_id, input.urls),
+  },
+  {
+    name: "gridar_submit_sitemap",
+    description:
+      "Re-submit the site's sitemap to GOOGLE Search Console, which makes Google re-read it instead of waiting for its next pass. Use it right after a sitemap changes (new URLs, host moved to/from www) or when gridar_index_coverage shows many pages 'unknown to Google'. Pass `sitemap_url` or omit for <public host>/sitemap.xml; the sitemap must live inside a Search Console property this account owns. Needs GSC connected with write access. Error codes: `gsc_scope_readonly` (HTTP 409, site connected before the scope was widened -> reconnect Search Console), `gsc_reauth_required` (HTTP 401, token expired or revoked -> reconnect), `gsc_not_owner`, `sitemap_hors_propriete`. Re-submitting does NOT force indexing (Google has no API for that); it only refreshes Google's copy of the sitemap, so calling it repeatedly changes nothing and burns Search Console quota. Returns {ok, sitemap, property, needs_reconnect, code, error}. No LLM.",
+    schema: SitemapSubmitArgs,
+    handler: (input) => submitSitemap(input.site_id, input.sitemap_url),
   },
 ];
 

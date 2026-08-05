@@ -31,7 +31,14 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
-GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
+# Scope COMPLET (lecture + ecriture) : la lecture seule interdisait
+# sitemaps.submit, donc re-soumettre un sitemap restait un geste manuel de
+# Darius. Constate le 2026-08-02 sur gridar.app (sitemap corrige mais jamais
+# relu par Google) et qrstudio.agency (telecharge une seule fois le 14/07).
+# `webmasters` couvre tout ce que `webmasters.readonly` couvrait : les sites
+# deja connectes continuent de LIRE sans rien changer ; seule l'ECRITURE exige
+# une reconnexion (nouveau consentement), et le code le dit explicitement.
+GSC_SCOPES = ['https://www.googleapis.com/auth/webmasters']
 GSC_TOKEN_URI = 'https://oauth2.googleapis.com/token'
 
 BASELINE_INITIAL_LIMIT = 30
@@ -107,13 +114,22 @@ def _build_gsc_service(site: Site):
         logger.warning('proof_loop: google API client not installed')
         return None
     client_id, client_secret = creds_cfg
+    # PAS de scopes= ici. Le scope d'un refresh token est fixe par le
+    # consentement, pas par le client : le passer ne l'elargit pas, il sert
+    # seulement de reference a google-auth pour comparer. Depuis que GSC_SCOPES
+    # vaut `webmasters`, tout site connecte AVANT l'elargissement (jeton
+    # readonly) declenchait a chaque rafraichissement un
+    # `WARNING ... Not all requested scopes were granted ... missing scopes
+    # https://www.googleapis.com/auth/webmasters` (google-auth 2.48,
+    # credentials.py:439). Rien de casse, mais un log qui hurle "scope manquant"
+    # exactement pendant la surveillance des logs post-deploiement. Le scope
+    # reellement accorde reste valide par Google a chaque appel.
     creds = Credentials(
         token=None,
         refresh_token=site.gsc_refresh_token,
         token_uri=GSC_TOKEN_URI,
         client_id=client_id,
         client_secret=client_secret,
-        scopes=GSC_SCOPES,
     )
     return build('searchconsole', 'v1', credentials=creds, cache_discovery=False)
 
@@ -212,6 +228,180 @@ def resolve_gsc_property(service, site: Site) -> str:
             return resolved
     site._gsc_resolved_property = resolved
     return resolved
+
+
+def default_sitemap_url(site: Site) -> str:
+    """The sitemap to submit: <public host>/sitemap.xml.
+
+    Goes through _public_base so the host is EXACTLY the one every other GSC
+    read uses. The www matters: gridar.app lost two weeks on a sitemap submitted
+    to the bare host while its pages live on www."""
+    from .index_coverage import _public_base  # late import: avoids the cycle
+    base, _ = _public_base(site)
+    return (base.rstrip('/') + '/sitemap.xml') if base else ''
+
+
+def property_covers(prop: str, url: str) -> bool:
+    """Does the GSC property `prop` contain `url`?
+
+    Google refuses a sitemap that is not inside the property. A domain property
+    (`sc-domain:x.com`) covers the host and every subdomain; a URL-prefix
+    property (`https://www.x.com/`) covers only what starts with it."""
+    from urllib.parse import urlparse
+    if not prop or not url:
+        return False
+    if prop.startswith('sc-domain:'):
+        host = urlparse(url if url.startswith('http') else 'https://' + url).netloc
+        host = host.lower().split(':')[0]
+        root = prop[len('sc-domain:'):].lower().strip('/')
+        return host == root or host.endswith('.' + root)
+    return url.startswith(prop.rstrip('/') + '/')
+
+
+def _property_for_url(service, url: str):
+    """(property containing `url`, exception) - the property is '' if none.
+
+    Why: resolve_gsc_property answers "which property do I read this site
+    through", and it strips the www and tries the bare host BEFORE the www one.
+    That answer is fine for reads and wrong for a write: submitting
+    https://www.gridar.app/sitemap.xml against the property https://gridar.app/
+    is rejected by Google. The hosted mode makes it worse, blogs live on a
+    subdomain (blog.client.ca) while the property is the root domain.
+
+    The exception is returned rather than swallowed: "no property" and "dead
+    token" produce the same empty answer, and telling a customer that his
+    property does not exist when his token is simply revoked sends him hunting
+    in the wrong place."""
+    try:
+        entries = (service.sites().list().execute() or {}).get('siteEntry') or []
+    except Exception as exc:
+        logger.warning('_property_for_url: sites().list failed: %s', exc)
+        return '', exc
+    owned = [e.get('siteUrl') for e in entries
+             if isinstance(e, dict) and e.get('permissionLevel') in (
+                 'siteOwner', 'siteFullUser', 'siteRestrictedUser')]
+    candidates = [p for p in owned if p and property_covers(p, url)]
+    if not candidates:
+        return '', None
+    # Le prefixe d'URL le plus long d'abord (le plus specifique), les proprietes
+    # de domaine en dernier : elles couvrent tout, donc elles n'apportent une
+    # reponse que si aucun prefixe ne colle.
+    candidates.sort(key=lambda p: (p.startswith('sc-domain:'), -len(p)))
+    return candidates[0], None
+
+
+def _classify_gsc_error(exc) -> str:
+    """'reauth' | 'readonly' | 'not_owner' | '' for a failed GSC call.
+
+    Reads the STRUCTURED fields (HTTP status, error reason) instead of matching
+    substrings on str(exc). str(exc) embeds the request URI, which contains the
+    customer's domain and the sitemap path: a client on telescope.io hit
+    `'403' in text and 'scope' in text` on any unrelated 403 and got told to
+    reconnect Search Console, forever."""
+    try:
+        from google.auth.exceptions import RefreshError
+    except ImportError:
+        RefreshError = ()
+    # Jeton revoque ou expire : le refresh se produit au premier appel, donc il
+    # remonte ici et non a la construction du client. C'est le seul cas ou
+    # reconnecter est vraiment la reparation, et c'est le contrat deja etabli
+    # ailleurs dans ce fichier de code (401 gsc_reauth_required).
+    if RefreshError and isinstance(exc, RefreshError):
+        return 'reauth'
+    statut = getattr(getattr(exc, 'resp', None), 'status', None)
+    reasons = set()
+    for d in (getattr(exc, 'error_details', None) or []):
+        if isinstance(d, dict):
+            for cle in ('reason', 'message'):
+                v = d.get(cle)
+                if isinstance(v, str):
+                    reasons.add(v)
+    reasons = {r.lower() for r in reasons}
+    if any('permission for site' in r for r in reasons):
+        return 'not_owner'
+    if reasons & {'insufficientpermissions', 'access_token_scope_insufficient',
+                  'forbidden_insufficient_scope'}:
+        return 'readonly'
+    if statut in (401, 403):
+        # Dernier recours quand error_details est vide : on regarde le seul
+        # champ de message, jamais l'URI.
+        msg = str(getattr(exc, 'reason', '') or '').lower()
+        if 'permission for site' in msg:
+            return 'not_owner'
+        if 'insufficient authentication scopes' in msg or 'insufficient permission' in msg:
+            return 'readonly'
+    return ''
+
+
+def submit_sitemap(site: Site, sitemap_url: str = '') -> dict:
+    """Submit (or re-submit) the site's sitemap to Search Console.
+
+    Why: re-submitting makes Google RE-READ the sitemap instead of waiting for
+    its next pass. Useful whenever a sitemap changes (gridar.app moved from the
+    bare host to www on 2026-08-02) or goes stale (qrstudio.agency: downloaded
+    once on 07-14, 0 of 80 URLs indexed).
+
+    Needs the FULL `webmasters` scope. A site connected before the widening
+    still carries a `webmasters.readonly` token: the call then 403s and we say
+    what to do about it (reconnect) instead of leaking a raw error.
+    Returns {ok, sitemap, property, needs_reconnect, code, error}."""
+    sitemap = (sitemap_url or default_sitemap_url(site)).strip()
+    if not sitemap:
+        return {'ok': False, 'error': "Aucun domaine configure pour ce site.",
+                'sitemap': '', 'needs_reconnect': False}
+    service = _build_gsc_service(site)
+    if service is None:
+        return {'ok': False, 'error': "GSC non connectee (aucun jeton) ou client OAuth absent.",
+                'sitemap': sitemap, 'needs_reconnect': False}
+    prop = resolve_gsc_property(service, site)
+    # La propriete de LECTURE ne contient pas forcement le sitemap : on cherche
+    # alors celle qui le contient vraiment, plutot que de laisser Google refuser
+    # avec un message que personne ne saura relier au vrai probleme.
+    if not prop or not property_covers(prop, sitemap):
+        mieux, echec = _property_for_url(service, sitemap)
+        if mieux:
+            if prop and mieux != prop:
+                logger.info('submit_sitemap: propriete %s ne couvre pas %s, bascule sur %s',
+                            prop, sitemap, mieux)
+            prop = mieux
+        elif _classify_gsc_error(echec) == 'reauth':
+            return {'ok': False, 'sitemap': sitemap, 'property': prop or '',
+                    'needs_reconnect': True, 'code': 'gsc_reauth_required',
+                    'error': "Le jeton Search Console de ce site est expire ou revoque. "
+                             "Reconnecte Search Console."}
+        elif prop:
+            return {'ok': False, 'sitemap': sitemap, 'property': prop,
+                    'needs_reconnect': False, 'code': 'sitemap_hors_propriete',
+                    'error': ("Le sitemap %s n'appartient a aucune propriete Search Console "
+                              "verifiee par ce compte (la propriete resolue est %s). Ajoute "
+                              "cette propriete dans Search Console, ou passe un sitemap_url "
+                              "qui vit dedans." % (sitemap, prop))}
+        else:
+            return {'ok': False, 'sitemap': sitemap, 'needs_reconnect': False,
+                    'error': "Aucune propriete Search Console verifiee ne correspond a ce site."}
+    try:
+        service.sitemaps().submit(siteUrl=prop, feedpath=sitemap).execute()
+    except Exception as exc:
+        genre = _classify_gsc_error(exc)
+        base = {'ok': False, 'sitemap': sitemap, 'property': prop}
+        if genre == 'reauth':
+            return dict(base, needs_reconnect=True, code='gsc_reauth_required',
+                        error="Le jeton Search Console de ce site est expire ou revoque. "
+                              "Reconnecte Search Console.")
+        if genre == 'not_owner':
+            return dict(base, needs_reconnect=False, code='gsc_not_owner',
+                        error="Le compte Google connecte n'est pas proprietaire de la "
+                              "propriete %s dans Search Console." % prop)
+        if genre == 'readonly':
+            return dict(base, needs_reconnect=True, code='gsc_scope_readonly',
+                        error="Le jeton de ce site est en LECTURE SEULE (connecte avant "
+                              "l'elargissement du scope). Reconnecte Search Console pour "
+                              "autoriser la soumission de sitemap.")
+        text = str(exc)
+        logger.warning('submit_sitemap: failed %s (%s): %s', sitemap, prop, text[:200])
+        return dict(base, needs_reconnect=False, error=text[:300])
+    logger.info('sitemap re-submitted to GSC: %s (property %s)', sitemap, prop)
+    return {'ok': True, 'sitemap': sitemap, 'property': prop, 'needs_reconnect': False}
 
 
 def _query_page_metrics(service, site: Site, page_url: str,

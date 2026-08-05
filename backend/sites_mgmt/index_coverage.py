@@ -6,8 +6,8 @@ pages Gridar knows about) against what Google shows:
   - `site:<domain>` via Serper: the pages Google surfaces. Works on ANY site,
     no auth, but approximate (Google caps the list it shows).
   - GSC URL Inspection (when GSC is connected): the AUTHORITATIVE per-URL index
-    status + the REASON a page is not indexed. Uses the same
-    webmasters.readonly scope the site already granted, so no reconnection.
+    status + the REASON a page is not indexed. Read-only, so it works on every
+    connected site, including the ones whose token predates the write scope.
 
 Returns a coverage report: indexed vs not, the reason when known, coverage %.
 No LLM call, no quota.
