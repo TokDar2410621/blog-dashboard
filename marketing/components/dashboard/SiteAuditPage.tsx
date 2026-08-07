@@ -279,7 +279,7 @@ export function SiteAuditPage() {
   // runs on-demand via a button - not part of the auto-loaded audit payload.
   const indexMutation = useMutation({
     mutationFn: async () => {
-      const res = await authFetch(`/sites/${siteId}/index-coverage/?max_inspect=20`);
+      const res = await authFetch(`/v1/sites/${siteId}/index-coverage/?max_inspect=12`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Erreur indexation");

@@ -9585,11 +9585,11 @@ class SiteAuditAggregatorView(APIView):
                         'X-API-KEY': api_key,
                         'Content-Type': 'application/json',
                     },
-                    json={'q': f'"{domain_only}" -site:{domain_only}', 'num': 20},
+                    json={'q': f'"{domain_only}" -site:{domain_only}', 'num': 10},
                     timeout=10,
                 )
                 if r.status_code != 200:
-                    return {'error': f'Serper {r.status_code}'}
+                    return {'error': "Analyse des liens temporairement indisponible."}
                 data = r.json()
                 organic = data.get('organic', []) or []
                 referring = {}

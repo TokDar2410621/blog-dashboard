@@ -4064,7 +4064,14 @@ class V1IndexCoverageView(BaseV1View):
             max_inspect = max(0, min(int(request.query_params.get('max_inspect') or 25), 100))
         except (TypeError, ValueError):
             max_inspect = 25
-        result = index_coverage(site, max_inspect=max_inspect)
+        try:
+            result = index_coverage(site, max_inspect=max_inspect)
+        except Exception as e:
+            logger.warning('index_coverage failed for site %s: %s', site.id, e)
+            return Response(
+                {'error': "L'audit d'indexation a echoue (service externe ou delai). Reessaie."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         result['site_id'] = site.id
         return Response(result)
 
