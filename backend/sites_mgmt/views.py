@@ -9589,7 +9589,7 @@ class SiteAuditAggregatorView(APIView):
                     timeout=10,
                 )
                 if r.status_code != 200:
-                    return {'error': "Analyse des liens temporairement indisponible."}
+                    return {'error': "Analyse des liens non disponible (limite de l'API de recherche)."}
                 data = r.json()
                 organic = data.get('organic', []) or []
                 referring = {}

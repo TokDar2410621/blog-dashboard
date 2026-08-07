@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from urllib.parse import urlparse
 
 import requests
@@ -179,7 +180,14 @@ def _gsc_inspect_urls(site, urls: list[str], cap: int = 25) -> tuple[dict, str |
     attempts = 0
     failures = 0
     first_err = ''
+    # Budget mur: l'inspection GSC est sequentielle et lente (~2-5s/URL). Sans
+    # borne, un cap eleve depasse le timeout serveur -> "Erreur indexation". On
+    # borne le temps ; les URLs non inspectees retombent sur site: (signale en
+    # "partiel" par le rapport).
+    deadline = time.monotonic() + 14.0
     for url in urls[:cap]:
+        if time.monotonic() > deadline:
+            break
         attempts += 1
         try:
             resp = service.urlInspection().index().inspect(body={
