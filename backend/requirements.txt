@@ -1,25 +1,30 @@
-django>=5.2,<6.0
-djangorestframework>=3.16
-djangorestframework-simplejwt>=5.3
-django-cors-headers>=4.3
-django-filter>=25.2
-python-dotenv>=1.2
-psycopg2-binary>=2.9
-gunicorn>=23.0
-whitenoise>=6.6
-dj-database-url>=3.0
-google-genai>=1.0
-google-auth>=2.23
-google-auth-oauthlib>=1.1
-google-api-python-client>=2.100
-requests>=2.31
-Pillow>=10.0
-markdown>=3.5
-pytrends>=4.9
-stripe>=10.0
-django-allauth>=65.0,<66.0
-dj-rest-auth[with_social]>=7.0,<8.0
-PyJWT>=2.8
-pgvector>=0.3
-voyageai>=0.3
-resend>=2.0
+# Versions epinglees exactement = etat prod sain (2026-08-07, Django 5.2.17).
+# Un rebuild reproduit l'image a l'identique, plus de derive amont surprise.
+# Ne PAS repasser en ">=" sans lockfile : "django>=5.2" avait laisse un build
+# resoudre Django 6.0 (retrait de cc_delim_re), ce qui a mis la prod DOWN (502).
+# Pour bumper : changer la version ici, deployer, suivre les logs jusqu'au boot.
+django==5.2.17
+djangorestframework==3.17.2
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-filter==26.1
+python-dotenv==1.2.2
+psycopg2-binary==2.9.12
+gunicorn==26.0.0
+whitenoise==6.12.0
+dj-database-url==3.1.2
+google-genai==2.17.0
+google-auth==2.56.3
+google-auth-oauthlib==1.4.0
+google-api-python-client==2.198.0
+requests==2.34.2
+Pillow==12.3.0
+markdown==3.10.3
+pytrends==4.9.2
+stripe==15.4.0
+django-allauth==65.19.0
+dj-rest-auth[with_social]==7.2.0
+PyJWT==2.13.0
+pgvector==0.5.0
+voyageai==0.5.0
+resend==2.35.0
