@@ -47,6 +47,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AuditWidget } from "@/components/AuditWidget";
 import { PositionCheckTool } from "@/components/PositionCheckTool";
+import { CalculatorWidget } from "@/components/CalculatorWidget";
 import type { Landing, ValueProp, FaqItem, SocialProofItem } from "@/lib/landing-api";
 
 // Normalize a social-proof entry (string OR object) to a display string.
@@ -95,10 +96,11 @@ function iconFor(name: string): LucideIcon {
 // A landing whose keyword promises a live tool embeds the real widget, so the
 // page DOES what it says: an "audit" landing runs an audit, a "position/suivi"
 // landing checks the ranking - instead of only describing the tool in copy.
-function toolFor(landing: Landing): "audit" | "position" | null {
+function toolFor(landing: Landing): "audit" | "position" | "calculator" | null {
   const s = `${landing.target_keyword || ""} ${landing.slug || ""}`.toLowerCase();
   if (/\baudit\b/.test(s)) return "audit";
   if (/(suivi|position|classement|ranking|rank)/.test(s)) return "position";
+  if (/calcul/.test(s)) return "calculator";
   return null;
 }
 
@@ -225,7 +227,13 @@ export function LandingRenderer({
           page delivers the function it promises, not just a description. */}
       {tool && (
         <section className="relative z-10 max-w-4xl mx-auto px-6 pb-8">
-          {tool === "audit" ? <AuditWidget /> : <PositionCheckTool />}
+          {tool === "audit" ? (
+            <AuditWidget />
+          ) : tool === "position" ? (
+            <PositionCheckTool />
+          ) : (
+            <CalculatorWidget />
+          )}
         </section>
       )}
 
