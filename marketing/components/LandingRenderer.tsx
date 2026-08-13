@@ -45,6 +45,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { AuditWidget } from "@/components/AuditWidget";
+import { PositionCheckTool } from "@/components/PositionCheckTool";
 import type { Landing, ValueProp, FaqItem, SocialProofItem } from "@/lib/landing-api";
 
 // Normalize a social-proof entry (string OR object) to a display string.
@@ -88,6 +90,16 @@ function iconFor(name: string): LucideIcon {
   if (!name) return Sparkles;
   const key = name.replace(/[\s_-]/g, "").toLowerCase();
   return ICONS[key] || Sparkles;
+}
+
+// A landing whose keyword promises a live tool embeds the real widget, so the
+// page DOES what it says: an "audit" landing runs an audit, a "position/suivi"
+// landing checks the ranking - instead of only describing the tool in copy.
+function toolFor(landing: Landing): "audit" | "position" | null {
+  const s = `${landing.target_keyword || ""} ${landing.slug || ""}`.toLowerCase();
+  if (/\baudit\b/.test(s)) return "audit";
+  if (/(suivi|position|classement|ranking|rank)/.test(s)) return "position";
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +168,7 @@ export function LandingRenderer({
   const socialProofs = (landing.social_proof || [])
     .map(socialProofText)
     .filter((t) => t.trim().length > 0);
+  const tool = toolFor(landing);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -207,6 +220,14 @@ export function LandingRenderer({
           </div>
         )}
       </section>
+
+      {/* Live tool - an audit/position landing runs its real widget here so the
+          page delivers the function it promises, not just a description. */}
+      {tool && (
+        <section className="relative z-10 max-w-4xl mx-auto px-6 pb-8">
+          {tool === "audit" ? <AuditWidget /> : <PositionCheckTool />}
+        </section>
+      )}
 
       {/* Social proof - trust signals band. Renders only when non-empty so
           landings without social_proof are visually unchanged. */}
