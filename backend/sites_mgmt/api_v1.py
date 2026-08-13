@@ -2158,10 +2158,11 @@ def _compute_site_seo_score(site) -> dict:
             'fix_url': f'/sites/{site.id}/settings/',
         })
 
-    # 3) Business model declared (drives prompts; 'personal_blog' counts as
-    # unset because it's the default placeholder for hobby sites).
+    # 3) Business model declared (drives prompts). 'personal_blog' is the DB
+    # default but the other business_model gates in this API accept it as a
+    # declared value; this check must agree with them.
     bm = (site.business_model or '').strip()
-    bm_ok = bool(bm and bm != 'personal_blog')
+    bm_ok = bool(bm)
     breakdown['business_model_declared'] = bm_ok
     if not bm_ok:
         action_items.append({
@@ -2251,7 +2252,8 @@ def _compute_site_seo_score(site) -> dict:
         action_items.append({
             'issue': (
                 f'Couverture FAQ schema faible ({int(faq_ratio * 100)}%). '
-                'Ajouter une section FAQ aux articles boost les featured snippets.'
+                'Une section FAQ rend les reponses extractibles par les moteurs '
+                'IA (Google a retire les rich results FAQ en mai 2026).'
             ),
             'fix_url': f'/sites/{site.id}/posts/',
         })

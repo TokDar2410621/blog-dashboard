@@ -4367,13 +4367,18 @@ class BrokenLinksView(APIView):
     """Scan a site's published articles for outbound HTTP(S) links and report
     those that are dead (4xx/5xx, timeout, connection error).
 
-    POST /sites/<site_id>/broken-links/?limit=100&language=fr
+    GET/POST /sites/<site_id>/broken-links/?limit=100&language=fr
 
     Each unique URL is checked once via HEAD (with GET fallback for servers
     that reject HEAD), cached 24h. Returns the broken URLs grouped by URL,
     each pointing back to the articles where it appears.
     """
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, site_id):
+        # The v1 API exposes this as GET; post() already reads its params
+        # from the query string too.
+        return self.post(request, site_id)
 
     def post(self, request, site_id):
         import re as _re
@@ -7764,7 +7769,25 @@ class GSCQueriesView(APIView):
                     )},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            page_url = property_url + slug.strip('/') + '/'
+            # The page filter must match the URL Google actually indexed.
+            # property_url + slug misses blogs living under a path
+            # (/blog/<slug>) and forces a trailing slash Next.js canonicals
+            # don't have; build the URL like the public sitemap does instead.
+            # WordPress keeps the historical guess (default /%postname%/
+            # permalink): _public_article_url needs wp_link there.
+            if site.is_wordpress:
+                page_url = property_url + slug.strip('/') + '/'
+            else:
+                article = {'slug': slug}
+                if site.is_hosted:
+                    hp = HostedPost.objects.filter(
+                        site=site, slug=slug,
+                    ).only('language').first()
+                    if hp:
+                        article['language'] = hp.language
+                page_url = _public_article_url(site, article) or (
+                    property_url + slug.strip('/') + '/'
+                )
 
             body = {
                 'startDate': start.isoformat(),
