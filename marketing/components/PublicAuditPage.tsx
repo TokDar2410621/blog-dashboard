@@ -572,7 +572,7 @@ export function PublicAuditPage() {
             )}
 
             {leadCaptured && (
-              <Card className="border-emerald-500/40 bg-emerald-500/10">
+              <Card className="border-emerald-500/40 bg-emerald-500/10 print:hidden">
                 <CardContent className="p-6 text-center space-y-3">
                   <CheckCircle2 className="h-10 w-10 mx-auto text-emerald-500" />
                   <h3 className="font-semibold">Rapport débloqué</h3>

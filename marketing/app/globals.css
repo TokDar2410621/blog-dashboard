@@ -110,3 +110,91 @@
   to { transform: translateX(-50%); }
 }
 .marquee-x { animation: marqueeX 30s linear infinite; }
+
+/* Print / "Sauvegarder en PDF".
+ *
+ * The site is dark on screen. Browsers print without background colors by
+ * default yet still print text color, so the dark palette comes out as
+ * near-white text on white paper - a page that reads as blank. Repaint the
+ * palette light for print rather than depending on the visitor ticking
+ * "background graphics". Verdict colors stay, darkened enough to read on paper.
+ *
+ * body carries `bg-zinc-950 text-zinc-100` from layout.tsx: a utility class
+ * beats @layer base, so overriding the tokens alone is not enough and the
+ * html/body rule needs !important. */
+@media print {
+  :root {
+    color-scheme: light;
+    --background: #fff;
+    --foreground: #111;
+    --card: #fff;
+    --card-foreground: #111;
+    --popover: #fff;
+    --popover-foreground: #111;
+    --primary: #047857;
+    --primary-foreground: #fff;
+    --secondary: #f4f4f5;
+    --secondary-foreground: #111;
+    --muted: #f4f4f5;
+    --muted-foreground: #555;
+    --accent: #f4f4f5;
+    --accent-foreground: #111;
+    --destructive: #b91c1c;
+    --border: #ccc;
+    --input: #ccc;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+
+  /* Site chrome has no place on paper. Both the audit page and the shared
+     report page use real <header>/<footer> elements. */
+  header,
+  footer,
+  nav {
+    display: none !important;
+  }
+
+  /* The shared report page hardcodes the zinc palette instead of tokens. */
+  .text-zinc-100,
+  .text-zinc-200,
+  .text-zinc-300 {
+    color: #111 !important;
+  }
+  .text-zinc-400,
+  .text-zinc-500 {
+    color: #555 !important;
+  }
+  [class*="bg-zinc-"],
+  [class*="bg-gradient-"],
+  [class*="bg-emerald-"],
+  [class*="bg-amber-"],
+  [class*="bg-red-"] {
+    background: #fff !important;
+  }
+  [class*="border-zinc-"] {
+    border-color: #ccc !important;
+  }
+
+  /* Keep the verdict readable: emerald/amber/red-400 wash out on white. */
+  .text-emerald-400,
+  .text-emerald-500 {
+    color: #047857 !important;
+  }
+  .text-amber-400,
+  .text-amber-500 {
+    color: #b45309 !important;
+  }
+  .text-red-400,
+  .text-red-500 {
+    color: #b91c1c !important;
+  }
+
+  /* Never print the blurred teaser of the locked recommendations. */
+  .backdrop-blur-sm {
+    display: none !important;
+  }
+}

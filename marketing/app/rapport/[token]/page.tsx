@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { GridarMark } from "@/components/GridarMark";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { PrintReportButton } from "@/components/PrintReportButton";
 import { FullReportSections } from "@/components/audit/FullReportSections";
 import { GbpVerdictSection } from "@/components/audit/GbpVerdictSection";
 import { fetchPublicReport } from "@/lib/report-api";
@@ -87,7 +88,10 @@ export default async function ReportPage({ params }: PageProps) {
             <GridarMark className="h-6 w-6" />
             <span className="font-medium">Gridar</span>
           </Link>
-          <CopyLinkButton />
+          <div className="flex items-center gap-2">
+            <PrintReportButton />
+            <CopyLinkButton />
+          </div>
         </header>
 
         {/* Score hero */}
