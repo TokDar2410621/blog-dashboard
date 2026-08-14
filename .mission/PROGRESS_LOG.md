@@ -1892,3 +1892,76 @@ Mission "tu vas faire ce qu'il faut pour rendre ca bon" - les 4 phases du pivot 
 **Prochain bloc concret** : aucun, mission Tier 5 livree. Pickup soit (a) le user fait les actions humaines de `PENDING_HUMAN.md` et on observe les premiers leads / conversions ; soit (b) prochaine session = monitoring + iterations sur le funnel (analytics events, A/B sur copy de la landing, plugin WP dans le directory, etc.).
 
 **Blocages** : aucun cote code. Cote actions humaines, voir `.mission/PENDING_HUMAN.md` (4 nouveaux items + 7 heritees + 1 deadline 24 juin pour Imagen).
+
+## Session 2026-08-14 - Tier 6 bootstrap + rang 1/20 (SSRF fermee)
+
+**Contexte** : journee partie d'une question sur le PDF de l'audit, qui a ouvert un inventaire complet de claude-seo 2.2.4, lequel a fait remonter une faille dans Gridar. Darius a tranche : « on va faire les 20 ». Dossier de reference : https://claude.ai/code/artifact/061040b0-6605-4dfc-a767-bbbe70f78529
+
+**Fait** :
+
+1. **Correctif PDF du lead magnet** (commit a9e4017, deploye sur Vercel). Le bouton « Sauvegarder en PDF » marchait mais sortait une feuille quasi blanche : le site rend en sombre, les navigateurs impriment sans les fonds mais gardent la couleur du texte. La feuille d'impression posee avec le bouton (c81ec24) vivait dans `src/index.css` du SPA Vite ; `dae7cf7` a recree la page en Next.js sans la porter, et `7d93a2e` a rendu le defaut visible en faisant du Next la porte d'entree de gridar.app. Ajout d'un bloc `@media print` dans `globals.css`, plus un bouton PDF sur `/rapport/<token>` qui n'en avait aucun alors que l'email J+0 y depose le lead. Verifie par Playwright sur un audit reel de tokamdarius.ca : 46 textes lisibles, 0 delave, PDF de 328 Ko contre 1 Ko avant.
+
+2. **Rang 1/20 : SSRF fermee** (commit 0d86539). `PublicAuditView` est publique et sans auth ; `_crawl_homepage` faisait un `get(url, allow_redirects=True)` sans verifier l'IP de destination et renvoyait 2000 caracteres du corps dans `body_snippet`. Portage de `url_safety.py` depuis claude-seo (MIT, Daniel Agrici). Adaptation importante : l'original epingle le DNS en patchant `socket.getaddrinfo` globalement et se declare mono-thread ; `views.py` compte neuf ThreadPoolExecutor et l'audit public fetch dans l'un d'eux, donc le patch global aurait intercepte le DNS de tout le worker, Postgres et Anthropic compris. Remplace par une marche de redirection qui revalide chaque saut, thread-safe et sans etat global.
+
+**Tests** : `manage.py check` OK. 16 tests dans `sites_mgmt.tests_url_safety` (cibles internes, obfuscation IPv4, confusion de parseur, marche de redirection avec boucles bornees), tous verts et hors ligne. Verification manuelle supplementaire sur 23 charges reelles dont `nip.io` : 22 bloquees, la 23e non concluante parce que httpbin.org repondait 503.
+
+**Deploiements** : Vercel manuel pour le front, fait et verifie sur gridar.app en mode impression. Railway auto sur push pour le backend : deploiement `3224d0c2` lance sur `0d86539`.
+
+**Decisions d'architecture** :
+- Ne pas porter le pinning DNS d'upstream dans un serveur multi-thread. Le gain anti-rebinding ne vaut pas le risque de patcher le resolveur du processus entier. Ecart residuel documente dans le module lui-meme.
+- Les appels vers des hotes de confiance en dur (googleapis, serper, anthropic) gardent `requests` nu. Seules les URL fournies par un tiers passent par `safe_get`.
+- Stirling PDF retenu comme piste pour le PDF genere serveur, licence verifiee : `app/core/` est MIT, le `engine/` proprietaire ne couvre que leur moteur IA vectoriel. Piege repere : la variante `ultra-lite` retire le groupe d'endpoints `CLI`, donc justement `html-to-pdf` et `url-to-pdf`.
+
+**Blocages** : aucun cote code. Deux decisions produit en attente cote Darius : promouvoir ou non la note du 12 aout au backlog `a-faire.md` du cerveau, et deployer ou non Stirling PDF comme service Railway separe.
+
+## Session 2026-08-14 (nuit) - Tier 6, 13 rangs sur 20 avances
+
+Darius est parti dormir avec la consigne de tout faire sans l'interrompre.
+
+**Decision prise sans le reveiller** : tout le travail va sur la branche
+`mission/2026-08-14-tier6-claude-seo`, pas sur `main`. Railway auto-deploie sur
+main et je refuse d'exposer la prod a 19 changements successifs pendant qu'il
+dort. Seul le rang 1, la faille SSRF, est parti sur main parce qu'une faille
+ouverte sur un endpoint public ne se garde pas au chaud.
+
+**Livre et branche (3 rangs)** :
+- Rang 1 (0d86539, sur main, deploye) : `url_safety.py` + fermeture SSRF.
+- Rang 3 (d6414e4) : data sufficiency gate. Une verification sans donnee ne
+  compte plus comme un echec, `seo_score` devient null sous le plancher, et
+  `onboarding_completeness` sort a part. Corrige au passage la couverture FAQ
+  qui comptait tout article ayant une cle `@type` quelconque.
+- Rang 9 (9a21890) : garde-fou anti pages tremplin sur les landings locales,
+  409 au-dela de 50 pages avec `force=true` pour passer outre.
+
+**Modules ecrits et testes, pas encore branches (10 rangs)** : commit c383550,
+13 163 lignes. Rangs 2, 5, 6, 8, 10, 13, 14, 15, 17, 20. Le detail du
+branchement de chacun est dans `.mission/TIER6_INTEGRATION.md`.
+
+**Pas commences (7 rangs)** : 4, 7, 11, 12, 16, 18, 19.
+
+**Tests** : 720 verts sur `sites_mgmt`, `manage.py check` propre.
+
+**Erreur de ma part, corrigee** : le correctif d'URL GSC de ce matin (5f32c6c,
+deja en prod) cassait `tests_gsc_property`. Je ne l'avais pas vu parce que je
+m'etais contente de `manage.py check` sans relancer la suite. Le test encodait
+l'ancienne construction `propriete + slug + '/'`. Attendu mis a jour, avec le
+pourquoi ecrit dans le test.
+
+**Choix d'architecture de la vague** : dix agents en parallele, un module
+autonome chacun, interdiction absolue de toucher aux fichiers partages
+(views.py, urls.py, models.py, api_v1.py). Zero conflit. Tous les modules sont
+du Python pur sans ORM ni reseau, donc testables hors ligne, et aucun n'ajoute
+de dependance : lxml, beautifulsoup4, playwright et weasyprint sont ecartes au
+profit de `html.parser` et `xml.etree`.
+
+**Prochain bloc concret** : brancher les modules, dans cet ordre de valeur.
+(1) `content_verify` sur `gridar_audit_article`, parce que cet audit note
+aujourd'hui 93/100 un article bourre de statistiques inventees et cite meme les
+faux chiffres comme preuve d'E-E-A-T (bug 15 du backlog cerveau). (2)
+`schema_validator` sur le chemin de publication. (3) `drift_rules` avec son
+modele `PageSnapshot` et son ecran, c'est lui qui transforme l'audit ponctuel en
+abonnement. Puis les rangs 4, 7, 11, 12, 16, 18, 19.
+
+**Action humaine** : merger la branche apres revue. Et re-verifier
+`data/google_updates.json` avant le 2026-08-31, date a laquelle il se declare
+perime tout seul.
