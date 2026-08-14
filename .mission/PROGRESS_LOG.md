@@ -1965,3 +1965,41 @@ abonnement. Puis les rangs 4, 7, 11, 12, 16, 18, 19.
 **Action humaine** : merger la branche apres revue. Et re-verifier
 `data/google_updates.json` avant le 2026-08-31, date a laquelle il se declare
 perime tout seul.
+
+## Session 2026-08-14 (matin) - les 20 rangs sont ecrits
+
+**Fait** :
+- Vague 2 : les 7 rangs restants portes (4, 7, 11, 12, 16, 18, 19). Commits
+  54a7242 (six modules) et 15ecd6a (local_seo).
+- Trois branchements de plus : `content_verify` sur l'audit d'article (5e10de7),
+  `agent_ux` et `gbp_lint` sur l'audit public (b885e77), `schema_validator` sur
+  la vue de schema (79aecff).
+
+**Etat** : les 20 modules existent, sont testes, et 6 sont branches sur une
+surface que l'utilisateur atteint. 1139 tests verts sur `sites_mgmt`.
+
+**Incident, et ce qu'il faut en retenir** : l'agent du rang 11 s'est arrete en
+plein milieu de son fichier. `local_seo.py` avait son en-tete, ses constantes et
+ses helpers, mais aucune de ses quatre fonctions publiques, et `VERTICALES`
+etait declaree dans `__all__` sans jamais etre definie. Le module s'importait
+sans erreur et aurait plante au premier appel. Il n'a jamais ete commite dans
+cet etat : je ne commite que des paires module + tests dont la suite passe.
+Le workflow a ete arrete et un agent cible a fini le travail sur
+l'echafaudage existant. Lecon : un fichier qui compile ne prouve rien, ce sont
+les tests qui prouvent, et un agent qui ne rend pas son rapport n'a pas fini.
+
+**Mesure sur le vrai site** : `agent_ux` donne 92/100 a gridar.app, avec deux
+manques reels sur la page d'accueil, aucun `<main>` et aucun bloc JSON-LD.
+C'est du dogfooding utilisable tel quel.
+
+**Prochain bloc concret** : brancher les 14 modules restants. L'ordre de valeur
+est dans `TIER6_INTEGRATION.md`. Commencer par `drift_rules`, qui demande un
+modele `PageSnapshot` et un ecran, et qui est celui qui transforme un audit
+ponctuel en abonnement. Puis `technical_grid` dans `_compute_site_seo_score`,
+qui donne enfin au score une mesure du site au lieu d'une mesure de
+l'onboarding.
+
+**Blocages** : `local_seo` a deux dimensions sur six (45 points) qui sortiront
+toujours du denominateur tant qu'aucune API Google Business Profile n'est
+branchee. Ce n'est pas un bug, le module le dit dans `couverture`, mais ca
+limite ce qu'il peut affirmer.

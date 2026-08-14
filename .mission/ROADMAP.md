@@ -161,28 +161,32 @@ Etat au 2026-08-14, branche `mission/2026-08-14-tier6-claude-seo`.
 Legende : [x] livre et branche, [~] module ecrit et teste mais pas encore
 branche (voir `TIER6_INTEGRATION.md`), [ ] pas commence.
 
+**Les 20 modules sont ecrits et testes.** 6 sont branches sur une surface que
+l'utilisateur atteint, 14 attendent leur cablage (endpoint, ecran, parfois un
+modele) : voir `TIER6_INTEGRATION.md`.
+
 - [x] 1. `url_safety.py` + fermeture de la SSRF de l'audit public (0d86539, en prod sur main)
 - [~] 2. Les 17 regles de derive -> `drift_rules.py` (c383550, 60 tests)
 - [x] 3. Data Sufficiency Gate (d6414e4, 10 tests)
-- [ ] 4. Grille technique reelle (9 categories, ponderation 22/23/20/10/10/10/5)
-- [~] 5. Validation de schema -> `schema_validator.py` (c383550, 84 tests)
-- [~] 6. Affirmations non sourcees -> `content_verify.py` (c383550, 47 tests)
-- [ ] 7. `crux_history` + `lcp_subparts` + `preload_check` (profondeur CWV)
+- [~] 4. Grille technique reelle -> `technical_grid.py` (54a7242)
+- [x] 5. Validation de schema -> `schema_validator.py`, branchee sur la vue de schema (79aecff, 84 tests)
+- [x] 6. Affirmations non sourcees -> `content_verify.py`, branchee sur l'audit d'article (5e10de7, 47 tests)
+- [~] 7. Profondeur CWV -> `cwv_depth.py` (54a7242)
 - [~] 8. Generation de schema -> `schema_builder.py` (c383550, 73 tests)
 - [x] 9. Seuils anti-doorway (9a21890, 14 tests)
-- [~] 10. Lint Google Business -> `gbp_lint.py` (c383550, 42 tests)
-- [ ] 11. Grille `seo-local` + coherence NAP sur 3 sources
-- [ ] 12. Pattern budgetaire (estimer, approuver, journaliser, plafonner)
+- [x] 10. Lint Google Business -> `gbp_lint.py`, branche sur l'audit public (b885e77, 42 tests)
+- [~] 11. Grille SEO local + coherence NAP -> `local_seo.py` (15ecd6a, 67 tests)
+- [~] 12. Garde-fou budgetaire -> `api_budget.py` (54a7242)
 - [~] 13. Parsing HTML -> `html_parse.py` (c383550, 49 tests)
 - [~] 14. `sitemap_discovery.py` (c383550, 39 tests)
 - [~] 15. Updates Google -> `google_updates.py` + `data/` (c383550, 55 tests)
-- [ ] 16. Seuils de chevauchement SERP (clustering empirique)
+- [~] 16. Chevauchement SERP -> `serp_clustering.py` (54a7242)
 - [~] 17. Taxonomie SXO -> `sxo.py` (c383550, 40 tests)
-- [ ] 18. `drift_report.py` (modele de rapport HTML autonome)
-- [ ] 19. `thinking-framework` (recommandations falsifiables)
-- [~] 20. Lisibilite agent IA -> `agent_ux.py` (c383550, 75 tests)
+- [~] 18. Rapport HTML autonome -> `report_html.py` (54a7242)
+- [~] 19. Recommandations falsifiables -> `thinking_framework.py` (54a7242)
+- [x] 20. Lisibilite agent IA -> `agent_ux.py`, branche sur l'audit public (b885e77, 75 tests)
 
-Suite de tests : 720 tests verts sur `sites_mgmt`.
+Suite de tests : **1139 tests verts** sur `sites_mgmt`.
 
 ### Trous de couverture identifies au passage (hors des 20)
 
