@@ -3779,6 +3779,33 @@ class V1StrategicOpportunityActionView(BaseV1View):
             }
             page_subtype = subtype_map.get(page_type, 'service')
 
+            # Doorway-page gate. A pile of location pages that differ only by
+            # city name is the pattern Google penalizes, and the cost lands on
+            # the whole domain, not just those pages. Refuse past the hard
+            # stop unless the caller states a justification.
+            if page_subtype == 'local':
+                from .quality_gates import check_location_volume
+                existing_local = HostedLanding.objects.filter(
+                    site=site, page_subtype='local',
+                ).count()
+                gate = check_location_volume(existing_local, adding=1)
+                forced = str(
+                    request.data.get('force') or request.query_params.get('force') or ''
+                ).lower() in ('1', 'true', 'yes')
+                if gate['level'] == 'hard_stop' and not forced:
+                    return Response(
+                        {
+                            'error': gate['message'],
+                            'code': 'doorway_hard_stop',
+                            'requirements': gate['requirements'],
+                            'existing_local_pages': existing_local,
+                            'hint': "Renvoie force=true pour passer outre en connaissance de cause.",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            else:
+                gate = None
+
             from .landing_generator import LandingGenerator, LandingGeneratorError
             try:
                 gen = LandingGenerator(site=site, language=op.language)
@@ -3812,10 +3839,17 @@ class V1StrategicOpportunityActionView(BaseV1View):
             op.save(update_fields=[
                 'status', 'generated_landing', 'updated_at',
             ])
-            return Response({
+            payload_out = {
                 'id': op.id, 'status': op.status,
                 'landing_id': landing.id, 'landing_slug': landing.slug,
-            })
+            }
+            if gate and gate['level'] != 'ok':
+                payload_out['quality_warning'] = {
+                    'message': gate['message'],
+                    'requirements': gate['requirements'],
+                    'level': gate['level'],
+                }
+            return Response(payload_out)
 
         return Response({'error': f"Action inconnue: {action}"},
                         status=status.HTTP_400_BAD_REQUEST)
