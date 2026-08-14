@@ -2936,6 +2936,10 @@ Respond in strict JSON (no markdown, no code fences) with this exact shape:
                 'jsonld': jsonld,
                 'script_tag': script_tag,
                 'usage_hint': usage_hint,
+                # An LLM writes this JSON-LD, so it can invent a property or
+                # leave a placeholder in it. Handing the user a script tag to
+                # paste without checking it first is how broken markup ships.
+                'validation': _validate_generated_schema(jsonld),
             })
 
         except Exception as e:
@@ -2958,6 +2962,7 @@ Respond in strict JSON (no markdown, no code fences) with this exact shape:
                 'script_tag': script_tag,
                 'usage_hint': usage_hint,
                 'warning': f'AI detection failed: {error_msg}',
+                'validation': _validate_generated_schema(jsonld),
             })
 
 
@@ -10063,6 +10068,21 @@ def _normalize_audit_domain(raw: str) -> str | None:
     if '.' not in raw or ' ' in raw:
         return None
     return raw
+
+
+def _validate_generated_schema(jsonld) -> dict:
+    """Check JSON-LD before handing it to the user, never raising.
+
+    Returns {issues, blocking}. A validator that can break schema generation
+    is worse than no validator, so any failure here reports empty.
+    """
+    try:
+        from .schema_validator import has_blocking_errors, validate_jsonld
+        issues = validate_jsonld(jsonld)
+        return {'issues': issues, 'blocking': has_blocking_errors(issues)}
+    except Exception:  # noqa: BLE001
+        logger.exception('schema validation failed')
+        return {'issues': [], 'blocking': False}
 
 
 def _crawl_homepage(url: str, timeout: int = 8) -> dict:
