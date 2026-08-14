@@ -587,7 +587,25 @@ class V1AuditView(BaseV1View):
         except Exception as e:
             return Response({'error': f'Erreur audit: {str(e)[:120]}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({**result, 'cache_hit': from_cache})
+
+        # Deterministic pass over the same text. The LLM audit reads a precise
+        # figure as an E-E-A-T signal and scores it up, so an article full of
+        # invented statistics comes back praised: measured on a real draft, it
+        # returned 93/100 and quoted the fabricated numbers as proof of
+        # first-hand experience. Regexes cannot know a figure is false either,
+        # but they can say nobody cited a source for it, which is the part the
+        # model gets backwards.
+        sourcing = None
+        try:
+            from .content_verify import verify_text
+            sourcing = verify_text(content, lang=language)
+        except Exception:  # noqa: BLE001 - never let the check break the audit
+            logger.exception('content_verify failed on audit')
+
+        payload = {**result, 'cache_hit': from_cache}
+        if sourcing is not None:
+            payload['sourcing'] = sourcing
+        return Response(payload)
 
 
 class V1BriefView(BaseV1View):
