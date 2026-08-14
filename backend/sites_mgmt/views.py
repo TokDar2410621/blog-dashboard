@@ -10127,6 +10127,10 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
             'h3_list': [h[:120] for h in h3_list if h][:10],
             'body_snippet': cleaned[:2000],
             'final_url': r.url,
+            # Underscore-prefixed: for callers that want to run further checks
+            # on the same fetch instead of hitting the site again. Pop it
+            # before serializing, it is the whole page.
+            '_html': html,
         }
     except Exception as e:
         return {'error': f'Crawl: {str(e)[:80]}'}
@@ -10835,6 +10839,23 @@ class PublicAuditView(APIView):
         crawl = results.get('crawl', {})
         ps = results.get('pagespeed', {})
 
+        # Two more reads off the page we already downloaded, so they cost one
+        # fetch, not three. Both fail soft: a partial audit still ships.
+        page_html = crawl.pop('_html', '') or ''
+        agent_readability = {}
+        gbp_deprecations = []
+        if page_html:
+            try:
+                from .agent_ux import check_agent_readability
+                agent_readability = check_agent_readability(page_html, homepage_url)
+            except Exception:  # noqa: BLE001
+                logger.exception('agent readability check failed')
+            try:
+                from .gbp_lint import lint_gbp_references
+                gbp_deprecations = lint_gbp_references(page_html, homepage_url)
+            except Exception:  # noqa: BLE001
+                logger.exception('gbp deprecation lint failed')
+
         # Google Business Profile verdict, in parallel with the keyword position
         # checks below (both only need the crawl to be done). Read-only via
         # Serper Maps; for a local trade the profile is often the real ceiling.
@@ -10946,6 +10967,11 @@ class PublicAuditView(APIView):
             },
             'top_keywords_estimated': positions,
             'recos_partial': recos,
+            # Read off the same fetch as the crawl. Agent readability is the
+            # 2026 angle almost nobody audits: whether an AI agent can make
+            # sense of the page without running its JavaScript.
+            'agent_readability': agent_readability or None,
+            'gbp_deprecations': gbp_deprecations or None,
             'full_report_gated': True,
             # The full report (competitors + decay + backlinks + 10+ recos) is
             # revealed after the visitor leaves their email.
