@@ -26,6 +26,8 @@ from datetime import date, datetime
 from io import StringIO
 import requests as http_requests
 
+from .url_safety import safe_get
+
 from django.http import HttpResponse
 
 import markdown as md_lib
@@ -10077,10 +10079,14 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
     """
     import re
     try:
-        r = http_requests.get(
+        # safe_get, not http_requests.get: `url` comes straight from a public
+        # unauthenticated caller and its body comes back in body_snippet, so an
+        # unchecked fetch turns this into an SSRF read primitive against the
+        # Railway network. safe_get refuses private/loopback/metadata targets
+        # and re-checks every redirect hop.
+        r = safe_get(
             url, timeout=timeout,
             headers={'User-Agent': 'Mozilla/5.0 GridarAudit/1.0 (+https://gridar.app)'},
-            allow_redirects=True,
         )
         if not r.ok:
             return {'error': f'HTTP {r.status_code}'}
