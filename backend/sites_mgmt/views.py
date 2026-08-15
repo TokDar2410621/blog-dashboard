@@ -9608,7 +9608,12 @@ class SiteAuditAggregatorView(APIView):
                 return {'error': 'SERPER_API_KEY non configuree.'}
             try:
                 domain_only = urlparse(homepage_url).netloc
-                # Serper backlinks proxy via 'link:' search - imprecise but free.
+                # This searches for the domain as a string, so it counts pages
+                # that MENTION the site, linked or not. It is not a backlink
+                # measure and must never be reported as one. Google retired the
+                # `link:` operator, and a real link graph needs Common Crawl or
+                # a paid index. Serper also caps `num` at 10 on this plan, so
+                # the count saturates at 10 whatever the site's real profile.
                 r = http_requests.post(
                     'https://google.serper.dev/search',
                     headers={
@@ -9631,13 +9636,24 @@ class SiteAuditAggregatorView(APIView):
                     if netloc and netloc != domain_only.replace('www.', ''):
                         referring[netloc] = referring.get(netloc, 0) + 1
                 return {
-                    'total_referring_domains': len(referring),
+                    # Named for what it is. The old key was
+                    # `total_referring_domains`, which claimed a link where
+                    # there was only a mention, and fed 15 % of the composite
+                    # score on that claim.
+                    'total_mentioning_domains': len(referring),
                     'top_domains': sorted(
                         referring.items(), key=lambda kv: -kv[1]
                     )[:5],
+                    'is_link_data': False,
+                    'saturates_at': 10,
+                    'note': (
+                        'Nombre de domaines qui mentionnent le site dans les 10 '
+                        'premiers resultats Google. Ce ne sont pas des liens '
+                        'entrants et le compte plafonne a 10.'
+                    ),
                 }
             except Exception as e:
-                return {'error': f'Backlinks: {str(e)[:80]}'}
+                return {'error': f'Mentions: {str(e)[:80]}'}
 
         def task_sitestats():
             try:
@@ -9728,11 +9744,14 @@ class SiteAuditAggregatorView(APIView):
         if kw.get('total', 0) > 0:
             components.append(('rankings', kw['top_10_pct'], 0.30))
         bl = results.get('backlinks', {})
-        if 'total_referring_domains' in bl:
-            # log10(n+1) * 30 capped to 100
-            n = bl['total_referring_domains']
-            bl_score = min(100, math.log10(n + 1) * 30)
-            components.append(('backlinks', bl_score, 0.15))
+        # Backlinks deliberately no longer feed the composite. The only signal
+        # available here counts mentions, not links, and Serper's 10-result cap
+        # held the sub-score to log10(11) * 30 = 31/100, so its 15 % weight
+        # could never contribute more than 4.7 of its 15 points and every site
+        # was scored under a ceiling it had no way to reach. `weight_sum` below
+        # redistributes the freed weight over the components that do measure
+        # something. Restore this once backlinks_commoncrawl gives real link
+        # data, and gate it on data sufficiency, one source not being enough.
         decay = results.get('decay', {})
         if 'decaying_count' in decay and 'healthy_count' in decay:
             total_pages = (decay.get('decaying_count') or 0) + (decay.get('healthy_count') or 0)
@@ -9777,11 +9796,21 @@ class SiteAuditAggregatorView(APIView):
                 'cta_label': 'Voir PageSpeed',
                 'cta_href': f'/dashboard/{site.id}/audit-global',
             })
-        if 'total_referring_domains' in bl and bl['total_referring_domains'] < 10:
+        # No backlink recommendation here on purpose. The old one fired below
+        # 10 referring domains on a counter that saturates at 10, so it told
+        # nearly every client "relance ton outreach" using a number that
+        # counted mentions in the first page of Google. Telling a client
+        # something false about their own site is the one thing a report
+        # cannot afford. It comes back with backlinks_commoncrawl.
+        if bl.get('total_mentioning_domains') == 0 and not bl.get('error'):
             recos.append({
                 'severity': 'low',
-                'message': f"Seulement {bl['total_referring_domains']} domaines referrent vers toi - relance ton outreach.",
-                'cta_label': 'Voir les backlinks',
+                'message': (
+                    "Aucun site ne mentionne ton domaine dans les premiers "
+                    "resultats Google. C'est un signal de notoriete, pas une "
+                    "mesure de tes liens entrants."
+                ),
+                'cta_label': 'Voir l audit',
                 'cta_href': f'/dashboard/{site.id}/audit-global',
             })
         if not site.gsc_refresh_token:
