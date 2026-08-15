@@ -107,7 +107,13 @@ type AuditPayload = {
     error?: string;
   };
   backlinks: {
-    total_referring_domains?: number;
+    // Mentions, not links. The backend used to call this
+    // total_referring_domains and score it as a backlink profile; it counts
+    // pages naming the domain in the first page of Google, linked or not.
+    total_mentioning_domains?: number;
+    is_link_data?: boolean;
+    saturates_at?: number;
+    note?: string;
     top_domains?: [string, number][];
     error?: string;
     pending?: boolean;
@@ -634,12 +640,12 @@ export function SiteAuditPage() {
           </CardContent>
         </Card>
 
-        {/* Backlinks */}
+        {/* Mentions. Not a link profile: see the backend note on the payload. */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <LinkIcon className="h-4 w-4" />
-              Profil de liens
+              Mentions du domaine
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -653,11 +659,21 @@ export function SiteAuditPage() {
             ) : (
               <>
                 <div className="text-3xl font-bold mb-1 tabular-nums">
-                  {data.backlinks.total_referring_domains ?? 0}
+                  {data.backlinks.total_mentioning_domains ?? 0}
+                  {data.backlinks.saturates_at != null &&
+                    (data.backlinks.total_mentioning_domains ?? 0) >=
+                      data.backlinks.saturates_at && (
+                      <span className="text-lg font-normal text-muted-foreground">+</span>
+                    )}
                 </div>
                 <div className="text-xs text-muted-foreground mb-3">
-                  domaines referrents estimes (via Serper)
+                  domaines qui te mentionnent, liés ou non
                 </div>
+                <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                  Ce n&apos;est pas une mesure de tes liens entrants. Le compte
+                  plafonne à {data.backlinks.saturates_at ?? 10} et vient des
+                  premiers résultats Google.
+                </p>
                 {data.backlinks.top_domains && data.backlinks.top_domains.length > 0 && (
                   <div className="space-y-1">
                     {data.backlinks.top_domains.map(([domain, count]) => (
