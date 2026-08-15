@@ -1,5 +1,45 @@
 # Tier 6 : brancher les modules portes
 
+## Backlinks (ajoute le 2026-08-15)
+
+Le sous-score backlinks a ete RETIRE du composite parce qu'il mesurait des
+mentions et saturait a 10. Trois modules apportent la vraie donnee :
+`backlinks_commoncrawl`, `backlinks_verify`, `backlinks_sources`.
+
+Sequence a cabler, dans un job de fond, jamais dans une requete :
+
+1. `backlinks_commoncrawl.referring_domains(domain, time_budget=1800)` en
+   management command lancee par un Cron Railway. Les fichiers font des Go, un
+   plafond dur de 4 Gio par appel borne l'egress. Le graphe est un instantane
+   trimestriel publie avec 1 a 2 mois de retard : `data_freshness` le dit dans
+   chaque payload et `temps_reel` est toujours False. A afficher, sinon on
+   laisse croire a du temps reel.
+2. `backlinks_sources.merge_sources([...])` pour fusionner avec Moz et Bing
+   quand les cles existent. Bing exige que chaque site soit verifie dans le
+   compte detenteur de la cle, donc utilisable pour les sites de Darius, pas
+   pour ceux de ses clients : un appel sur un domaine client renvoie
+   `non_autorise` avec l'explication plutot qu'un profil vide qui se lirait
+   "aucun backlink".
+3. `backlinks_sources.data_sufficiency(sources)` AVANT d'afficher un chiffre.
+   `score_autorise` a False veut dire : montrer `message` et rien d'autre.
+4. `backlinks_verify.verify_batch(links, domain)` sur la liste obtenue, puis
+   `validate_report(lot)` avant tout affichage.
+
+Deux pieges signales par les agents :
+- `verify_batch` cree son propre ThreadPoolExecutor. `views.py` en a deja neuf.
+  Dans le chemin de l'audit, l'appeler avec `max_workers=2` ou le sortir du
+  pool.
+- Ne jamais scorer sur `confirmes / total` : le denominateur contiendrait les
+  injoignables, donc un blocage Cloudflare ferait baisser la note du client.
+  Le seul chiffre honnete est `resume['taux_confirmation']`, et
+  `resume['couverture']` dit s'il merite d'etre montre.
+
+Modeles a creer : `BacklinkSnapshot` (autorite par version de crawl) et
+`BacklinkVerification` en append-only, sans contrainte d'unicite sur
+(site, cle_url), parce que c'est l'historique qui convainc un client :
+confirme le 3 mars, encore le 12 juin, disparu le 2 aout.
+
+
 Les modules sont ecrits, testes et commites. Ils sont tous en Python pur, sans
 ORM et sans reseau : ils prennent des donnees, ils rendent des donnees. Reste a
 les brancher. Ce fichier dit ou, pour chacun.
