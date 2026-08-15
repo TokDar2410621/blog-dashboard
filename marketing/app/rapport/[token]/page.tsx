@@ -191,7 +191,11 @@ export default async function ReportPage({ params }: PageProps) {
                   >
                     <span className="truncate text-zinc-200">{kw.keyword}</span>
                     <span className={`font-mono text-xs shrink-0 ml-2 ${positionColor(kw.position)}`}>
-                      {kw.position == null ? "hors top 50" : `#${kw.position}`}
+                      {kw.checked === false
+                        ? "non vérifié"
+                        : kw.position == null
+                        ? "hors des premiers résultats"
+                        : `#${kw.position}`}
                     </span>
                   </div>
                 ))}

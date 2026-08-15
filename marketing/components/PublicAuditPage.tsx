@@ -52,7 +52,15 @@ type AuditResult = {
     meta_description?: string;
     error?: string;
   };
-  top_keywords_estimated: { keyword: string; position: number | null }[];
+  // `checked` false means the lookup itself failed. Rendering that as "hors
+  // top 50" told visitors their site ranked nowhere whenever our data source
+  // was down or out of quota.
+  top_keywords_estimated: {
+    keyword: string;
+    position: number | null;
+    checked?: boolean;
+    reason?: string;
+  }[];
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
   gbp?: GbpVerdict | null;
   full_report_gated: boolean;
@@ -396,8 +404,10 @@ export function PublicAuditPage() {
                                 : "text-muted-foreground"
                             }`}
                           >
-                            {kw.position == null
-                              ? "hors top 50"
+                            {kw.checked === false
+                              ? "non vérifié"
+                              : kw.position == null
+                              ? "hors des premiers résultats"
                               : `#${kw.position}`}
                           </span>
                         </div>
