@@ -52,7 +52,14 @@ export type PublicReport = {
     meta_description?: string;
     error?: string;
   };
-  top_keywords_estimated: { keyword: string; position: number | null }[];
+  // `checked` false means the lookup failed, which is not the same claim as
+  // "this site does not rank". See PublicAuditView._check_position.
+  top_keywords_estimated: {
+    keyword: string;
+    position: number | null;
+    checked?: boolean;
+    reason?: string;
+  }[];
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
   // Read-only Google Business Profile verdict (via Serper Maps, no GBP access).
   // For a local trade the profile is usually the real ceiling before content.

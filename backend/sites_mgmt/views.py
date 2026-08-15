@@ -10942,8 +10942,16 @@ class PublicAuditView(APIView):
                         json={'q': kw, 'num': 50, 'hl': 'fr', 'gl': 'ca'},
                         timeout=8,
                     )
+                    # `checked` separates "we looked and it is not there" from
+                    # "we could not look". Both used to collapse into
+                    # position=None, which the UI renders as "hors top 50": a
+                    # quota error therefore told the visitor their site ranks
+                    # nowhere. Same failure mode as counting mentions as
+                    # backlinks, and it lands on a stranger's site.
                     if r.status_code != 200:
-                        return {'keyword': kw, 'position': None}
+                        detail = 'quota' if r.status_code == 400 else f'http_{r.status_code}'
+                        return {'keyword': kw, 'position': None,
+                                'checked': False, 'reason': detail}
                     organic = (r.json().get('organic') or [])
                     pos = None
                     dom = domain[4:] if domain.startswith('www.') else domain
@@ -10955,9 +10963,11 @@ class PublicAuditView(APIView):
                         if host and host == dom:
                             pos = item.get('position') or idx + 1
                             break
-                    return {'keyword': kw, 'position': pos}
+                    return {'keyword': kw, 'position': pos, 'checked': True,
+                            'depth': len(organic)}
                 except Exception:
-                    return {'keyword': kw, 'position': None}
+                    return {'keyword': kw, 'position': None,
+                            'checked': False, 'reason': 'erreur_reseau'}
 
             with ThreadPoolExecutor(max_workers=8) as pool:
                 positions = list(pool.map(_check_position, keywords_to_check))
@@ -10971,9 +10981,13 @@ class PublicAuditView(APIView):
         components = []
         if 'avg' in ps:
             components.append(('pagespeed', ps['avg'], 0.60))
-        if positions:
-            top_10 = sum(1 for p in positions if p['position'] and p['position'] <= 10)
-            rank_score = (top_10 / len(positions)) * 100
+        # Only keywords we actually managed to check may score. A failed
+        # lookup counted as a zero, so an empty Serper quota silently halved
+        # the visitor's score instead of admitting the measure did not run.
+        verifies = [p for p in positions if p.get('checked')]
+        if verifies:
+            top_10 = sum(1 for p in verifies if p['position'] and p['position'] <= 10)
+            rank_score = (top_10 / len(verifies)) * 100
             components.append(('rankings', rank_score, 0.40))
         composite_score = None
         if components:
@@ -10987,10 +11001,24 @@ class PublicAuditView(APIView):
                 'severity': 'high' if ps['avg'] < 50 else 'medium',
                 'message': f"Score PageSpeed mobile = {ps['avg']}/100. Vise 80+.",
             })
-        if positions and all(p['position'] is None for p in positions):
+        if verifies and all(p['position'] is None for p in verifies):
             recos.append({
                 'severity': 'high',
-                'message': "Aucun de tes mots-cles principaux n'apparait dans le top 50 Google.",
+                'message': (
+                    f"Aucun de tes {len(verifies)} mots-cles verifies n'apparait "
+                    "dans les premiers resultats Google."
+                ),
+            })
+        elif positions and not verifies:
+            # Say the measure failed. Announcing "you rank nowhere" because our
+            # own quota ran out is a false statement about someone else's site.
+            recos.append({
+                'severity': 'low',
+                'message': (
+                    "Positions Google non verifiees pour cet audit : la source "
+                    "de donnees n'a pas repondu. Ce n'est pas un constat sur "
+                    "ton site."
+                ),
             })
         if crawl.get('error'):
             recos.append({
