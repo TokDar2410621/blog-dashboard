@@ -587,7 +587,25 @@ class V1AuditView(BaseV1View):
         except Exception as e:
             return Response({'error': f'Erreur audit: {str(e)[:120]}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response({**result, 'cache_hit': from_cache})
+
+        # Deterministic pass over the same text. The LLM audit reads a precise
+        # figure as an E-E-A-T signal and scores it up, so an article full of
+        # invented statistics comes back praised: measured on a real draft, it
+        # returned 93/100 and quoted the fabricated numbers as proof of
+        # first-hand experience. Regexes cannot know a figure is false either,
+        # but they can say nobody cited a source for it, which is the part the
+        # model gets backwards.
+        sourcing = None
+        try:
+            from .content_verify import verify_text
+            sourcing = verify_text(content, lang=language)
+        except Exception:  # noqa: BLE001 - never let the check break the audit
+            logger.exception('content_verify failed on audit')
+
+        payload = {**result, 'cache_hit': from_cache}
+        if sourcing is not None:
+            payload['sourcing'] = sourcing
+        return Response(payload)
 
 
 class V1BriefView(BaseV1View):
@@ -2117,6 +2135,30 @@ _SEO_SCORE_WEIGHTS = {
     'no_transactional_blog':     10,
 }
 
+# What each check actually reads. 'config' checks read Gridar's own database
+# (is the field filled, is GSC linked); 'measured' checks look at the site
+# itself. The split matters because a site can be perfectly configured here
+# and never have been crawled, and the two must not be reported as one number.
+_SEO_SCORE_KIND = {
+    'indexability':              'measured',
+    'author_bio_filled':         'config',
+    'business_model_declared':   'config',
+    'gsc_connected':             'config',
+    'has_cluster':               'config',
+    'hreflang_valid':            'measured',
+    'cwv_ok':                    'measured',
+    'faq_coverage':              'measured',
+    'no_transactional_blog':     'config',
+}
+
+# Data sufficiency gate, ported from claude-seo v2.2.4 skills/seo-backlinks
+# (MIT, Daniel Agrici). Its rule: below a floor of factors carrying real data,
+# emit no number at all, because a low score computed on absent data reads as
+# "your SEO is bad" when the truth is "we did not measure it". Here the floor
+# applies to the measured subset: with fewer than 2 of the 4 measured checks
+# carrying data, `seo_score` comes back None instead of a misleading integer.
+_MEASURED_FLOOR = 2
+
 
 def _compute_site_seo_score(site) -> dict:
     """Return {score, breakdown, action_items} for the given site.
@@ -2136,14 +2178,16 @@ def _compute_site_seo_score(site) -> dict:
         published_count = HostedPost.objects.filter(site=site, status='published').count()
         total_count = HostedPost.objects.filter(site=site).count()
     else:
-        # External sites: we trust the integration (we can't query them cheaply
-        # here without DB connection setup). Assume indexable if domain set.
-        published_count = 1 if site.domain else 0
-        total_count = published_count
+        # External site: we cannot count its published pages from here without
+        # setting up its DB connection. Report no data rather than inferring
+        # indexability from "a domain is filled in", which measured Gridar's
+        # own config and passed for a crawl result.
+        published_count = None
+        total_count = 0
 
-    indexable = published_count > 0
-    breakdown['indexability'] = bool(indexable)
-    if not indexable:
+    indexable = None if published_count is None else published_count > 0
+    breakdown['indexability'] = None if indexable is None else bool(indexable)
+    if indexable is False:
         action_items.append({
             'issue': 'Aucun article publie - Google n a rien a indexer.',
             'fix_url': f'/sites/{site.id}/posts/new/',
@@ -2207,11 +2251,12 @@ def _compute_site_seo_score(site) -> dict:
         )
         hreflang_ok = groups.exists()
     else:
-        # External sites: we can't check cheaply. Assume valid unless proven
-        # otherwise by the dedicated hreflang-check tool.
-        hreflang_ok = True
+        # Multilingual external site: no data from here. V1HreflangCheckView
+        # can answer it properly; defaulting to True credited sites that had
+        # never been checked.
+        hreflang_ok = None
     breakdown['hreflang_valid'] = hreflang_ok
-    if not hreflang_ok:
+    if hreflang_ok is False:
         action_items.append({
             'issue': 'Site multilingue sans hreflang - cannibalisation cross-langue probable.',
             'fix_url': f'/sites/{site.id}/site-audit/',
@@ -2227,28 +2272,45 @@ def _compute_site_seo_score(site) -> dict:
         ps = audit_cached.get('pagespeed') or {}
         perf = ps.get('performance')
         if perf is None:
-            cwv_value: float = 0.5
+            cwv_value = None
         else:
             cwv_value = 1.0 if perf >= 70 else 0.0
     else:
-        cwv_value = 0.5  # unknown - partial credit so we don't penalize new sites
+        # No audit run yet. None, not 0.5: half credit was a guess dressed up
+        # as a measurement, and it moved the score either way for no reason.
+        cwv_value = None
     breakdown['cwv_ok'] = cwv_value
-    if cwv_value < 1.0:
+    if cwv_value is not None and cwv_value < 1.0:
         action_items.append({
             'issue': 'Core Web Vitals non valides ou non mesures - lancer un audit PageSpeed.',
             'fix_url': f'/sites/{site.id}/site-audit/',
         })
 
-    # 8) FAQ coverage: % of published posts with FAQ schema in schema_jsonld.
+    # 8) FAQ coverage: share of published posts carrying FAQPage JSON-LD.
     if site.is_hosted and total_count > 0:
-        with_faq = HostedPost.objects.filter(
-            site=site, schema_jsonld__has_key='@type',
-        ).count()
+        # Counted in Python on purpose: `@type` is sometimes a list
+        # (['BlogPosting', 'FAQPage']) and sometimes a string, and the
+        # JSONField `contains` lookup matches neither shape reliably across
+        # Postgres and SQLite. The previous query asked only "has an @type
+        # key", so every article with any schema at all counted as an FAQ.
+        def _has_faq(blob) -> bool:
+            if not isinstance(blob, dict):
+                return False
+            t = blob.get('@type')
+            return t == 'FAQPage' or (isinstance(t, list) and 'FAQPage' in t)
+
+        blobs = HostedPost.objects.filter(site=site).values_list(
+            'schema_jsonld', flat=True,
+        )
+        with_faq = sum(1 for b in blobs if _has_faq(b))
         faq_ratio = with_faq / max(1, total_count)
     else:
-        faq_ratio = 0.0
-    breakdown['faq_coverage'] = round(faq_ratio, 3)
-    if faq_ratio < 0.5:
+        # Nothing to read: an external site's posts are not in this database.
+        # Zero would have been reported as "no FAQ anywhere", which is a claim
+        # about the site we never checked.
+        faq_ratio = None
+    breakdown['faq_coverage'] = None if faq_ratio is None else round(faq_ratio, 3)
+    if faq_ratio is not None and faq_ratio < 0.5:
         action_items.append({
             'issue': (
                 f'Couverture FAQ schema faible ({int(faq_ratio * 100)}%). '
@@ -2278,25 +2340,63 @@ def _compute_site_seo_score(site) -> dict:
             'fix_url': f'/sites/{site.id}/keyword-strategy/',
         })
 
-    # Compute weighted score.
-    total_weight = sum(_SEO_SCORE_WEIGHTS.values())
-    weighted_sum = 0.0
-    for check, weight in _SEO_SCORE_WEIGHTS.items():
-        val = breakdown.get(check, 0)
-        if isinstance(val, bool):
-            val = 1.0 if val else 0.0
-        else:
-            try:
-                val = float(val)
-            except (TypeError, ValueError):
-                val = 0.0
-            val = max(0.0, min(1.0, val))
-        weighted_sum += val * weight
-    score = int(round(weighted_sum / total_weight * 100))
+    # Weighted score. A check that came back None carries no data: its weight
+    # is redistributed over the checks that do, rather than counting as a zero
+    # and inventing a failure the site never had.
+    def _weighted(names):
+        acc = 0.0
+        total = 0
+        for check in names:
+            val = breakdown.get(check)
+            if val is None:
+                continue
+            if isinstance(val, bool):
+                val = 1.0 if val else 0.0
+            else:
+                try:
+                    val = max(0.0, min(1.0, float(val)))
+                except (TypeError, ValueError):
+                    continue
+            acc += val * _SEO_SCORE_WEIGHTS[check]
+            total += _SEO_SCORE_WEIGHTS[check]
+        return (acc / total * 100) if total else None
+
+    measured = [k for k, kind in _SEO_SCORE_KIND.items() if kind == 'measured']
+    config = [k for k, kind in _SEO_SCORE_KIND.items() if kind == 'config']
+    with_data = [k for k in measured if breakdown.get(k) is not None]
+    unknown = [k for k in _SEO_SCORE_WEIGHTS if breakdown.get(k) is None]
+
+    overall = _weighted(list(_SEO_SCORE_WEIGHTS.keys()))
+    seo_only = _weighted(measured)
+    onboarding = _weighted(config)
+    sufficient = len(with_data) >= _MEASURED_FLOOR
+
+    if not sufficient:
+        action_items.insert(0, {
+            'issue': (
+                f'Score SEO indisponible : seulement {len(with_data)} des '
+                f'{len(measured)} verifications portant sur le site ont des '
+                'donnees. Lance un audit du site pour en obtenir un.'
+            ),
+            'fix_url': f'/sites/{site.id}/site-audit/',
+        })
 
     return {
-        'score': score,
+        # Kept for existing callers: all nine checks, weights redistributed.
+        'score': None if overall is None else int(round(overall)),
+        # The site itself, config checks excluded. None when the gate trips.
+        'seo_score': int(round(seo_only)) if (sufficient and seo_only is not None) else None,
+        # What Gridar knows about the site, which is a different question.
+        'onboarding_completeness': None if onboarding is None else int(round(onboarding)),
+        'data_sufficiency': {
+            'measured_with_data': len(with_data),
+            'measured_total': len(measured),
+            'floor': _MEASURED_FLOOR,
+            'sufficient': sufficient,
+            'unknown_checks': unknown,
+        },
         'breakdown': breakdown,
+        'kinds': _SEO_SCORE_KIND,
         'action_items': action_items,
     }
 
@@ -2304,12 +2404,19 @@ def _compute_site_seo_score(site) -> dict:
 class V1SiteSeoScoreView(BaseV1View):
     """GET /api/v1/sites/<id>/seo-score/
 
-    Returns a composite SEO score (0-100) computed from 9 weighted checks:
-    indexability, author bio, business model, GSC connection, pillar+spokes
-    cluster, hreflang validity (if multilingual), Core Web Vitals, FAQ
-    schema coverage, no transactional intent stuck on blog posts.
+    Nine weighted checks: indexability, author bio, business model, GSC
+    connection, pillar+spokes cluster, hreflang validity (if multilingual),
+    Core Web Vitals, FAQ schema coverage, no transactional intent stuck on
+    blog posts.
 
-    Response: {score, breakdown: {...}, action_items: [{issue, fix_url}]}
+    Four of them measure the site, five read Gridar's own configuration, and
+    `kinds` says which is which. A check with no data available returns null
+    and its weight is redistributed rather than counted as a failure. Below
+    the data sufficiency floor, `seo_score` is null on purpose: a number
+    computed on absent data reads as bad SEO when nothing was measured.
+
+    Response: {score, seo_score, onboarding_completeness, data_sufficiency,
+    breakdown, kinds, action_items: [{issue, fix_url}]}
     """
 
     def get(self, request, site_id):
@@ -3690,6 +3797,33 @@ class V1StrategicOpportunityActionView(BaseV1View):
             }
             page_subtype = subtype_map.get(page_type, 'service')
 
+            # Doorway-page gate. A pile of location pages that differ only by
+            # city name is the pattern Google penalizes, and the cost lands on
+            # the whole domain, not just those pages. Refuse past the hard
+            # stop unless the caller states a justification.
+            if page_subtype == 'local':
+                from .quality_gates import check_location_volume
+                existing_local = HostedLanding.objects.filter(
+                    site=site, page_subtype='local',
+                ).count()
+                gate = check_location_volume(existing_local, adding=1)
+                forced = str(
+                    request.data.get('force') or request.query_params.get('force') or ''
+                ).lower() in ('1', 'true', 'yes')
+                if gate['level'] == 'hard_stop' and not forced:
+                    return Response(
+                        {
+                            'error': gate['message'],
+                            'code': 'doorway_hard_stop',
+                            'requirements': gate['requirements'],
+                            'existing_local_pages': existing_local,
+                            'hint': "Renvoie force=true pour passer outre en connaissance de cause.",
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            else:
+                gate = None
+
             from .landing_generator import LandingGenerator, LandingGeneratorError
             try:
                 gen = LandingGenerator(site=site, language=op.language)
@@ -3723,10 +3857,17 @@ class V1StrategicOpportunityActionView(BaseV1View):
             op.save(update_fields=[
                 'status', 'generated_landing', 'updated_at',
             ])
-            return Response({
+            payload_out = {
                 'id': op.id, 'status': op.status,
                 'landing_id': landing.id, 'landing_slug': landing.slug,
-            })
+            }
+            if gate and gate['level'] != 'ok':
+                payload_out['quality_warning'] = {
+                    'message': gate['message'],
+                    'requirements': gate['requirements'],
+                    'level': gate['level'],
+                }
+            return Response(payload_out)
 
         return Response({'error': f"Action inconnue: {action}"},
                         status=status.HTTP_400_BAD_REQUEST)

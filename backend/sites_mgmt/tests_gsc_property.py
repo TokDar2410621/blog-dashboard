@@ -191,7 +191,13 @@ class GSCQueriesViewProprieteVideTests(TestCase):
         self.assertEqual(
             self.site.gsc_property_url, 'https://qrstudio.agency/',
             "la propriete decouverte doit avoir ete persistee (auto-guerison)")
-        self.assertEqual(response.data['page_url'], 'https://qrstudio.agency/mon-article/')
+        # Attendu change avec 5f32c6c : l'URL de page est desormais construite
+        # comme celle du sitemap public (_public_article_url), donc
+        # /blog/<slug> sans slash final, au lieu de propriete + slug + '/'.
+        # L'ancienne forme n'existait sur aucun site et ne remontait jamais la
+        # moindre ligne GSC, ce qui est le bug que ce correctif ferme.
+        self.assertEqual(
+            response.data['page_url'], 'https://qrstudio.agency/blog/mon-article')
         self.assertEqual(response.data['queries'][0]['query'], 'seo local')
 
     def test_aucune_propriete_correspondante_erreur_explicite(self):

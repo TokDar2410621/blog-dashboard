@@ -134,3 +134,67 @@ Architecture finale plus simple que l'OAuth dance prevu - juste un Bearer API to
 - [x] Plugin PHP `wordpress-plugin/gridar-connector/gridar-connector.php` + readme.txt - admin page sous Settings, auto-creation App Password via WP_Application_Passwords, POST a Gridar, rollback si fail.
 - [x] Backend `POST /api/v1/wp-connector/connect/` (Bearer auth via BaseV1View) - probe creds avant persist + upsert (owner, wp_url).
 - [ ] **Action humaine** : soumettre le plugin a wordpress.org/plugins (5-15 jours de validation). Voir PENDING_HUMAN.md.
+
+---
+
+## Tier 6 - Reprise de claude-seo (2026-08-14)
+
+Origine : inventaire complet du plugin open-source claude-seo 2.2.4 (MIT,
+Daniel Agrici), confronte au code reel de Gridar. Dossier de reference avec
+l'inventaire, la licence et les pieges :
+https://claude.ai/code/artifact/061040b0-6605-4dfc-a767-bbbe70f78529
+
+Darius a tranche le 2026-08-14 : « on va faire les 20 ». Ordre impose par
+valeur decroissante, chaque rang suppose les precedents traites.
+
+**Regle de licence** : MIT, attribution requise si un extrait sort du SaaS
+(paquet mcp-server publie, export telechargeable). Ligne exacte :
+`Claude SEO v2.2.4, Daniel Agrici (AgriciDaniel), MIT, github.com/AgriciDaniel/claude-seo`.
+Trois exceptions a ne pas toucher : la skill `seo-flow` (CC BY 4.0),
+`content_quality.py` et `content_humanize.py` (CC BY-SA heritee de Wikipedia).
+
+**Regle Railway** : ne jamais porter `google_report.py` (WeasyPrint tire
+cairo/pango, meme famille que le pycairo qui a tue le PDF en mai) ni rien
+qui importe `render_page` (Playwright, +150 Mo).
+
+Etat au 2026-08-14, branche `mission/2026-08-14-tier6-claude-seo`.
+Legende : [x] livre et branche, [~] module ecrit et teste mais pas encore
+branche (voir `TIER6_INTEGRATION.md`), [ ] pas commence.
+
+**Les 20 modules sont ecrits et testes.** 6 sont branches sur une surface que
+l'utilisateur atteint, 14 attendent leur cablage (endpoint, ecran, parfois un
+modele) : voir `TIER6_INTEGRATION.md`.
+
+- [x] 1. `url_safety.py` + fermeture de la SSRF de l'audit public (0d86539, en prod sur main)
+- [~] 2. Les 17 regles de derive -> `drift_rules.py` (c383550, 60 tests)
+- [x] 3. Data Sufficiency Gate (d6414e4, 10 tests)
+- [~] 4. Grille technique reelle -> `technical_grid.py` (54a7242)
+- [x] 5. Validation de schema -> `schema_validator.py`, branchee sur la vue de schema (79aecff, 84 tests)
+- [x] 6. Affirmations non sourcees -> `content_verify.py`, branchee sur l'audit d'article (5e10de7, 47 tests)
+- [~] 7. Profondeur CWV -> `cwv_depth.py` (54a7242)
+- [~] 8. Generation de schema -> `schema_builder.py` (c383550, 73 tests)
+- [x] 9. Seuils anti-doorway (9a21890, 14 tests)
+- [x] 10. Lint Google Business -> `gbp_lint.py`, branche sur l'audit public (b885e77, 42 tests)
+- [~] 11. Grille SEO local + coherence NAP -> `local_seo.py` (15ecd6a, 67 tests)
+- [~] 12. Garde-fou budgetaire -> `api_budget.py` (54a7242)
+- [~] 13. Parsing HTML -> `html_parse.py` (c383550, 49 tests)
+- [~] 14. `sitemap_discovery.py` (c383550, 39 tests)
+- [~] 15. Updates Google -> `google_updates.py` + `data/` (c383550, 55 tests)
+- [~] 16. Chevauchement SERP -> `serp_clustering.py` (54a7242)
+- [~] 17. Taxonomie SXO -> `sxo.py` (c383550, 40 tests)
+- [~] 18. Rapport HTML autonome -> `report_html.py` (54a7242)
+- [~] 19. Recommandations falsifiables -> `thinking_framework.py` (54a7242)
+- [x] 20. Lisibilite agent IA -> `agent_ux.py`, branche sur l'audit public (b885e77, 75 tests)
+
+Suite de tests : **1139 tests verts** sur `sites_mgmt`.
+
+### Trous de couverture identifies au passage (hors des 20)
+
+Six territoires que Gridar ne couvre pas du tout : backlinks reels (le
+`task_backlinks` actuel compte des mentions Serper, pas des liens, et pese
+15 % du score), derive dans le temps, SEO local profond, profondeur CWV,
+SEO des images (absent du crawl), SEO e-commerce.
+
+Et une dette sur le score compose : six de ses neuf checks lisent l'etat de
+configuration en base, pas l'etat SEO du site. Trois correctifs a cout quasi
+nul, detailles dans le dossier de reference.
