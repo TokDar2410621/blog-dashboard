@@ -756,8 +756,11 @@ class PublicCanIRankView(APIView):
         try:
             r = http_requests.post(
                 f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
-                json={'contents': [{'parts': [{'text': prompt}]}]},
-                timeout=20,
+                json={
+                    'contents': [{'parts': [{'text': prompt}]}],
+                    'generationConfig': {'thinkingConfig': {'thinkingBudget': 0}},
+                },
+                timeout=25,
             )
             r.raise_for_status()
             text = r.json()['candidates'][0]['content']['parts'][0]['text']
@@ -1052,8 +1055,11 @@ class PublicCompetitorCompareView(APIView):
         try:
             r = http_requests.post(
                 f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
-                json={'contents': [{'parts': [{'text': prompt}]}]},
-                timeout=20,
+                json={
+                    'contents': [{'parts': [{'text': prompt}]}],
+                    'generationConfig': {'thinkingConfig': {'thinkingBudget': 0}},
+                },
+                timeout=25,
             )
             r.raise_for_status()
             text = r.json()['candidates'][0]['content']['parts'][0]['text']
