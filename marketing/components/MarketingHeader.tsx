@@ -51,6 +51,12 @@ export function MarketingHeader({ trail }: Props) {
             Tarifs
           </Link>
           <Link
+            href="/tools"
+            className="hidden md:inline text-sm text-zinc-400 hover:text-white"
+          >
+            Outils
+          </Link>
+          <Link
             href="/blog"
             className="hidden md:inline text-sm text-zinc-400 hover:text-white"
           >

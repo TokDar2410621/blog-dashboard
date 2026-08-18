@@ -68,6 +68,9 @@ def classify_intent_heuristic(keyword: str) -> str:
     return 'info'
 
 
+classify_intent = classify_intent_heuristic
+
+
 def map_intent_to_article_type(intent: str, keyword: str = '') -> str:
     """Pick the most natural article_type for an autopilot run.
 

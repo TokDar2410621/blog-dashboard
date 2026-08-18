@@ -29,6 +29,7 @@ export function MarketingFooter() {
             </p>
           </div>
           <div className="flex flex-wrap gap-6 items-start">
+            <Link href="/tools" className="hover:text-zinc-100">Outils gratuits</Link>
             <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
             <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
             <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>

@@ -41,6 +41,15 @@ from .views import (
     GSCOAuthUrlView, GSCOAuthCallbackView, GSCDisconnectView, GSCQueriesView,
     AutopilotConfigView, AutopilotRunView,
 )
+from .views_tools import (
+    PublicAiVisibilityView,
+    PublicCompetitorGapView,
+    PublicToolEventView,
+    PublicCanIRankView,
+    PublicSeoRoiCalculatorView,
+    PublicAiCitationCheckerView,
+    PublicCompetitorCompareView,
+)
 from .api_v1 import (
     V1MeView, V1SitesView, V1ArticlesView, V1ArticleDetailView, V1GenerateView,
     V1AuditView, V1BriefView, V1KeywordsView, V1RankSnapshotView,
@@ -164,6 +173,14 @@ urlpatterns = [
     path('public/report/<uuid:token>/', PublicReportView.as_view(), name='public-report'),
     path('public/unsubscribe/', PublicUnsubscribeView.as_view(), name='public-unsubscribe'),
     path('public/unsubscribe/one-click/', PublicUnsubscribeOneClickView.as_view(), name='public-unsubscribe-one-click'),
+    # Public lead-magnet tools (no auth)
+    path('public/ai-visibility/', PublicAiVisibilityView.as_view(), name='public-ai-visibility'),
+    path('public/competitor-gap/', PublicCompetitorGapView.as_view(), name='public-competitor-gap'),
+    path('public/tool-event/', PublicToolEventView.as_view(), name='public-tool-event'),
+    path('public/can-i-rank/', PublicCanIRankView.as_view(), name='public-can-i-rank'),
+    path('public/seo-roi/', PublicSeoRoiCalculatorView.as_view(), name='public-seo-roi'),
+    path('public/ai-citation/', PublicAiCitationCheckerView.as_view(), name='public-ai-citation'),
+    path('public/competitor-compare/', PublicCompetitorCompareView.as_view(), name='public-competitor-compare'),
     # WordPress plugin 1-click connector
     path('v1/wp-connector/connect/', WPConnectorView.as_view(), name='v1-wp-connector-connect'),
     path('keyword-research/', KeywordResearchView.as_view(), name='keyword-research'),

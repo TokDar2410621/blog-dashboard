@@ -440,6 +440,23 @@ class Lead(models.Model):
         null=True, blank=True,
         help_text="Composite SEO score at the moment of capture, for cohort analysis.",
     )
+    lead_score = models.IntegerField(
+        null=True, blank=True,
+        help_text="Automated 0-100 score based on site size, SEO potential, "
+                  "industry, and commercial opportunity.",
+    )
+    first_tool = models.CharField(
+        max_length=30, blank=True, default='public_audit',
+        help_text="Which lead-magnet tool first captured this lead.",
+    )
+    company_name = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Auto-detected from the site title or meta.",
+    )
+    estimated_monthly_traffic = models.IntegerField(
+        null=True, blank=True,
+        help_text="Estimated organic traffic at capture time.",
+    )
     report_token = models.UUIDField(
         null=True, blank=True, db_index=True,
         help_text="Token of the PublicAuditReport captured with this audit, so "
@@ -1608,3 +1625,106 @@ class StrategicOpportunity(models.Model):
 
     def __str__(self):
         return f"StrategicOpportunity #{self.id} kw='{self.keyword}' status={self.status}"
+
+
+class ToolAnalysis(models.Model):
+    """Generic analysis record for any public lead-magnet tool.
+
+    Each run of a free tool (audit, ai-visibility, competitor-gap, etc.)
+    produces one row so we can track usage, cache results, and link back
+    to the Lead if the visitor later provides their email.
+    """
+    TOOL_CHOICES = [
+        ('audit', 'Audit SEO'),
+        ('ai_visibility', 'AI Visibility Checker'),
+        ('competitor_gap', 'Competitor Gap Finder'),
+        ('can_i_rank', 'Can I Rank?'),
+        ('competitor_compare', 'Competitor Comparison'),
+        ('ai_citation', 'AI Citation Checker'),
+        ('seo_roi', 'SEO ROI Calculator'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'En attente'),
+        ('running', 'En cours'),
+        ('completed', 'Termine'),
+        ('failed', 'Echoue'),
+    ]
+
+    lead = models.ForeignKey(
+        'Lead', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tool_analyses',
+        help_text="Linked after the visitor provides their email.",
+    )
+    domain = models.CharField(max_length=255, db_index=True)
+    tool = models.CharField(
+        max_length=30, choices=TOOL_CHOICES, db_index=True,
+    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='pending',
+    )
+    score = models.IntegerField(
+        null=True, blank=True,
+        help_text="Primary score (0-100) produced by the tool.",
+    )
+    result = models.JSONField(
+        default=dict, blank=True,
+        help_text="Full result payload returned by the tool.",
+    )
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Analyse outil (lead magnet)"
+        verbose_name_plural = "Analyses outils (lead magnets)"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['domain', 'tool', '-created_at']),
+            models.Index(fields=['tool', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"ToolAnalysis #{self.id} {self.tool} {self.domain}"
+
+
+class ConversionEvent(models.Model):
+    """Tracks funnel events across all public lead-magnet tools.
+
+    Lightweight analytics row: one per event per visitor action.
+    Replaces a full PostHog integration for MVP tracking.
+    """
+    EVENT_CHOICES = [
+        ('tool_view', 'Page vue'),
+        ('domain_submitted', 'Domaine soumis'),
+        ('analysis_started', 'Analyse lancee'),
+        ('analysis_completed', 'Analyse terminee'),
+        ('report_previewed', 'Apercu du rapport'),
+        ('email_submitted', 'Email soumis'),
+        ('report_opened', 'Rapport ouvert'),
+        ('cta_clicked', 'CTA clique'),
+        ('signup_started', 'Inscription commencee'),
+        ('signup_completed', 'Inscription terminee'),
+    ]
+
+    lead = models.ForeignKey(
+        'Lead', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='conversion_events',
+    )
+    event = models.CharField(max_length=30, choices=EVENT_CHOICES, db_index=True)
+    tool = models.CharField(max_length=30, blank=True, default='')
+    domain = models.CharField(max_length=255, blank=True, default='')
+    metadata = models.JSONField(default=dict, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Evenement de conversion"
+        verbose_name_plural = "Evenements de conversion"
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['event', '-timestamp']),
+            models.Index(fields=['tool', '-timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.event} {self.tool} {self.domain}"
