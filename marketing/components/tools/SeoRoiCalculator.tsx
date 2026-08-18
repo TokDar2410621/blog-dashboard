@@ -192,8 +192,8 @@ export function SeoRoiCalculator() {
             </CardHeader>
             <CardContent>
               <div className="h-48 w-full flex items-end gap-2 pt-4">
-                {result.scenarios.moderate.monthly_revenue.map((rev, i) => {
-                  const maxRev = Math.max(...result.scenarios.moderate.monthly_revenue);
+                {(result.scenarios?.moderate?.monthly_revenue || []).map((rev, i) => {
+                  const maxRev = Math.max(...(result.scenarios?.moderate?.monthly_revenue || [0]));
                   const height = maxRev > 0 ? (rev / maxRev) * 100 : 0;
                   return (
                     <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative">

@@ -842,7 +842,29 @@ class PublicSeoRoiCalculatorView(APIView):
                 break
                 
         year_one_roi_percent = scenarios['moderate']['monthly_projections'][-1]['roi_percentage']
-        
+
+        # Reshape each scenario into the EXACT shape SeoRoiCalculator (frontend)
+        # reads: {name, year_one_revenue, roi_percent, break_even_month,
+        # monthly_revenue[]}. The frontend did scenarios.moderate.monthly_revenue
+        # .map() on a payload that only had monthly_projections -> TypeError.
+        def _summary(sc, label):
+            proj = sc.get('monthly_projections', [])
+            be = next((m['month'] for m in proj if m['roi_percentage'] > 0), 12)
+            return {
+                'name': label,
+                'year_one_revenue': round(sc.get('totals', {}).get('total_revenue', 0)),
+                'roi_percent': round(proj[-1]['roi_percentage']) if proj else 0,
+                'break_even_month': be,
+                'monthly_revenue': [round(m['projected_revenue']) for m in proj],
+                'monthly_projections': proj,
+                'totals': sc.get('totals', {}),
+            }
+        scenarios = {
+            'conservative': _summary(scenarios['conservative'], 'Conservateur'),
+            'moderate': _summary(scenarios['moderate'], 'Modere'),
+            'aggressive': _summary(scenarios['aggressive'], 'Agressif'),
+        }
+
         insight = f"Avec un investissement de {monthly_seo_investment}$/mois, le scenario modere prevoit un ROI positif au mois {break_even_month if break_even_month else '12+'}."
         gridar_advantage = "Gridar automatise la creation de contenu a grande echelle, ce qui permet d'atteindre le scenario agressif pour une fraction du cout d'une agence."
         
@@ -934,7 +956,7 @@ class PublicAiCitationCheckerView(APIView):
                     results.append({
                         'query': q,
                         'cited': cited,
-                        'context': res.get('answer', ''),
+                        'context_snippet': res.get('answer', ''),
                         'competing_sources': sources
                     })
                     
@@ -948,13 +970,14 @@ class PublicAiCitationCheckerView(APIView):
                 all_competitors.extend([s for s in r['competing_sources'] if domain_norm not in s])
                 
         from collections import Counter
-        top_competing = [c[0] for c in Counter(all_competitors).most_common(5)]
+        top_competing = [{'domain': c[0], 'count': c[1]} for c in Counter(all_competitors).most_common(5)]
         
         payload = {
             'domain': domain_norm,
             'citation_score': score,
             'total_queries_tested': total_queries,
             'times_cited': times_cited,
+            'results': results,
             'citation_results': results,
             'top_competing_sources': top_competing,
             'recommendations': [
@@ -1005,19 +1028,21 @@ class PublicCompetitorCompareView(APIView):
             "{\n"
             f'  "overall_winner": "<{domain_norm} or {comp_norm}>",\n'
             '  "categories": [\n'
-            '    {"name": "SEO technique", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"},\n'
-            '    {"name": "Contenu", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"},\n'
-            '    {"name": "Autorite percu", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"},\n'
-            '    {"name": "UX et design", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"},\n'
-            '    {"name": "Presence IA", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"},\n'
-            '    {"name": "Strategie locale", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<short French Canadian insight>"}\n'
+            '    {"category": "SEO technique", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"},\n'
+            '    {"category": "Contenu", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"},\n'
+            '    {"category": "Autorite percue", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"},\n'
+            '    {"category": "UX et design", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"},\n'
+            '    {"category": "Presence IA", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"},\n'
+            '    {"category": "Strategie locale", "domain_score": <0-100>, "competitor_score": <0-100>, "winner": "<domain>", "insight": "<courte remarque>"}\n'
             '  ],\n'
-            '  "summary": "<paragraph in French Canadian summarizing the comparison>",\n'
-            '  "key_advantages": {\n'
-            f'    "domain": ["<adv 1>", "<adv 2>"],\n'
-            f'    "competitor": ["<adv 1>", "<adv 2>"]\n'
-            '  },\n'
-            '  "action_items": ["<action 1>", "<action 2>", "<action 3>"],\n'
+            '  "summary": "<paragraphe en francais canadien>",\n'
+            '  "domain_advantages": ["<avantage 1>", "<avantage 2>"],\n'
+            '  "competitor_advantages": ["<avantage 1>", "<avantage 2>"],\n'
+            '  "action_items": [\n'
+            '    {"priority": "<Haute|Moyenne|Basse>", "text": "<action>"},\n'
+            '    {"priority": "<Haute|Moyenne|Basse>", "text": "<action>"},\n'
+            '    {"priority": "<Haute|Moyenne|Basse>", "text": "<action>"}\n'
+            '  ],\n'
             '  "gridar_advantage": "<short sentence in French Canadian>"\n'
             "}\n"
             "Do NOT include markdown formatting, output raw JSON."
@@ -1043,9 +1068,32 @@ class PublicCompetitorCompareView(APIView):
                 text = text[4:].strip()
                 
             payload = json.loads(text)
+            # Normalize to the CompetitorCompare (frontend) contract, whatever the
+            # LLM returns: categories[].category, flat *_advantages, action_items
+            # as {priority, text}. Frontend does .map on these -> must be arrays.
+            cats = payload.get('categories')
+            if isinstance(cats, list):
+                for c in cats:
+                    if isinstance(c, dict) and not c.get('category'):
+                        c['category'] = c.get('name', '')
+            else:
+                payload['categories'] = []
+            ka = payload.get('key_advantages')
+            if isinstance(ka, dict):
+                payload.setdefault('domain_advantages', ka.get('domain', []))
+                payload.setdefault('competitor_advantages', ka.get('competitor', []))
+            if not isinstance(payload.get('domain_advantages'), list):
+                payload['domain_advantages'] = []
+            if not isinstance(payload.get('competitor_advantages'), list):
+                payload['competitor_advantages'] = []
+            ai = payload.get('action_items')
+            payload['action_items'] = [
+                (i if isinstance(i, dict) else {'priority': 'Moyenne', 'text': str(i)})
+                for i in (ai if isinstance(ai, list) else [])
+            ]
             payload['domain'] = domain_norm
             payload['competitor'] = comp_norm
-            
+
             cache.set(cache_key, payload, timeout=3600)
             return Response(payload)
         except Exception:

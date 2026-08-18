@@ -162,7 +162,7 @@ export function AiCitationChecker() {
                 Apercu des requetes
               </h3>
               <div className="space-y-3">
-                {result.results.map((req, i) => (
+                {(result.results || []).map((req, i) => (
                   <Card key={i} className="border-white/5 bg-white/[0.01]">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between gap-4">
@@ -183,12 +183,12 @@ export function AiCitationChecker() {
                           {req.context_snippet}
                         </div>
                       )}
-                      {req.competing_sources.length > 0 && (
+                      {(req.competing_sources?.length ?? 0) > 0 && (
                         <div className="flex flex-wrap items-center gap-2 text-xs">
                           <span className="text-zinc-500 flex items-center gap-1">
                             <LinkIcon className="h-3 w-3" /> Sources:
                           </span>
-                          {req.competing_sources.map((src, j) => (
+                          {(req.competing_sources || []).map((src, j) => (
                             <span key={j} className="text-zinc-300 bg-white/5 px-1.5 py-0.5 rounded">{src}</span>
                           ))}
                         </div>
@@ -206,7 +206,7 @@ export function AiCitationChecker() {
                     Top Sources Concurrentes
                   </h3>
                   <div className="space-y-2">
-                    {result.top_competing_sources.map((src, i) => (
+                    {(result.top_competing_sources || []).map((src, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
                         <span className="text-zinc-300 truncate mr-2">{src.domain}</span>
                         <span className="text-zinc-500 text-xs bg-zinc-800 px-1.5 py-0.5 rounded">
@@ -224,7 +224,7 @@ export function AiCitationChecker() {
                     <Lightbulb className="h-4 w-4" /> Recommandations
                   </h3>
                   <ul className="space-y-3 text-sm text-zinc-300">
-                    {result.recommendations.map((rec, i) => (
+                    {(result.recommendations || []).map((rec, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <ArrowRight className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                         <span>{rec}</span>

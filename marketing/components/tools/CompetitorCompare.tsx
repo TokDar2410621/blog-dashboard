@@ -184,7 +184,7 @@ export function CompetitorCompare() {
                 Comparaison par categorie
               </h3>
               <div className="space-y-6">
-                {result.categories.map((cat, i) => (
+                {(result.categories || []).map((cat, i) => (
                   <div key={i} className="space-y-2">
                     <div className="flex justify-between items-center text-sm">
                       <span className="font-medium text-zinc-300">{cat.category}</span>
@@ -224,7 +224,7 @@ export function CompetitorCompare() {
                   <ShieldCheck className="h-4 w-4" /> Tes Avantages
                 </h3>
                 <ul className="space-y-3">
-                  {result.domain_advantages.map((adv, i) => (
+                  {(result.domain_advantages || []).map((adv, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
                       <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
                       <span>{adv}</span>
@@ -240,7 +240,7 @@ export function CompetitorCompare() {
                   <AlertTriangle className="h-4 w-4" /> Avantages du concurrent
                 </h3>
                 <ul className="space-y-3">
-                  {result.competitor_advantages.map((adv, i) => (
+                  {(result.competitor_advantages || []).map((adv, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-zinc-300">
                       <Zap className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                       <span>{adv}</span>
@@ -257,7 +257,7 @@ export function CompetitorCompare() {
                  Plan d'action prioritaire
               </h3>
               <div className="space-y-3">
-                {result.action_items.map((item, i) => (
+                {(result.action_items || []).map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-white/[0.02] p-3 rounded-md border border-white/5">
                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border mt-0.5 shrink-0 ${
                       item.priority === "Haute" ? "bg-red-500/10 text-red-400 border-red-500/20" :
