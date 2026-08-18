@@ -653,6 +653,49 @@ class PublicToolEventView(APIView):
         return Response({'ok': True}, status=status.HTTP_201_CREATED)
 
 
+def _normalize_can_i_rank(payload: dict) -> dict:
+    """Coerce the LLM output into the EXACT shape CanIRankChecker (frontend)
+    expects, so a shape drift (factors as dict, verdict in English, string
+    competitors/quick_wins) never crashes the frontend .map() calls."""
+    if not isinstance(payload, dict):
+        payload = {}
+    vmap = {'easy': 'Facile', 'possible': 'Possible',
+            'difficult': 'Difficile', 'very_difficult': 'Tres difficile'}
+    fr = set(vmap.values())
+    v = str(payload.get('verdict', '')).strip()
+    payload['verdict'] = v if v in fr else vmap.get(v.lower(), 'Possible')
+    labels = {
+        'domain_authority_estimate': "Autorite du domaine",
+        'content_relevance': "Pertinence du contenu",
+        'competition_level': "Niveau de competition",
+        'topical_authority': "Autorite thematique",
+        'technical_readiness': "Preparation technique",
+    }
+    f = payload.get('factors')
+    if isinstance(f, dict):
+        payload['factors'] = [
+            {'name': labels.get(k, str(k).replace('_', ' ').capitalize()),
+             'score': int(val) if isinstance(val, (int, float)) else 0}
+            for k, val in f.items()
+        ]
+    elif not isinstance(f, list):
+        payload['factors'] = []
+    qw = payload.get('quick_wins')
+    payload['quick_wins'] = [
+        (i if isinstance(i, dict) else {'title': str(i), 'description': ''})
+        for i in (qw if isinstance(qw, list) else [])
+    ]
+    tc = payload.get('top_competitors')
+    payload['top_competitors'] = [
+        (i if isinstance(i, dict) else {'domain': str(i), 'authority': 0})
+        for i in (tc if isinstance(tc, list) else [])
+    ]
+    if not isinstance(payload.get('overall_score'), (int, float)):
+        payload['overall_score'] = 0
+    payload.setdefault('estimated_time_to_rank', '-')
+    return payload
+
+
 class PublicCanIRankView(APIView):
     authentication_classes = []
     permission_classes = []
@@ -683,23 +726,30 @@ class PublicCanIRankView(APIView):
             f"Analyse if the website {domain_norm} can realistically rank for the keyword '{keyword}'.\n"
             f"Here is some info about the site's homepage: Title: {crawl.get('title')}, H1: {crawl.get('h1')}, Desc: {crawl.get('meta_description')}\n"
             f"Act as an expert SEO. Return a realistic assessment. Provide the result in JSON format EXACTLY matching this structure:\n"
+            "Repond en francais canadien. Output ONLY JSON matching EXACTLY:\n"
             "{\n"
             '  "overall_score": <number 0-100>,\n'
-            '  "factors": {\n'
-            '    "domain_authority_estimate": <number 0-100>,\n'
-            '    "content_relevance": <number 0-100>,\n'
-            '    "competition_level": <number 0-100>,\n'
-            '    "topical_authority": <number 0-100>,\n'
-            '    "technical_readiness": <number 0-100>\n'
-            "  },\n"
-            '  "verdict": "<easy|possible|difficult|very_difficult>",\n'
-            '  "explanation": "<short paragraph in French Canadian explaining the score and verdict>",\n'
-            '  "quick_wins": ["<tip 1>", "<tip 2>", "<tip 3>"],\n'
-            '  "top_competitors": ["<domain1.com>", "<domain2.com>", "<domain3.com>"],\n'
-            '  "estimated_time_to_rank": "<e.g. 3-6 mois>",\n'
-            '  "gridar_advantage": "<short sentence in French Canadian on how Gridar helps achieve this>"\n'
+            '  "verdict": "<Facile|Possible|Difficile|Tres difficile>",\n'
+            '  "factors": [\n'
+            '    {"name": "Autorite du domaine", "score": <0-100>},\n'
+            '    {"name": "Pertinence du contenu", "score": <0-100>},\n'
+            '    {"name": "Niveau de competition", "score": <0-100>},\n'
+            '    {"name": "Autorite thematique", "score": <0-100>},\n'
+            '    {"name": "Preparation technique", "score": <0-100>}\n'
+            "  ],\n"
+            '  "quick_wins": [\n'
+            '    {"title": "<court>", "description": "<une phrase>"},\n'
+            '    {"title": "<court>", "description": "<une phrase>"},\n'
+            '    {"title": "<court>", "description": "<une phrase>"}\n'
+            "  ],\n"
+            '  "top_competitors": [\n'
+            '    {"domain": "<domaine1.com>", "authority": <0-100>},\n'
+            '    {"domain": "<domaine2.com>", "authority": <0-100>},\n'
+            '    {"domain": "<domaine3.com>", "authority": <0-100>}\n'
+            "  ],\n"
+            '  "estimated_time_to_rank": "<ex: 3-6 mois>"\n'
             "}\n"
-            "Do NOT include any markdown formatting, only output the JSON."
+            "No markdown, only the JSON."
         )
         
         import requests as http_requests
@@ -721,10 +771,10 @@ class PublicCanIRankView(APIView):
             if text.startswith('json'):
                 text = text[4:].strip()
                 
-            payload = json.loads(text)
+            payload = _normalize_can_i_rank(json.loads(text))
             payload['domain'] = domain_norm
             payload['keyword'] = keyword
-            
+
             cache.set(cache_key, payload, timeout=3600)
             return Response(payload)
         except Exception:

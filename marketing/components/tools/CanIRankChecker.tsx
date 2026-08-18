@@ -223,7 +223,7 @@ export function CanIRankChecker() {
                   Facteurs de ranking
                 </h3>
                 <div className="space-y-4">
-                  {result.factors.map((factor, i) => (
+                  {(result.factors || []).map((factor, i) => (
                     <div key={i} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-zinc-300">{factor.name}</span>
@@ -248,7 +248,7 @@ export function CanIRankChecker() {
                   Gains rapides
                 </h3>
                 <div className="space-y-3">
-                  {result.quick_wins.map((qw, i) => (
+                  {(result.quick_wins || []).map((qw, i) => (
                     <div key={i} className="flex items-start gap-3 bg-white/[0.02] p-3 rounded-md border border-white/5">
                       <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] font-bold text-emerald-400 mt-0.5">
                         {i + 1}
@@ -270,7 +270,7 @@ export function CanIRankChecker() {
                 Top Concurrents Actuels
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {result.top_competitors.map((comp, i) => (
+                {(result.top_competitors || []).map((comp, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded border border-white/5 bg-zinc-900/50">
                     <span className="text-sm text-zinc-300 truncate mr-2">{comp.domain}</span>
                     <span className="text-xs font-mono px-2 py-0.5 bg-zinc-800 rounded text-emerald-400">
