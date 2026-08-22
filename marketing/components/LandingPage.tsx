@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import ProductMockup3D from "@/components/ProductMockup3D";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
 import { GridarMark } from "@/components/GridarMark";
 import {
@@ -39,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NAV_TOOLS } from "@/lib/tools-nav";
-import { motion } from "motion/react";
+import { CinematicMockup } from "@/components/CinematicMockup";
 
 // =========================================================================
 // Reveal-on-scroll wrapper. Pure IntersectionObserver, no deps. Respects
@@ -266,14 +265,7 @@ export default function LandingPage() {
             </p>
           </Reveal>
           <div className="relative">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85, y: 60 }}
-              whileInView={{ opacity: 1, scale: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <ProductMockup3D />
-            </motion.div>
+            <CinematicMockup />
             {/* Activity feed floating in the empty left gutter, balances the AI
                 generator side panel that overhangs the right. Scaled down and
                 pushed far left so it sits BESIDE the mockup, not over it. */}
