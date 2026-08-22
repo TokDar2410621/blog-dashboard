@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s | Gridar",
   },
   description:
-    "SaaS SEO concu pour les PME quebecoises. Generation d'articles en lexique FR-CA, audit SEO automatique, suivi des positions Google. Arivex Studio.",
+    "Audit SEO gratuit en 60 secondes pour PME quebecoises : vois ce qui t'empeche de ranker sur Google. Puis Gridar corrige (contenu FR-CA, suivi des positions). Arivex Studio.",
   applicationName: "Gridar",
   authors: [{ name: "Arivex Studio", url: "https://www.gridar.app" }],
   creator: "Arivex Studio",
@@ -33,13 +33,13 @@ export const metadata: Metadata = {
     siteName: "Gridar",
     title: "Gridar - Le SEO en francais qui comprend le Quebec",
     description:
-      "Generation d'articles SEO en lexique quebecois, audit IA et suivi des positions Google. Pour les PME qui veulent ranker.",
+      "Entre ton URL, recois ton audit SEO en 60 secondes. Puis Gridar corrige ce qui bloque : contenu en quebecois et suivi des positions Google.",
   },
   twitter: {
     card: "summary_large_image",
     title: "Gridar - SEO francais pour le Quebec",
     description:
-      "Generation d'articles en quebecois, audit SEO IA, suivi positions Google. Pour les PME.",
+      "Audit SEO gratuit en 60s pour PME quebecoises. Vois ce qui bloque, puis Gridar corrige et suit tes positions.",
   },
   alternates: {
     canonical: "/",
