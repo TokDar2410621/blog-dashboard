@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NAV_TOOLS } from "@/lib/tools-nav";
+import { motion } from "motion/react";
 
 // =========================================================================
 // Reveal-on-scroll wrapper. Pure IntersectionObserver, no deps. Respects
@@ -209,7 +210,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="hero-fade-2 text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tighter">
             Le SEO en français qui comprend{" "}
-            <span className="bg-gradient-to-br from-emerald-300 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="text-emerald-400">
               le Québec
             </span>
             .
@@ -264,8 +265,15 @@ export default function LandingPage() {
               Liste d'articles, audit SEO automatique, génération IA, suivi des positions Google. Tout dans le dashboard, en français-québécois.
             </p>
           </Reveal>
-          <Reveal delay={150} className="relative">
-            <ProductMockup3D />
+          <div className="relative">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 60 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ProductMockup3D />
+            </motion.div>
             {/* Activity feed floating in the empty left gutter, balances the AI
                 generator side panel that overhangs the right. Scaled down and
                 pushed far left so it sits BESIDE the mockup, not over it. */}
@@ -281,7 +289,7 @@ export default function LandingPage() {
             >
               <ActivityFeed />
             </div>
-          </Reveal>
+          </div>
         </div>
       </section>
 
@@ -317,7 +325,7 @@ export default function LandingPage() {
             {OUTCOMES.map((o, i) => (
               <Reveal key={o.title} delay={i * 80}>
                 <div className="h-full rounded-xl border border-white/10 bg-zinc-900/40 p-5 hover:border-emerald-500/30 motion-safe:transition-colors">
-                  <div className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-br from-emerald-300 to-cyan-400 bg-clip-text text-transparent">
+                  <div className="text-3xl md:text-4xl font-bold tracking-tight text-emerald-400">
                     {o.metric}
                   </div>
                   <div className="mt-2 font-semibold text-zinc-100">{o.title}</div>
