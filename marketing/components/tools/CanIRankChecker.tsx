@@ -18,6 +18,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
+import { ToolHero } from "@/components/tools/ToolHero";
 
 const API_BASE = "";
 
@@ -99,18 +100,7 @@ export function CanIRankChecker() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-          <Target className="h-3 w-3" />
-          <span>Can I Rank?</span>
-        </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-          Puis-je ranker sur ce mot-cle?
-        </h1>
-        <p className="text-base md:text-lg text-zinc-400 max-w-xl mx-auto">
-          Evalue tes chances reelles d'atteindre la premiere page selon l'autorite de ton domaine et tes concurrents actuels.
-        </p>
-      </div>
+      <ToolHero icon={Target} badge="Can I Rank?" title="Puis-je ranker sur ce mot-cle?" subtitle="Evalue tes chances reelles d'atteindre la premiere page selon l'autorite de ton domaine et tes concurrents actuels." />
 
       <Card className="mb-8">
         <CardContent className="p-4">

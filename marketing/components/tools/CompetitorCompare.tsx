@@ -20,6 +20,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
+import { ToolHero } from "@/components/tools/ToolHero";
 
 const API_BASE = "";
 
@@ -83,18 +84,7 @@ export function CompetitorCompare() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 md:py-16">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-          <GitCompare className="h-3 w-3" />
-          <span>Comparaison de Concurrents</span>
-        </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-          Qui a la meilleure strategie SEO?
-        </h1>
-        <p className="text-base md:text-lg text-zinc-400 max-w-xl mx-auto">
-          Compare ton site a ton concurrent principal sur 20+ dimensions et decouvre comment le depasser.
-        </p>
-      </div>
+      <ToolHero icon={GitCompare} badge="Comparaison de Concurrents" title="Qui a la meilleure strategie SEO?" subtitle="Compare ton site a ton concurrent principal sur 20+ dimensions et decouvre comment le depasser." />
 
       <Card className="mb-8">
         <CardContent className="p-4">

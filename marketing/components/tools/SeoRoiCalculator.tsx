@@ -17,6 +17,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
+import { ToolHero } from "@/components/tools/ToolHero";
 
 const API_BASE = "";
 
@@ -87,18 +88,7 @@ export function SeoRoiCalculator() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10 md:py-16">
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-          <TrendingUp className="h-3 w-3" />
-          <span>Calculateur ROI SEO</span>
-        </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-          Calcule ton retour sur investissement SEO
-        </h1>
-        <p className="text-base md:text-lg text-zinc-400 max-w-xl mx-auto">
-          Decouvre combien le SEO peut rapporter a ton entreprise.
-        </p>
-      </div>
+      <ToolHero icon={TrendingUp} badge="Calculateur ROI SEO" title="Calcule ton retour sur investissement SEO" subtitle="Decouvre combien le SEO peut rapporter a ton entreprise." />
 
       <Card className="mb-8">
         <CardContent className="p-6">
