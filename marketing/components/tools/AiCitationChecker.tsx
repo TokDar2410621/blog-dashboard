@@ -84,7 +84,7 @@ export function AiCitationChecker() {
           Est-ce que l'IA te cite comme source?
         </h1>
         <p className="text-base md:text-lg text-zinc-400 max-w-xl mx-auto">
-          Verifie si ChatGPT, Perplexity et autres modeles utilisent tes contenus pour generer leurs reponses.
+          Verifie si l'IA de Google (Gemini) utilise tes contenus pour generer ses reponses.
         </p>
       </div>
 

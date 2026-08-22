@@ -92,9 +92,9 @@ function businessConsequence(result: AiVisResult): string {
     return `Ta visibilite IA est correcte, mais ${compCount} concurrent${compCount > 1 ? "s" : ""} sont mentionnes plus souvent. Il y a ${gapCount} requete${gapCount > 1 ? "s" : ""} ou ils apparaissent et pas toi.`;
   }
   if (score >= 30) {
-    return `Quand un client potentiel demande a ChatGPT ou Gemini une recommandation dans ton domaine, tes concurrents apparaissent ${compCount > 0 ? `${result.top_competitors[0]?.mentions || 0}x plus souvent` : "et pas toi"}. Chaque jour sans action, c'est du trafic qualifie qui va ailleurs.`;
+    return `Quand un client potentiel demande a l'IA de Google (Gemini) une recommandation dans ton domaine, tes concurrents apparaissent ${compCount > 0 ? `${result.top_competitors[0]?.mentions || 0}x plus souvent` : "et pas toi"}. Chaque jour sans action, c'est du trafic qualifie qui va ailleurs.`;
   }
-  return `Ton entreprise est quasi invisible pour les moteurs IA. Quand quelqu'un demande une recommandation dans ton secteur, les IA ne te mentionnent pas. Tes concurrents captent ce trafic a ta place.`;
+  return `Ton entreprise est quasi invisible pour l'IA de Google. Quand quelqu'un demande une recommandation dans ton secteur, l'IA ne te mentionne pas. Tes concurrents captent ce trafic a ta place.`;
 }
 
 const ENGINE_LABELS: Record<string, string> = {
@@ -152,10 +152,10 @@ export function AiVisibilityChecker() {
           <span>AI Visibility Checker</span>
         </div>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-          Es-tu visible dans ChatGPT?
+          Es-tu visible dans l'IA de Google?
         </h1>
         <p className="text-base md:text-lg text-zinc-400 max-w-xl mx-auto">
-          Decouvre si ChatGPT, Gemini et les moteurs IA recommandent ton
+          Decouvre si l'IA de Google (Gemini) recommande ton
           entreprise -- ou tes concurrents.
         </p>
       </div>
@@ -207,7 +207,7 @@ export function AiVisibilityChecker() {
           {[
             "Detection du secteur et de la marque...",
             "Generation de requetes commerciales...",
-            "Interrogation des moteurs IA...",
+            "Interrogation de l'IA de Google...",
             "Calcul du score de visibilite...",
           ].map((step, i) => (
             <div

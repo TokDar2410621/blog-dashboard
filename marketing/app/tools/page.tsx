@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Outils SEO gratuits - Gridar",
     description:
-      "Audit ton site, mesure ta visibilite dans ChatGPT et Gemini, trouve les mots-cles de tes concurrents. Gratuit, sans inscription.",
+      "Audit ton site, mesure ta visibilite dans l'IA de Google (Gemini), trouve les mots-cles de tes concurrents. Gratuit, sans inscription.",
     url: "https://www.gridar.app/tools",
     type: "website",
   },
@@ -48,7 +48,7 @@ const tools: ToolCard[] = [
   {
     title: "AI Visibility Checker",
     description:
-      "Decouvre si ChatGPT, Gemini et les moteurs IA recommandent ton entreprise ou tes concurrents.",
+      "Decouvre si l'IA de Google (Gemini) recommande ton entreprise ou tes concurrents.",
     href: "/tools/ai-visibility-checker",
     icon: Eye,
     available: true,
@@ -80,7 +80,7 @@ const tools: ToolCard[] = [
   {
     title: "AI Citation Checker",
     description:
-      "Est-ce que les moteurs IA utilisent ton site comme source? Decouvre quelles pages sont citees.",
+      "Est-ce que l'IA de Google utilise ton site comme source? Decouvre quelles pages sont citees.",
     href: "/tools/ai-citation-checker",
     icon: Quote,
     available: true,
