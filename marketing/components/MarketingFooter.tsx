@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { GridarMark } from "@/components/GridarMark";
+import { NAV_TOOLS } from "@/lib/tools-nav";
 import { useAuth } from "@/context/AuthContext";
 
 /**
@@ -28,23 +29,47 @@ export function MarketingFooter() {
               québécoises qui veulent ranker. Aucun investisseur, aucun pivot prévu.
             </p>
           </div>
-          <div className="flex flex-wrap gap-6 items-start">
-            <Link href="/tools" className="hover:text-zinc-100">Outils gratuits</Link>
-            <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
-            <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
-            <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
-            <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
-            <Link href="/#pricing" className="hover:text-zinc-100">Tarifs</Link>
-            <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
-            <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
-            <a
-              href="https://github.com/TokDar2410621/blog-dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-zinc-100"
-            >
-              GitHub
-            </a>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+            <div className="flex flex-col gap-2">
+              <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                Outils gratuits
+              </span>
+              {NAV_TOOLS.map((tool) => (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className="hover:text-zinc-100"
+                >
+                  {tool.label}
+                </Link>
+              ))}
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                Ressources
+              </span>
+              <Link href="/tools" className="hover:text-zinc-100">Tous les outils</Link>
+              <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
+              <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
+              <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
+              <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                Gridar
+              </span>
+              <Link href="/#pricing" className="hover:text-zinc-100">Tarifs</Link>
+              <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
+              <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
+              <a
+                href="https://github.com/TokDar2410621/blog-dashboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-zinc-100"
+              >
+                GitHub
+              </a>
+            </div>
           </div>
         </div>
         <div className="mt-12 pt-6 border-t border-white/5 text-xs flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-center">

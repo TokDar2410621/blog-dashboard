@@ -19,6 +19,7 @@ import {
   BarChart3,
   Zap,
   ChevronRight,
+  ChevronDown,
   TrendingUp,
   Globe,
   Eye,
@@ -30,6 +31,14 @@ import {
   ShieldCheck,
   Target,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { NAV_TOOLS } from "@/lib/tools-nav";
 
 // =========================================================================
 // Reveal-on-scroll wrapper. Pure IntersectionObserver, no deps. Respects
@@ -147,6 +156,37 @@ export default function LandingPage() {
           <nav className="flex items-center gap-6">
             <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
             <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="hidden md:inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white outline-none">
+                Outils
+                <ChevronDown className="h-3.5 w-3.5" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-64 bg-zinc-900 border-white/10 text-zinc-200"
+              >
+                {NAV_TOOLS.map((tool) => (
+                  <DropdownMenuItem
+                    key={tool.href}
+                    asChild
+                    className="cursor-pointer focus:bg-white/5 focus:text-white"
+                  >
+                    <Link href={tool.href} className="text-sm text-zinc-300">
+                      {tool.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  asChild
+                  className="cursor-pointer focus:bg-white/5 focus:text-white"
+                >
+                  <Link href="/tools" className="text-sm text-emerald-400">
+                    Voir tous les outils →
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link href="/blog" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Blog</Link>
             <Link href="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
             {!hideLoginAffordance && (
@@ -777,22 +817,47 @@ export default function LandingPage() {
                 québécoises qui veulent ranker. Aucun investisseur, aucun pivot prévu.
               </p>
             </div>
-            <div className="flex flex-wrap gap-6 items-start">
-              <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
-              <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
-              <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
-              <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
-              <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
-              <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
-              <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
-              <a
-                href="https://github.com/TokDar2410621/blog-dashboard"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-zinc-100"
-              >
-                GitHub
-              </a>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
+              <div className="flex flex-col gap-2">
+                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                  Outils gratuits
+                </span>
+                {NAV_TOOLS.map((tool) => (
+                  <Link
+                    key={tool.href}
+                    href={tool.href}
+                    className="hover:text-zinc-100"
+                  >
+                    {tool.label}
+                  </Link>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                  Ressources
+                </span>
+                <Link href="/tools" className="hover:text-zinc-100">Tous les outils</Link>
+                <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
+                <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
+                <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
+                <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
+                  Gridar
+                </span>
+                <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
+                <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
+                <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
+                <a
+                  href="https://github.com/TokDar2410621/blog-dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-zinc-100"
+                >
+                  GitHub
+                </a>
+              </div>
             </div>
           </div>
           <div className="mt-12 pt-6 border-t border-white/5 text-xs flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-center">

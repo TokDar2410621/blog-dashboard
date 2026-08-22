@@ -1,8 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { NAV_TOOLS } from "@/lib/tools-nav";
 import { useAuth } from "@/context/AuthContext";
 
 type Props = {
@@ -50,12 +59,37 @@ export function MarketingHeader({ trail }: Props) {
           >
             Tarifs
           </Link>
-          <Link
-            href="/tools"
-            className="hidden md:inline text-sm text-zinc-400 hover:text-white"
-          >
-            Outils
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="hidden md:inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white outline-none">
+              Outils
+              <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="w-64 bg-zinc-900 border-white/10 text-zinc-200"
+            >
+              {NAV_TOOLS.map((tool) => (
+                <DropdownMenuItem
+                  key={tool.href}
+                  asChild
+                  className="cursor-pointer focus:bg-white/5 focus:text-white"
+                >
+                  <Link href={tool.href} className="text-sm text-zinc-300">
+                    {tool.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer focus:bg-white/5 focus:text-white"
+              >
+                <Link href="/tools" className="text-sm text-emerald-400">
+                  Voir tous les outils →
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link
             href="/blog"
             className="hidden md:inline text-sm text-zinc-400 hover:text-white"
