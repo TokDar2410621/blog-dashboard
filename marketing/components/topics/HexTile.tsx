@@ -1,7 +1,7 @@
 "use client";
 
 import type * as React from "react";
-import { CheckCircle2, Circle, Sparkles } from "lucide-react";
+import { CheckCircle2, Circle, Lightbulb } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -54,7 +54,7 @@ const STATUS_STYLES: Record<
 const ICONS = {
   covered: CheckCircle2,
   missing: Circle,
-  recommended: Sparkles,
+  recommended: Lightbulb,
 };
 
 const STATUS_LABEL: Record<HexStatus, string> = {

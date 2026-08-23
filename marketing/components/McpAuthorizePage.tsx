@@ -8,7 +8,7 @@ import { authFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GridarMark } from "@/components/GridarMark";
-import { Sparkles, ShieldCheck, ArrowRight, Loader2, XCircle } from "lucide-react";
+import { KeyRound, ShieldCheck, ArrowRight, Loader2, XCircle } from "lucide-react";
 
 type IssueResponse = {
   access_token: string;
@@ -171,7 +171,7 @@ export function McpAuthorizePage() {
                   onClick={grant}
                   className="flex-1 bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
                 >
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <KeyRound className="h-4 w-4 mr-2" />
                   Autoriser
                 </Button>
               </div>

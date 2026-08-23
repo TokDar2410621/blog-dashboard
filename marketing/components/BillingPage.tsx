@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2,
-  Sparkles,
+  Lightbulb,
   ArrowLeft,
   CreditCard,
   Loader2,
@@ -478,7 +478,7 @@ export function BillingPage() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="h-4 w-4 mr-2" />
+                          <CreditCard className="h-4 w-4 mr-2" />
                           {sub?.is_paid ? `Passer à ${plan.name}` : "Souscrire"}
                         </>
                       )}
@@ -499,7 +499,7 @@ export function BillingPage() {
           <CardContent className="py-5 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
             <div>
               <div className="font-semibold flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-500" />
+                <Lightbulb className="h-4 w-4 text-emerald-500" />
                 Plus de 5 sites ou besoin sur mesure ?
               </div>
               <div className="text-sm text-muted-foreground mt-1">

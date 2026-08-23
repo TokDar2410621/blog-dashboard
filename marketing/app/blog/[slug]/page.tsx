@@ -8,7 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Clock,
-  Sparkles,
+  PenLine,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -329,7 +329,7 @@ export default async function BlogPostPage({ params }: PageProps) {
               </p>
               <Link href="/login">
                 <Button size="lg" className="bg-white text-zinc-950 hover:bg-zinc-200">
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <PenLine className="h-4 w-4 mr-2" />
                   Essayer gratuitement
                 </Button>
               </Link>

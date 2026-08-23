@@ -44,7 +44,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Sparkles,
+  Lightbulb,
+  Bot,
   Check,
   Eye,
   Target,
@@ -704,7 +705,7 @@ export default function KeywordTrackerPage() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <Lightbulb className="h-4 w-4 mr-2" />
                   Suggerer avec l'IA
                 </>
               )}
@@ -718,7 +719,7 @@ export default function KeywordTrackerPage() {
         <Card className="border-primary/40">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Lightbulb className="h-5 w-5 text-primary" />
               Suggestions IA ({suggestions.length})
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -840,7 +841,7 @@ export default function KeywordTrackerPage() {
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4 mr-2" />
+                <Bot className="h-4 w-4 mr-2" />
                 Reclasser avec l'IA
               </>
             )}

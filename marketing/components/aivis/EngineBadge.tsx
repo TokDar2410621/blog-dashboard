@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import {
   Bot,
-  Sparkles,
+  Compass,
   Search,
   Gem,
   MessageSquare,
@@ -31,7 +31,7 @@ type EngineMeta = {
 const ENGINE_META: Record<AiVisibilityEngine, EngineMeta> = {
   chatgpt: {
     label: "ChatGPT",
-    Icon: Sparkles,
+    Icon: Bot,
     className:
       "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   },
@@ -49,7 +49,7 @@ const ENGINE_META: Record<AiVisibilityEngine, EngineMeta> = {
   },
   searchgpt: {
     label: "SearchGPT",
-    Icon: Bot,
+    Icon: Compass,
     className:
       "bg-neutral-500/15 text-neutral-200 border-neutral-500/40",
   },

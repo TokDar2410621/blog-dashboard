@@ -24,7 +24,7 @@ import {
   Trash2,
   Wrench,
   ArrowRight,
-  Sparkles,
+  PenLine,
   TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -514,7 +514,7 @@ export function ContentDecayPage() {
                               )}&autostart=1&hint=decay`}
                             >
                               <Button size="sm">
-                                <Sparkles className="h-3 w-3 mr-1" />
+                                <PenLine className="h-3 w-3 mr-1" />
                                 Re-optimiser
                               </Button>
                             </Link>

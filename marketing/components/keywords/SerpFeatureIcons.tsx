@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, MessageSquare, Sparkles, type LucideIcon } from "lucide-react";
+import { Search, MessageSquare, Bot, type LucideIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -44,7 +44,7 @@ const FEATURES: FeatureSpec[] = [
   },
   {
     key: "ai",
-    icon: Sparkles,
+    icon: Bot,
     label: "AI Overview",
     description: "Reponse generee par l'IA de Google en haut de page.",
   },

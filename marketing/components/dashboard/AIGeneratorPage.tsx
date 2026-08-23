@@ -23,7 +23,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Sparkles, Loader2, Pencil, RefreshCw, AlertTriangle, Coins } from "lucide-react";
+import { PenLine, Lightbulb, FileText, Loader2, Pencil, RefreshCw, AlertTriangle, Coins } from "lucide-react";
 import { toast } from "sonner";
 import { ContentBriefPanel, type ContentBrief } from "@/components/dashboard/ContentBrief";
 import { PAAPanel } from "@/components/dashboard/PAAPanel";
@@ -403,7 +403,7 @@ export function AIGeneratorPage() {
             {activeBrief && (
               <div className="flex items-center justify-between gap-2 p-3 rounded border border-primary/30 bg-primary/5">
                 <div className="flex items-center gap-2 text-xs">
-                  <Sparkles className="h-3 w-3 text-primary" />
+                  <Lightbulb className="h-3 w-3 text-primary" />
                   <span>
                     <strong>Brief actif</strong> -{" "}
                     {`Claude utilisera l'outline (${activeBrief.outline?.length || 0} sections), ${activeBrief.faq?.length || 0} FAQ et les entités recommandées.`}
@@ -450,7 +450,7 @@ export function AIGeneratorPage() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <PenLine className="h-4 w-4 mr-2" />
                   Générer
                 </>
               )}
@@ -543,7 +543,7 @@ export function AIGeneratorPage() {
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
-                <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-30" />
                 <p>Le résultat de la génération apparaîtra ici</p>
               </div>
             )}

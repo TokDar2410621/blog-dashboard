@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Loader2, Check, ExternalLink, Rocket, BookOpen, Sparkles, Code, Copy, AlertCircle } from "lucide-react";
+import { Globe, Loader2, Check, ExternalLink, Rocket, BookOpen, Lightbulb, Code, Copy, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -224,7 +224,7 @@ export default function Integrations() {
               {suggestCompetitors.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
               ) : (
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                <Lightbulb className="h-3.5 w-3.5 mr-1.5" />
               )}
               Suggérer avec IA
             </Button>

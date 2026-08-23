@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { Loader2, Settings, Palette, User as UserIcon, Rocket, Languages, BarChart3, Brain, Plug, Sparkles } from "lucide-react";
+import { Loader2, Settings, Palette, User as UserIcon, Rocket, Languages, BarChart3, Brain, Plug, Repeat } from "lucide-react";
 import { PageBreadcrumb } from "@/components/PageBreadcrumb";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
@@ -30,7 +30,7 @@ function SettingsSidebar() {
     { to: `${base}/langues`, label: "Langues", icon: Languages },
     { to: `${base}/gsc`, label: "Search Console", icon: BarChart3 },
     { to: `${base}/memoire`, label: "Memoire (RAG)", icon: Brain },
-    { to: `${base}/autopilote`, label: "Autopilote", icon: Sparkles },
+    { to: `${base}/autopilote`, label: "Autopilote", icon: Repeat },
     { to: `${base}/integrations`, label: "Integrations", icon: Plug },
   ];
 

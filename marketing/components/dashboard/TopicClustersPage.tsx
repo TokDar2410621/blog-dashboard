@@ -24,7 +24,7 @@ import {
   Star,
   GitBranch,
   Lightbulb,
-  Sparkles,
+  PenLine,
   AlertCircle,
   Hexagon,
   List as ListIcon,
@@ -440,7 +440,7 @@ export function TopicClustersPage() {
                             }
                           >
                             <Button size="sm" variant="outline">
-                              <Sparkles className="h-3 w-3 mr-1" />
+                              <PenLine className="h-3 w-3 mr-1" />
                               Générer
                             </Button>
                           </Link>

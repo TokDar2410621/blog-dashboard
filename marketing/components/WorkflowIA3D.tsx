@@ -12,7 +12,7 @@
  * and loops every 8 seconds.
  */
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Sparkles, FileSearch, CheckCircle2 } from "lucide-react";
+import { ArrowRight, Lightbulb, PenLine, FileSearch, CheckCircle2 } from "lucide-react";
 
 const EMERALD = "#10b981";
 const EMERALD_DARK = "#059669";
@@ -204,7 +204,7 @@ export default function WorkflowIA3D() {
         <div className="wia3d-card">
           <span className="wia3d-step">01 · Sujet</span>
           <div className="flex items-center gap-2 mb-3 mt-2">
-            <Sparkles size={14} className="text-emerald-500" strokeWidth={2.5} />
+            <Lightbulb size={14} className="text-emerald-500" strokeWidth={2.5} />
             <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
               Tu donnes l'idée
             </div>
@@ -282,7 +282,7 @@ export default function WorkflowIA3D() {
                 color: "white",
               }}
             >
-              <Sparkles size={11} strokeWidth={2.5} />
+              <PenLine size={11} strokeWidth={2.5} />
             </div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
               Brief + recherche + rédaction

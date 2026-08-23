@@ -12,7 +12,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  Sparkles,
+  Search,
   TrendingUp,
   Users,
   Zap,
@@ -310,7 +310,7 @@ export function AiVisibilityChecker() {
           <Card className="border-white/10 bg-white/[0.02]">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3 text-zinc-200">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <Search className="h-4 w-4 text-emerald-400" />
                 <h3 className="text-sm font-semibold uppercase tracking-wide">
                   Requetes testees (apercu)
                 </h3>

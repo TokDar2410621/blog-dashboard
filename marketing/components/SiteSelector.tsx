@@ -42,7 +42,7 @@ import {
   CheckCircle,
   Database,
   BarChart3,
-  Sparkles,
+  SquarePen,
   CreditCard,
   Key,
   ShoppingBag,
@@ -245,7 +245,6 @@ function SiteSelectorContent() {
             <div className="absolute inset-0 flex items-center justify-center backdrop-blur-[1px]">
               <div className="relative max-w-md text-center px-6 py-10">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-4">
-                  <Sparkles className="h-3 w-3" />
                   Ton dashboard t&apos;attend
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
@@ -271,7 +270,7 @@ function SiteSelectorContent() {
             variant="default"
             onClick={() => setWpDialogOpen(true)}
           >
-            <Sparkles className="h-5 w-5 mr-2" />
+            <SquarePen className="h-5 w-5 mr-2" />
             WordPress
           </Button>
           <Button

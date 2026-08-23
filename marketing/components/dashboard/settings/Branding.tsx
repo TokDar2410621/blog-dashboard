@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Sparkles, Palette, ImageIcon } from "lucide-react";
+import { Loader2, ScanSearch, Palette, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -76,7 +76,7 @@ export default function Branding() {
               {scanBranding.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
+                <ScanSearch className="h-4 w-4 mr-2" />
               )}
               Scanner
             </Button>

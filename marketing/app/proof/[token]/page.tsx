@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ExternalLink, Sparkles, TrendingUp } from "lucide-react";
+import { ArrowRight, ExternalLink, PenLine, TrendingUp } from "lucide-react";
 import { GridarMark } from "@/components/GridarMark";
 import { fetchPublicProof } from "@/lib/proof-api";
 
@@ -158,7 +158,7 @@ export default async function ProofPage({ params }: PageProps) {
 
         <section className="rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] p-6">
           <div className="flex items-start gap-3">
-            <Sparkles className="h-5 w-5 text-emerald-400 shrink-0 mt-1" />
+            <PenLine className="h-5 w-5 text-emerald-400 shrink-0 mt-1" />
             <div className="flex-1">
               <p className="font-medium text-zinc-100 mb-1">
                 Tes propres impressions Google, mesurees pareil

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Eye, PenLine, Clock, Sparkles, ArrowRight, Search, BarChart3, Settings, TrendingDown, Link2, Network, UserCheck } from "lucide-react";
+import { FileText, Eye, PenLine, Clock, Lightbulb, ArrowRight, Search, BarChart3, Settings, TrendingDown, Link2, Network, UserCheck } from "lucide-react";
 import { HreflangCard } from "@/components/dashboard/HreflangCard";
 import { ProofCard } from "@/components/dashboard/ProofCard";
 import {
@@ -187,7 +187,7 @@ export function OverviewPage() {
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="pt-6 space-y-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="h-6 w-6 text-primary shrink-0 mt-1" />
+              <Lightbulb className="h-6 w-6 text-primary shrink-0 mt-1" />
               <div className="flex-1">
                 <h2 className="text-xl font-bold">Bienvenue ! Voici tes 4 prochains pas.</h2>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -237,7 +237,7 @@ export function OverviewPage() {
                 </div>
                 <Link href={`${base}/generer`}>
                   <Button size="sm" className="h-10 md:h-8">
-                    <Sparkles className="h-3 w-3 mr-1.5" />
+                    <PenLine className="h-3 w-3 mr-1.5" />
                     Générer
                   </Button>
                 </Link>

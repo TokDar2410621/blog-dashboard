@@ -37,7 +37,6 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  Sparkles,
   Target,
   TrendingUp,
   Zap,
@@ -59,7 +58,7 @@ function socialProofText(item: SocialProofItem): string {
   return "";
 }
 
-// String -> icon map. Falls back to Sparkles. Keeps the model's `icon` field
+// String -> icon map. Falls back to CheckCircle2. Keeps the model's `icon` field
 // a free-form string while still type-safe at render time.
 const ICONS: Record<string, LucideIcon> = {
   alerttriangle: AlertTriangle,
@@ -81,16 +80,15 @@ const ICONS: Record<string, LucideIcon> = {
   refreshcw: RefreshCw,
   search: Search,
   shieldcheck: ShieldCheck,
-  sparkles: Sparkles,
   target: Target,
   trendingup: TrendingUp,
   zap: Zap,
 };
 
 function iconFor(name: string): LucideIcon {
-  if (!name) return Sparkles;
+  if (!name) return CheckCircle2;
   const key = name.replace(/[\s_-]/g, "").toLowerCase();
-  return ICONS[key] || Sparkles;
+  return ICONS[key] || CheckCircle2;
 }
 
 // A landing whose keyword promises a live tool embeds the real widget, so the
@@ -214,7 +212,6 @@ export function LandingRenderer({
                 size="lg"
                 className="bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-7 text-base motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
               >
-                <Sparkles className="h-4 w-4 mr-2" />
                 {landing.hero_cta_text}
               </Button>
             </Link>
@@ -342,7 +339,6 @@ export function LandingRenderer({
                   size="lg"
                   className="bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-8 text-base motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
                 >
-                  <Sparkles className="h-4 w-4 mr-2" />
                   {landing.cta_bottom_text}
                 </Button>
               </Link>

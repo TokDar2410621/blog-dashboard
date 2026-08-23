@@ -5,7 +5,7 @@ import {
   FileText,
   ShieldCheck,
   TrendingUp,
-  Sparkles,
+  PenLine,
   ArrowUp,
   ArrowDown,
   Minus,
@@ -106,7 +106,7 @@ export function DashboardDemo() {
           </span>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs font-medium text-emerald-300">
-          <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+          <PenLine aria-hidden="true" className="h-3.5 w-3.5" />
           Générer
         </span>
       </div>

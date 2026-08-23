@@ -13,7 +13,8 @@ import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Sparkles,
+  Bot,
+  Lightbulb,
   Loader2,
   Plus,
   RefreshCw,
@@ -361,7 +362,7 @@ export default function AiVisibilityPage() {
           <Card className="overflow-hidden border-emerald-500/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground font-medium">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
+                <Bot className="h-4 w-4 text-emerald-400" />
                 Score de visibilite IA
               </CardTitle>
             </CardHeader>
@@ -487,7 +488,7 @@ export default function AiVisibilityPage() {
               {suggestMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                <Lightbulb className="h-4 w-4" />
               )}
               Suggerer des prompts
             </Button>

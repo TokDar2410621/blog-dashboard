@@ -30,7 +30,6 @@ import { setTokens, getToken } from "@/lib/auth-storage";
 import { useAuth } from "@/context/AuthContext";
 import {
   Loader2,
-  Sparkles,
   CheckCircle2,
   Github,
   ArrowLeft,
@@ -497,7 +496,6 @@ export function LoginPage() {
         <div className="relative w-full flex flex-col justify-center px-12 py-16">
           <div className="max-w-md mb-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-6">
-              <Sparkles className="h-3 w-3" />
               SEO #1 au Québec
             </div>
             <h2 className="text-3xl font-bold tracking-tight text-white leading-tight">

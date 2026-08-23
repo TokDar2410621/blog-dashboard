@@ -11,7 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { authFetch } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Coins, Sparkles, Zap, Loader2 } from "lucide-react";
+import { AlertTriangle, Coins, Lightbulb, Zap, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 type Subscription = {
@@ -130,7 +130,7 @@ export function QuotaBanner({
   // ------ Approaching limit (>= warnAt%, < 100%) -> just a friendly nudge ------
   return (
     <div className="rounded-lg border border-border/50 bg-muted/30 p-3 mb-4 flex items-center gap-3 text-sm">
-      <Sparkles className="h-4 w-4 text-primary shrink-0" />
+      <Lightbulb className="h-4 w-4 text-primary shrink-0" />
       <div className="flex-1">
         Plus que <span className="font-semibold">{limit - used}</span> articles
         ce mois-ci{" "}

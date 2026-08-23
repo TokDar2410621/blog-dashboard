@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import {
-  Sparkles,
   Languages,
   CheckCircle2,
   ArrowRight,
@@ -481,7 +480,6 @@ export default function LandingPage() {
             <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.06] to-transparent p-6 flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Sparkles className="h-4 w-4 text-emerald-400" />
                   <span className="text-xs font-mono uppercase tracking-wider text-emerald-400">
                     Enterprise
                   </span>
@@ -684,7 +682,6 @@ export default function LandingPage() {
           <div className="mt-12 flex flex-col sm:flex-row gap-3 justify-center items-center">
             <Link href={authedHref}>
               <Button size="lg" className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-200 h-12 px-8 text-base motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:-translate-y-0.5 motion-safe:hover:scale-[1.02]">
-                <Sparkles className="h-4 w-4 mr-2" />
                 {isAuthenticated ? "Aller au tableau de bord" : "Commencer gratuitement"}
               </Button>
             </Link>
@@ -761,7 +758,7 @@ function HeroAuditInput({ authedHref }: { authedHref: string }) {
         disabled={submitting || !domain.trim()}
         className="h-12 px-6 bg-gradient-to-r from-emerald-400 to-emerald-500 hover:from-emerald-300 hover:to-emerald-400 text-zinc-950 font-semibold motion-safe:transition-all motion-safe:hover:-translate-y-0.5 disabled:opacity-60"
       >
-        <Sparkles className="h-4 w-4 mr-2" />
+        <Search className="h-4 w-4 mr-2" />
         {submitting ? "Audit en cours..." : "Audite mon site"}
       </Button>
     </form>

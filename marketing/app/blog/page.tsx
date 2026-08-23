@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
 import { BlogList } from "@/components/BlogList";
@@ -58,7 +58,6 @@ export default async function BlogIndexPage() {
       <section className="relative overflow-hidden border-b border-white/5">
         <div className="relative max-w-4xl mx-auto px-4 md:px-6 py-20 md:py-28 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-6">
-            <Sparkles className="h-3 w-3" />
             Tactiques SEO QC
           </div>
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-5">
@@ -89,7 +88,7 @@ export default async function BlogIndexPage() {
             </p>
             <Link href="/login">
               <Button size="lg" className="bg-white text-zinc-950 hover:bg-zinc-200">
-                <Sparkles className="h-4 w-4 mr-2" />
+                <PenLine className="h-4 w-4 mr-2" />
                 Commencer gratuitement
               </Button>
             </Link>

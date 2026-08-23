@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
-  TrendingUp, Share2, Copy, RefreshCw, CheckCircle2, Sparkles,
+  TrendingUp, Share2, Copy, RefreshCw, CheckCircle2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -61,7 +61,6 @@ export function ProofCard({ siteId }: { siteId: string | number }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
             Preuve Gridar
           </CardTitle>
         </CardHeader>
@@ -83,7 +82,6 @@ export function ProofCard({ siteId }: { siteId: string | number }) {
     <Card className="border-primary/30 bg-primary/5">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
           Preuve Gridar
         </CardTitle>
       </CardHeader>

@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Sparkles, ArrowRight } from "lucide-react";
+import { CheckCircle2, Circle, Lightbulb, PenLine, ArrowRight } from "lucide-react";
 import type { HexTopic } from "./HexTile";
 
 type SelectedTopic = {
@@ -67,7 +67,7 @@ export function TopicDrawer({
     topic.status === "covered"
       ? CheckCircle2
       : topic.status === "recommended"
-        ? Sparkles
+        ? Lightbulb
         : Circle;
   const iconColor =
     topic.status === "covered"
@@ -185,7 +185,7 @@ export function TopicDrawer({
           <div className="border-t p-4">
             <Link href={generateHref} onClick={() => onOpenChange(false)}>
               <Button className="w-full" size="lg">
-                <Sparkles className="h-4 w-4 mr-2" />
+                <PenLine className="h-4 w-4 mr-2" />
                 Generer cet article
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>

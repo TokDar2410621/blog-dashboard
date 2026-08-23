@@ -14,7 +14,7 @@
  */
 import React from "react";
 import {
-  Sparkles,
+  PenLine,
   Search,
   Plus,
   CheckCircle2,
@@ -198,7 +198,7 @@ function SidePanel({ style }: { style?: React.CSSProperties }) {
             color: "white",
           }}
         >
-          <Sparkles size={14} strokeWidth={2.5} />
+          <PenLine size={14} strokeWidth={2.5} />
         </div>
         <div
           style={{

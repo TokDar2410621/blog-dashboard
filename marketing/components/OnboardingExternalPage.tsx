@@ -12,7 +12,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Sparkles,
   Globe,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -443,7 +442,6 @@ export default function OnboardingExternalPage() {
           <div className="rounded-2xl border border-border/50 bg-zinc-950 overflow-hidden">
             <div className="flex items-center justify-between min-w-0 px-6 py-4 border-b border-white/5">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-400" />
                 <span className="text-sm font-medium text-white">
                   Voilà à quoi ton blog ressemblera
                 </span>
@@ -506,7 +504,7 @@ export default function OnboardingExternalPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Code2 className="h-5 w-5 text-primary" />
               2. Framework du frontend
             </CardTitle>
           </CardHeader>

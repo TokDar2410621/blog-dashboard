@@ -16,7 +16,7 @@ import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Sparkles,
+  PenLine,
   RefreshCw,
   Loader2,
   AlertTriangle,
@@ -29,6 +29,7 @@ import {
   Copy,
   EyeOff,
   Lightbulb,
+  Quote,
   Layers,
   Globe,
   Wrench,
@@ -349,7 +350,7 @@ function OpportunityCard({
 
         {concept?.hook && (
           <RecoBlock
-            icon={Sparkles}
+            icon={Quote}
             label="Le hook"
             body={concept.hook}
             accent="emerald"
@@ -418,7 +419,6 @@ function OpportunityCard({
         {/* Asset note */}
         {concept?.asset_used && (
           <p className="text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3 inline mr-1 text-emerald-400" />
             Asset exploité : <span className="text-foreground">{concept.asset_used}</span>
           </p>
         )}
@@ -500,7 +500,7 @@ function OpportunityCard({
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4 mr-2" />
+                    <PenLine className="h-4 w-4 mr-2" />
                     Créer cette page
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </>
@@ -576,7 +576,7 @@ function RecoBlock({
   body,
   accent,
 }: {
-  icon: typeof Sparkles;
+  icon: typeof Lightbulb;
   label: string;
   body: string;
   accent?: "emerald";
@@ -805,7 +805,7 @@ export default function OpportunitiesPage() {
           {actionable.length > 0 && (
             <section className="space-y-4">
               <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.05] p-4">
-                <Sparkles className="h-5 w-5 shrink-0 text-emerald-400 mt-0.5" />
+                <PenLine className="h-5 w-5 shrink-0 text-emerald-400 mt-0.5" />
                 <div>
                   <h2 className="font-semibold text-sm flex items-center gap-2">
                     Actionnable avec Gridar

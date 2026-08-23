@@ -38,7 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Save, Send, Loader2, Search, Settings2, Star,
-  ImageIcon, Sparkles, Check, PenLine, Eye, CalendarClock, Wand2, Globe, Plus, X,
+  ImageIcon, ImagePlus, Check, PenLine, Eye, CalendarClock, Wand2, Globe, Plus, X,
   ThumbsUp, ThumbsDown,
   Languages,
 } from "lucide-react";
@@ -1142,7 +1142,7 @@ export function PostEditorPage({ slug }: { slug?: string }) {
                           {tagsGenerating ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
-                            <Sparkles className="h-3 w-3" />
+                            <PenLine className="h-3 w-3" />
                           )}
                           Générer
                         </Button>
@@ -1212,7 +1212,7 @@ export function PostEditorPage({ slug }: { slug?: string }) {
                         size="sm"
                         onClick={() => setImageTab("ai")}
                       >
-                        <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                        <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
                         Générer (IA)
                       </Button>
                     </div>
@@ -1351,7 +1351,7 @@ export function PostEditorPage({ slug }: { slug?: string }) {
                             {aiGenerating ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Sparkles className="h-4 w-4" />
+                              <ImagePlus className="h-4 w-4" />
                             )}
                           </Button>
                         </div>
@@ -1531,7 +1531,7 @@ export function PostEditorPage({ slug }: { slug?: string }) {
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <PenLine className="h-4 w-4 mr-2" />
                   Générer l&apos;article
                 </>
               )}

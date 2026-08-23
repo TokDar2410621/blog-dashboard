@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles,
+  Lightbulb,
+  PenLine,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -107,7 +108,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
     <Card>
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Lightbulb className="h-5 w-5 text-primary" />
           Brief de contenu
         </CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -131,7 +132,7 @@ export function ContentBriefPanel({ language, defaultKeyword = "", onApply }: Pr
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <PenLine className="h-4 w-4 mr-2" />
                   Générer le brief
                 </>
               )}

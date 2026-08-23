@@ -14,7 +14,7 @@ import {
 import {
   Search,
   Loader2,
-  Sparkles,
+  PenLine,
   ExternalLink,
   HelpCircle,
   Video,
@@ -226,7 +226,7 @@ export default function SerpAnalyzerPage() {
                 size="lg"
                 className="shrink-0 h-auto min-h-10 whitespace-normal"
               >
-                <Sparkles className="h-4 w-4 mr-2" />
+                <PenLine className="h-4 w-4 mr-2" />
                 Generer un article qui bat ce SERP
               </Button>
             </CardContent>
@@ -480,7 +480,7 @@ export default function SerpAnalyzerPage() {
                 size="lg"
                 className="h-auto min-h-10 whitespace-normal"
               >
-                <Sparkles className="h-4 w-4 mr-2" />
+                <PenLine className="h-4 w-4 mr-2" />
                 Generer un article qui bat ce SERP
               </Button>
             </CardContent>

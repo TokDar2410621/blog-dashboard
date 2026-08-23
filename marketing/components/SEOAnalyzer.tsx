@@ -9,7 +9,7 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  Sparkles,
+  Lightbulb,
   Loader2,
   ChevronDown,
   ChevronUp,
@@ -1852,7 +1852,7 @@ export function SEOAnalyzer({
       <Card>
         <CardHeader className="py-3 px-4">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
+            <Lightbulb className="h-4 w-4" />
             {lang === "fr" ? "Suggestions IA" : "AI Suggestions"}
           </CardTitle>
         </CardHeader>
@@ -1870,7 +1870,7 @@ export function SEOAnalyzer({
               </>
             ) : (
               <>
-                <Sparkles className="h-4 w-4 mr-1.5" />
+                <Lightbulb className="h-4 w-4 mr-1.5" />
                 {lang === "fr" ? "Obtenir des suggestions" : "Get suggestions"}
               </>
             )}

@@ -14,7 +14,7 @@ import {
   Lock,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
+  Search,
   Loader2,
   ArrowRight,
   ShieldCheck,
@@ -264,7 +264,7 @@ export function PublicAuditPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4 mr-2" />
+                    <Search className="h-4 w-4 mr-2" />
                     Lancer l&apos;audit
                   </>
                 )}

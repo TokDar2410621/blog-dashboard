@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { authFetch } from "@/lib/api-client";
 import type { Site } from "@/lib/schemas";
-import { Globe, LogIn, AlertTriangle, TrendingDown, Sparkles } from "lucide-react";
+import { Globe, LogIn, AlertTriangle, TrendingDown } from "lucide-react";
 
 export interface MultiSiteHealthTableProps {
   sites: Site[];
@@ -248,7 +248,6 @@ export function MultiSiteHealthTable({
                           variant="outline"
                           className="border-primary/40 text-primary text-[10px] font-mono uppercase tracking-wider px-1.5 py-0"
                         >
-                          <Sparkles className="h-2.5 w-2.5 mr-0.5" />
                           New
                         </Badge>
                       </div>
