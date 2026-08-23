@@ -145,6 +145,28 @@
   .container-scroll-header {
     transform: none !important;
   }
+
+  /* Meme cause, autre victime : les blocs du hero (ui/hero-10.tsx) entrent
+   * en `hidden` (opacite 0, blur 6px) et attendent le passage a `visible`.
+   * Sous preference de mouvement reduit, ce passage n'a jamais lieu et le
+   * hero se retrouve VIDE : ni titre, ni champ d'audit, ni boutons. Mesure du
+   * 2026-08-23 sur la landing, opacite calculee restee a 0 apres 2,5 s.
+   * Le visiteur qui demande moins de mouvement doit voir le contenu tout de
+   * suite, pas le perdre. */
+  .hero-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  /* Traits du fond de hero (ui/floating-paths.tsx). L'arret du mouvement se
+   * fait en JS pour ne pas laisser tourner 36 animations en boucle, mais motion
+   * fige alors le trace a 30% de sa longueur, et ce tronçon tombe hors du
+   * cadre : le fond disparait entierement. On rend le trait entier. */
+  .floating-paths path {
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
 }
 
 /* Print / "Sauvegarder en PDF".

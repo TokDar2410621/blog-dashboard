@@ -112,7 +112,12 @@ function Reveal({
   if (!active) return <div className={className}>{children}</div>
 
   return (
-    <motion.div variants={variants ?? item} className={className}>
+    // `hero-reveal` est la prise de la neutralisation CSS (globals.css). Elle
+    // se fait la et pas ici : useReducedMotion() de motion@13 rend `false`
+    // quand la preference etait deja posee avant le chargement, donc le bloc
+    // demarre en etat cache et n en sort jamais. Constat identique a celui
+    // deja documente pour container-scroll-card.
+    <motion.div variants={variants ?? item} className={cn('hero-reveal', className)}>
       {children}
     </motion.div>
   )
@@ -239,7 +244,9 @@ export function Hero10({
   ) : null
 
   return (
-    <section className="bg-background relative isolate w-full overflow-hidden">
+    // Pas de `bg-background` ici : le corps de page peint deja le fond, et un
+    // fond opaque a cet endroit recouvrirait tout decor pose derriere le hero.
+    <section className="relative isolate w-full overflow-hidden">
       <motion.div
         className={cn(
           'relative z-10 mx-auto flex max-w-6xl flex-col items-center px-6 text-center',

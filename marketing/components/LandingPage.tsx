@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Hero10 } from "@/components/ui/hero-10";
+import { FloatingPathsBackground } from "@/components/ui/floating-paths";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import {
@@ -129,39 +130,45 @@ export default function LandingPage() {
           captures de /public/hero sont de vraies captures du produit, la
           premiere sur le site public, les deux autres sur le tableau de bord
           de demonstration (donnees de demo, jamais celles d'un client). */}
-      <Hero10
-        title="Le SEO fait pour toi."
-        titleLine2Prefix="Pour les PME"
-        titleHighlight="du Québec"
-        description="Entre ton URL. En 60 secondes, on te sort exactement ce qui t’empêche de ranker sur Google au Québec : tags, schéma, vitesse, mots-clés, contenu manquant."
-        animation="subtle"
-        action={<HeroAuditInput authedHref={authedHref} />}
-        primaryCTA={{
-          ctaEnabled: true,
-          text: isAuthenticated ? "Tableau de bord" : "Créer un compte gratuit",
-          link: authedHref,
-          variant: "default",
-          size: "lg",
-        }}
-        secondaryCTA={{
-          ctaEnabled: true,
-          text: "Voir comment ça marche",
-          link: "#features",
-          variant: "ghost",
-          size: "lg",
-        }}
-        socialProof="Sans carte · Audit complet en 60 secondes · 100% confidentiel"
-        images={[
-          "/hero/1-input.png",
-          "/hero/2-produit.png",
-          "/hero/3-positions.png",
-        ]}
-        imageAlts={[
-          "Le champ où on entre son domaine pour lancer l’audit",
-          "Les articles produits, avec leur score de qualité",
-          "Le suivi des positions Google sur trente jours",
-        ]}
-      />
+      {/* Traits derivants derriere le hero. Le fond est pose ICI plutot
+          que dans Hero10 : le composant reste reutilisable sans decor, et
+          la landing choisit son ambiance. `position` negatif fait deriver
+          les traits vers la droite. */}
+      <FloatingPathsBackground position={-1} className="relative z-10">
+        <Hero10
+          title="Le SEO fait pour toi."
+          titleLine2Prefix="Pour les PME"
+          titleHighlight="du Québec"
+          description="Entre ton URL. En 60 secondes, on te sort exactement ce qui t’empêche de ranker sur Google au Québec : tags, schéma, vitesse, mots-clés, contenu manquant."
+          animation="subtle"
+          action={<HeroAuditInput authedHref={authedHref} />}
+          primaryCTA={{
+            ctaEnabled: true,
+            text: isAuthenticated ? "Tableau de bord" : "Créer un compte gratuit",
+            link: authedHref,
+            variant: "default",
+            size: "lg",
+          }}
+          secondaryCTA={{
+            ctaEnabled: true,
+            text: "Voir comment ça marche",
+            link: "#features",
+            variant: "ghost",
+            size: "lg",
+          }}
+          socialProof="Sans carte · Audit complet en 60 secondes · 100% confidentiel"
+          images={[
+            "/hero/1-input.png",
+            "/hero/2-produit.png",
+            "/hero/3-positions.png",
+          ]}
+          imageAlts={[
+            "Le champ où on entre son domaine pour lancer l’audit",
+            "Les articles produits, avec leur score de qualité",
+            "Le suivi des positions Google sur trente jours",
+          ]}
+        />
+      </FloatingPathsBackground>
 
       {/* Product screen - l'ecran se redresse au scroll et le dashboard dedans
           est reellement cliquable (donnees de demo, aucun appel reseau). */}
