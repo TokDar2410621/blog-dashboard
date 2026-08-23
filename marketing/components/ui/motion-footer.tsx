@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Link from "next/link";
-import { Search, ArrowUpRight } from "lucide-react";
+import { Search, ArrowUpRight, ChevronDown } from "lucide-react";
 import { NAV_TOOLS } from "@/lib/tools-nav";
 import { cn } from "@/lib/utils";
 
@@ -97,12 +97,14 @@ const STYLES = `
   background-clip: text;
 }
 
-/* Le rideau plein ecran est un effet de bureau. Mesure du 2026-08-23 : le
- * contenu du pied fait 746px de haut, soit plus qu'un ecran de 640 ou 844px.
- * Un element fixed plus haut que le viewport est inatteignable, la barre du bas
- * finissait 159px sous l'ecran. Sous md on repasse donc en flux normal : le
- * pied s'allonge autant qu'il faut et se scrolle comme le reste de la page. */
-@media (max-width: 47.99rem) {
+/* Le rideau tourne partout, telephone compris. Deux choses le rendent possible
+ * malgre un pied plus haut que l'ecran : le plan du site part replie sous md,
+ * et le bloc central absorbe le surplus en defilement interne, ce qui garde la
+ * barre du bas collee en bas. Mesure du 2026-08-23 : la barre reste a l'ecran
+ * jusqu'a 560px de haut. En dessous, le pied n'aurait plus de place du tout
+ * (paysage de telephone), donc on repasse en flux normal. Le critere est la
+ * HAUTEUR disponible, jamais la largeur. */
+@media (max-height: 30rem) {
   .cinematic-footer-curtain {
     clip-path: none !important;
     height: auto !important;
@@ -112,6 +114,11 @@ const STYLES = `
     height: auto !important;
   }
 }
+
+/* Le triangle natif du <details> jure avec le reste : on met notre chevron. */
+.footer-plan-resume::-webkit-details-marker { display: none; }
+.footer-plan-resume { list-style: none; }
+details[open] .footer-plan-chevron { transform: rotate(180deg); }
 
 .footer-text-glow {
   background: linear-gradient(180deg, var(--foreground) 0%, color-mix(in oklch, var(--foreground) 40%, transparent) 100%);
@@ -269,6 +276,22 @@ export function CinematicFooter() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const linksRef = useRef<HTMLDivElement>(null);
 
+  // Le rideau plein ecran exige que le pied tienne dans un ecran. Sur
+  // telephone, le plan du site deploye le faisait deborder de 160px et la
+  // barre du bas devenait inatteignable. Il part donc replie sous md, et le
+  // visiteur l'ouvre s'il le veut. Les liens restent dans le DOM dans les deux
+  // cas : un <details> ferme n'est pas un lien perdu pour l'indexation.
+  // Ouvert au rendu serveur, ce qui donne le cas desktop et laisse le HTML
+  // complet aux robots ; l'effet le replie ensuite sur les petits ecrans.
+  const [planOuvert, setPlanOuvert] = React.useState(true);
+  useEffect(() => {
+    const mql = window.matchMedia("(width < 48rem)");
+    const sync = () => setPlanOuvert(!mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!wrapperRef.current) return;
@@ -344,22 +367,25 @@ export function CinematicFooter() {
             </div>
           </div>
 
-          {/* Center content */}
-          <div className="relative z-10 mx-auto mt-20 flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-6">
+          {/* Center content. min-h-0 + overflow-y-auto : le pied est un element
+              fixed de la hauteur d'un ecran, il ne peut pas grandir. Si le
+              visiteur deplie le plan du site sur telephone, le surplus se
+              scrolle ici au lieu de passer sous la barre du bas. */}
+          <div className="relative z-10 mx-auto mt-16 flex w-full min-h-0 max-w-5xl flex-1 flex-col items-center justify-center overflow-y-auto px-6 md:mt-20">
             <h2
               ref={headingRef}
-              className="footer-text-glow mb-12 text-center text-5xl font-black tracking-tighter md:text-8xl"
+              className="footer-text-glow mb-8 text-center text-4xl font-black tracking-tighter sm:text-5xl md:mb-12 md:text-8xl"
             >
               Prêt à ranker au Québec?
             </h2>
 
-            <div ref={linksRef} className="flex w-full flex-col items-center gap-6">
+            <div ref={linksRef} className="flex w-full flex-col items-center gap-4 md:gap-6">
               {/* CTA primaires */}
               <div className="flex w-full flex-wrap justify-center gap-4">
                 <MagneticButton
                   as="a"
                   href="/audit"
-                  className="footer-glass-pill group flex items-center gap-3 rounded-full px-10 py-5 text-sm font-bold text-foreground md:text-base"
+                  className="footer-glass-pill group flex items-center gap-3 rounded-full px-6 py-3.5 text-sm font-bold text-foreground md:px-10 md:py-5 md:text-base"
                 >
                   <Search className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
                   Auditer mon site
@@ -368,7 +394,7 @@ export function CinematicFooter() {
                 <MagneticButton
                   as="a"
                   href="/tools"
-                  className="footer-glass-pill group flex items-center gap-3 rounded-full px-10 py-5 text-sm font-bold text-foreground md:text-base"
+                  className="footer-glass-pill group flex items-center gap-3 rounded-full px-6 py-3.5 text-sm font-bold text-foreground md:px-10 md:py-5 md:text-base"
                 >
                   Tous les outils
                   <ArrowUpRight className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-foreground" />
@@ -379,10 +405,22 @@ export function CinematicFooter() {
                   c'est le seul chemin interne vers les 8 pages d'outils depuis
                   le bas de page, et un footer cinematique ne doit pas couter
                   son maillage au site. */}
-              <nav
-                aria-label="Plan du site"
-                className="mt-10 grid w-full max-w-3xl grid-cols-2 gap-x-8 gap-y-8 text-left sm:grid-cols-3"
+              <details
+                open={planOuvert}
+                onToggle={(e) => setPlanOuvert(e.currentTarget.open)}
+                className="mt-4 w-full max-w-3xl md:mt-10"
               >
+                <summary className="footer-plan-resume mx-auto flex w-fit cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/70 md:hidden">
+                  Plan du site
+                  <ChevronDown
+                    aria-hidden="true"
+                    className="footer-plan-chevron h-3.5 w-3.5 transition-transform duration-200"
+                  />
+                </summary>
+                <nav
+                  aria-label="Plan du site"
+                  className="mt-4 grid w-full grid-cols-2 gap-x-8 gap-y-6 text-left sm:grid-cols-3 md:mt-0 md:gap-y-8"
+                >
                 <ColonneLiens titre="Outils gratuits">
                   {NAV_TOOLS.map((outil) => (
                     <LienPied key={outil.href} href={outil.href}>
@@ -410,12 +448,13 @@ export function CinematicFooter() {
                     GitHub
                   </LienPied>
                 </ColonneLiens>
-              </nav>
+                </nav>
+              </details>
             </div>
           </div>
 
           {/* Bottom bar */}
-          <div className="relative z-20 flex w-full flex-col items-center justify-between gap-6 px-6 pb-8 md:flex-row md:px-12">
+          <div className="relative z-20 flex w-full flex-col items-center justify-between gap-3 px-6 pb-6 md:flex-row md:gap-6 md:px-12 md:pb-8">
             <div className="order-2 flex flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:order-1 md:items-start md:text-xs">
               {/* Annee calculee : un millesime en dur finit toujours par mentir. */}
               <span>© {new Date().getFullYear()} Gridar - Arivex Studio</span>
