@@ -146,11 +146,9 @@ export function AiVisibilityChecker() {
 
   return (
     <>
-      <AiVisibilityHero />
-
-      <div className="max-w-3xl mx-auto px-4 pb-16 pt-10">
-      {/* Input form */}
-      <Card className="mb-8">
+      <AiVisibilityHero>
+        {/* Input form */}
+        <Card>
         <CardContent className="p-4">
           <form
             onSubmit={runAnalysis}
@@ -189,7 +187,9 @@ export function AiVisibilityChecker() {
           </p>
         </CardContent>
       </Card>
+      </AiVisibilityHero>
 
+      <div className="max-w-3xl mx-auto px-4 pb-16 pt-8">
       {/* Loading state */}
       {loading && (
         <div className="space-y-3 mb-8">
