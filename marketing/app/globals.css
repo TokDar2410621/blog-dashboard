@@ -116,6 +116,45 @@
   .demo-panel-in { animation: demoPanelIn 240ms cubic-bezier(0.16, 1, 0.3, 1); }
 }
 
+/* Fond de traits du hero (ui/floating-paths.tsx).
+ *
+ * L'animation porte sur le CALQUE qui contient le SVG, jamais sur le SVG lui
+ * meme. Mesures du 2026-08-23 en fenetre reelle, 1440x900 : animer les traits
+ * avec motion donnait 43 a 47 i/s, les memes animations en CSS 33 a 45, une
+ * page temoin 61. Le cout ne vient donc pas de ce qui pilote l'animation mais
+ * du repaint de 36 grandes courbes a chaque image, et toucher a quoi que ce
+ * soit dans le SVG force ce repaint.
+ *
+ * Anime de l'exterieur, le SVG est rasterise une fois et le compositeur se
+ * contente de deplacer la texture. translate3d et will-change garantissent le
+ * calque GPU. Le calque deborde de 3 rem (-inset-12 sur l'element), donc une
+ * derive de 22 px ne decouvre aucun bord.
+ *
+ * Le passage par prefers-reduced-motion: no-preference remplace toute
+ * neutralisation : sous preference de mouvement reduit, aucune animation n'est
+ * declaree, donc les traits restent simplement fixes et entiers. */
+@keyframes floatingPathsDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(-34px, 20px, 0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* transform et opacite sur le meme calque : le compositeur traite les deux,
+   * la respiration ne coute donc rien de plus que la derive. Elle remplace le
+   * scintillement que l'original obtenait en animant chaque trait. */
+  .floating-paths-layer {
+    will-change: transform, opacity;
+    animation: floatingPathsDrift 40s ease-in-out infinite;
+  }
+}
+
 /* Panneau du dashboard de demo : les donnees sont calibrees pour tenir sans
  * scroll, mais un zoom navigateur ou une police systeme agrandie peuvent faire
  * deborder. La barre doit alors se VOIR, sinon la derniere ligne parait
@@ -157,15 +196,6 @@
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
-  }
-
-  /* Traits du fond de hero (ui/floating-paths.tsx). L'arret du mouvement se
-   * fait en JS pour ne pas laisser tourner 36 animations en boucle, mais motion
-   * fige alors le trace a 30% de sa longueur, et ce tronçon tombe hors du
-   * cadre : le fond disparait entierement. On rend le trait entier. */
-  .floating-paths path {
-    stroke-dasharray: none !important;
-    stroke-dashoffset: 0 !important;
   }
 }
 
