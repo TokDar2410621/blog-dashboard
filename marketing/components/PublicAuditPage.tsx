@@ -28,6 +28,7 @@ import {
   type FullReport,
 } from "@/components/audit/FullReportSections";
 import { GbpVerdictSection } from "@/components/audit/GbpVerdictSection";
+import { OnPageSection } from "@/components/audit/OnPageSection";
 import type { GbpVerdict } from "@/lib/report-api";
 
 // Empty base = same-origin via Next.js rewrites (see next.config.ts).
@@ -48,6 +49,18 @@ type AuditResult = {
     poids_effectif: number;
   }[];
   score_absentes?: { cle: string; raison: string | null }[];
+  /** Les huit controles lus sur la page d'accueil. Contrairement a la vitesse
+   *  et aux positions, ils sont mesurables sur tous les sites, des le premier
+   *  jour, et le visiteur peut les corriger lui-meme. */
+  onpage?: {
+    score: number;
+    controles: {
+      cle: string;
+      libelle: string;
+      poids: number;
+      reussi: boolean;
+    }[];
+  } | null;
   pagespeed: {
     performance?: number;
     seo?: number;
@@ -322,6 +335,8 @@ export function PublicAuditPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <OnPageSection onpage={result.onpage} />
 
             <GbpVerdictSection gbp={result.gbp} />
 

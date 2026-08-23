@@ -10209,7 +10209,31 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
             return {'error': f'HTTP {r.status_code}'}
         html = r.text
         title_m = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
-        h1_m = re.search(r'<h1[^>]*>([^<]+)</h1>', html, re.IGNORECASE)
+
+        # Le contenu des <script> et <style> n'est pas du texte de page, et il
+        # doit partir AVANT toute extraction de titre. react-wrap-balancer
+        # injecte un <script> a l'interieur meme du <h1> : sans ce nettoyage,
+        # son code JavaScript se retrouvait dans le H1 lu, puis dans les
+        # mots-cles envoyes a Serper ("self wrap", "supports text").
+        html_texte = re.sub(r'<script[^>]*>.*?</script>', ' ', html,
+                            flags=re.IGNORECASE | re.DOTALL)
+        html_texte = re.sub(r'<style[^>]*>.*?</style>', ' ', html_texte,
+                            flags=re.IGNORECASE | re.DOTALL)
+
+        def _texte_balise(motif: str) -> list[str]:
+            """Contenu textuel des balises correspondantes, balises internes
+            retirees. `[^<]+` exigeait un titre sans une seule balise dedans,
+            or un hero moderne en contient presque toujours : un <span> pour
+            colorer un mot, un <br> pour casser la ligne. Le H1 de gridar.app
+            lui-meme n'etait pas vu, donc declare absent dans son propre audit
+            et absent de l'extraction de mots-cles, dont il est la source la
+            plus intentionnelle."""
+            return [
+                re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', m)).strip()
+                for m in re.findall(motif, html_texte, re.IGNORECASE | re.DOTALL)
+            ]
+
+        h1_list = [h for h in _texte_balise(r'<h1[^>]*>(.*?)</h1>') if h]
         meta_m = re.search(
             r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)',
             html, re.IGNORECASE,
@@ -10220,19 +10244,11 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
         )
 
         # All h2 and h3 - useful for n-gram extraction.
-        h2_list = [
-            re.sub(r'<[^>]+>', '', m).strip()
-            for m in re.findall(r'<h2[^>]*>(.*?)</h2>', html, re.IGNORECASE | re.DOTALL)
-        ]
-        h3_list = [
-            re.sub(r'<[^>]+>', '', m).strip()
-            for m in re.findall(r'<h3[^>]*>(.*?)</h3>', html, re.IGNORECASE | re.DOTALL)
-        ]
+        h2_list = [h for h in _texte_balise(r'<h2[^>]*>(.*?)</h2>') if h]
+        h3_list = [h for h in _texte_balise(r'<h3[^>]*>(.*?)</h3>') if h]
 
-        # Clean body text snippet: strip scripts/styles, drop tags, collapse ws.
-        cleaned = re.sub(r'<script[^>]*>.*?</script>', ' ', html, flags=re.IGNORECASE | re.DOTALL)
-        cleaned = re.sub(r'<style[^>]*>.*?</style>', ' ', cleaned, flags=re.IGNORECASE | re.DOTALL)
-        cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
+        # Clean body text snippet: drop tags, collapse ws.
+        cleaned = re.sub(r'<[^>]+>', ' ', html_texte)
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
 
         # Regex extraction leaves HTML entities raw, so an apostrophe reached
@@ -10245,7 +10261,10 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
 
         return {
             'title': _clean(title_m.group(1) if title_m else '', 200),
-            'h1': _clean(h1_m.group(1) if h1_m else '', 200),
+            'h1': _clean(h1_list[0] if h1_list else '', 200),
+            # Le compte reel : un gabarit qui pose deux H1 est une erreur
+            # classique, et le premier seul ne permet pas de la voir.
+            'h1_count': len(h1_list),
             'meta_description': _clean(meta_m.group(1) if meta_m else '', 300),
             'meta_keywords': _clean(meta_kw_m.group(1) if meta_kw_m else '', 500),
             'h2_list': [_clean(h, 120) for h in h2_list if h][:10],
@@ -10314,22 +10333,101 @@ _BOILERPLATE = frozenset({
 _STRONG_KEYWORD_SOURCES = ('meta_keywords', 'h1', 'title')
 
 
-_POIDS_SCORE_PUBLIC = {'pagespeed': 60, 'rankings': 40}
+# Les huit controles de la composante on-page, avec leur part des 100 points.
+# Ils se lisent tous dans la page deja telechargee : aucun appel externe, donc
+# aucun timeout, aucun quota, et une note disponible sur 100 % des sites.
+_CONTROLES_ONPAGE = (
+    ('title_present', 'Balise title', 15),
+    ('title_longueur', 'Longueur du title', 10),
+    ('meta_description_presente', 'Meta description', 15),
+    ('meta_description_longueur', 'Longueur de la meta description', 10),
+    ('h1_present', 'Balise H1', 15),
+    ('h1_unique', 'Un seul H1', 10),
+    ('hierarchie', 'Sous-titres H2', 10),
+    ('donnees_structurees', 'Donnees structurees JSON-LD', 15),
+)
+
+# Google tronque le title autour de 60 caracteres et la description autour de
+# 160. En dessous du plancher, la balise existe mais ne dit rien.
+_TITLE_MIN, _TITLE_MAX = 30, 65
+_DESC_MIN, _DESC_MAX = 70, 160
 
 
-def _composer_score_public(ps: dict, positions: list) -> dict:
+def _score_onpage(crawl: dict, page_html: str = '') -> dict | None:
+    """Note sur 100 les signaux on-page de la page d'accueil.
+
+    Rend None quand le crawl a echoue : sans page, il n'y a rien a mesurer et
+    un zero se lirait comme un verdict.
+
+    Cette composante existe parce que les deux autres sont conditionnelles.
+    PageSpeed depend d'une API tierce qui peut expirer, les positions dependent
+    d'un quota Serper et d'un site assez age pour ranker. Les signaux on-page,
+    eux, sont lisibles sur la page qu'on vient de telecharger, pour tout le
+    monde, du premier jour. C'est aussi la seule partie sur laquelle le
+    visiteur peut agir le jour meme.
+    """
+    import re
+
+    if not crawl or crawl.get('error'):
+        return None
+    html = page_html or ''
+
+    title = (crawl.get('title') or '').strip()
+    desc = (crawl.get('meta_description') or '').strip()
+    h1 = (crawl.get('h1') or '').strip()
+    h2 = [h for h in (crawl.get('h2_list') or []) if h]
+
+    # Le crawl compte lui-meme les H1 apres avoir retire les <script>. On ne
+    # recompte sur le HTML brut que pour les appelants qui n'ont pas ce champ.
+    nb_h1 = crawl.get('h1_count')
+    if nb_h1 is None:
+        nb_h1 = len(re.findall(r'<h1[\s>]', html, re.IGNORECASE)) if html else (1 if h1 else 0)
+
+    resultats = {
+        'title_present': bool(title),
+        'title_longueur': bool(title) and _TITLE_MIN <= len(title) <= _TITLE_MAX,
+        'meta_description_presente': bool(desc),
+        'meta_description_longueur': bool(desc) and _DESC_MIN <= len(desc) <= _DESC_MAX,
+        'h1_present': bool(h1),
+        'h1_unique': nb_h1 == 1,
+        'hierarchie': len(h2) >= 1,
+        'donnees_structurees': bool(
+            html and re.search(r'application/ld\+json', html, re.IGNORECASE)
+        ),
+    }
+
+    gagnes = sum(poids for cle, _, poids in _CONTROLES_ONPAGE if resultats[cle])
+    return {
+        'score': gagnes,
+        'controles': [
+            {'cle': cle, 'libelle': libelle, 'poids': poids, 'reussi': resultats[cle]}
+            for cle, libelle, poids in _CONTROLES_ONPAGE
+        ],
+    }
+
+
+_POIDS_SCORE_PUBLIC = {'pagespeed': 40, 'onpage': 35, 'rankings': 25}
+
+
+def _composer_score_public(ps: dict, positions: list, onpage: dict | None = None) -> dict:
     """Assemble le score de l'audit public et dit sur quoi il repose.
 
-    Rend {composite_score, composantes, absentes, partiel}.
+    Rend {composite_score, composantes, absentes, partiel, onpage}.
 
-    Deux composantes : la moyenne PageSpeed (60 %) et la part des mots-cles
-    verifies qui sortent dans le top 10 (40 %). Quand l'une manque, les poids
-    sont renormalises sur celle qui reste, ce qui est defendable mais doit se
-    DIRE : un PageSpeed en timeout faisait porter 100 % du score aux positions,
-    et un site correct qui ne rank pas encore ressortait a 10/100 sans que rien
-    ne signale que la moitie de la mesure manquait. Constate le 2026-08-23 sur
-    gridar.app, dont le PageSpeed reel vaut 90 mais repond en 17 a 23 s contre
-    une coupure a 25 s.
+    Trois composantes : les signaux on-page de la page d'accueil (35 %), la
+    moyenne PageSpeed (40 %) et la part des mots-cles verifies qui sortent dans
+    le top 10 (25 %).
+
+    L'on-page pese autant parce qu'il est le seul des trois a etre mesurable
+    partout et tout de suite : PageSpeed depend d'une API tierce qui expire,
+    les positions d'un quota Serper et d'un site assez age pour ranker. Avant
+    son arrivee, un PageSpeed en timeout faisait porter 100 % du score aux
+    positions, et un site correct qui ne rank pas encore ressortait a 10/100.
+    Constate le 2026-08-23 sur gridar.app, dont le PageSpeed reel vaut 90 mais
+    repond en 17 a 23 s contre une coupure a 25 s.
+
+    Quand une composante manque, les poids sont renormalises sur celles qui
+    restent, et `partiel` le dit.
 
     Un mot-cle dont la verification a echoue ne compte pas : le compter zero
     revenait a punir le visiteur d'un quota Serper epuise.
@@ -10337,12 +10435,15 @@ def _composer_score_public(ps: dict, positions: list) -> dict:
     composantes: list[tuple[str, float, float]] = []
 
     if 'avg' in ps:
-        composantes.append(('pagespeed', float(ps['avg']), 0.60))
+        composantes.append(('pagespeed', float(ps['avg']), 0.40))
+
+    if onpage and onpage.get('score') is not None:
+        composantes.append(('onpage', float(onpage['score']), 0.35))
 
     verifies = [p for p in (positions or []) if p.get('checked')]
     if verifies:
         top_10 = sum(1 for p in verifies if p.get('position') and p['position'] <= 10)
-        composantes.append(('rankings', (top_10 / len(verifies)) * 100, 0.40))
+        composantes.append(('rankings', (top_10 / len(verifies)) * 100, 0.25))
 
     composite = None
     if composantes:
@@ -10360,12 +10461,13 @@ def _composer_score_public(ps: dict, positions: list) -> dict:
         for nom, valeur, poids in composantes
     ]
     presentes = {nom for nom, _, _ in composantes}
+    _RAISONS = {
+        'pagespeed': ps.get('error') or 'mesure indisponible',
+        'onpage': 'page d accueil illisible',
+        'rankings': 'aucun mot-cle verifiable',
+    }
     absentes = [
-        {
-            'cle': cle,
-            'raison': (ps.get('error') or 'mesure indisponible') if cle == 'pagespeed'
-                      else 'aucun mot-cle verifiable',
-        }
+        {'cle': cle, 'raison': _RAISONS[cle]}
         for cle in _POIDS_SCORE_PUBLIC
         if cle not in presentes
     ]
@@ -10374,6 +10476,9 @@ def _composer_score_public(ps: dict, positions: list) -> dict:
         'composantes': detail,
         'absentes': absentes,
         'partiel': bool(absentes) and composite is not None,
+        # Le detail des huit controles, pour que le rapport puisse nommer ce
+        # qui manque au lieu d'afficher un chiffre nu.
+        'onpage': onpage,
     }
 
 
@@ -11220,7 +11325,12 @@ class PublicAuditView(APIView):
         # maintenant seulement, avec ce qui reste du budget de la requete.
         ps_thread.join(timeout=20)
 
-        score = _composer_score_public(ps, positions)
+        # page_html a ete retire du crawl plus haut pour ne pas serialiser toute
+        # la page ; la note on-page en a besoin pour compter les H1 et reperer
+        # le JSON-LD.
+        onpage = _score_onpage(crawl, page_html)
+
+        score = _composer_score_public(ps, positions, onpage)
         composite_score = score['composite_score']
         score_composantes = score['composantes']
         score_absentes = score['absentes']
@@ -11281,6 +11391,7 @@ class PublicAuditView(APIView):
             'score_partiel': score_partiel,
             'score_composantes': score_composantes,
             'score_absentes': score_absentes,
+            'onpage': onpage,
             'pagespeed': ps,
             'gbp': gbp_result or None,
             'crawl': {
