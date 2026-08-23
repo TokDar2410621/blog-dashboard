@@ -23,11 +23,11 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.gridar.app"),
   title: {
-    default: "Gridar - Le SEO en francais qui comprend le Quebec",
+    default: "Gridar - Le SEO fait pour toi, pour les PME du Québec",
     template: "%s | Gridar",
   },
   description:
-    "Audit SEO gratuit en 60 secondes pour PME quebecoises : vois ce qui t'empeche de ranker sur Google. Puis Gridar corrige (contenu FR-CA, suivi des positions). Arivex Studio.",
+    "Audit SEO gratuit en 60 secondes pour PME québécoises : vois ce qui t’empêche de ranker sur Google. Puis Gridar corrige, contenu FR-CA et suivi des positions. Arivex Studio.",
   applicationName: "Gridar",
   authors: [{ name: "Arivex Studio", url: "https://www.gridar.app" }],
   creator: "Arivex Studio",
@@ -37,15 +37,15 @@ export const metadata: Metadata = {
     locale: "fr_CA",
     url: "https://www.gridar.app",
     siteName: "Gridar",
-    title: "Gridar - Le SEO en francais qui comprend le Quebec",
+    title: "Gridar - Le SEO fait pour toi, pour les PME du Québec",
     description:
-      "Entre ton URL, recois ton audit SEO en 60 secondes. Puis Gridar corrige ce qui bloque : contenu en quebecois et suivi des positions Google.",
+      "Entre ton URL, reçois ton audit SEO en 60 secondes. Puis Gridar corrige ce qui bloque : contenu en québécois et suivi des positions Google.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gridar - SEO francais pour le Quebec",
+    title: "Gridar - Le SEO fait pour toi, PME du Québec",
     description:
-      "Audit SEO gratuit en 60s pour PME quebecoises. Vois ce qui bloque, puis Gridar corrige et suit tes positions.",
+      "Audit SEO gratuit en 60 s pour PME québécoises. Vois ce qui bloque, puis Gridar corrige et suit tes positions.",
   },
   alternates: {
     canonical: "/",

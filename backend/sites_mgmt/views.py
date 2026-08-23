@@ -10167,14 +10167,22 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
         cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
         cleaned = re.sub(r'\s+', ' ', cleaned).strip()
 
+        # Regex extraction leaves HTML entities raw, so an apostrophe reached
+        # the report as "t&#x27;empeche" and a prospect read that in their own
+        # audit. Decode once, here, before anything is stored or displayed.
+        from html import unescape as _unescape
+
+        def _clean(s: str, limite: int) -> str:
+            return _unescape(s or '').strip()[:limite]
+
         return {
-            'title': (title_m.group(1).strip() if title_m else '')[:200],
-            'h1': (h1_m.group(1).strip() if h1_m else '')[:200],
-            'meta_description': (meta_m.group(1).strip() if meta_m else '')[:300],
-            'meta_keywords': (meta_kw_m.group(1).strip() if meta_kw_m else '')[:500],
-            'h2_list': [h[:120] for h in h2_list if h][:10],
-            'h3_list': [h[:120] for h in h3_list if h][:10],
-            'body_snippet': cleaned[:2000],
+            'title': _clean(title_m.group(1) if title_m else '', 200),
+            'h1': _clean(h1_m.group(1) if h1_m else '', 200),
+            'meta_description': _clean(meta_m.group(1) if meta_m else '', 300),
+            'meta_keywords': _clean(meta_kw_m.group(1) if meta_kw_m else '', 500),
+            'h2_list': [_clean(h, 120) for h in h2_list if h][:10],
+            'h3_list': [_clean(h, 120) for h in h3_list if h][:10],
+            'body_snippet': _unescape(cleaned)[:2000],
             'final_url': r.url,
             # Underscore-prefixed: for callers that want to run further checks
             # on the same fetch instead of hitting the site again. Pop it
