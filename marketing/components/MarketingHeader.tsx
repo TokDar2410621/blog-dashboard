@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,8 +40,20 @@ export function MarketingHeader({ trail }: Props) {
   const headerCtaLabel = isAuthenticated ? "Tableau de bord" : "Connexion";
   const hideLoginAffordance = authLoading;
 
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="relative z-20 border-b border-white/5 backdrop-blur-xl bg-zinc-950/70 sticky top-0">
+    <header
+      className={`relative z-20 sticky top-0 border-b border-transparent backdrop-blur-xl bg-zinc-950/70 transition-colors ${
+        scrolled ? "md:border-white/5" : ""
+      }`}
+    >
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 group">
           <GridarMark className="h-[30px] w-[30px] text-emerald-400" />
