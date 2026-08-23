@@ -337,12 +337,6 @@ export function CinematicFooter() {
               © 2026 Gridar - Arivex Studio
             </div>
 
-            <div className="footer-glass-pill order-1 flex cursor-default items-center gap-2 rounded-full border-border/50 px-6 py-3 md:order-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground md:text-xs">Fait avec</span>
-              <span className="animate-footer-heartbeat text-sm text-destructive md:text-base">❤</span>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground md:text-xs">a Saint-Hyacinthe, QC</span>
-            </div>
-
             <MagneticButton
               as="button"
               onClick={scrollToTop}
