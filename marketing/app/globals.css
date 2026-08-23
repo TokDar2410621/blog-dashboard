@@ -111,6 +111,48 @@
 }
 .marquee-x { animation: marqueeX 30s linear infinite; }
 
+/* Bascule d'onglet du dashboard de demo (DashboardDemo.tsx). Le panneau
+ * entrant s'installe au lieu d'apparaitre sec. Transform + opacite seulement,
+ * et rien du tout quand le visiteur demande moins de mouvement. */
+@keyframes demoPanelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .demo-panel-in { animation: demoPanelIn 240ms cubic-bezier(0.16, 1, 0.3, 1); }
+}
+
+/* Panneau du dashboard de demo : les donnees sont calibrees pour tenir sans
+ * scroll, mais un zoom navigateur ou une police systeme agrandie peuvent faire
+ * deborder. La barre doit alors se VOIR, sinon la derniere ligne parait
+ * simplement tranchee par le bezel. Overlay par defaut sur macOS et mobile,
+ * donc invisible au repos : on la force en gouttiere stable. */
+.demo-panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+  scrollbar-gutter: stable;
+}
+
+/* Ecran qui se redresse au scroll (ui/container-scroll-animation.tsx).
+ *
+ * La neutralisation du mouvement se fait ICI et pas en JavaScript : mesure du
+ * 2026-08-23, useReducedMotion() de motion@13 rend `false` alors que la media
+ * query correspond, car il n'ecoute que l'evenement `change`, qui ne survient
+ * jamais si la preference etait deja posee avant le chargement.
+ *
+ * !important est necessaire : motion ecrit le transform en style inline.
+ * La marge redevient positive parce que la marge negative ne servait qu'a
+ * compenser la montee du titre, montee qui n'a plus lieu ici. */
+@media (prefers-reduced-motion: reduce) {
+  .container-scroll-card {
+    transform: none !important;
+    margin-top: 2rem;
+  }
+  .container-scroll-header {
+    transform: none !important;
+  }
+}
+
 /* Print / "Sauvegarder en PDF".
  *
  * The site is dark on screen. Browsers print without background colors by

@@ -38,7 +38,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NAV_TOOLS } from "@/lib/tools-nav";
-import { CinematicMockup } from "@/components/CinematicMockup";
+import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { DashboardDemo } from "@/components/DashboardDemo";
 
 // =========================================================================
 // Reveal-on-scroll wrapper. Pure IntersectionObserver, no deps. Respects
@@ -248,41 +249,28 @@ export default function LandingPage() {
 
       </section>
 
-      {/* Product mockup section - 3D perspective showing the dashboard */}
-      <section className="relative z-10 border-t border-white/5 py-24 overflow-hidden">
-        <div className="max-w-6xl mx-auto px-6">
-          <Reveal className="text-center mb-14">
-            <p className="text-xs font-mono uppercase tracking-wider text-emerald-400/80 mb-4">
-              L'app en 3 secondes
-            </p>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              Tout ton SEO,
-              <br />
-              <span className="text-emerald-400">une seule interface.</span>
-            </h2>
-            <p className="text-zinc-400 max-w-xl mx-auto">
-              Liste d'articles, audit SEO automatique, génération IA, suivi des positions Google. Tout dans le dashboard, en français-québécois.
-            </p>
-          </Reveal>
-          <div className="relative">
-            <CinematicMockup />
-            {/* Activity feed floating in the empty left gutter, balances the AI
-                generator side panel that overhangs the right. Scaled down and
-                pushed far left so it sits BESIDE the mockup, not over it. */}
-            <div
-              className="hidden lg:block absolute z-30"
-              style={{
-                bottom: 50,
-                left: -180,
-                width: 320,
-                transform: "scale(0.78)",
-                transformOrigin: "bottom left",
-              }}
-            >
-              <ActivityFeed />
+      {/* Product screen - l'ecran se redresse au scroll et le dashboard dedans
+          est reellement cliquable (donnees de demo, aucun appel reseau). */}
+      <section className="relative z-10 border-t border-white/5 overflow-hidden">
+        <ContainerScroll
+          titleComponent={
+            <div className="px-6">
+              <p className="text-xs font-mono uppercase tracking-wider text-emerald-400/80 mb-4">
+                L'app en 3 secondes
+              </p>
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+                Tout ton SEO,
+                <br />
+                <span className="text-emerald-400">une seule interface.</span>
+              </h2>
+              <p className="text-zinc-400 max-w-xl mx-auto">
+                Liste d'articles, audit SEO automatique, suivi des positions Google. Clique dans l'écran, c'est le vrai produit.
+              </p>
             </div>
-          </div>
-        </div>
+          }
+        >
+          <DashboardDemo />
+        </ContainerScroll>
       </section>
 
       {/* Workflow IA - 4-step animated flow */}
