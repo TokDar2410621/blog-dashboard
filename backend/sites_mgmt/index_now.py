@@ -55,6 +55,27 @@ def _same_site(host_a: str, host_b: str) -> bool:
     return bool(root) and root == _root(host_b)
 
 
+def _resolve_key_host(host: str, key: str) -> str:
+    """The host that actually SERVES the key file, redirects followed.
+
+    The apex usually 301/308s to www (or the reverse). IndexNow verifies the key
+    file at the host it was handed, so announcing a host whose key file is only
+    a redirect gets the whole batch rejected. This matters for the auto-ping on
+    delivery, which builds its URL from `site.domain` and would otherwise always
+    announce the apex. Fails open: any network trouble keeps the given host.
+    """
+    try:
+        resp = requests.get(f'https://{host}/{key}.txt', allow_redirects=True,
+                            timeout=8)
+        if resp.status_code == 200:
+            final = (urlparse(resp.url).netloc or '').lower()
+            if final and _same_site(final, host):
+                return final
+    except Exception as exc:  # noqa: BLE001
+        logger.info('IndexNow key host unresolved for %s: %s', host, exc)
+    return host
+
+
 def get_or_create_key(site) -> str:
     """The site's IndexNow key, generated + persisted on first use."""
     key = (getattr(site, 'indexnow_key', '') or '').strip()
@@ -150,12 +171,13 @@ def submit_urls(site, urls) -> dict:
             'submitted': 0, 'skipped_wrong_host': skipped_host, 'host': site_host,
         }
 
-    # One host for the whole batch. On a mixed apex/www list the majority host
-    # wins and the rest are rebased onto it: both variants are the same site,
-    # and the losing variant redirects to the winner anyway.
+    # One host for the whole batch, and it has to be the one serving the key
+    # file. Start from the majority host of the URLs, then follow the key file's
+    # redirects to land on the variant that answers 200.
     host = max(hosts, key=hosts.get)  # dict order makes ties deterministic
+    host = _resolve_key_host(host, key)
     normalized = 0
-    if len(hosts) > 1:
+    if list(hosts) != [host]:
         rebased = []
         for u in clean:
             parsed = urlparse(u if u.startswith('http') else 'https://' + u)

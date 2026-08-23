@@ -16,6 +16,7 @@ cle deja posee (donc aucune ecriture DB, aucun reseau).
 Run: python manage.py test sites_mgmt.tests_index_now
 """
 from unittest.mock import patch
+from urllib.parse import urlparse, urlunparse
 
 from django.test import SimpleTestCase
 
@@ -36,13 +37,31 @@ class FakeSite:
 
 
 class FakeResponse:
-    def __init__(self, status_code=200):
+    def __init__(self, status_code=200, url=''):
         self.status_code = status_code
+        self.url = url
 
 
-def _submit(site, urls, status_code=200):
-    """Appelle submit_urls sans reseau et rend (resultat, payload envoye)."""
-    with patch('sites_mgmt.index_now.requests.post') as post:
+def _rehost(url: str, host: str) -> str:
+    return urlunparse(urlparse(url)._replace(netloc=host))
+
+
+def _submit(site, urls, status_code=200, key_host=None, key_status=200,
+            key_raises=False):
+    """Appelle submit_urls sans reseau et rend (resultat, payload envoye).
+
+    `key_host` : host qui sert reellement le fichier de cle une fois les
+    redirections suivies (None = pas de redirection). `key_status` / `key_raises`
+    simulent un fichier de cle injoignable.
+    """
+    def _get(url, **_kwargs):
+        if key_raises:
+            raise OSError('connexion refusee')
+        return FakeResponse(key_status,
+                            url if key_host is None else _rehost(url, key_host))
+
+    with patch('sites_mgmt.index_now.requests.post') as post, \
+            patch('sites_mgmt.index_now.requests.get', side_effect=_get):
         post.return_value = FakeResponse(status_code)
         result = submit_urls(site, urls)
         payload = post.call_args.kwargs['json'] if post.call_args else None
@@ -146,6 +165,46 @@ class HostVariantTests(SimpleTestCase):
         rejected, _ = _submit(site, ['https://restaurant.ca/poutine'])
         self.assertFalse(rejected['ok'])
         self.assertEqual(rejected['skipped_wrong_host'], 1)
+
+
+class KeyHostResolutionTests(SimpleTestCase):
+    """Le host annonce doit etre celui qui SERT le fichier, pas celui qui redirige.
+
+    C'est le cas du ping automatique a la livraison : l'URL est construite depuis
+    site.domain, donc sur l'apex, dont le fichier de cle n'est qu'une 308.
+    """
+
+    def test_the_announced_host_follows_the_key_file_redirect(self):
+        result, payload = _submit(FakeSite(), ['https://gridar.app/mon-article'],
+                                  key_host='www.gridar.app')
+        self.assertEqual(payload['host'], 'www.gridar.app')
+        self.assertEqual(payload['keyLocation'],
+                         f'https://www.gridar.app/{KEY}.txt')
+        self.assertEqual(payload['urlList'],
+                         ['https://www.gridar.app/mon-article'])
+        self.assertEqual(result['normalized_to_host'], 1)
+
+    def test_no_redirect_leaves_the_host_alone(self):
+        result, payload = _submit(FakeSite(), ['https://www.gridar.app/tools'])
+        self.assertEqual(payload['host'], 'www.gridar.app')
+        self.assertNotIn('normalized_to_host', result)
+
+    def test_a_redirect_to_another_site_is_ignored(self):
+        """Un fichier de cle qui atterrit ailleurs ne doit pas detourner le lot."""
+        _, payload = _submit(FakeSite(), ['https://gridar.app/tools'],
+                             key_host='cdn-parking.example')
+        self.assertEqual(payload['host'], 'gridar.app')
+
+    def test_an_unreachable_key_file_keeps_the_given_host(self):
+        """Echec ouvert : sans reponse, on soumet quand meme sur le host des URLs."""
+        _, payload = _submit(FakeSite(), ['https://gridar.app/tools'],
+                             key_raises=True)
+        self.assertEqual(payload['host'], 'gridar.app')
+
+    def test_a_404_key_file_keeps_the_given_host(self):
+        _, payload = _submit(FakeSite(), ['https://gridar.app/tools'],
+                             key_status=404, key_host='www.gridar.app')
+        self.assertEqual(payload['host'], 'gridar.app')
 
 
 class FailureReportingTests(SimpleTestCase):
