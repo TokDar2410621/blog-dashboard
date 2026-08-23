@@ -106,10 +106,10 @@ export default function ToolsHubPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 md:py-20">
       <div className="text-center max-w-2xl mx-auto mb-12">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300 mb-4">
-          <span>Gratuit, sans inscription</span>
-        </div>
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
+        <h1
+          style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
+          className="text-4xl md:text-6xl font-medium tracking-tight mb-5 text-white"
+        >
           Outils SEO gratuits
         </h1>
         <p className="text-base md:text-lg text-zinc-400">

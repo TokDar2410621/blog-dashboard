@@ -22,7 +22,8 @@ import {
   Zap,
   Download,
 } from "lucide-react";
-import { GridarMark } from "@/components/GridarMark";
+import { MarketingHeader } from "@/components/MarketingHeader";
+import { CinematicFooter } from "@/components/ui/motion-footer";
 import { toast } from "sonner";
 import {
   FullReportSections,
@@ -206,19 +207,7 @@ export function PublicAuditPage() {
 
   return (
     <div className="dark min-h-screen bg-background text-foreground">
-      <header className="border-b border-border/40 sticky top-0 bg-background/95 backdrop-blur z-20">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <GridarMark className="h-5 w-5 text-primary" />
-            <span className="font-bold">Gridar</span>
-          </Link>
-          <Link href="/login">
-            <Button size="sm" variant="outline">
-              Connexion
-            </Button>
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader trail="Audit SEO + GEO" />
 
       <main className="max-w-5xl mx-auto px-4 py-8 md:py-12">
         <div className="text-center max-w-2xl mx-auto mb-8">
@@ -615,11 +604,7 @@ export function PublicAuditPage() {
         )}
       </main>
 
-      <footer className="mt-16 border-t border-border/40 py-6">
-        <div className="max-w-5xl mx-auto px-4 text-center text-xs text-muted-foreground">
-          Gridar, audit SEO + génération d&apos;articles FR-CA pour PME québécoises
-        </div>
-      </footer>
+      <CinematicFooter />
     </div>
   );
 }
