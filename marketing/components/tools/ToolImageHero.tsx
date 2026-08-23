@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 type ToolImageHeroProps = {
   /** Image de fond full-bleed (idealement sur fond noir). */
@@ -24,13 +24,16 @@ export function ToolImageHero({
   subtitle,
   children,
 }: ToolImageHeroProps) {
+  const reduce = useReducedMotion();
   return (
     <section className="relative flex min-h-[calc(100svh-68px)] w-full flex-col items-center justify-center overflow-hidden bg-zinc-950 px-4">
-      {/* Image full-bleed */}
-      <div
+      {/* Image full-bleed, leger zoom lent (Ken Burns) */}
+      <motion.div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat opacity-95"
         style={{ backgroundImage: `url('${imageSrc}')` }}
+        animate={reduce ? undefined : { scale: [1, 1.08, 1] }}
+        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
       />
 
       {/* Scrim radial pour la lisibilite du titre */}

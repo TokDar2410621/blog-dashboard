@@ -18,7 +18,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -99,9 +99,12 @@ export function CanIRankChecker() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={Target} badge="Can I Rank?" title="Puis-je ranker sur ce mot-cle?" subtitle="Evalue tes chances reelles d'atteindre la premiere page selon l'autorite de ton domaine et tes concurrents actuels." />
-
+    <>
+      <ToolImageHero
+        imageSrc="/hero-canirank.webp"
+        title="Puis-je ranker sur ce mot-cle?"
+        subtitle="Evalue tes chances reelles d'atteindre la premiere page selon l'autorite de ton domaine et tes concurrents actuels."
+      >
       <Card className="mb-8">
         <CardContent className="p-4">
           <form onSubmit={runAnalysis} className="flex flex-col gap-4">
@@ -149,7 +152,9 @@ export function CanIRankChecker() {
           </form>
         </CardContent>
       </Card>
+      </ToolImageHero>
 
+      <div className="max-w-3xl mx-auto px-4 pb-16 pt-8">
       {loading && (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
@@ -305,6 +310,7 @@ export function CanIRankChecker() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

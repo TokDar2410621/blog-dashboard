@@ -20,7 +20,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -83,10 +83,9 @@ export function CompetitorCompare() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={GitCompare} badge="Comparaison de Concurrents" title="Qui a la meilleure strategie SEO?" subtitle="Compare ton site a ton concurrent principal sur 20+ dimensions et decouvre comment le depasser." />
-
-      <Card className="mb-8">
+    <>
+      <ToolImageHero imageSrc="/hero-versus.webp" title="Qui a la meilleure strategie SEO?" subtitle="Compare ton site a ton concurrent principal sur 20+ dimensions et decouvre comment le depasser.">
+        <Card className="mb-8">
         <CardContent className="p-4">
           <form onSubmit={runAnalysis} className="flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -135,7 +134,9 @@ export function CompetitorCompare() {
           </form>
         </CardContent>
       </Card>
+      </ToolImageHero>
 
+      <div className="max-w-4xl mx-auto px-4 pb-16 pt-8">
       {loading && (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
@@ -296,6 +297,7 @@ export function CompetitorCompare() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

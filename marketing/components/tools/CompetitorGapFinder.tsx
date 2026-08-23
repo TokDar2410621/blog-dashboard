@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  GitCompare,
   Loader2,
   ArrowRight,
   TrendingUp,
@@ -19,7 +18,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -106,11 +105,10 @@ export function CompetitorGapFinder() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={GitCompare} badge="Competitor Gap Finder" title="Tes concurrents gagnent sur des mots-cles ou tu es absent" subtitle="Trouve les opportunites SEO que tes concurrents exploitent mais que tu laisses passer." />
-
-      {/* Input form */}
-      <Card className="mb-8">
+    <>
+      <ToolImageHero imageSrc="/hero-gap.webp" title="Tes concurrents gagnent sur des mots-cles ou tu es absent" subtitle="Trouve les opportunites SEO que tes concurrents exploitent mais que tu laisses passer.">
+        {/* Input form */}
+        <Card className="mb-8">
         <CardContent className="p-5">
           <form onSubmit={runAnalysis} className="space-y-3">
             <div>
@@ -198,7 +196,9 @@ export function CompetitorGapFinder() {
           </form>
         </CardContent>
       </Card>
+      </ToolImageHero>
 
+      <div className="max-w-3xl mx-auto px-4 pb-16 pt-8">
       {/* Loading */}
       {loading && (
         <div className="space-y-3 mb-8">
@@ -352,6 +352,7 @@ export function CompetitorGapFinder() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

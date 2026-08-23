@@ -17,7 +17,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -87,8 +87,8 @@ export function SeoRoiCalculator() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={TrendingUp} badge="Calculateur ROI SEO" title="Calcule ton retour sur investissement SEO" subtitle="Decouvre combien le SEO peut rapporter a ton entreprise." />
+    <>
+      <ToolImageHero imageSrc="/hero-roi.webp" title="Calcule ton retour sur investissement SEO" subtitle="Decouvre combien le SEO peut rapporter a ton entreprise.">
 
       <Card className="mb-8">
         <CardContent className="p-6">
@@ -134,6 +134,9 @@ export function SeoRoiCalculator() {
         </CardContent>
       </Card>
 
+      </ToolImageHero>
+
+      <div className="max-w-4xl mx-auto px-4 pb-16 pt-8">
       {loading && (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
@@ -240,6 +243,7 @@ export function SeoRoiCalculator() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

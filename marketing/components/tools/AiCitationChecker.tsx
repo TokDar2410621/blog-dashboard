@@ -18,7 +18,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -75,10 +75,13 @@ export function AiCitationChecker() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={Quote} badge="AI Citation Checker" title="Est-ce que l'IA te cite comme source?" subtitle="Verifie si l'IA de Google (Gemini) utilise tes contenus pour generer ses reponses." />
-
-      <Card className="mb-8">
+    <>
+      <ToolImageHero
+        imageSrc="/hero-citation.webp"
+        title="Est-ce que l'IA te cite comme source?"
+        subtitle="Verifie si l'IA de Google (Gemini) utilise tes contenus pour generer ses reponses."
+      >
+        <Card className="mb-8">
         <CardContent className="p-4">
           <form onSubmit={runAnalysis} className="flex flex-col sm:flex-row gap-2">
             <Input
@@ -110,7 +113,9 @@ export function AiCitationChecker() {
           </form>
         </CardContent>
       </Card>
+      </ToolImageHero>
 
+      <div className="max-w-4xl mx-auto px-4 pb-16 pt-8">
       {loading && (
         <div className="flex justify-center py-8">
           <Loader2 className="h-8 w-8 text-emerald-400 animate-spin" />
@@ -259,6 +264,7 @@ export function AiCitationChecker() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
