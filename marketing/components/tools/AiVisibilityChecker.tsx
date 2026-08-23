@@ -21,7 +21,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { ToolHero } from "@/components/tools/ToolHero";
+import { AiVisibilityHero } from "@/components/tools/AiVisibilityHero";
 
 const API_BASE = "";
 
@@ -146,7 +146,7 @@ export function AiVisibilityChecker() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
-      <ToolHero icon={Eye} badge="AI Visibility Checker" title="Es-tu visible dans l'IA de Google?" subtitle="Decouvre si l'IA de Google (Gemini) recommande ton entreprise ou tes concurrents." />
+      <AiVisibilityHero />
 
       {/* Input form */}
       <Card className="mb-8">
