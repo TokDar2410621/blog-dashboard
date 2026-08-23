@@ -115,6 +115,22 @@ const STYLES = `
   }
 }
 
+/* Ecran de bureau court (portable 13 pouces, fenetre pas plein ecran). Le pied
+ * fait exactement la hauteur du viewport : sous 850px, mesure a l'appui, le
+ * contenu debordait de 12 a 57px, le bloc central se mettait a defiler et le
+ * titre remontait sous le marquee. On resserre le rythme plutot que de laisser
+ * glisser. Au-dessus de 850px, rien ne change. */
+@media (min-width: 48rem) and (max-height: 53.125rem) {
+  .cinematic-footer-wrapper h2 {
+    font-size: 4rem;
+    line-height: 0.95;
+    margin-bottom: 1.5rem;
+  }
+  .footer-plan {
+    margin-top: 1.5rem;
+  }
+}
+
 /* Le triangle natif du <details> jure avec le reste : on met notre chevron. */
 .footer-plan-resume::-webkit-details-marker { display: none; }
 .footer-plan-resume { list-style: none; }
@@ -408,7 +424,7 @@ export function CinematicFooter() {
               <details
                 open={planOuvert}
                 onToggle={(e) => setPlanOuvert(e.currentTarget.open)}
-                className="mt-4 w-full max-w-3xl md:mt-10"
+                className="footer-plan mt-4 w-full max-w-3xl md:mt-10"
               >
                 <summary className="footer-plan-resume mx-auto flex w-fit cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400/70 md:hidden">
                   Plan du site
