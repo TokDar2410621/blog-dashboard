@@ -1782,6 +1782,63 @@ Reponds UNIQUEMENT avec un JSON: {{"tags": ["tag1", "tag2", ...]}}"""
             )
 
 
+def _sourcing_report(content, language='fr'):
+    """Passe deterministe sur le texte : quels chiffres n'ont aucune source.
+
+    Rend None si le module echoue. Cette verification ne doit jamais faire
+    tomber l'audit, mais son absence doit se voir plutot que se deviner : un
+    None dans la charge utile dit "pas verifie", pas "rien a signaler".
+    """
+    try:
+        from .content_verify import sourcing_gate, verify_text
+        rapport = verify_text(content or '', lang=language)
+        rapport['gate'] = sourcing_gate(rapport)
+        return rapport
+    except Exception:  # noqa: BLE001 - jamais casser l'audit sur ce controle
+        logger.exception('content_verify a echoue pendant l audit')
+        return None
+
+
+def _sourcing_prompt_section(sourcing, limit):
+    """Constats de sourcage a injecter dans le prompt de l'auditeur.
+
+    Le modele lit un chiffre precis comme un signal E-E-A-T et monte la note :
+    mesure sur un vrai brouillon, il rendait 93/100 et citait les chiffres
+    fabriques comme preuve d'experience vecue. Une regex ne sait pas non plus
+    si un chiffre est faux, mais elle sait que personne n'a cite de source, et
+    c'est exactement la partie que le modele prend a l'envers. Lui donner ces
+    constats vaut mieux que les produire a cote de lui.
+
+    Seules les affirmations situees dans les `limit` premiers caracteres sont
+    listees : c'est tout ce que le modele recoit, et lui parler d'un passage
+    qu'il ne voit pas l'inviterait a inventer.
+    """
+    if not sourcing:
+        return ''
+    visibles = [
+        claim for claim in sourcing.get('claims') or []
+        if not claim.get('has_citation') and (claim.get('position') or 0) < limit
+    ]
+    if not visibles:
+        return ''
+
+    lignes = '\n'.join(f'- "{claim["claim"]}"' for claim in visibles[:12])
+    reste = len(visibles) - 12
+    if reste > 0:
+        lignes += f'\n- ... and {reste} more'
+    return f"""
+A deterministic pass over this text found {len(visibles)} factual claim(s) with
+no source marker anywhere near them:
+{lignes}
+
+Treat that as established fact, not opinion. An unsourced figure is not an
+E-E-A-T signal, it is a liability: never list one among the strengths, and say
+so in the verdict when the article leans on several of them. You cannot tell
+whether a figure is false, and neither can this check - what is established is
+that nobody cited a source for it.
+"""
+
+
 def _run_seo_audit(title, excerpt, content, keyword='', language='fr', api_key=None):
     """Run the SEO audit prompt against Gemini and return the parsed result.
 
@@ -1797,15 +1854,24 @@ def _run_seo_audit(title, excerpt, content, keyword='', language='fr', api_key=N
     if not api_key:
         raise RuntimeError('GEMINI_API_KEY non configuree')
 
+    # v2 : le prompt a change (constats de sourcage injectes), donc les entrees
+    # ecrites par l'ancienne version ne doivent plus repondre.
     cache_key = _seo_cache_key(
-        'seo-audit:', title, excerpt, content[:5000], keyword, language
+        'seo-audit-v2:', title, excerpt, content[:5000], keyword, language
     )
+
+    # Hors du cache : c'est une passe de regex sur le texte complet, elle ne
+    # coute rien et le cache est indexe sur les 5000 premiers caracteres. Deux
+    # articles partageant ce debut rendraient sinon le rapport de l'autre.
+    sourcing = _sourcing_report(content, language)
+
     cached = cache.get(cache_key)
     if cached is not None:
-        return cached, True  # (result, from_cache)
+        return {**cached, 'sourcing': sourcing}, True  # (result, from_cache)
 
     lang = 'French' if language == 'fr' else 'English'
     kw_section = f'Primary keyword: {keyword}\n' if keyword else ''
+    sourcing_section = _sourcing_prompt_section(sourcing, limit=5000)
 
     prompt = f"""You are a senior SEO expert. Audit this blog article holistically.
 Focus on REAL SEO signals, not checklists. Write feedback in {lang}.
@@ -1823,8 +1889,10 @@ Evaluate:
 - Readability (sentence length, active voice, scannability)
 - Engagement hooks (intro, CTA, internal links)
 - Technical basics (meta description quality, H2 hierarchy, image alt if mentioned)
-
-Be honest and specific. Numbers and examples > platitudes.
+{sourcing_section}
+Be honest and specific. Your OWN feedback should cite numbers and examples
+rather than platitudes. That is not the same as rewarding the article for
+containing numbers.
 
 Respond in JSON only (no markdown):
 {{
@@ -1855,7 +1923,7 @@ Respond in JSON only (no markdown):
         'actions': data.get('actions', []),
     }
     cache.set(cache_key, result, timeout=SEO_CACHE_TTL)
-    return result, False
+    return {**result, 'sourcing': sourcing}, False
 
 
 class SEOAuditView(APIView):

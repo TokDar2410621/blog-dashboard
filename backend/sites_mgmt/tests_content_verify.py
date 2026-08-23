@@ -11,7 +11,8 @@ Run all:
 from django.test import SimpleTestCase
 
 from .content_verify import (
-    CLAIM_KINDS, extract_claims, find_unsourced_claims, verify_text,
+    CLAIM_KINDS, extract_claims, find_unsourced_claims, sourcing_gate,
+    verify_text,
 )
 
 NBSP = ' '
@@ -395,3 +396,99 @@ class GeneratedArticleTests(ClaimAssertions):
     def test_every_kind_of_finding_carries_usable_context(self):
         for claim in self.claims(self.ARTICLE):
             self.assertIn(claim['claim'], claim['context'])
+
+
+class SourcingGateTests(SimpleTestCase):
+    """Le verdict exploitable au-dessus de l'inventaire.
+
+    Le garde ne dit jamais qu'un chiffre est faux : ni lui ni personne ici ne
+    peut le savoir. Il dit que personne n'a cite de source, ce qui se verifie.
+    """
+
+    def gate(self, texte):
+        return sourcing_gate(verify_text(texte))
+
+    def test_texte_sans_chiffre_ne_passe_pas_pour_bien_source(self):
+        garde = self.gate("Verifiez la licence RBQ. Demandez trois soumissions.")
+
+        self.assertEqual(garde['level'], 'ok')
+        self.assertEqual(garde['unsourced_count'], 0)
+        # La nuance qui compte : rien a signaler n'est pas la meme chose que
+        # tout est source. Le message doit dire lequel des deux.
+        self.assertIn('n avance pas de chiffre', garde['message'])
+
+    def test_article_bourre_de_chiffres_sans_source_est_bloquant(self):
+        texte = (
+            "87 % des proprietaires regrettent leur choix. Le marche a "
+            "progresse de 34 % en un an. Dans 73 % des cas la facture depasse "
+            "l estimation de 18 %. Les certifies facturent 2,3 fois plus cher "
+            "et durent 4 fois plus longtemps."
+        )
+        garde = self.gate(texte)
+
+        self.assertEqual(garde['level'], 'hard_stop')
+        self.assertGreaterEqual(garde['unsourced_count'], 5)
+        self.assertTrue(garde['requirements'])
+        # Le message doit renverser la lecture que le modele en faisait.
+        self.assertIn('E-E-A-T', garde['message'])
+
+    def test_un_seul_chiffre_orphelin_ne_bloque_pas(self):
+        garde = self.gate(
+            "Le sablage ameliore la valeur de revente de 12 % des maisons."
+        )
+
+        self.assertEqual(garde['level'], 'ok')
+        self.assertEqual(garde['unsourced_count'], 1)
+        # Il reste signale : 'ok' ne veut pas dire silencieux.
+        self.assertTrue(garde['requirements'])
+
+    def test_deux_chiffres_orphelins_avertissent(self):
+        texte = (
+            "Le sablage ameliore la valeur de revente de 12 % des maisons. "
+            "Nos clients recoivent 3 fois plus d appels."
+        )
+        garde = self.gate(texte)
+
+        self.assertEqual(garde['level'], 'warning')
+        self.assertEqual(garde['unsourced_count'], 2)
+
+    def test_les_memes_chiffres_sourcés_passent(self):
+        texte = (
+            "Selon Statistique Canada, 87 % des proprietaires regrettent leur "
+            "choix. D apres la SCHL, le marche a progresse de 34 % en un an. "
+            "Selon l Institut de la statistique du Quebec, la facture depasse "
+            "l estimation dans 73 % des cas."
+        )
+        garde = self.gate(texte)
+
+        self.assertEqual(garde['level'], 'ok')
+        self.assertEqual(garde['unsourced_count'], 0)
+        self.assertIn('toutes accompagnees', garde['message'])
+
+    def test_le_palier_bloquant_exige_volume_ET_proportion(self):
+        # Beaucoup de chiffres, presque tous sources : le volume seul ne doit
+        # pas suffire a bloquer, sinon un article dense et rigoureux se fait
+        # punir pour sa densite.
+        rapport = {
+            'claim_count': 40,
+            'unsourced_count': 6,
+            'unsourced_ratio': 0.15,
+            'unsourced_by_kind': {'statistic': 6},
+        }
+
+        self.assertEqual(sourcing_gate(rapport)['level'], 'warning')
+
+    def test_les_dates_seules_ne_bloquent_pas(self):
+        # Une date sans source se corrige autrement qu une statistique. Elle
+        # ne doit pas peser dans le palier haut.
+        rapport = {
+            'claim_count': 8,
+            'unsourced_count': 8,
+            'unsourced_ratio': 1.0,
+            'unsourced_by_kind': {'temporal': 6, 'superlative': 2},
+        }
+
+        self.assertEqual(sourcing_gate(rapport)['level'], 'warning')
+
+    def test_rapport_vide_ne_leve_pas(self):
+        self.assertEqual(sourcing_gate({})['level'], 'ok')

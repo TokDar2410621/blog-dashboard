@@ -29,6 +29,7 @@ __all__ = [
     'CLAIM_KINDS',
     'extract_claims',
     'find_unsourced_claims',
+    'sourcing_gate',
     'verify_text',
 ]
 
@@ -470,4 +471,101 @@ def verify_text(text: str, lang: str = 'fr', *,
         'unsourced_count': len(unsourced),
         'unsourced_ratio': round(len(unsourced) / len(claims), 3) if claims else 0.0,
         'unsourced_by_kind': by_kind,
+    }
+
+
+# Deux affirmations sans source, c'est deja un article qui avance des chiffres
+# qu'on ne peut pas retracer. Le palier haut demande a la fois du volume et une
+# proportion : un texte a dix chiffres dont un seul est sourcé est un autre
+# probleme qu'un texte a deux chiffres, tous deux sans source.
+SOURCING_WARNING_AT = 2
+SOURCING_HARD_STOP_AT = 5
+SOURCING_HARD_STOP_RATIO = 0.8
+
+# Les genres qui se font prendre pour de l'autorite. Une date sans source ou un
+# superlatif se corrigent autrement et ne pesent pas dans le palier haut.
+_AUTHORITY_KINDS = ('statistic', 'authority', 'comparative', 'quantity')
+
+
+def sourcing_gate(report: dict) -> dict:
+    """Verdict deterministe sur le sourcage, a la forme des autres gardes.
+
+    `level` vaut 'ok', 'warning' ou 'hard_stop'. Prend la sortie de
+    `verify_text`. Ne dit jamais qu'un chiffre est faux : personne ici ne peut
+    le savoir. Il dit que personne n'a cite de source, ce qui est verifiable et
+    suffit a decider.
+    """
+    total = int(report.get('claim_count') or 0)
+    unsourced = int(report.get('unsourced_count') or 0)
+    ratio = float(report.get('unsourced_ratio') or 0.0)
+    by_kind = report.get('unsourced_by_kind') or {}
+    autorite = sum(int(by_kind.get(kind) or 0) for kind in _AUTHORITY_KINDS)
+
+    if total == 0:
+        return {
+            'level': 'ok',
+            'unsourced_count': 0,
+            'unsourced_ratio': 0.0,
+            'message': (
+                'Aucune affirmation chiffree reperee. Ce n est pas un texte '
+                'bien source, c est un texte qui n avance pas de chiffre.'
+            ),
+            'requirements': [],
+        }
+
+    if unsourced == 0:
+        return {
+            'level': 'ok',
+            'unsourced_count': 0,
+            'unsourced_ratio': 0.0,
+            'message': (
+                f'{total} affirmation(s) chiffree(s), toutes accompagnees d une '
+                'source dans leur voisinage.'
+            ),
+            'requirements': [],
+        }
+
+    exigences = [
+        'Citer la source a cote du chiffre, pas en fin d article',
+        'Remplacer par une donnee que le client peut fournir et prouver',
+        'Supprimer le chiffre si personne ne peut le retracer',
+    ]
+
+    if (autorite >= SOURCING_HARD_STOP_AT
+            and ratio >= SOURCING_HARD_STOP_RATIO):
+        return {
+            'level': 'hard_stop',
+            'unsourced_count': unsourced,
+            'unsourced_ratio': ratio,
+            'message': (
+                f'{unsourced} affirmation(s) chiffree(s) sur {total} sans '
+                'aucune source reperable. Un article bati sur des chiffres que '
+                'personne ne peut retracer expose le site a une perte de '
+                'confiance, et ces chiffres ne comptent pas comme signal '
+                'E-E-A-T : ils comptent contre.'
+            ),
+            'requirements': exigences,
+        }
+
+    if unsourced >= SOURCING_WARNING_AT:
+        return {
+            'level': 'warning',
+            'unsourced_count': unsourced,
+            'unsourced_ratio': ratio,
+            'message': (
+                f'{unsourced} affirmation(s) chiffree(s) sur {total} sans '
+                'source reperable dans leur voisinage.'
+            ),
+            'requirements': exigences,
+        }
+
+    return {
+        'level': 'ok',
+        'unsourced_count': unsourced,
+        'unsourced_ratio': ratio,
+        'message': (
+            f'{unsourced} affirmation chiffree sur {total} sans source '
+            'reperable. Isole, cela reste corrigeable a la relecture.'
+        ),
+        'requirements': exigences,
     }

@@ -588,23 +588,17 @@ class V1AuditView(BaseV1View):
             return Response({'error': f'Erreur audit: {str(e)[:120]}'},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Deterministic pass over the same text. The LLM audit reads a precise
-        # figure as an E-E-A-T signal and scores it up, so an article full of
-        # invented statistics comes back praised: measured on a real draft, it
-        # returned 93/100 and quoted the fabricated numbers as proof of
-        # first-hand experience. Regexes cannot know a figure is false either,
-        # but they can say nobody cited a source for it, which is the part the
-        # model gets backwards.
-        sourcing = None
-        try:
-            from .content_verify import verify_text
-            sourcing = verify_text(content, lang=language)
-        except Exception:  # noqa: BLE001 - never let the check break the audit
-            logger.exception('content_verify failed on audit')
-
+        # `sourcing` arrive de `_run_seo_audit`, qui fait la passe deterministe
+        # ET la donne a lire au modele avant qu'il note. Elle etait faite ici,
+        # apres coup : le rapport etait juste mais la note qu'il surplombait
+        # continuait de feliciter l'article pour ses chiffres inventes.
+        # `gate.level` porte le verdict exploitable ('ok', 'warning',
+        # 'hard_stop'), remonte au premier niveau pour qu'un appelant n'ait pas
+        # a fouiller l'inventaire pour savoir s'il peut publier.
         payload = {**result, 'cache_hit': from_cache}
-        if sourcing is not None:
-            payload['sourcing'] = sourcing
+        gate = (result.get('sourcing') or {}).get('gate')
+        if gate:
+            payload['sourcing_gate'] = gate['level']
         return Response(payload)
 
 
