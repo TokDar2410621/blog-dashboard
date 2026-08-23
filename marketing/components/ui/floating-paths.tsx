@@ -65,7 +65,7 @@ export function FloatingPathsBackground({
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <svg
           className="floating-paths w-full h-full text-slate-950 dark:text-white"
-          viewBox="0 0 696 316"
+          viewBox="0 40 696 316"
           fill="none"
           preserveAspectRatio="xMidYMid slice"
         >
