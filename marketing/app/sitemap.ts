@@ -30,6 +30,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.85,
     },
     {
+      url: `${SITE}/tools/ai-citation-checker`,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${SITE}/tools/competitor-compare`,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${SITE}/tools/keyword-difficulty`,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    {
+      url: `${SITE}/tools/seo-roi-calculator`,
+      changeFrequency: "weekly",
+      priority: 0.85,
+    },
+    // /tools/seo-audit stays out on purpose: it redirects to /audit, already
+    // declared above. A sitemap must not advertise a redirect.
+    {
       url: `${SITE}/suivi-position-google-canada`,
       changeFrequency: "weekly",
       priority: 0.85,
