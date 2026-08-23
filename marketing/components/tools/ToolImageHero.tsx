@@ -1,7 +1,23 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
+
+// Le titre s'assemble mot par mot (flou qui se dissipe + montee, decale).
+const TITLE_CONTAINER = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } },
+};
+
+const WORD = {
+  hidden: { opacity: 0, y: 20, filter: "blur(10px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as const },
+  },
+};
 
 type ToolImageHeroProps = {
   /** Image de fond full-bleed (idealement sur fond noir). */
@@ -58,27 +74,46 @@ export function ToolImageHero({
 
       {/* Contenu */}
       <div className="relative z-10 flex w-full max-w-2xl flex-col items-center text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 22, filter: "blur(8px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-        >
+        {reduce ? (
           <h1
             style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
             className="text-balance text-4xl font-medium leading-[1.05] tracking-tight text-white md:text-6xl"
           >
             {title}
           </h1>
-          <p className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-zinc-300 md:text-lg">
-            {subtitle}
-          </p>
-        </motion.div>
+        ) : (
+          <motion.h1
+            style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
+            className="text-balance text-4xl font-medium leading-[1.05] tracking-tight text-white md:text-6xl"
+            variants={TITLE_CONTAINER}
+            initial="hidden"
+            animate="show"
+          >
+            {title.split(" ").map((word, i, arr) => (
+              <Fragment key={i}>
+                <motion.span variants={WORD} className="inline-block">
+                  {word}
+                </motion.span>
+                {i < arr.length - 1 ? " " : ""}
+              </Fragment>
+            ))}
+          </motion.h1>
+        )}
+
+        <motion.p
+          className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-zinc-300 md:text-lg"
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: reduce ? 0 : 1, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {subtitle}
+        </motion.p>
 
         {children && (
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={reduce ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.8, delay: reduce ? 0 : 1.2, ease: [0.16, 1, 0.3, 1] }}
             className="mt-16 w-full max-w-xl"
           >
             {children}
