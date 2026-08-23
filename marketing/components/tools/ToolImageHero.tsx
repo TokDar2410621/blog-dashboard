@@ -1,24 +1,36 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+
+type ToolImageHeroProps = {
+  /** Image de fond full-bleed (idealement sur fond noir). */
+  imageSrc: string;
+  title: string;
+  subtitle: string;
+  /** La barre d'input de l'outil, posee dans le fondu image -> noir. */
+  children?: ReactNode;
+};
 
 /**
- * Hero full-bleed de la page AI Visibility. Deux mains qui se tendent (image
- * reelle detouree, /hero-hands.png) en fond plein ecran sur du noir. Le titre
- * serif est au centre ; l'image se fond vers le noir en bas, et la barre
- * d'input (children) se pose dans cette zone de transition image -> noir.
+ * Hero full-bleed reutilisable pour toutes les pages d'outils. Une image en
+ * fond plein ecran sur du noir, titre serif au centre, l'image se fond vers le
+ * noir en bas, et l'input (children) se pose dans cette zone de transition.
+ * Un seul endroit a ajuster pour toutes les pages.
  */
-export function AiVisibilityHero({ children }: { children?: ReactNode }) {
-  const reduce = useReducedMotion();
-
+export function ToolImageHero({
+  imageSrc,
+  title,
+  subtitle,
+  children,
+}: ToolImageHeroProps) {
   return (
     <section className="relative flex min-h-[calc(100svh-68px)] w-full flex-col items-center justify-center overflow-hidden bg-zinc-950 px-4">
-      {/* Mains, full-bleed */}
+      {/* Image full-bleed */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat opacity-95"
-        style={{ backgroundImage: "url('/hero-hands.png')" }}
+        style={{ backgroundImage: `url('${imageSrc}')` }}
       />
 
       {/* Scrim radial pour la lisibilite du titre */}
@@ -52,10 +64,10 @@ export function AiVisibilityHero({ children }: { children?: ReactNode }) {
             style={{ fontFamily: "var(--font-fraunces), Georgia, serif" }}
             className="text-balance text-4xl font-medium leading-[1.05] tracking-tight text-white md:text-6xl"
           >
-            Es-tu visible dans l'IA de Google?
+            {title}
           </h1>
           <p className="mx-auto mt-5 max-w-lg text-base leading-relaxed text-zinc-300 md:text-lg">
-            Découvre si l'IA de Google (Gemini) recommande ton entreprise ou tes concurrents.
+            {subtitle}
           </p>
         </motion.div>
 

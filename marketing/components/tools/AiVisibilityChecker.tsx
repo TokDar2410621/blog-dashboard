@@ -21,7 +21,7 @@ import {
 import { GridarMark } from "@/components/GridarMark";
 import { toast } from "sonner";
 import { EmailGate } from "@/components/tools/EmailGate";
-import { AiVisibilityHero } from "@/components/tools/AiVisibilityHero";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 
 const API_BASE = "";
 
@@ -146,7 +146,11 @@ export function AiVisibilityChecker() {
 
   return (
     <>
-      <AiVisibilityHero>
+      <ToolImageHero
+        imageSrc="/hero-hands.png"
+        title="Es-tu visible dans l'IA de Google?"
+        subtitle="Découvre si l'IA de Google (Gemini) recommande ton entreprise ou tes concurrents."
+      >
         {/* Input form */}
         <Card>
         <CardContent className="p-4">
@@ -187,7 +191,7 @@ export function AiVisibilityChecker() {
           </p>
         </CardContent>
       </Card>
-      </AiVisibilityHero>
+      </ToolImageHero>
 
       <div className="max-w-3xl mx-auto px-4 pb-16 pt-8">
       {/* Loading state */}
