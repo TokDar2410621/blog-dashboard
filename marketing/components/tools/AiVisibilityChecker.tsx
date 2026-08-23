@@ -145,9 +145,10 @@ export function AiVisibilityChecker() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
+    <>
       <AiVisibilityHero />
 
+      <div className="max-w-3xl mx-auto px-4 pb-16 pt-10">
       {/* Input form */}
       <Card className="mb-8">
         <CardContent className="p-4">
@@ -368,6 +369,7 @@ export function AiVisibilityChecker() {
           </Card>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
