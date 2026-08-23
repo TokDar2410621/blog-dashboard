@@ -4,7 +4,9 @@ import * as React from "react";
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import Link from "next/link";
 import { Search, ArrowUpRight } from "lucide-react";
+import { NAV_TOOLS } from "@/lib/tools-nav";
 import { cn } from "@/lib/utils";
 
 if (typeof window !== "undefined") {
@@ -95,6 +97,22 @@ const STYLES = `
   background-clip: text;
 }
 
+/* Le rideau plein ecran est un effet de bureau. Mesure du 2026-08-23 : le
+ * contenu du pied fait 746px de haut, soit plus qu'un ecran de 640 ou 844px.
+ * Un element fixed plus haut que le viewport est inatteignable, la barre du bas
+ * finissait 159px sous l'ecran. Sous md on repasse donc en flux normal : le
+ * pied s'allonge autant qu'il faut et se scrolle comme le reste de la page. */
+@media (max-width: 47.99rem) {
+  .cinematic-footer-curtain {
+    clip-path: none !important;
+    height: auto !important;
+  }
+  .cinematic-footer-wrapper {
+    position: static !important;
+    height: auto !important;
+  }
+}
+
 .footer-text-glow {
   background: linear-gradient(180deg, var(--foreground) 0%, color-mix(in oklch, var(--foreground) 40%, transparent) 100%);
   -webkit-background-clip: text;
@@ -183,13 +201,67 @@ MagneticButton.displayName = "MagneticButton";
 // -------------------------------------------------------------------------
 const MarqueeItem = () => (
   <div className="flex items-center space-x-12 px-6">
-    <span>SEO en francais</span> <span className="text-primary/60">✦</span>
+    <span>SEO en français</span> <span className="text-primary/60">✦</span>
     <span>Audit en 60 secondes</span> <span className="text-secondary/60">✦</span>
-    <span>Visibilite IA</span> <span className="text-primary/60">✦</span>
+    <span>Visibilité IA</span> <span className="text-primary/60">✦</span>
     <span>Suivi des positions Google</span> <span className="text-secondary/60">✦</span>
-    <span>Fait au Quebec</span> <span className="text-primary/60">✦</span>
+    <span>Fait au Québec</span> <span className="text-primary/60">✦</span>
   </div>
 );
+
+// -------------------------------------------------------------------------
+// Plan du site : liens sobres, pas de magnetisme. Une vingtaine d'elements
+// magnetiques cote a cote, ce serait du bruit et vingt contextes GSAP pour
+// rien.
+// -------------------------------------------------------------------------
+function ColonneLiens({
+  titre,
+  children,
+}: {
+  titre: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/70 md:text-xs">
+        {titre}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function LienPied({
+  href,
+  externe,
+  children,
+}: {
+  href: string;
+  externe?: boolean;
+  children: React.ReactNode;
+}) {
+  const classe =
+    "text-xs text-muted-foreground transition-colors hover:text-foreground md:text-sm";
+  // mailto: et les domaines externes ne passent pas par le routeur client.
+  if (externe) {
+    return (
+      <a
+        href={href}
+        className={classe}
+        {...(href.startsWith("http")
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : {})}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={classe}>
+      {children}
+    </Link>
+  );
+}
 
 export function CinematicFooter() {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -249,7 +321,7 @@ export function CinematicFooter() {
 
       <div
         ref={wrapperRef}
-        className="relative h-screen w-full"
+        className="cinematic-footer-curtain relative h-screen w-full"
         style={{ clipPath: "polygon(0% 0, 100% 0%, 100% 100%, 0 100%)" }}
       >
         <footer className="cinematic-footer-wrapper fixed bottom-0 left-0 flex h-screen w-full flex-col justify-between overflow-hidden bg-background text-foreground">
@@ -278,7 +350,7 @@ export function CinematicFooter() {
               ref={headingRef}
               className="footer-text-glow mb-12 text-center text-5xl font-black tracking-tighter md:text-8xl"
             >
-              Pret a ranker au Quebec?
+              Prêt à ranker au Québec?
             </h2>
 
             <div ref={linksRef} className="flex w-full flex-col items-center gap-6">
@@ -303,28 +375,60 @@ export function CinematicFooter() {
                 </MagneticButton>
               </div>
 
-              {/* Liens secondaires */}
-              <div className="mt-2 flex w-full flex-wrap justify-center gap-3 md:gap-6">
-                <MagneticButton as="a" href="/docs" className="footer-glass-pill rounded-full px-6 py-3 text-xs font-medium text-muted-foreground hover:text-foreground md:text-sm">
-                  Documentation
-                </MagneticButton>
-                <MagneticButton as="a" href="/privacy" className="footer-glass-pill rounded-full px-6 py-3 text-xs font-medium text-muted-foreground hover:text-foreground md:text-sm">
-                  Confidentialite
-                </MagneticButton>
-                <MagneticButton as="a" href="/terms" className="footer-glass-pill rounded-full px-6 py-3 text-xs font-medium text-muted-foreground hover:text-foreground md:text-sm">
-                  Conditions
-                </MagneticButton>
-                <MagneticButton as="a" href="mailto:tokamdarius@gmail.com" className="footer-glass-pill rounded-full px-6 py-3 text-xs font-medium text-muted-foreground hover:text-foreground md:text-sm">
-                  Contact
-                </MagneticButton>
-              </div>
+              {/* Plan du site. Discret par rapport aux pastilles, mais present :
+                  c'est le seul chemin interne vers les 8 pages d'outils depuis
+                  le bas de page, et un footer cinematique ne doit pas couter
+                  son maillage au site. */}
+              <nav
+                aria-label="Plan du site"
+                className="mt-10 grid w-full max-w-3xl grid-cols-2 gap-x-8 gap-y-8 text-left sm:grid-cols-3"
+              >
+                <ColonneLiens titre="Outils gratuits">
+                  {NAV_TOOLS.map((outil) => (
+                    <LienPied key={outil.href} href={outil.href}>
+                      {outil.label}
+                    </LienPied>
+                  ))}
+                </ColonneLiens>
+
+                <ColonneLiens titre="Ressources">
+                  <LienPied href="/tools">Tous les outils</LienPied>
+                  <LienPied href="/blog">Blogue</LienPied>
+                  <LienPied href="/docs">Documentation</LienPied>
+                  <LienPied href="/api-docs">API REST</LienPied>
+                  <LienPied href="/docs/integrations">Intégrations</LienPied>
+                </ColonneLiens>
+
+                <ColonneLiens titre="Gridar">
+                  <LienPied href="/#pricing">Tarifs</LienPied>
+                  <LienPied href="/audit">Auditer mon site</LienPied>
+                  <LienPied href="/login">Créer un compte</LienPied>
+                  <LienPied href="mailto:tokamdarius@gmail.com" externe>
+                    Contact
+                  </LienPied>
+                  <LienPied href="https://github.com/TokDar2410621/blog-dashboard" externe>
+                    GitHub
+                  </LienPied>
+                </ColonneLiens>
+              </nav>
             </div>
           </div>
 
           {/* Bottom bar */}
           <div className="relative z-20 flex w-full flex-col items-center justify-between gap-6 px-6 pb-8 md:flex-row md:px-12">
-            <div className="order-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:order-1 md:text-xs">
-              © 2026 Gridar - Arivex Studio
+            <div className="order-2 flex flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:order-1 md:items-start md:text-xs">
+              {/* Annee calculee : un millesime en dur finit toujours par mentir. */}
+              <span>© {new Date().getFullYear()} Gridar - Arivex Studio</span>
+              <span className="normal-case tracking-normal">Fait à Saint-Hyacinthe, QC.</span>
+            </div>
+
+            <div className="order-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground md:order-2 md:text-xs">
+              <Link href="/privacy" className="transition-colors hover:text-foreground">
+                Confidentialité
+              </Link>
+              <Link href="/terms" className="transition-colors hover:text-foreground">
+                Conditions
+              </Link>
             </div>
 
             <MagneticButton
