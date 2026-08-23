@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Hero10 } from "@/components/ui/hero-10";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import {
@@ -123,49 +124,44 @@ export default function LandingPage() {
       {/* Top nav */}
       <MarketingHeader />
 
-      {/* Hero */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-24 md:pt-32 pb-20">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="hero-fade-2 text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tighter">
-            Le SEO en français qui comprend{" "}
-            <span className="text-emerald-400">
-              le Québec
-            </span>
-            .
-          </h1>
-          <p className="hero-fade-3 mt-8 text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-            Entre ton URL. En 60 secondes, on te sort exactement ce qui t'empêche de ranker sur Google au Québec : tags, schema, vitesse, mots-clés, contenu manquant.
-          </p>
-          <div className="hero-fade-4 mt-10 max-w-xl mx-auto">
-            <HeroAuditInput authedHref={authedHref} />
-          </div>
-          <div className="hero-fade-4 mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link href={authedHref}>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full sm:w-auto h-12 px-6 bg-transparent border-white/15 hover:bg-white/5 text-zinc-100 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
-              >
-                {isAuthenticated ? "Tableau de bord" : "Créer un compte gratuit"}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-            <a href="#features">
-              <Button
-                size="lg"
-                variant="ghost"
-                className="w-full sm:w-auto h-12 px-6 text-zinc-300 hover:bg-white/5 motion-safe:transition-transform motion-safe:hover:-translate-y-0.5"
-              >
-                Voir comment ça marche
-              </Button>
-            </a>
-          </div>
-          <p className="hero-fade-5 mt-5 text-xs text-zinc-500">
-            Sans carte · Audit complet en 60 secondes · 100% confidentiel
-          </p>
-        </div>
-
-      </section>
+      {/* Hero. Le champ d'audit reste DANS le hero via `action` : un hero qui
+          promet vaut moins qu'un hero ou l'outil tourne deja. Les trois
+          captures de /public/hero sont de vraies captures du produit, la
+          premiere sur le site public, les deux autres sur le tableau de bord
+          de demonstration (donnees de demo, jamais celles d'un client). */}
+      <Hero10
+        title="Le SEO fait pour toi."
+        titleLine2Prefix="Pour les PME"
+        titleHighlight="du Québec"
+        description="Entre ton URL. En 60 secondes, on te sort exactement ce qui t’empêche de ranker sur Google au Québec : tags, schéma, vitesse, mots-clés, contenu manquant."
+        animation="subtle"
+        action={<HeroAuditInput authedHref={authedHref} />}
+        primaryCTA={{
+          ctaEnabled: true,
+          text: isAuthenticated ? "Tableau de bord" : "Créer un compte gratuit",
+          link: authedHref,
+          variant: "default",
+          size: "lg",
+        }}
+        secondaryCTA={{
+          ctaEnabled: true,
+          text: "Voir comment ça marche",
+          link: "#features",
+          variant: "ghost",
+          size: "lg",
+        }}
+        socialProof="Sans carte · Audit complet en 60 secondes · 100% confidentiel"
+        images={[
+          "/hero/1-input.png",
+          "/hero/2-produit.png",
+          "/hero/3-positions.png",
+        ]}
+        imageAlts={[
+          "Le champ où on entre son domaine pour lancer l’audit",
+          "Les articles produits, avec leur score de qualité",
+          "Le suivi des positions Google sur trente jours",
+        ]}
+      />
 
       {/* Product screen - l'ecran se redresse au scroll et le dashboard dedans
           est reellement cliquable (donnees de demo, aucun appel reseau). */}
