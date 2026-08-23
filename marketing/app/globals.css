@@ -145,7 +145,40 @@
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
+/* Rendu telephone : le tiret qui glisse le long du trace, conserve tel quel
+ * parce que c'est le rendu voulu sur petit ecran. Reproduction fidele de ce
+ * que motion produisait, relevee sur la version precedente : la longueur du
+ * tiret monte de 0,3 a 1 sur le cycle puis repart de 0,3, le decalage fait un
+ * aller-retour complet, l'opacite passe de 0,35 a 0,7 et revient, le tout en
+ * lineaire. `pathLength="1"` sur chaque trait rend ces valeurs normalisees.
+ *
+ * La rupture de longueur au bouclage est inherente a cet effet : elle etait
+ * genante sur grand ecran, elle passe inapercue dans une fenetre etroite. */
+@keyframes floatingPathFlow {
+  0% {
+    stroke-dasharray: 0.3px 1px;
+    stroke-dashoffset: 0px;
+    opacity: 0.35;
+  }
+  50% {
+    stroke-dasharray: 0.65px 1px;
+    stroke-dashoffset: -1px;
+    opacity: 0.7;
+  }
+  100% {
+    stroke-dasharray: 1px 1px;
+    stroke-dashoffset: 0px;
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (max-width: 767.98px) {
+  .floating-paths path {
+    animation: floatingPathFlow var(--duree, 24s) linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 768px) {
   /* transform et opacite sur le meme calque : le compositeur traite les deux,
    * la respiration ne coute donc rien de plus que la derive. Elle remplace le
    * scintillement que l'original obtenait en animant chaque trait. */

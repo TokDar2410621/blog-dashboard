@@ -21,14 +21,23 @@ import { cn } from "@/lib/utils";
  * l'animation mais du fait de repeindre 36 grandes courbes a chaque image, et
  * animer quoi que ce soit A L'INTERIEUR du SVG force ce repaint.
  *
- * D'ou la forme retenue : le SVG ne bouge plus du tout, il est rasterise une
- * fois. C'est le calque HTML qui le porte qui derive, par transform, ce que le
- * compositeur execute sans repeindre. Les traits sont entiers et sans tiret,
- * donc ils ne peuvent plus se couper.
+ * D'ou la forme retenue SUR GRAND ECRAN : le SVG ne bouge plus du tout, il est
+ * rasterise une fois. C'est le calque HTML qui le porte qui derive, par
+ * transform, ce que le compositeur execute sans repeindre. Les traits sont
+ * entiers et sans tiret, donc ils ne peuvent plus se couper. Le calque deborde
+ * du hero (md:-inset-12) pour que la derive ne decouvre aucun bord.
  *
- * Le calque deborde du hero (-inset-12) pour que la derive ne decouvre jamais
- * de bord. Plus de motion ici, donc plus de dependance a useReducedMotion(),
- * dont le defaut est documente ailleurs dans ce projet.
+ * SOUS 768 px, le tiret qui glisse le long du trace est conserve : c'est le
+ * rendu que Darius veut sur telephone. La fenetre y est etroite, donc bien
+ * moins de surface a repeindre, et la rupture de longueur au bouclage ne se
+ * voit pas comme sur un grand ecran. Il est reproduit en CSS et non avec
+ * motion, a valeurs identiques (voir globals.css), ce qui evite de reintroduire
+ * une dependance a useReducedMotion(), dont le defaut est documente ailleurs
+ * dans ce projet.
+ *
+ * `pathLength={1}` est ce qui rend cette reproduction possible : il normalise
+ * le trace, si bien que les valeurs de tiret s'expriment en fraction de la
+ * longueur totale, exactement comme motion les calculait.
  */
 export function FloatingPathsBackground({
   position,
@@ -54,14 +63,19 @@ export function FloatingPathsBackground({
     // opaque se lit comme un trait fin. Ici les traits sont blancs sur noir et
     // la meme valeur donne des bandes qui traversent le titre. Plafond a 0,22.
     opacity: 0.03 + i * 0.0055,
+    // Duree du glissement sur telephone. Meme formule qu'avant le passage en
+    // CSS, pour que le desordre entre traits soit exactement le meme.
+    duree: `${20 + ((i * 7) % 11)}s`,
   }));
 
   return (
-    // `overflow-hidden` va avec le -inset-12 du calque : sans lui, le
+    // `overflow-hidden` va avec le md:-inset-12 du calque : sans lui, le
     // debordement de 3 rem ajoute une barre de defilement horizontale.
     <div className={cn("w-full relative overflow-hidden", className)}>
+      {/* inset-0 sous 768 px : le debordement ne sert qu'a la derive du grand
+          ecran, et le garder sur telephone changerait le cadrage des traits. */}
       <div
-        className="floating-paths-layer absolute -inset-12 pointer-events-none"
+        className="floating-paths-layer absolute inset-0 md:-inset-12 pointer-events-none"
         aria-hidden="true"
       >
         <svg
@@ -74,9 +88,11 @@ export function FloatingPathsBackground({
             <path
               key={path.id}
               d={path.d}
+              pathLength={1}
               stroke="currentColor"
               strokeWidth={path.width}
               strokeOpacity={path.opacity}
+              style={{ "--duree": path.duree } as React.CSSProperties}
             />
           ))}
         </svg>
