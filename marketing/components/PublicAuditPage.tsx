@@ -87,6 +87,9 @@ type AuditResult = {
   // deduction et pas les siens. Les presenter sans le dire ferait passer une
   // supposition pour une mesure.
   keywords_confidence?: "strong" | "weak";
+  /** "llm" quand un modele a lu la page pour en tirer de vraies requetes,
+   *  "heuristique" quand on est retombe sur le decoupage en n-grammes. */
+  keywords_source?: "llm" | "heuristique";
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
   gbp?: GbpVerdict | null;
   full_report_gated: boolean;
@@ -402,6 +405,15 @@ export function PublicAuditPage() {
                           Ta page d&apos;accueil ne nomme pas ton métier, alors
                           on a déduit ces mots-clés de son texte. Ce sont nos
                           suppositions, pas les tiennes.
+                        </p>
+                      )}
+                      {/* D'ou viennent ces requetes : lues par un modele sur ta
+                          page, ou decoupees dans son texte. Les deux methodes
+                          n'ont pas la meme valeur, autant le dire. */}
+                      {result.keywords_source === "llm" && (
+                        <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
+                          Requêtes déduites de ta page d&apos;accueil, telles
+                          qu&apos;un client les taperait dans Google.
                         </p>
                       )}
                       {result.top_keywords_estimated.map((kw, i) => (

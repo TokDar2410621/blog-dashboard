@@ -120,3 +120,21 @@ def call_llm(prompt: str, max_tokens: int = 2000, system: str = None,
     except Exception as exc:  # noqa: BLE001
         logger.warning('LLM fallback (DeepSeek) failed: %s', exc)
         return ''
+
+
+def call_deepseek(prompt: str, max_tokens: int = 800, system: str = None,
+                  timeout: int = 20) -> str:
+    """DeepSeek en direct, sans passer par Anthropic. Rend '' en cas d'echec.
+
+    `call_llm` place Anthropic en premier, ce qui est le bon ordre quand la
+    qualite prime. Pour un travail a fort volume et faible enjeu, appele depuis
+    un endpoint public a chaque audit, c'est le cout qui prime : DeepSeek est
+    un ordre de grandeur moins cher et suffit largement.
+
+    Ne leve jamais : l'appelant doit pouvoir se rabattre sur autre chose.
+    """
+    try:
+        return _deepseek_text(prompt, max_tokens, system, timeout) or ''
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('DeepSeek direct call failed: %s', exc)
+        return ''

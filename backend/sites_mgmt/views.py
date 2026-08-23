@@ -10406,6 +10406,119 @@ def _score_onpage(crawl: dict, page_html: str = '') -> dict | None:
     }
 
 
+_SYSTEME_MOTS_CLES = (
+    "Tu es analyste SEO. On te donne le contenu d'une page d'accueil. Tu rends "
+    "UNIQUEMENT un tableau JSON des requetes que de vrais clients taperaient "
+    "dans Google pour trouver cette entreprise. Rien d'autre, aucun texte "
+    "autour."
+)
+
+_GABARIT_MOTS_CLES = """\
+Voici la page d'accueil de {domaine}.
+
+Titre : {title}
+H1 : {h1}
+Meta description : {description}
+Sous-titres : {h2}
+Extrait du contenu : {extrait}
+
+Rends entre 5 et {maximum} requetes de recherche, en JSON, dans cette forme
+exacte : ["requete un", "requete deux"]
+
+Regles :
+- Ecris ce qu'un CLIENT tape, pas ce que l'entreprise dit d'elle-meme. "sablage
+  de plancher montreal", pas "notre savoir-faire depuis 1998".
+- Meme langue que la page.
+- Deux a six mots par requete.
+- Aucune requete de marque, sauf si le nom de l'entreprise est ce qu'on
+  chercherait vraiment.
+- Pas de slogan, pas de nom de section du site, pas de mot de navigation.
+- Si la page ne dit pas assez clairement ce que vend l'entreprise, rends un
+  tableau vide plutot que d'inventer.
+"""
+
+
+def _mots_cles_par_llm(crawl: dict, domaine: str, maximum: int = 10,
+                       timeout: int = 15) -> list[str] | None:
+    """Demande a DeepSeek les requetes qu'un client taperait pour ce site.
+
+    Rend None des que le resultat n'est pas exploitable, et l'appelant reprend
+    l'extraction par n-grammes. Aucune dependance dure a un LLM sur une route
+    publique.
+
+    Pourquoi : l'extraction par n-grammes decoupe le H1 et le title en tranches
+    de deux ou trois mots. Sur un slogan, ca produit "seule interface" ou
+    "gridar quebec", que personne ne tape. Ces chaines partaient ensuite chez
+    Serper et la part de mots-cles dans le top 10 devenait la composante
+    `rankings` du score. Le site etait donc note sur des requetes inventees.
+
+    La validation est volontairement severe : ce que rend le modele part dans
+    des appels Serper factures et entre dans un score montre a un prospect.
+    """
+    import json
+    import re
+
+    from .llm import call_deepseek
+
+    if not crawl or crawl.get('error'):
+        return None
+
+    prompt = _GABARIT_MOTS_CLES.format(
+        domaine=domaine,
+        title=(crawl.get('title') or '')[:200],
+        h1=(crawl.get('h1') or '')[:200],
+        description=(crawl.get('meta_description') or '')[:300],
+        h2=' | '.join((crawl.get('h2_list') or [])[:8])[:400],
+        extrait=(crawl.get('body_snippet') or '')[:1200],
+        maximum=maximum,
+    )
+
+    try:
+        brut = call_deepseek(prompt, max_tokens=400, system=_SYSTEME_MOTS_CLES,
+                             timeout=timeout)
+    except Exception:  # noqa: BLE001 - call_deepseek avale deja tout, ceinture
+        logger.exception('mots-cles par LLM indisponibles')
+        return None
+    if not brut:
+        return None
+
+    # Le modele encadre parfois sa reponse d'un bloc markdown ou d'une phrase.
+    bloc = re.search(r'\[.*?\]', brut, re.DOTALL)
+    if not bloc:
+        return None
+    try:
+        brut_liste = json.loads(bloc.group(0))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(brut_liste, list):
+        return None
+
+    propres: list[str] = []
+    vus: set[str] = set()
+    for item in brut_liste:
+        if not isinstance(item, str):
+            continue
+        mot = ' '.join(item.split()).strip(' "\'.,;:!?')
+        if not (3 <= len(mot) <= 80):
+            continue
+        if not (2 <= len(mot.split()) <= 6):
+            continue
+        # Une URL, une balise ou un saut de ligne n'est pas une requete.
+        if re.search(r'https?://|www\.|[<>{}]', mot):
+            continue
+        cle = mot.lower()
+        if cle in vus:
+            continue
+        vus.add(cle)
+        propres.append(mot)
+        if len(propres) >= maximum:
+            break
+
+    # Moins de trois requetes exploitables, ce n'est pas un gain sur
+    # l'heuristique : on la laisse faire son travail.
+    return propres if len(propres) >= 3 else None
+
+
 _POIDS_SCORE_PUBLIC = {'pagespeed': 40, 'onpage': 35, 'rankings': 25}
 
 
@@ -11263,10 +11376,22 @@ class PublicAuditView(APIView):
         gbp_thread.start()
 
         # Extract 7-10 candidate keywords from all the crawled signals.
-        keywords_to_check = _extract_candidate_keywords(crawl, max_kws=10)
+        # DeepSeek lit la page et propose les requetes qu'un client taperait.
+        # L'extraction par n-grammes reste le repli : elle ne depend de rien et
+        # cette route est publique, elle ne doit jamais dependre d'un LLM.
+        keywords_to_check = _mots_cles_par_llm(crawl, domain, maximum=10)
+        keywords_source = 'llm'
+        if not keywords_to_check:
+            keywords_to_check = _extract_candidate_keywords(crawl, max_kws=10)
+            keywords_source = 'heuristique'
+
         # Whether the page actually named its trade, or we fell through to word
         # frequency. The visitor must not read a guess as a measured finding.
-        keywords_confidence = _keyword_confidence(crawl)
+        # Quand les requetes viennent du modele, elles sortent d'une lecture de
+        # la page et non d'un decoupage en tranches : la reserve ne tient plus.
+        keywords_confidence = (
+            'strong' if keywords_source == 'llm' else _keyword_confidence(crawl)
+        )
 
         # Parallel Serper position checks - bounded by the existing
         # ThreadPoolExecutor pattern. Each call ~1-3s, so 10 sequentially
@@ -11404,6 +11529,7 @@ class PublicAuditView(APIView):
             # 'strong' = read from the page's own title/h1/meta; 'weak' = we
             # fell through to word frequency and these are guesses.
             'keywords_confidence': keywords_confidence,
+            'keywords_source': keywords_source,
             'recos_partial': recos,
             # Read off the same fetch as the crawl. Agent readability is the
             # 2026 angle almost nobody audits: whether an AI agent can make
