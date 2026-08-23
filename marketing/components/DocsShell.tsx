@@ -20,8 +20,6 @@ export function DocsShell({ slug, content }: Props) {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <MarketingHeader trail="Docs" />
 
-      {/* Top emerald wash, lifted from the landing hero so /docs feels like a continuation. */}
-      <div className="fixed inset-x-0 top-0 h-[40vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent" />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-6 grid lg:grid-cols-[260px_1fr] gap-8 py-10">
         <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">

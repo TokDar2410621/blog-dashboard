@@ -161,8 +161,7 @@ export default function Terminal3D() {
           borderRadius: 14,
           boxShadow: `
             0 1px 2px rgba(0,0,0,0.3),
-            0 16px 40px rgba(0,0,0,0.45),
-            0 32px 70px rgba(16,185,129,0.10)
+            0 16px 40px rgba(0,0,0,0.45)
           `,
           overflow: "hidden",
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",

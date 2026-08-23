@@ -319,14 +319,6 @@ export default async function BlogPostPage({ params }: PageProps) {
           )}
 
           <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-8 text-center relative overflow-hidden">
-            <div
-              aria-hidden
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(60% 50% at 50% 50%, rgba(16,185,129,0.15), transparent 70%)",
-              }}
-            />
             <div className="relative">
               <h2 className="text-2xl font-bold tracking-tight mb-2">
                 Tu veux générer ce genre d&apos;article sur ton site ?

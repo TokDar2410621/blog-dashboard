@@ -16,8 +16,6 @@ export default function Terms() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <MarketingHeader trail="Conditions" />
 
-      {/* Top emerald wash, same hero recipe as landing. */}
-      <div className="fixed inset-x-0 top-0 h-[40vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.04] via-transparent to-transparent" />
 
       <main className="relative z-10 max-w-3xl mx-auto px-4 md:px-6 py-12">
         <article

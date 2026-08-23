@@ -177,7 +177,7 @@ export default function WorkflowIA3D() {
           align-items: center;
           justify-content: center;
           z-index: 5;
-          box-shadow: 0 4px 14px rgba(16,185,129,0.40);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.35);
         }
         .wia3d-cursor {
           display: inline-block;

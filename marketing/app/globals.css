@@ -93,12 +93,6 @@
 .hero-fade-4 { animation: heroFade 0.8s ease-out 0.45s backwards; }
 .hero-fade-5 { animation: heroFade 0.8s ease-out 0.6s backwards; }
 
-@keyframes glowPulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-.glow-pulse { animation: glowPulse 4s ease-in-out infinite; }
-
 @keyframes drawLine {
   from { stroke-dashoffset: 200; }
   to { stroke-dashoffset: 0; }

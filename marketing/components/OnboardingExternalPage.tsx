@@ -452,13 +452,7 @@ export default function OnboardingExternalPage() {
                 {selectedSite.domain || "ton-domaine.com"}/blog/...
               </span>
             </div>
-            <div
-              className="relative"
-              style={{
-                background:
-                  "radial-gradient(50% 80% at 50% 0%, rgba(16,185,129,0.08), transparent 70%)",
-              }}
-            >
+            <div className="relative">
               <BrowserBlogPreview3D
                 domain={selectedSite.domain || "ton-domaine.com"}
                 brandColor={selectedSite.theme_config?.brand_color || undefined}

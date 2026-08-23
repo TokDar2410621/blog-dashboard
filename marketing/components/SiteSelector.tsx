@@ -230,16 +230,6 @@ function SiteSelectorContent() {
           </div>
         ) : (
           <div className="relative min-h-[360px] rounded-2xl overflow-hidden border border-border/50 bg-zinc-950">
-            {/* Emerald glow background */}
-            <div
-              aria-hidden
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(80% 60% at 50% 30%, rgba(16,185,129,0.15), transparent 70%)",
-              }}
-            />
-
             {/* Grayed-out mockup preview, scaled down */}
             <div
               className="relative grayscale opacity-50 pointer-events-none -mb-20 md:-mb-44"

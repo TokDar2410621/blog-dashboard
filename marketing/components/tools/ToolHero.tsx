@@ -49,7 +49,7 @@ export function ToolHero({ icon: Icon, badge, title, subtitle }: ToolHeroProps) 
 
   return (
     <div className="relative mb-12 pt-6">
-      <div className="relative mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-white/[0.05] via-white/[0.02] to-transparent px-6 py-16 text-center shadow-[0_0_80px_-20px_rgba(16,185,129,0.35)] md:py-20">
+      <div className="relative mx-auto max-w-3xl overflow-hidden rounded-[28px] border border-white/[0.08] bg-gradient-to-b from-white/[0.05] via-white/[0.02] to-transparent px-6 py-16 text-center md:py-20">
         {/* Lignes de scan */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
           {SCAN_LINES.map((top) => (
@@ -68,12 +68,6 @@ export function ToolHero({ icon: Icon, badge, title, subtitle }: ToolHeroProps) 
           ))}
         </div>
 
-        {/* Glow d'ambiance */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute left-1/2 top-0 -z-10 h-72 w-[440px] -translate-x-1/2 -translate-y-1/4 rounded-full bg-emerald-500/20 blur-[120px]"
-        />
-
         {/* Coins en equerre (viseur) */}
         <Corner pos="left-4 top-4 border-l-2 border-t-2 rounded-tl-sm" />
         <Corner pos="right-4 top-4 border-r-2 border-t-2 rounded-tr-sm" />
@@ -86,7 +80,6 @@ export function ToolHero({ icon: Icon, badge, title, subtitle }: ToolHeroProps) 
             variants={item}
             className="relative mx-auto mb-8 flex h-20 w-20 items-center justify-center"
           >
-            <div className="absolute inset-0 rounded-full bg-emerald-500/25 blur-2xl" />
             <div className="absolute inset-0 rounded-full border border-emerald-400/25" />
             <div className="absolute inset-[6px] rounded-full border border-emerald-400/15" />
             <div className="absolute inset-[12px] rounded-full border border-emerald-400/10" />

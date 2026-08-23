@@ -125,10 +125,6 @@ export default function LandingPage() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-6px); }
         }
-        @keyframes glowPulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
         @keyframes shimmer {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
@@ -140,7 +136,6 @@ export default function LandingPage() {
           .hero-fade-4 { animation: heroFadeUp 0.7s ease-out 0.50s backwards; }
           .hero-fade-5 { animation: heroFadeUp 0.7s ease-out 0.65s backwards; }
           .float-slow { animation: float 5s ease-in-out infinite; }
-          .glow-pulse { animation: glowPulse 4s ease-in-out infinite; }
           .draw-line { animation: drawLine 2s ease-out 0.3s backwards; }
         }
       `}</style>
@@ -206,7 +201,6 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-24 md:pt-32 pb-20">
-        <RadialGlow />
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="hero-fade-2 text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.95] tracking-tighter">
             Le SEO en français qui comprend{" "}
@@ -753,7 +747,6 @@ export default function LandingPage() {
 
       {/* Final CTA */}
       <section className="relative z-10 py-24 border-t border-white/5">
-        <RadialGlow />
         <Reveal className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-4xl md:text-6xl font-bold tracking-tight leading-[0.95]">
             Tes concurrents écrivent encore dans Word.
@@ -887,9 +880,8 @@ function HeroAuditInput({ authedHref }: { authedHref: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="relative flex flex-col sm:flex-row gap-2 p-1.5 rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl shadow-[0_0_60px_-10px_rgba(16,185,129,0.25)] motion-safe:transition-shadow motion-safe:focus-within:shadow-[0_0_60px_-5px_rgba(16,185,129,0.45)]"
+      className="relative flex flex-col sm:flex-row gap-2 p-1.5 rounded-2xl border border-white/10 bg-zinc-900/60 backdrop-blur-xl"
     >
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-emerald-500/30 via-cyan-500/20 to-emerald-500/30 opacity-60 blur-xl pointer-events-none -z-10" />
       <input
         type="text"
         inputMode="url"
@@ -927,17 +919,7 @@ function BackgroundGrid() {
           backgroundSize: "48px 48px",
         }}
       />
-      {/* Top fade */}
-      <div className="fixed inset-x-0 top-0 h-[40vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.05] via-transparent to-transparent" />
     </>
-  );
-}
-
-function RadialGlow() {
-  return (
-    <div className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[600px] w-[1000px] rounded-full bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-transparent blur-3xl motion-safe:glow-pulse" />
-    </div>
   );
 }
 
@@ -1035,7 +1017,6 @@ function ActivityFeed() {
   const tripled = [...FEED_ITEMS, ...FEED_ITEMS, ...FEED_ITEMS];
   return (
     <div className="relative">
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-emerald-500/30 via-cyan-500/10 to-transparent blur-xl pointer-events-none" />
       <div className="relative rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl overflow-hidden">
         {/* Window chrome */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
@@ -1124,7 +1105,7 @@ function ModeCard({
   body: string;
 }) {
   return (
-    <div className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-emerald-400/30 backdrop-blur-sm p-6 motion-safe:transition-all motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_8px_30px_rgba(52,211,153,0.08)]">
+    <div className="group relative rounded-2xl border border-white/10 bg-zinc-900/40 hover:bg-zinc-900/60 hover:border-emerald-400/30 backdrop-blur-sm p-6 motion-safe:transition-all motion-safe:duration-300 motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
       <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br from-emerald-500/0 to-emerald-500/0 group-hover:from-emerald-500/10 group-hover:to-transparent motion-safe:transition-colors motion-safe:duration-500" />
       <div className="flex items-start justify-between mb-4">
         <Icon className="h-6 w-6 text-emerald-400 motion-safe:transition-transform motion-safe:duration-300 motion-safe:group-hover:scale-110" />
@@ -1201,7 +1182,6 @@ function FeatureRow({
 function MockupFrame({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <div className="relative">
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-transparent blur-xl pointer-events-none" />
       <div className="relative rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
           <div className="flex items-center gap-1.5">
@@ -1418,7 +1398,6 @@ function RankMockup() {
 function LexiconLiveMockup() {
   return (
     <div className="relative">
-      <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-transparent blur-xl pointer-events-none" />
       <div className="relative rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
           <div className="flex items-center gap-1.5">
@@ -1559,7 +1538,7 @@ function PriceCard({
     <div
       className={`relative rounded-2xl p-6 motion-safe:transition-all motion-safe:duration-300 motion-safe:hover:-translate-y-1 ${
         highlight
-          ? "bg-gradient-to-b from-emerald-500/10 to-zinc-900/40 border-2 border-emerald-500/40 motion-safe:hover:shadow-[0_12px_40px_rgba(52,211,153,0.15)]"
+          ? "bg-gradient-to-b from-emerald-500/10 to-zinc-900/40 border-2 border-emerald-500/40 motion-safe:hover:shadow-[0_12px_40px_rgba(0,0,0,0.3)]"
           : "bg-zinc-900/40 border border-white/10 hover:border-white/20 motion-safe:hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
       }`}
     >

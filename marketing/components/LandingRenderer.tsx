@@ -196,7 +196,6 @@ export function LandingRenderer({
           backgroundSize: "48px 48px",
         }}
       />
-      <div className="fixed inset-x-0 top-0 h-[40vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.05] via-transparent to-transparent" />
 
       {/* Hero */}
       <section className="relative z-10 max-w-4xl mx-auto px-6 pt-24 md:pt-32 pb-12 text-center">

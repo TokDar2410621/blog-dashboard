@@ -126,8 +126,6 @@ export default function ApiDocs() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <MarketingHeader trail="API" />
 
-      {/* Top emerald wash, same hero recipe as landing. */}
-      <div className="fixed inset-x-0 top-0 h-[40vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.05] via-transparent to-transparent" />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 md:px-6 py-12 space-y-8">
         {/* Page title block */}
@@ -155,13 +153,7 @@ export default function ApiDocs() {
 
         {/* Terminal hero, kept as-is (already dark-themed) but framed with our border. */}
         <div className="rounded-2xl border border-white/10 bg-zinc-950 overflow-hidden">
-          <div
-            className="relative"
-            style={{
-              background:
-                "radial-gradient(50% 80% at 50% 0%, rgba(16,185,129,0.12), transparent 70%)",
-            }}
-          >
+          <div className="relative">
             <Terminal3D />
           </div>
         </div>

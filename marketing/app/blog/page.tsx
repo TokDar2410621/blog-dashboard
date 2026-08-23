@@ -56,14 +56,6 @@ export default async function BlogIndexPage() {
       </header>
 
       <section className="relative overflow-hidden border-b border-white/5">
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 50% 20%, rgba(16,185,129,0.18), transparent 70%)",
-          }}
-        />
         <div className="relative max-w-4xl mx-auto px-4 md:px-6 py-20 md:py-28 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-6">
             <Sparkles className="h-3 w-3" />
@@ -87,14 +79,6 @@ export default async function BlogIndexPage() {
         <BlogList posts={posts} />
 
         <section className="mt-24 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-10 md:p-12 text-center relative overflow-hidden">
-          <div
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(60% 50% at 50% 50%, rgba(16,185,129,0.18), transparent 70%)",
-            }}
-          />
           <div className="relative">
             <h2 className="text-3xl font-bold tracking-tight mb-3">
               Tu veux générer ce genre d&apos;article sur ton site ?

@@ -313,7 +313,7 @@ function SidePanel({ style }: { style?: React.CSSProperties }) {
           justifyContent: "center",
           gap: 6,
           cursor: "default",
-          boxShadow: "0 4px 12px rgba(16,185,129,0.30)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.30)",
         }}
       >
         Générer l'article <ArrowRight size={14} strokeWidth={2.5} />
@@ -603,7 +603,7 @@ function MainMock() {
             fontSize: 13,
             fontWeight: 600,
             cursor: "default",
-            boxShadow: "0 4px 12px rgba(16,185,129,0.30)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.30)",
           }}
         >
           <Plus size={14} strokeWidth={2.5} />

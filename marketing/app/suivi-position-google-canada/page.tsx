@@ -145,8 +145,6 @@ export default function SuiviPositionGoogleCanadaPage() {
 
       <MarketingHeader trail="Suivi position Google" />
 
-      {/* Emerald wash, meme recette que le hero de la landing. */}
-      <div className="fixed inset-x-0 top-0 h-[45vh] z-0 pointer-events-none bg-gradient-to-b from-emerald-500/[0.06] via-transparent to-transparent" />
 
       <main className="relative z-10">
         {/* 1. HERO */}

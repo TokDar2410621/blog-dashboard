@@ -247,14 +247,6 @@ export function LoginPage() {
     <div className="min-h-screen bg-background grid lg:grid-cols-2 overflow-hidden">
       {/* Left: form */}
       <div className="flex items-center justify-center p-6 lg:p-12 relative">
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 50% 30%, rgba(16,185,129,0.08), transparent 70%)",
-          }}
-        />
         <div className="relative w-full max-w-sm space-y-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -502,15 +494,6 @@ export function LoginPage() {
 
       {/* Right: mockup showcase (desktop only) */}
       <div className="hidden lg:flex relative overflow-hidden bg-zinc-950">
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(70% 60% at 70% 30%, rgba(16,185,129,0.15), transparent 70%), radial-gradient(40% 40% at 30% 80%, rgba(16,185,129,0.10), transparent 70%)",
-          }}
-        />
-
         <div className="relative w-full flex flex-col justify-center px-12 py-16">
           <div className="max-w-md mb-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-400/30 bg-emerald-400/10 text-emerald-300 text-xs font-mono uppercase tracking-wider mb-6">
