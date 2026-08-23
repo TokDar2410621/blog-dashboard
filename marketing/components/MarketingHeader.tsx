@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GridarMark } from "@/components/GridarMark";
 import {
@@ -11,6 +11,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { NAV_TOOLS } from "@/lib/tools-nav";
 import { useAuth } from "@/context/AuthContext";
 
@@ -105,7 +112,7 @@ export function MarketingHeader({ trail }: Props) {
           {!hideLoginAffordance && (
             <Link
               href={authedHref}
-              className="text-sm text-zinc-400 hover:text-white"
+              className="hidden md:inline text-sm text-zinc-400 hover:text-white"
             >
               {headerCtaLabel}
             </Link>
@@ -115,6 +122,70 @@ export function MarketingHeader({ trail }: Props) {
               {primaryCtaLabel}
             </Button>
           </Link>
+
+          {/* Menu mobile */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                aria-label="Ouvrir le menu"
+                className="md:hidden inline-flex items-center justify-center rounded-md p-1.5 text-zinc-300 hover:text-white"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className="w-72 border-white/10 bg-zinc-950 text-zinc-200"
+            >
+              <SheetTitle className="px-4 pt-4 text-zinc-100">Menu</SheetTitle>
+              <nav className="flex flex-col gap-0.5 overflow-y-auto px-2 pb-6 text-sm">
+                <SheetClose asChild>
+                  <Link href="/#features" className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                    Fonctionnalités
+                  </Link>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Link href="/#pricing" className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                    Tarifs
+                  </Link>
+                </SheetClose>
+
+                <div className="mt-3 mb-1 px-2 text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Outils
+                </div>
+                {NAV_TOOLS.map((tool) => (
+                  <SheetClose asChild key={tool.href}>
+                    <Link href={tool.href} className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                      {tool.label}
+                    </Link>
+                  </SheetClose>
+                ))}
+                <SheetClose asChild>
+                  <Link href="/tools" className="rounded-md px-2 py-2 text-emerald-400 hover:bg-white/5">
+                    Voir tous les outils →
+                  </Link>
+                </SheetClose>
+
+                <div className="my-2 h-px bg-white/10" />
+                <SheetClose asChild>
+                  <Link href="/blog" className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                    Blog
+                  </Link>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Link href="/docs" className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                    Docs
+                  </Link>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Link href={authedHref} className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                    {headerCtaLabel}
+                  </Link>
+                </SheetClose>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </nav>
       </div>
     </header>
