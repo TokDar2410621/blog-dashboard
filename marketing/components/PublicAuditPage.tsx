@@ -61,6 +61,10 @@ type AuditResult = {
     checked?: boolean;
     reason?: string;
   }[];
+  // 'weak' = la page ne nomme pas son metier, les mots-cles sont notre
+  // deduction et pas les siens. Les presenter sans le dire ferait passer une
+  // supposition pour une mesure.
+  keywords_confidence?: "strong" | "weak";
   recos_partial: { severity: "high" | "medium" | "low"; message: string }[];
   gbp?: GbpVerdict | null;
   full_report_gated: boolean;
@@ -387,6 +391,13 @@ export function PublicAuditPage() {
                     </p>
                   ) : (
                     <div className="space-y-1">
+                      {result.keywords_confidence === "weak" && (
+                        <p className="text-xs text-amber-500/90 mb-3 leading-relaxed">
+                          Ta page d&apos;accueil ne nomme pas ton métier, alors
+                          on a déduit ces mots-clés de son texte. Ce sont nos
+                          suppositions, pas les tiennes.
+                        </p>
+                      )}
                       {result.top_keywords_estimated.map((kw, i) => (
                         <div
                           key={i}

@@ -10208,6 +10208,88 @@ _STOPWORDS = frozenset({
     'menu', 'contact', 'about', 'page', 'site',
 })
 
+# Site furniture: words a CMS or a template puts on every page. They recur, so
+# frequency ranks them highly, but nobody types them into Google. Left out of
+# _STOPWORDS on purpose: a stopword is dropped from every phrase, while these
+# only disqualify a phrase made of them ("sujet article", "importe blog"), and
+# must not kill a real one that happens to contain one.
+_BOILERPLATE = frozenset({
+    # FR
+    'article', 'articles', 'blog', 'blogue', 'blogues', 'billet', 'billets',
+    'sujet', 'sujets', 'publie', 'publiee', 'publies', 'publier', 'publication',
+    'publications', 'actualite', 'actualites', 'nouvelle', 'nouvelles',
+    'categorie', 'categories', 'archive', 'archives', 'commentaire',
+    'commentaires', 'partager', 'suivant', 'suivante', 'precedent',
+    'precedente', 'propos', 'temoignage', 'temoignages', 'galerie',
+    'portfolio', 'mentions', 'legales', 'confidentialite', 'cookies',
+    'infolettre', 'newsletter', 'abonner', 'abonnez', 'inscription',
+    'inscrire', 'connexion', 'compte', 'panier', 'resultats', 'chargement',
+    'bienvenue', 'cliquez', 'suivez', 'rejoignez', 'decouvrez', 'importe',
+    'copyright', 'reserves', 'navigation', 'rechercher', 'recherche',
+    # EN
+    'post', 'posts', 'category', 'categories', 'archive', 'archives',
+    'comment', 'comments', 'share', 'next', 'previous', 'testimonial',
+    'testimonials', 'gallery', 'privacy', 'policy', 'subscribe', 'signup',
+    'login', 'account', 'cart', 'results', 'loading', 'welcome', 'follow',
+    'join', 'search', 'navigation', 'copyright', 'reserved',
+})
+
+# Sources 1 to 3 name the trade; 4 and 5 only guess from recurrence.
+_STRONG_KEYWORD_SOURCES = ('meta_keywords', 'h1', 'title')
+
+
+def _keyword_confidence(crawl: dict) -> str:
+    """'strong' when the page names a trade, 'weak' otherwise.
+
+    Counting substantive words is not enough: a slogan has plenty of them.
+    "Le SEO en francais qui comprend le Quebec" and "Courtiere hypothecaire au
+    Quebec" both survive a stopword filter, yet only the second says what the
+    business sells. So the test is lexical, against the trade vocabulary
+    `local_seo` already carries for its six verticals.
+
+    Weak does not mean the extraction failed. It means the keywords are our
+    guess rather than the site's own words, and the report has to say so
+    instead of scoring the visitor on a guess.
+    """
+    texte = _strip_accents_lower(' '.join(
+        (crawl.get(champ) or '') for champ in _STRONG_KEYWORD_SOURCES
+    ))
+    if not texte.strip():
+        return 'weak'
+    try:
+        from .local_seo import VERTICALES
+    except Exception:  # noqa: BLE001 - never let this break an audit
+        logger.exception('lexique local_seo indisponible')
+        return 'weak'
+    # Prefix matching on words, not substring on the whole phrase: the lexicon
+    # is written masculine singular ("courtier hypothecaire") and a Quebec site
+    # writes "courtiere hypothecaire". The trailing "e" breaks a plain `in`.
+    # Same reason plombier has to reach plomberie.
+    jetons = re.findall(r"[a-z0-9]+", texte)
+    for entree in VERTICALES:
+        # (cle, libelle, schema_type, termes_forts, termes_faibles)
+        for terme in list(entree[3]) + list(entree[4]):
+            mots = re.findall(r"[a-z0-9]+", _strip_accents_lower(terme))
+            if not mots:
+                continue
+            if all(
+                any(
+                    j.startswith(m) if len(m) >= 4 else j == m
+                    for j in jetons
+                )
+                for m in mots
+            ):
+                return 'strong'
+    return 'weak'
+
+
+def _strip_accents_lower(s: str) -> str:
+    import unicodedata
+    return ''.join(
+        c for c in unicodedata.normalize('NFD', (s or '').lower())
+        if unicodedata.category(c) != 'Mn'
+    )
+
 
 def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
     """Return up to `max_kws` deduplicated candidate keywords from the crawled
@@ -10259,6 +10341,11 @@ def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
         key = _normalize(phrase.strip())
         if not key or key in seen:
             return False
+        # A phrase built only of site furniture is never a search query,
+        # whichever source produced it.
+        mots = key.split()
+        if mots and all(m in _BOILERPLATE for m in mots):
+            return False
         seen.add(key)
         candidates.append(phrase.strip())
         return len(candidates) >= max_kws
@@ -10299,6 +10386,11 @@ def _extract_candidate_keywords(crawl: dict, max_kws: int = 10) -> list[str]:
         for phrase, count in bigrams.most_common(20):
             if count < 2:
                 break
+            # Stricter here than in _push: frequency is the weakest signal we
+            # have, so a single furniture word disqualifies the pair rather
+            # than only a pair made entirely of them.
+            if any(_normalize(m) in _BOILERPLATE for m in phrase.split()):
+                continue
             if _push(phrase):
                 return candidates
 
@@ -10922,6 +11014,9 @@ class PublicAuditView(APIView):
 
         # Extract 7-10 candidate keywords from all the crawled signals.
         keywords_to_check = _extract_candidate_keywords(crawl, max_kws=10)
+        # Whether the page actually named its trade, or we fell through to word
+        # frequency. The visitor must not read a guess as a measured finding.
+        keywords_confidence = _keyword_confidence(crawl)
 
         # Parallel Serper position checks - bounded by the existing
         # ThreadPoolExecutor pattern. Each call ~1-3s, so 10 sequentially
@@ -11002,13 +11097,25 @@ class PublicAuditView(APIView):
                 'message': f"Score PageSpeed mobile = {ps['avg']}/100. Vise 80+.",
             })
         if verifies and all(p['position'] is None for p in verifies):
-            recos.append({
-                'severity': 'high',
-                'message': (
-                    f"Aucun de tes {len(verifies)} mots-cles verifies n'apparait "
-                    "dans les premiers resultats Google."
-                ),
-            })
+            if keywords_confidence == 'strong':
+                recos.append({
+                    'severity': 'high',
+                    'message': (
+                        f"Aucun de tes {len(verifies)} mots-cles verifies n'apparait "
+                        "dans les premiers resultats Google."
+                    ),
+                })
+            else:
+                # The keywords were guessed from word frequency, so "you rank
+                # nowhere" would be a verdict on our own guess, not on the site.
+                recos.append({
+                    'severity': 'medium',
+                    'message': (
+                        "Ta page d'accueil ne nomme pas ton metier, alors on a "
+                        "devine tes mots-cles a partir du texte. Dis-nous les "
+                        "tiens pour une mesure fiable."
+                    ),
+                })
         elif positions and not verifies:
             # Say the measure failed. Announcing "you rank nowhere" because our
             # own quota ran out is a false statement about someone else's site.
@@ -11043,6 +11150,9 @@ class PublicAuditView(APIView):
                 'error': crawl.get('error'),
             },
             'top_keywords_estimated': positions,
+            # 'strong' = read from the page's own title/h1/meta; 'weak' = we
+            # fell through to word frequency and these are guesses.
+            'keywords_confidence': keywords_confidence,
             'recos_partial': recos,
             # Read off the same fetch as the crawl. Agent readability is the
             # 2026 angle almost nobody audits: whether an AI agent can make
