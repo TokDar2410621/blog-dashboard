@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import WorkflowIA3D from "@/components/WorkflowIA3D";
-import { GridarMark } from "@/components/GridarMark";
+import { MarketingHeader } from "@/components/MarketingHeader";
 import {
   Sparkles,
   Languages,
@@ -18,27 +18,14 @@ import {
   BarChart3,
   Zap,
   ChevronRight,
-  ChevronDown,
   TrendingUp,
   Globe,
-  Eye,
-  FileText,
   Layers,
   Link2,
-  AlertTriangle,
-  Award,
   ShieldCheck,
-  Target,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { NAV_TOOLS } from "@/lib/tools-nav";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
+import { CinematicFooter } from "@/components/ui/motion-footer";
 import { DashboardDemo } from "@/components/DashboardDemo";
 
 // =========================================================================
@@ -99,16 +86,8 @@ export default function LandingPage() {
   // Auth-aware CTAs: if the visitor already has a valid session, every
   // "Connexion" / "Commencer" link points to /sites (site selector) instead
   // of /login. isLoading guards the SSR/hydration mismatch flash.
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
   const authedHref = isAuthenticated ? "/sites" : "/login";
-  const primaryCtaLabel = isAuthenticated ? "Tableau de bord" : "Commencer";
-  const headerCtaLabel = isAuthenticated ? "Tableau de bord" : "Connexion";
-  // Hide the secondary "Connexion" text link entirely while we're still
-  // probing /auth/me/ AND once we know the user is authenticated - the
-  // primary "Tableau de bord" button covers that affordance, no point
-  // showing both. Authenticated users should not see the word "Connexion"
-  // anywhere in the header.
-  const hideLoginAffordance = authLoading || isAuthenticated;
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       {/* Global animation keyframes used across the page. */}
@@ -143,61 +122,7 @@ export default function LandingPage() {
       <BackgroundGrid />
 
       {/* Top nav */}
-      <header className="relative z-20 border-b border-white/5 backdrop-blur-xl bg-zinc-950/70 sticky top-0">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <GridarMark className="h-[30px] w-[30px] text-emerald-400" />
-            <span className="font-semibold tracking-tight text-[1.4rem]">Gridar</span>
-          </div>
-          <nav className="flex items-center gap-6">
-            <a href="#features" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Fonctionnalités</a>
-            <a href="#pricing" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Tarifs</a>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="hidden md:inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white outline-none">
-                Outils
-                <ChevronDown className="h-3.5 w-3.5" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-64 bg-zinc-900 border-white/10 text-zinc-200"
-              >
-                {NAV_TOOLS.map((tool) => (
-                  <DropdownMenuItem
-                    key={tool.href}
-                    asChild
-                    className="cursor-pointer focus:bg-white/5 focus:text-white"
-                  >
-                    <Link href={tool.href} className="text-sm text-zinc-300">
-                      {tool.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="bg-white/10" />
-                <DropdownMenuItem
-                  asChild
-                  className="cursor-pointer focus:bg-white/5 focus:text-white"
-                >
-                  <Link href="/tools" className="text-sm text-emerald-400">
-                    Voir tous les outils →
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Link href="/blog" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Blog</Link>
-            <Link href="/docs" className="hidden md:inline text-sm text-zinc-400 hover:text-white">Docs</Link>
-            {!hideLoginAffordance && (
-              <Link href={authedHref} className="text-sm text-zinc-400 hover:text-white">
-                {headerCtaLabel}
-              </Link>
-            )}
-            <Link href={authedHref}>
-              <Button size="sm" className="bg-white text-zinc-950 hover:bg-zinc-200">
-                {primaryCtaLabel}
-              </Button>
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <MarketingHeader />
 
       {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 pt-24 md:pt-32 pb-20">
@@ -784,73 +709,9 @@ export default function LandingPage() {
         </Reveal>
       </section>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5">
-        <div className="max-w-6xl mx-auto px-6 py-12 text-sm text-zinc-500">
-          <div className="flex flex-col md:flex-row justify-between gap-8">
-            <div className="max-w-md">
-              <div className="flex items-center gap-2 mb-3 text-zinc-100">
-                <GridarMark className="h-[30px] w-[30px] text-emerald-400" />
-                <span className="font-semibold text-[1.4rem]">Gridar</span>
-              </div>
-              <p>
-                Le SaaS SEO bilingue FR-CA, conçu et opéré au Québec. Pour les PME
-                québécoises qui veulent ranker. Aucun investisseur, aucun pivot prévu.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
-              <div className="flex flex-col gap-2">
-                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
-                  Outils gratuits
-                </span>
-                {NAV_TOOLS.map((tool) => (
-                  <Link
-                    key={tool.href}
-                    href={tool.href}
-                    className="hover:text-zinc-100"
-                  >
-                    {tool.label}
-                  </Link>
-                ))}
-              </div>
-              <div className="flex flex-col gap-2">
-                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
-                  Ressources
-                </span>
-                <Link href="/tools" className="hover:text-zinc-100">Tous les outils</Link>
-                <Link href="/docs" className="hover:text-zinc-100">Documentation</Link>
-                <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
-                <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
-                <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
-              </div>
-              <div className="flex flex-col gap-2">
-                <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
-                  Gridar
-                </span>
-                <a href="#pricing" className="hover:text-zinc-100">Tarifs</a>
-                <Link href={authedHref} className="hover:text-zinc-100">{headerCtaLabel}</Link>
-                <a href="mailto:tokamdarius@gmail.com" className="hover:text-zinc-100">Contact</a>
-                <a
-                  href="https://github.com/TokDar2410621/blog-dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-zinc-100"
-                >
-                  GitHub
-                </a>
-              </div>
-            </div>
-          </div>
-          <div className="mt-12 pt-6 border-t border-white/5 text-xs flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-center">
-            <span>© {new Date().getFullYear()} Gridar - Arivex Studio</span>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/privacy" className="hover:text-zinc-100">Confidentialité</Link>
-              <Link href="/terms" className="hover:text-zinc-100">Conditions</Link>
-              <span>Fait à Saint-Hyacinthe, QC.</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer cinematique : rideau plein ecran, meme composant que les
+          pages d'outils, plan du site complet a l'interieur. */}
+      <CinematicFooter />
     </div>
   );
 }
@@ -923,173 +784,6 @@ function BackgroundGrid() {
   );
 }
 
-// --- Activity feed (Linear-style) -----------------------------------------
-
-const FEED_ITEMS: Array<{
-  icon: typeof Sparkles;
-  badge: string;
-  badgeColor: string;
-  text: string;
-  highlight?: string;
-  meta: string;
-}> = [
-  {
-    icon: PenLine,
-    badge: "PUBLIÉ",
-    badgeColor: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30",
-    text: "Article",
-    highlight: "« Comment retenir les développeurs au Québec »",
-    meta: "il y a 2 min",
-  },
-  {
-    icon: TrendingUp,
-    badge: "RANK",
-    badgeColor: "text-cyan-300 bg-cyan-500/10 border-cyan-500/30",
-    text: "« automatisation pme québec »",
-    highlight: "#14 → #8",
-    meta: "il y a 5 min",
-  },
-  {
-    icon: Award,
-    badge: "AUDIT",
-    badgeColor: "text-violet-300 bg-violet-500/10 border-violet-500/30",
-    text: "Score IA",
-    highlight: "82/100",
-    meta: "il y a 12 min",
-  },
-  {
-    icon: Sparkles,
-    badge: "BRIEF",
-    badgeColor: "text-amber-300 bg-amber-500/10 border-amber-500/30",
-    text: "Brief généré pour",
-    highlight: "« marketing courriel pme »",
-    meta: "il y a 18 min",
-  },
-  {
-    icon: AlertTriangle,
-    badge: "DÉCLIN",
-    badgeColor: "text-orange-300 bg-orange-500/10 border-orange-500/30",
-    text: "Impressions",
-    highlight: "-42% sur 30j",
-    meta: "il y a 1 h",
-  },
-  {
-    icon: Globe,
-    badge: "WP",
-    badgeColor: "text-blue-300 bg-blue-500/10 border-blue-500/30",
-    text: "WordPress connecté",
-    highlight: "monsalon.ca",
-    meta: "il y a 2 h",
-  },
-  {
-    icon: Layers,
-    badge: "CLUSTER",
-    badgeColor: "text-pink-300 bg-pink-500/10 border-pink-500/30",
-    text: "5 topic clusters détectés",
-    meta: "il y a 3 h",
-  },
-  {
-    icon: Target,
-    badge: "MOT-CLÉ",
-    badgeColor: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30",
-    text: "+3 mots-clés ajoutés au suivi",
-    meta: "il y a 5 h",
-  },
-  {
-    icon: Link2,
-    badge: "MAILLAGE",
-    badgeColor: "text-indigo-300 bg-indigo-500/10 border-indigo-500/30",
-    text: "2 articles orphelins détectés",
-    meta: "il y a 6 h",
-  },
-  {
-    icon: ShieldCheck,
-    badge: "AI 23%",
-    badgeColor: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30",
-    text: "Article",
-    highlight: "« TPS et TVQ pour solo »",
-    meta: "il y a 8 h",
-  },
-];
-
-function ActivityFeed() {
-  // Triple the array for seamless infinite scroll
-  const tripled = [...FEED_ITEMS, ...FEED_ITEMS, ...FEED_ITEMS];
-  return (
-    <div className="relative">
-      <div className="relative rounded-2xl border border-white/10 bg-zinc-900/80 backdrop-blur-xl overflow-hidden">
-        {/* Window chrome */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
-            <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
-            <span className="h-2.5 w-2.5 rounded-full bg-zinc-700" />
-          </div>
-          <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Activité - tokamdarius.ca
-          </div>
-          <span className="text-[10px] text-zinc-600">live</span>
-        </div>
-
-        {/* Scrolling feed */}
-        <div className="relative h-[280px] overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-zinc-900 to-transparent z-10 pointer-events-none" />
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-zinc-900 to-transparent z-10 pointer-events-none" />
-          <div className="animate-feed-scroll">
-            {tripled.map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 px-5 py-3 border-b border-white/5"
-                >
-                  <span className="mt-0.5 shrink-0 h-7 w-7 rounded-md bg-zinc-800 border border-white/5 flex items-center justify-center">
-                    <Icon className="h-3.5 w-3.5 text-zinc-300" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${item.badgeColor}`}
-                      >
-                        {item.badge}
-                      </span>
-                      <span className="text-sm text-zinc-300">
-                        {item.text}
-                        {item.highlight && (
-                          <>
-                            {" "}
-                            <span className="font-semibold text-white">
-                              {item.highlight}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-zinc-500 shrink-0 mt-1 font-mono">
-                    {item.meta}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Inject the keyframes */}
-      <style>{`
-        @keyframes feedScroll {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(-33.333%); }
-        }
-        .animate-feed-scroll {
-          animation: feedScroll 40s linear infinite;
-        }
-      `}</style>
-    </div>
-  );
-}
 
 // --- Mode card ------------------------------------------------------------
 
