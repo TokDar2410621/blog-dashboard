@@ -38,6 +38,16 @@ type AuditResult = {
   domain: string;
   audited_at: string | null;
   composite_score: number | null;
+  /** Vrai quand une composante du score n'a pas pu etre mesuree et que le
+   *  chiffre ne porte donc que sur celles qui restent. */
+  score_partiel?: boolean;
+  score_composantes?: {
+    cle: string;
+    valeur: number;
+    poids_nominal: number;
+    poids_effectif: number;
+  }[];
+  score_absentes?: { cle: string; raison: string | null }[];
   pagespeed: {
     performance?: number;
     seo?: number;
@@ -265,6 +275,21 @@ export function PublicAuditPage() {
                     <div className={`text-sm font-medium ${scoreColor(result.composite_score)}`}>
                       {scoreLabel(result.composite_score)}
                     </div>
+                    {/* Un score calcule sur une seule composante doit le dire.
+                        Sinon un site correct dont le PageSpeed n'a pas repondu
+                        lit "10/100" comme un verdict sur son SEO. */}
+                    {result.score_partiel && (
+                      <p className="mt-2 max-w-xs text-center text-xs text-amber-300/90 md:text-left">
+                        Score partiel :{" "}
+                        {result.score_absentes
+                          ?.map((c) =>
+                            c.cle === "pagespeed" ? "la vitesse" : "les positions",
+                          )
+                          .join(" et ")}{" "}
+                        n{"'"}a pas pu être mesuré. Le chiffre ne porte que sur le
+                        reste.
+                      </p>
+                    )}
                   </div>
                   <div className="flex-1 text-sm text-muted-foreground">
                     <p className="mb-2">

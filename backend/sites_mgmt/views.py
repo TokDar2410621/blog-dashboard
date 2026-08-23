@@ -10314,6 +10314,69 @@ _BOILERPLATE = frozenset({
 _STRONG_KEYWORD_SOURCES = ('meta_keywords', 'h1', 'title')
 
 
+_POIDS_SCORE_PUBLIC = {'pagespeed': 60, 'rankings': 40}
+
+
+def _composer_score_public(ps: dict, positions: list) -> dict:
+    """Assemble le score de l'audit public et dit sur quoi il repose.
+
+    Rend {composite_score, composantes, absentes, partiel}.
+
+    Deux composantes : la moyenne PageSpeed (60 %) et la part des mots-cles
+    verifies qui sortent dans le top 10 (40 %). Quand l'une manque, les poids
+    sont renormalises sur celle qui reste, ce qui est defendable mais doit se
+    DIRE : un PageSpeed en timeout faisait porter 100 % du score aux positions,
+    et un site correct qui ne rank pas encore ressortait a 10/100 sans que rien
+    ne signale que la moitie de la mesure manquait. Constate le 2026-08-23 sur
+    gridar.app, dont le PageSpeed reel vaut 90 mais repond en 17 a 23 s contre
+    une coupure a 25 s.
+
+    Un mot-cle dont la verification a echoue ne compte pas : le compter zero
+    revenait a punir le visiteur d'un quota Serper epuise.
+    """
+    composantes: list[tuple[str, float, float]] = []
+
+    if 'avg' in ps:
+        composantes.append(('pagespeed', float(ps['avg']), 0.60))
+
+    verifies = [p for p in (positions or []) if p.get('checked')]
+    if verifies:
+        top_10 = sum(1 for p in verifies if p.get('position') and p['position'] <= 10)
+        composantes.append(('rankings', (top_10 / len(verifies)) * 100, 0.40))
+
+    composite = None
+    if composantes:
+        somme_poids = sum(w for _, _, w in composantes)
+        composite = round(sum(v * (w / somme_poids) for _, v, w in composantes))
+
+    somme_poids = sum(w for _, _, w in composantes) or 1
+    detail = [
+        {
+            'cle': nom,
+            'valeur': round(valeur),
+            'poids_nominal': _POIDS_SCORE_PUBLIC[nom],
+            'poids_effectif': round(poids / somme_poids * 100),
+        }
+        for nom, valeur, poids in composantes
+    ]
+    presentes = {nom for nom, _, _ in composantes}
+    absentes = [
+        {
+            'cle': cle,
+            'raison': (ps.get('error') or 'mesure indisponible') if cle == 'pagespeed'
+                      else 'aucun mot-cle verifiable',
+        }
+        for cle in _POIDS_SCORE_PUBLIC
+        if cle not in presentes
+    ]
+    return {
+        'composite_score': composite,
+        'composantes': detail,
+        'absentes': absentes,
+        'partiel': bool(absentes) and composite is not None,
+    }
+
+
 def _keyword_confidence(crawl: dict) -> str:
     """'strong' when the page names a trade, 'weak' otherwise.
 
@@ -10991,7 +11054,7 @@ class PublicAuditView(APIView):
     throttle_classes = [PublicAuditThrottle]
 
     def post(self, request):
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor
 
         domain = _normalize_audit_domain(request.data.get('domain') or '')
         if not domain:
@@ -11024,7 +11087,7 @@ class PublicAuditView(APIView):
                         'strategy': 'mobile',
                         'category': ['performance', 'seo', 'accessibility'],
                     },
-                    timeout=25,
+                    timeout=45,
                 )
                 if r.status_code != 200:
                     return {'error': f'PageSpeed {r.status_code}'}
@@ -11039,22 +11102,29 @@ class PublicAuditView(APIView):
             except Exception as e:
                 return {'error': f'PageSpeed: {str(e)[:80]}'}
 
-        # Run crawl + pagespeed in parallel.
-        results = {}
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = {
-                pool.submit(task_crawl): 'crawl',
-                pool.submit(task_pagespeed): 'pagespeed',
-            }
-            for fut in as_completed(futures):
-                key = futures[fut]
-                try:
-                    results[key] = fut.result()
-                except Exception as e:
-                    results[key] = {'error': str(e)[:80]}
+        # PageSpeed part sur son propre fil et n'est recolte qu'au moment de
+        # calculer le score. Il ne depend de rien, alors que la recherche de
+        # positions attend le crawl : les attendre ensemble ici additionnait
+        # les deux durees au lieu de les superposer. Mesure du 2026-08-23 sur
+        # gridar.app : PageSpeed repond en 17 a 23 s, les positions prennent
+        # une quinzaine de secondes derriere. En serie on frolait la minute.
+        import threading
 
-        crawl = results.get('crawl', {})
-        ps = results.get('pagespeed', {})
+        ps: dict = {}
+
+        def _pagespeed_task():
+            try:
+                ps.update(task_pagespeed())
+            except Exception as e:  # noqa: BLE001 - un audit partiel part quand meme
+                ps['error'] = str(e)[:80]
+
+        ps_thread = threading.Thread(target=_pagespeed_task, daemon=True)
+        ps_thread.start()
+
+        try:
+            crawl = task_crawl()
+        except Exception as e:  # noqa: BLE001
+            crawl = {'error': str(e)[:80]}
 
         # Two more reads off the page we already downloaded, so they cost one
         # fetch, not three. Both fail soft: a partial audit still ships.
@@ -11076,7 +11146,6 @@ class PublicAuditView(APIView):
         # Google Business Profile verdict, in parallel with the keyword position
         # checks below (both only need the crawl to be done). Read-only via
         # Serper Maps; for a local trade the profile is often the real ceiling.
-        import threading
         gbp_result = {}
 
         def _gbp_task():
@@ -11147,23 +11216,15 @@ class PublicAuditView(APIView):
             # unranked ones at the bottom so the user sees their wins first.
             positions.sort(key=lambda r: (r['position'] is None, r['position'] or 999))
 
-        # Composite score - smaller weight set vs the authenticated audit
-        # because we have less data here (no GSC, no backlinks deep).
-        components = []
-        if 'avg' in ps:
-            components.append(('pagespeed', ps['avg'], 0.60))
-        # Only keywords we actually managed to check may score. A failed
-        # lookup counted as a zero, so an empty Serper quota silently halved
-        # the visitor's score instead of admitting the measure did not run.
-        verifies = [p for p in positions if p.get('checked')]
-        if verifies:
-            top_10 = sum(1 for p in verifies if p['position'] and p['position'] <= 10)
-            rank_score = (top_10 / len(verifies)) * 100
-            components.append(('rankings', rank_score, 0.40))
-        composite_score = None
-        if components:
-            wsum = sum(w for _, _, w in components)
-            composite_score = round(sum(s * (w / wsum) for _, s, w in components))
+        # PageSpeed a tourne pendant le crawl et les positions. On le recolte
+        # maintenant seulement, avec ce qui reste du budget de la requete.
+        ps_thread.join(timeout=20)
+
+        score = _composer_score_public(ps, positions)
+        composite_score = score['composite_score']
+        score_composantes = score['composantes']
+        score_absentes = score['absentes']
+        score_partiel = score['partiel']
 
         # Build recos (partial set for the public view - rest gated).
         recos = []
@@ -11217,6 +11278,9 @@ class PublicAuditView(APIView):
             'domain': domain,
             'audited_at': datetime.utcnow().isoformat(),
             'composite_score': composite_score,
+            'score_partiel': score_partiel,
+            'score_composantes': score_composantes,
+            'score_absentes': score_absentes,
             'pagespeed': ps,
             'gbp': gbp_result or None,
             'crawl': {
