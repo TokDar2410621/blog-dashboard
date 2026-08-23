@@ -17,13 +17,11 @@ import {
   Search,
   Loader2,
   ArrowRight,
-  ShieldCheck,
-  Users,
-  Zap,
   Download,
 } from "lucide-react";
 import { MarketingHeader } from "@/components/MarketingHeader";
 import { CinematicFooter } from "@/components/ui/motion-footer";
+import { ToolImageHero } from "@/components/tools/ToolImageHero";
 import { toast } from "sonner";
 import {
   FullReportSections,
@@ -209,35 +207,12 @@ export function PublicAuditPage() {
     <div className="dark min-h-screen bg-background text-foreground">
       <MarketingHeader trail="Audit SEO + GEO" />
 
-      <main className="max-w-5xl mx-auto px-4 py-8 md:py-12">
-        <div className="text-center max-w-2xl mx-auto mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3">
-            Audit SEO gratuit de ton site en 30 secondes
-          </h1>
-          <p className="text-muted-foreground text-base md:text-lg mb-4">
-            Entre ton domaine, découvre ton score SEO, tes positions sur Google et
-            les principaux points à fixer. Sans inscription.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground">
-            {stats && (
-              <span className="flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-primary" />
-                <strong className="text-foreground">{stats.audits_this_month}</strong>
-                {" "}audits ce mois-ci
-              </span>
-            )}
-            <span className="flex items-center gap-1.5">
-              <Zap className="h-3.5 w-3.5 text-primary" />
-              Résultat en {"<"} 30s
-            </span>
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-              Conforme Loi 25 (QC) + RGPD
-            </span>
-          </div>
-        </div>
-
-        <Card className="max-w-2xl mx-auto mb-8 print:hidden">
+      <ToolImageHero
+        imageSrc="/hero-audit.webp"
+        title="Audit SEO gratuit de ton site en 30 secondes"
+        subtitle="Entre ton domaine, découvre ton score SEO, tes positions sur Google et les principaux points à fixer. Sans inscription."
+      >
+        <Card className="print:hidden">
           <CardContent className="p-4">
             <form onSubmit={runAudit} className="flex flex-col sm:flex-row gap-2">
               <Input
@@ -270,7 +245,9 @@ export function PublicAuditPage() {
             )}
           </CardContent>
         </Card>
+      </ToolImageHero>
 
+      <main className="max-w-5xl mx-auto px-4 pb-12">
         {result && (
           <div className="space-y-6 max-w-4xl mx-auto">
             <Card>
