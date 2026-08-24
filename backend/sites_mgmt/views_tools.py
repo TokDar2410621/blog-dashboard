@@ -289,6 +289,108 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
     return [t.format(sector=sector) for t in templates[:n]]
 
 
+_SYSTEME_REQUETES_COMMERCIALES = (
+    "Tu es analyste marketing. On te donne le titre, le H1 et la description "
+    "de la page d'accueil d'une entreprise. Tu rends UNIQUEMENT un tableau "
+    "JSON de requetes commerciales, rien d'autre autour."
+)
+
+_GABARIT_REQUETES_COMMERCIALES = """\
+Entreprise : {brand} ({domain})
+Titre : {title}
+H1 : {h1}
+Meta description : {description}
+
+Rends entre 5 et {maximum} requetes, en francais quebecois, qu'un CLIENT
+potentiel taperait pour trouver une entreprise comme celle-ci, en JSON, dans
+cette forme exacte : ["requete un", "requete deux"]
+
+Regles :
+- Ecris ce qu'un client cherche, pas ce que l'entreprise dit d'elle-meme.
+- N'inclus PAS le nom de la marque "{brand}" dans les requetes, sauf si
+  c'est litteralement ce qu'on chercherait.
+- Deux a six mots par requete : decouverte de service, comparaisons, intention
+  locale.
+- Si la page ne dit pas assez clairement ce que vend l'entreprise, rends un
+  tableau vide plutot que d'inventer.
+"""
+
+
+def _requetes_commerciales_llm(crawl: dict, brand: str, domain: str,
+                               n: int = 15, timeout: int = 15) -> list[str] | None:
+    """DeepSeek lit title/H1/description et genere directement les requetes
+    commerciales qu'un client taperait, sans passer par une case de secteur.
+
+    Rend None des que le resultat n'est pas exploitable ; l'appelant retombe
+    sur `_generate_commercial_queries`, qui route par secteur.
+
+    Pourquoi : `_SECTEURS_CONNUS` ne couvre que 13 verticales locales
+    (dentiste, avocat, plombier...). Un developpeur web freelance, ou
+    n'importe quelle entreprise hors de ces cases, tombe sur le secteur
+    'general' - et l'ancien generateur de repli substituait ce mot
+    LITTERALEMENT dans ses gabarits ("meilleur general Montreal", "comparatif
+    general 2026"), montre tel quel a un visiteur. Constate le 2026-08-24 sur
+    tokamdarius.ca. En lisant directement le contenu reel de la page, ce
+    chemin n'a plus besoin d'une case de secteur du tout.
+    """
+    import re
+
+    from .llm import call_deepseek
+
+    if not crawl or crawl.get('error'):
+        return None
+    title = (crawl.get('title') or '').strip()
+    h1 = (crawl.get('h1') or '').strip()
+    desc = (crawl.get('meta_description') or '').strip()
+    if not (title or h1 or desc):
+        return None
+
+    prompt = _GABARIT_REQUETES_COMMERCIALES.format(
+        brand=brand or domain, domain=domain, title=title[:200], h1=h1[:200],
+        description=desc[:300], maximum=n,
+    )
+    try:
+        brut = call_deepseek(prompt, max_tokens=400,
+                             system=_SYSTEME_REQUETES_COMMERCIALES, timeout=timeout)
+    except Exception:  # noqa: BLE001 - call_deepseek avale deja tout, ceinture
+        logger.exception('requetes commerciales par LLM indisponibles')
+        return None
+    if not brut:
+        return None
+
+    bloc = re.search(r'\[.*?\]', brut, re.DOTALL)
+    if not bloc:
+        return None
+    try:
+        brut_liste = json.loads(bloc.group(0))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(brut_liste, list):
+        return None
+
+    propres: list[str] = []
+    vus: set[str] = set()
+    for item in brut_liste:
+        if not isinstance(item, str):
+            continue
+        requete = ' '.join(item.split()).strip(' "\'.,;:!?')
+        if not (3 <= len(requete) <= 80):
+            continue
+        if not (2 <= len(requete.split()) <= 6):
+            continue
+        if re.search(r'https?://|www\.|[<>{}]', requete):
+            continue
+        cle = requete.lower()
+        if cle in vus:
+            continue
+        vus.add(cle)
+        propres.append(requete)
+        if len(propres) >= n:
+            break
+
+    return propres if len(propres) >= 3 else None
+
+
 def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
     """Check if a domain is mentioned in an AI engine's response to a query.
 
@@ -437,8 +539,15 @@ class PublicAiVisibilityView(APIView):
         sector = meta['sector']
         sector_source = meta['source']
 
-        # Step 2: generate commercial queries
-        queries = _generate_commercial_queries(brand, sector, domain, n=15)
+        # Step 2: generate commercial queries. DeepSeek d'abord, en lisant la
+        # page reelle : ne depend d'aucune case de secteur, donc marche aussi
+        # pour une entreprise hors des 13 verticales connues. Repli sur le
+        # generateur par secteur seulement si le LLM echoue.
+        queries = _requetes_commerciales_llm(crawl, brand, domain, n=15)
+        queries_source = 'llm'
+        if not queries:
+            queries = _generate_commercial_queries(brand, sector, domain, n=15)
+            queries_source = 'sector_fallback'
 
         # Step 3: check AI mentions (parallel, Gemini only for now)
         ai_results = []
@@ -499,6 +608,7 @@ class PublicAiVisibilityView(APIView):
             'brand': brand,
             'sector': sector,
             'sector_source': sector_source,
+            'queries_source': queries_source,
             'analyzed_at': datetime.utcnow().isoformat(),
             'ai_visibility_score': scores['score'],
             'scores_breakdown': scores,
@@ -648,10 +758,13 @@ class PublicCompetitorGapView(APIView):
                 pass
             return (query, [])
 
-        # Generate test queries based on sector
-        test_queries = _generate_commercial_queries(
-            meta['brand'], meta['sector'], domain, n=20
-        )
+        # Generate test queries. DeepSeek d'abord, en lisant la page reelle ;
+        # repli sur le generateur par secteur seulement si le LLM echoue.
+        test_queries = _requetes_commerciales_llm(crawl, meta['brand'], domain, n=20)
+        if not test_queries:
+            test_queries = _generate_commercial_queries(
+                meta['brand'], meta['sector'], domain, n=20
+            )
 
         # Run all SERP checks in parallel
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -1035,8 +1148,12 @@ class PublicAiCitationCheckerView(APIView):
             
         crawl = _crawl_homepage_light(f'https://{domain_norm}')
         brand_info = _marque_et_secteur(crawl, domain_norm)
-        
-        queries = _generate_commercial_queries(brand_info['brand'], brand_info['sector'], domain_norm, n=8)
+
+        # DeepSeek d'abord, en lisant la page reelle ; repli sur le
+        # generateur par secteur seulement si le LLM echoue.
+        queries = _requetes_commerciales_llm(crawl, brand_info['brand'], domain_norm, n=8)
+        if not queries:
+            queries = _generate_commercial_queries(brand_info['brand'], brand_info['sector'], domain_norm, n=8)
         if not queries:
             queries = [f"meilleur {brand_info['sector']} Montreal", f"comparatif {brand_info['sector']}"]
             
