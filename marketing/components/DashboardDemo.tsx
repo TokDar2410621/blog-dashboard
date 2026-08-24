@@ -31,7 +31,12 @@ import { cn } from "@/lib/utils";
  * prefers-reduced-motion les coupe sans JavaScript.
  */
 
-const SITE = "boutique-demo.ca";
+// Un domaine fictif generique, pas un secteur precis : "boutique-demo.ca"
+// contenait "boutique", et l'ancien detecteur de secteur des outils publics
+// (par sous-chaine sur toute la page) lisait ce mot sur la propre page
+// d'accueil de Gridar et concluait a un site e-commerce. Corrige le
+// 2026-08-24 cote detection, mais autant ne pas laisser un second piege ici.
+const SITE = "demo-entreprise.ca";
 
 type ViewId = "articles" | "audit" | "positions";
 

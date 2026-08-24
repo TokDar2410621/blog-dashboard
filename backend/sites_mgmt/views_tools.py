@@ -60,27 +60,148 @@ def _crawl_homepage_light(url: str) -> dict:
             return {'error': f'HTTP {r.status_code}'}
         html = r.text[:50000]
         import re
-        title_m = re.search(r'<title[^>]*>([^<]+)</title>', html, re.I)
+        # react-wrap-balancer (et des libs similaires) injectent un <script>
+        # a l'interieur meme du <h1> pour equilibrer les lignes du titre.
+        # Sans ce retrait, son code JavaScript se retrouvait dans le H1 lu,
+        # puis dans un prompt envoye a Gemini par l'outil Can I Rank. Meme
+        # correctif que le crawl de l'audit public.
+        html_texte = re.sub(r'<script[^>]*>.*?</script>', ' ', html,
+                            flags=re.I | re.DOTALL)
+        html_texte = re.sub(r'<style[^>]*>.*?</style>', ' ', html_texte,
+                            flags=re.I | re.DOTALL)
+        title_m = re.search(r'<title[^>]*>([^<]+)</title>', html_texte, re.I)
         title = title_m.group(1).strip() if title_m else ''
-        h1_m = re.search(r'<h1[^>]*>([^<]+)</h1>', html, re.I)
-        h1 = h1_m.group(1).strip() if h1_m else ''
+        # `[^<]+` exigeait un H1 sans une seule balise a l'interieur, ce qui
+        # rate tout hero moderne (un <span> pour colorer un mot, un <br> pour
+        # la coupure de ligne).
+        h1_m = re.search(r'<h1[^>]*>(.*?)</h1>', html_texte, re.I | re.DOTALL)
+        h1 = re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', h1_m.group(1))).strip() if h1_m else ''
         desc_m = re.search(
             r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']*)["\'\s]',
             html, re.I,
         )
         desc = desc_m.group(1).strip() if desc_m else ''
-        return {'title': title, 'h1': h1, 'meta_description': desc, '_html': html}
+        # Le HTML complet n'est plus rendu : _detect_brand_and_sector ne le
+        # lisait que pour un scan de sous-chaine sur toute la page, retire
+        # ci-dessous au profit de ces trois champs cibles. Voir leur commentaire.
+        return {'title': title, 'h1': h1, 'meta_description': desc}
     except Exception as e:
         return {'error': str(e)[:100]}
 
 
+# Secteurs reconnus par la detection marque/secteur, LLM et heuristique de
+# repli confondus. Partages pour que les deux methodes parlent le meme
+# vocabulaire en aval (generation de requetes, affichage).
+_SECTEURS_CONNUS = (
+    'dental', 'legal', 'plumbing', 'restaurant', 'real_estate', 'accounting',
+    'saas', 'ecommerce', 'marketing', 'agency', 'seo', 'health', 'general',
+)
+
+_SYSTEME_SECTEUR = (
+    "Tu es analyste marketing. On te donne le titre, le H1 et la description "
+    "de la page d'accueil d'une entreprise. Tu rends UNIQUEMENT un objet JSON "
+    "avec sa marque et son secteur d'activite reel, rien d'autre autour."
+)
+
+_GABARIT_SECTEUR = """\
+Domaine : {domain}
+Titre : {title}
+H1 : {h1}
+Meta description : {description}
+
+Rends un objet JSON, exactement cette forme :
+{{"brand": "...", "sector": "..."}}
+
+Regles :
+- "brand" est le nom de l'entreprise elle-meme (1 a 3 mots), pas un slogan.
+- "sector" doit decrire ce que l'entreprise VEND reellement, choisi parmi :
+  {secteurs}. Si rien ne correspond precisement, rends "general".
+- Ignore tout exemple, cas d'usage ou nom cite en demonstration sur la page :
+  le secteur decrit l'entreprise elle-meme, pas ce dont sa page parle en
+  passant.
+"""
+
+
+def _detecter_marque_secteur_llm(crawl: dict, domain: str, timeout: int = 10) -> dict | None:
+    """DeepSeek lit title/H1/description et identifie marque + secteur.
+
+    Rend None des que le resultat n'est pas exploitable ; jamais de
+    dependance dure a un LLM sur ces routes publiques, l'appelant reprend
+    l'heuristique de repli.
+
+    Contrairement a un scan de sous-chaine, le modele distingue "cette
+    entreprise vend X" de "cette page mentionne X en exemple". C'est
+    precisement ce qui manquait le 2026-08-24 : la page d'accueil de Gridar
+    cite "restaurant a Montreal" comme cas d'usage dans un mockup, et affiche
+    le domaine fictif "boutique-demo.ca" dans un autre. Un scan de la page
+    entiere lisait "boutique" et concluait a tort que Gridar vend en ligne.
+    """
+    import re
+
+    from .llm import call_deepseek
+
+    if not crawl or crawl.get('error'):
+        return None
+    title = (crawl.get('title') or '').strip()
+    h1 = (crawl.get('h1') or '').strip()
+    desc = (crawl.get('meta_description') or '').strip()
+    if not (title or h1 or desc):
+        return None
+
+    prompt = _GABARIT_SECTEUR.format(
+        domain=domain, title=title[:200], h1=h1[:200], description=desc[:300],
+        secteurs=', '.join(_SECTEURS_CONNUS),
+    )
+    try:
+        brut = call_deepseek(prompt, max_tokens=150, system=_SYSTEME_SECTEUR,
+                             timeout=timeout)
+    except Exception:  # noqa: BLE001 - call_deepseek avale deja tout, ceinture
+        logger.exception('detection marque/secteur par LLM indisponible')
+        return None
+    if not brut:
+        return None
+
+    bloc = re.search(r'\{.*?\}', brut, re.DOTALL)
+    if not bloc:
+        return None
+    try:
+        data = json.loads(bloc.group(0))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    brand = ' '.join(str(data.get('brand') or '').split()).strip()
+    sector = str(data.get('sector') or '').strip().lower()
+    if not (2 <= len(brand) <= 60):
+        return None
+    if sector not in _SECTEURS_CONNUS:
+        return None
+    return {'brand': brand, 'sector': sector, 'source': 'llm'}
+
+
 def _detect_brand_and_sector(crawl: dict, domain: str) -> dict:
-    """Infer brand name and probable sector from the crawl data."""
+    """Heuristique de repli : marque et secteur devines par sous-chaine, sur
+    le titre, le H1 et la meta description SEULEMENT.
+
+    Restreint le 2026-08-24 : la version precedente scannait tout le HTML de
+    la page (jusqu'a 50 Ko), donc n'importe quel contenu decoratif pouvait
+    detourner la classification entiere. La page d'accueil de Gridar affiche
+    le domaine fictif d'un dashboard de demonstration, "boutique-demo.ca" :
+    le scanner lisait "boutique" n'importe ou sur la page et concluait que
+    Gridar est un site e-commerce, ce qui polluait ensuite les requetes
+    generees pour le propre auto-audit de visibilite IA de Gridar.
+
+    Se limiter aux trois champs qui decrivent reellement l'entreprise reduit
+    beaucoup la marge d'erreur, meme si ca reste un test de sous-chaine : le
+    chemin LLM ci-dessus est la methode fiable, celle-ci n'est que son repli.
+    """
     title = crawl.get('title', '')
     # Brand = first segment before | or - in the title
     brand = title.split('|')[0].split(' - ')[0].strip() if title else domain.split('.')[0].capitalize()
-    # Sector detection via keywords in the page content
-    html = crawl.get('_html', '').lower()
+    texte = ' '.join([
+        crawl.get('title', ''), crawl.get('h1', ''), crawl.get('meta_description', ''),
+    ]).lower()
     sector_hints = {
         'dentiste': 'dental', 'dentaire': 'dental', 'dental': 'dental',
         'avocat': 'legal', 'lawyer': 'legal', 'juridique': 'legal',
@@ -96,10 +217,16 @@ def _detect_brand_and_sector(crawl: dict, domain: str) -> dict:
     }
     sector = 'general'
     for hint, cat in sector_hints.items():
-        if hint in html:
+        if hint in texte:
             sector = cat
             break
-    return {'brand': brand, 'sector': sector}
+    return {'brand': brand, 'sector': sector, 'source': 'heuristique'}
+
+
+def _marque_et_secteur(crawl: dict, domain: str) -> dict:
+    """Point d'entree unique des 3 outils publics qui en ont besoin : DeepSeek
+    d'abord, repli heuristique sinon. Jamais de dependance dure a un LLM."""
+    return _detecter_marque_secteur_llm(crawl, domain) or _detect_brand_and_sector(crawl, domain)
 
 
 def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 15) -> list[str]:
@@ -305,9 +432,10 @@ class PublicAiVisibilityView(APIView):
         # Step 1: crawl homepage for brand/sector detection
         homepage = f'https://{domain}'
         crawl = _crawl_homepage_light(homepage)
-        meta = _detect_brand_and_sector(crawl, domain)
+        meta = _marque_et_secteur(crawl, domain)
         brand = meta['brand']
         sector = meta['sector']
+        sector_source = meta['source']
 
         # Step 2: generate commercial queries
         queries = _generate_commercial_queries(brand, sector, domain, n=15)
@@ -370,6 +498,7 @@ class PublicAiVisibilityView(APIView):
             'domain': domain,
             'brand': brand,
             'sector': sector,
+            'sector_source': sector_source,
             'analyzed_at': datetime.utcnow().isoformat(),
             'ai_visibility_score': scores['score'],
             'scores_breakdown': scores,
@@ -498,7 +627,7 @@ class PublicCompetitorGapView(APIView):
 
         # Step 2: crawl homepage for brand/sector
         crawl = _crawl_homepage_light(f'https://{domain}')
-        meta = _detect_brand_and_sector(crawl, domain)
+        meta = _marque_et_secteur(crawl, domain)
 
         # Step 3: get keywords that competitors rank for
         competitor_keywords = {}  # keyword -> {competitor, position, url, title}
@@ -905,7 +1034,7 @@ class PublicAiCitationCheckerView(APIView):
             return Response(cached)
             
         crawl = _crawl_homepage_light(f'https://{domain_norm}')
-        brand_info = _detect_brand_and_sector(crawl, domain_norm)
+        brand_info = _marque_et_secteur(crawl, domain_norm)
         
         queries = _generate_commercial_queries(brand_info['brand'], brand_info['sector'], domain_norm, n=8)
         if not queries:
