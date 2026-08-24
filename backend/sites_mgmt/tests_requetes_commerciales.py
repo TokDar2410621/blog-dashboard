@@ -21,11 +21,12 @@ pertinentes, meme hors des 13 verticales connues.
 
 Run: python manage.py test sites_mgmt.tests_requetes_commerciales
 """
+import os
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
-from .views_tools import _requetes_commerciales_llm
+from .views_tools import _generate_commercial_queries, _requetes_commerciales_llm
 
 CRAWL_DEV = {
     'title': 'Tokam Darius | Developpeur Web a Jonquiere & Chicoutimi',
@@ -162,3 +163,43 @@ class RepliTests(SimpleTestCase):
     def test_une_panne_du_modele_ne_fait_pas_planter_l_appelant(self):
         with patch('sites_mgmt.llm.call_deepseek', side_effect=RuntimeError('boom')):
             self.assertIsNone(_requetes_commerciales_llm(CRAWL_DEV, 'X', 'x.ca'))
+
+
+# ---------------------------------------------------------------------------
+class FiletDeSecuriteTests(SimpleTestCase):
+    """`_generate_commercial_queries` : le repli de dernier recours, quand
+    `_requetes_commerciales_llm` a lui-meme echoue. Le defaut original :
+    quand aucune cle Gemini n'est configuree (ou que Gemini echoue), le mot
+    sentinelle 'general' etait substitue tel quel dans un gabarit.
+
+    Gemini teste en premier a l'interieur de cette fonction : on desactive sa
+    cle pour ces tests, sinon ils dependraient d'un vrai appel reseau non
+    deterministe (et factureraient du quota pour un test unitaire).
+    """
+
+    def setUp(self):
+        self._sans_gemini = patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+        self._sans_gemini.start()
+        self.addCleanup(self._sans_gemini.stop)
+
+    def test_secteur_general_ne_produit_jamais_le_mot_general(self):
+        r = _generate_commercial_queries('Tokam Darius', 'general', 'tokamdarius.ca')
+        self.assertTrue(all('general' not in q.lower() for q in r))
+
+    def test_secteur_general_rend_quand_meme_une_liste_non_vide(self):
+        """Le vrai defaut du 2026-08-24 : Vercel et tokamdarius.ca recevaient
+        des requetes visibles, pas une liste vide - le probleme etait leur
+        contenu, pas leur absence. Le repli doit rester utile."""
+        r = _generate_commercial_queries('X', 'general', 'x.ca')
+        self.assertGreaterEqual(len(r), 5)
+
+    def test_secteur_connu_garde_son_comportement_par_gabarit(self):
+        """Le repli sectoriel existant, pour dental etc., n'est pas touche."""
+        r = _generate_commercial_queries('Cabinet Dupont', 'dental', 'dupont.ca')
+        self.assertIn('meilleur dental Montreal', r)
+
+    def test_le_plafond_n_est_jamais_depasse(self):
+        r = _generate_commercial_queries('X', 'general', 'x.ca', n=3)
+        self.assertEqual(len(r), 3)
+        r2 = _generate_commercial_queries('X', 'dental', 'x.ca', n=3)
+        self.assertEqual(len(r2), 3)

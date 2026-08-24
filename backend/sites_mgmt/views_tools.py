@@ -233,15 +233,32 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
     """Generate commercial queries for AI visibility testing.
 
     Uses Gemini if available, otherwise falls back to template queries.
+
+    Repli de dernier recours : `_requetes_commerciales_llm` est desormais le
+    chemin principal des 3 outils qui appellent cette fonction, et il n'a
+    besoin d'aucun secteur pour fonctionner. Celle-ci ne s'execute que quand
+    ce chemin echoue - typiquement un delai reseau ou un quota DeepSeek,
+    constate le 2026-08-24 sur environ 1 site sur 4 dans un echantillon de
+    sites reels (Vercel, tokamdarius.ca), pas parce que le secteur est
+    reellement indetermine.
     """
     gemini_key = os.environ.get('GEMINI_API_KEY')
+    # 'general' est la valeur sentinelle qui dit "aucune des verticales
+    # connues ne correspond", pas une categorie de commerce. Un prompt qui
+    # demande des requetes "dans le secteur 'general'" desoriente Gemini pour
+    # rien ; decrire une activite non precisee est plus honnete et produit de
+    # meilleurs resultats.
+    secteur_decrit = (
+        f"in the '{sector}' sector" if sector != 'general'
+        else "whose exact business category is unclear from its website"
+    )
     if gemini_key:
         try:
             import requests as http_requests
             prompt = (
                 f"Generate {n} commercial search queries (in French Canadian) "
-                f"that a potential customer would type to find a business like '{brand}' "
-                f"in the '{sector}' sector. "
+                f"that a potential customer would type to find a business like '{brand}', "
+                f"{secteur_decrit}. "
                 f"Do NOT include the brand name '{brand}' in the queries. "
                 f"Focus on service discovery, comparisons, and local intent. "
                 f"Return ONLY a JSON array of strings, no explanations."
@@ -268,7 +285,31 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
         except Exception:
             logger.exception('Gemini query generation failed, using fallback')
 
-    # Fallback templates
+    # Repli deterministe. Quand le secteur est 'general', AUCUN gabarit
+    # n'utilise plus {sector} : le substituer tel quel produisait "meilleur
+    # general Montreal", montre tel quel a un visiteur (Darius, 2026-08-24).
+    # Les gabarits ci-dessous restent utiles pour n'importe quelle entreprise
+    # locale sans avoir besoin de savoir ce qu'elle vend.
+    if sector == 'general':
+        templates = [
+            'meilleure entreprise pres de chez moi',
+            'avis clients entreprise locale Quebec',
+            'recommandation service professionnel Quebec',
+            'entreprise fiable pres de chez moi',
+            'comparatif entreprises locales 2026',
+            'service professionnel recommande Quebec',
+            'entreprise recommandee Montreal',
+            'top entreprises locales Canada',
+            'comment choisir un bon prestataire',
+            'entreprise professionnelle pres de chez moi',
+            'avis service local Quebec',
+            'meilleur prestataire de services Quebec',
+            'entreprise de confiance Quebec',
+            'service local recommande 2026',
+            'prestataire fiable Montreal',
+        ]
+        return templates[:n]
+
     templates = [
         'meilleur {sector} Montreal',
         '{sector} recommande Quebec',
@@ -1150,12 +1191,13 @@ class PublicAiCitationCheckerView(APIView):
         brand_info = _marque_et_secteur(crawl, domain_norm)
 
         # DeepSeek d'abord, en lisant la page reelle ; repli sur le
-        # generateur par secteur seulement si le LLM echoue.
+        # generateur par secteur seulement si le LLM echoue. Pas de troisieme
+        # repli : `_generate_commercial_queries` rend toujours une liste non
+        # vide (gabarits generiques quand le secteur est 'general'), un filet
+        # de plus serait mort et repeterait le meme bug qu'il est cense eviter.
         queries = _requetes_commerciales_llm(crawl, brand_info['brand'], domain_norm, n=8)
         if not queries:
             queries = _generate_commercial_queries(brand_info['brand'], brand_info['sector'], domain_norm, n=8)
-        if not queries:
-            queries = [f"meilleur {brand_info['sector']} Montreal", f"comparatif {brand_info['sector']}"]
             
         gemini_key = os.environ.get('GEMINI_API_KEY')
         if not gemini_key:
