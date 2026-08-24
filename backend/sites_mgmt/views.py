@@ -11461,6 +11461,11 @@ class PublicAuditView(APIView):
         score_absentes = score['absentes']
         score_partiel = score['partiel']
 
+        # `verifies` sert aussi aux recommandations ci-dessous : recalcule ici
+        # plutot que fait ressortir de `_composer_score_public`, qui reste une
+        # fonction pure sur ses seuls arguments.
+        verifies = [p for p in (positions or []) if p.get('checked')]
+
         # Build recos (partial set for the public view - rest gated).
         recos = []
         if 'avg' in ps and ps['avg'] < 70:
