@@ -58,7 +58,14 @@ def _crawl_homepage_light(url: str) -> dict:
         }, allow_redirects=True)
         if r.status_code != 200:
             return {'error': f'HTTP {r.status_code}'}
-        html = r.text[:50000]
+        # 50 Ko datait d'une epoque ou cette fonction rendait aussi le HTML
+        # complet pour un scan de sous-chaine (retire depuis). Une page avec
+        # beaucoup de CSS critique inline avant le <head><title> peut couper
+        # avant meme d'atteindre le titre : facebook.com fait 428 Ko et son
+        # <title> n'arrive qu'a la position 105 238. Sans erreur, la fonction
+        # rendait title/h1/description tous vides, donc rien a lire ni pour
+        # DeepSeek ni pour l'heuristique de repli. Constate le 2026-08-24.
+        html = r.text[:300000]
         import re
         # react-wrap-balancer (et des libs similaires) injectent un <script>
         # a l'interieur meme du <h1> pour equilibrer les lignes du titre.

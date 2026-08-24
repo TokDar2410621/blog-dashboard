@@ -101,6 +101,27 @@ class LeBugReproduitTests(SimpleTestCase):
         self.assertNotIn('__wrap_n', crawl['h1'])
         self.assertEqual(crawl['h1'], 'Le SEO fait pour toi. Pour les PME du Quebec')
 
+    def test_un_gros_preambule_avant_le_titre_ne_le_coupe_plus(self):
+        """Constate le 2026-08-24 sur facebook.com : la page fait 428 Ko et
+        son <title> n'arrive qu'a la position 105 238, apres un enorme bloc de
+        CSS critique inline. L'ancienne troncature a 50 Ko coupait avant
+        d'atteindre le titre, rendant crawl = {title: '', h1: '', desc: ''}
+        SANS erreur - ni DeepSeek ni l'heuristique n'avaient alors la moindre
+        matiere, et le secteur tombait sur 'general' pour un site aussi
+        identifiable que Facebook."""
+        preambule = '<style>' + ('.x{color:red}' * 5000) + '</style>'  # ~65 Ko
+        with patch('requests.get') as get:
+            get.return_value.status_code = 200
+            get.return_value.text = (
+                f'<html><head>{preambule}<title>Facebook</title>'
+                '<meta name="description" content="Se connecter avec des amis."/>'
+                '</head><body><h1>Voir ce qui se passe dans le monde</h1></body></html>'
+            )
+            crawl = _crawl_homepage_light('https://facebook.com')
+        self.assertEqual(crawl['title'], 'Facebook')
+        self.assertEqual(crawl['h1'], 'Voir ce qui se passe dans le monde')
+        self.assertEqual(crawl['meta_description'], 'Se connecter avec des amis.')
+
 
 # ---------------------------------------------------------------------------
 class HeuristiqueDeReplilTests(SimpleTestCase):
