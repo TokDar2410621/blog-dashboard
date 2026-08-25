@@ -124,23 +124,41 @@ class SeoTechniqueEtUxTests(SimpleTestCase):
         {'cle': 'h1_present', 'libelle': 'Balise H1', 'poids': 15, 'reussi': False},
     ]}
 
-    def test_seo_combine_onpage_et_lighthouse(self):
-        r = mesurer_seo_technique(self.ONPAGE, {'seo': 90})
-        self.assertEqual(r['score'], 80)   # moyenne de 70 et 90
-        self.assertTrue(r['disponible'])
-        self.assertTrue(any('8 controles' in p for p in r['preuves']))
+    AUTRE = {'score': 40, 'controles': []}
+
+    def test_seo_combine_onpage_et_lighthouse_quand_les_deux_sont_la(self):
+        a, b = mesurer_seo_technique(self.ONPAGE, {'seo': 90},
+                                     self.AUTRE, {'seo': 60})
+        self.assertEqual(a['score'], 80)   # moyenne de 70 et 90
+        self.assertEqual(b['score'], 50)   # moyenne de 40 et 60
+        self.assertTrue(any('8 controles' in p for p in a['preuves']))
+
+    def test_lighthouse_manquant_d_un_cote_sort_du_calcul_des_DEUX(self):
+        """Constate en prod le 2026-08-25 : PageSpeed avait repondu pour un
+        domaine et pas pour l'autre. Un site etait note sur ses seuls signaux
+        on-page (90) pendant que l'autre recevait une moyenne on-page +
+        Lighthouse (58). Deux echelles differentes presentees comme un ecart."""
+        a, b = mesurer_seo_technique(self.ONPAGE, None, self.AUTRE, {'seo': 100})
+        self.assertEqual(a['score'], 70)   # on-page seul
+        self.assertEqual(b['score'], 40)   # on-page seul aussi, pas 70
+        for mesure in (a, b):
+            self.assertFalse(any('Lighthouse' in p for p in mesure['preuves']))
 
     def test_seo_nomme_les_controles_rates_comme_preuve(self):
-        r = mesurer_seo_technique(self.ONPAGE, None)
-        self.assertEqual(r['score'], 70)
-        self.assertTrue(any('Balise H1' in p for p in r['preuves']))
+        a, _ = mesurer_seo_technique(self.ONPAGE, None, self.AUTRE, None)
+        self.assertEqual(a['score'], 70)
+        self.assertTrue(any('Balise H1' in p for p in a['preuves']))
 
-    def test_seo_sans_rien_est_indisponible_pas_zero(self):
-        r = mesurer_seo_technique(None, None)
-        self.assertIsNone(r['score'])
-        self.assertFalse(r['disponible'])
-        self.assertEqual(r['source'], 'indisponible')
-        self.assertTrue(r['raison'])
+    def test_seo_indisponible_des_qu_une_page_n_a_pas_pu_etre_lue(self):
+        """Comparer un chiffre a une absence donnerait un faux verdict."""
+        for args in ((None, None, self.AUTRE, None),
+                     (self.ONPAGE, None, None, None),
+                     (None, None, None, None)):
+            a, b = mesurer_seo_technique(*args)
+            for mesure in (a, b):
+                self.assertIsNone(mesure['score'])
+                self.assertFalse(mesure['disponible'])
+                self.assertTrue(mesure['raison'])
 
     def test_ux_pondere_performance_et_accessibilite(self):
         r = mesurer_ux({'performance': 50, 'accessibilite': 100,
@@ -286,6 +304,17 @@ class SerpTests(SimpleTestCase):
         self.assertEqual(b['score'], 0)      # mesure a zero, pas indisponible
         self.assertTrue(b['disponible'])
         self.assertTrue(any('2 SERP sur 4' in p for p in a['preuves']))
+
+    def test_mentions_manquantes_d_un_cote_sortent_du_calcul_des_DEUX(self):
+        """Meme piege d'asymetrie que sur SEO technique : un domaine note sur
+        sa seule dominance SERP pendant que l'autre recoit dominance +
+        mentions, ce sont deux echelles differentes."""
+        serp = {'requetes_verifiees': ['q1', 'q2'],
+                'positions_a': {'q1': 1}, 'positions_b': {'q1': 2}}
+        a, b = mesurer_autorite(serp, 8, None)
+        self.assertEqual(a['score'], b['score'])   # meme dominance top-3
+        for mesure in (a, b):
+            self.assertFalse(any('mentionnent' in p for p in mesure['preuves']))
 
     def test_autorite_dit_que_ce_ne_sont_pas_des_backlinks(self):
         """Le repo s'est deja brule dessus : une ancienne cle

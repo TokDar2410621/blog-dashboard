@@ -166,30 +166,51 @@ def mesurer_pagespeed(url: str, timeout: int = 45) -> dict | None:
 # ---------------------------------------------------------------------------
 # Categorie : SEO technique
 # ---------------------------------------------------------------------------
-def mesurer_seo_technique(onpage: dict | None, psi: dict | None) -> dict:
-    """Signaux on-page mesures, plus la note SEO de Lighthouse quand elle est la.
+def mesurer_seo_technique(onpage_a: dict | None, psi_a: dict | None,
+                          onpage_b: dict | None, psi_b: dict | None
+                          ) -> tuple[dict, dict]:
+    """Signaux on-page mesures, plus la note SEO de Lighthouse.
 
     `onpage` vient de `_score_onpage` (views.py) : huit controles deterministes
     sur 100 (title, meta description, H1, hierarchie, JSON-LD). Deterministe
     veut dire que deux domaines sont reellement comparables, contrairement a un
     chiffre genere.
+
+    Les deux domaines sont notes sur les MEMES composantes. La note Lighthouse
+    n'entre dans le calcul que si elle existe des DEUX cotes : sinon un site
+    serait note sur ses seuls signaux on-page pendant que l'autre recoit une
+    moyenne on-page + Lighthouse. Constate en prod le 2026-08-25, PageSpeed
+    ayant repondu pour un domaine et pas pour l'autre : 90 d'un cote (on-page
+    seul) contre 58 de l'autre (moyenne de 15 et d'un Lighthouse quasi
+    parfait). Deux echelles differentes presentees comme un ecart.
     """
-    composantes, preuves = [], []
-
-    if onpage and onpage.get('score') is not None:
-        composantes.append(onpage['score'])
+    def preuves_onpage(onpage):
+        if not onpage or onpage.get('score') is None:
+            return []
+        lignes = [f"{onpage['score']}/100 sur 8 controles on-page"]
         rates = [c['libelle'] for c in onpage.get('controles', []) if not c.get('reussi')]
-        preuves.append(f"{onpage['score']}/100 sur 8 controles on-page")
         if rates:
-            preuves.append('Manque : ' + ', '.join(rates[:4]))
+            lignes.append('Manque : ' + ', '.join(rates[:4]))
+        return lignes
 
-    if psi and psi.get('seo') is not None:
-        composantes.append(psi['seo'])
-        preuves.append(f"Lighthouse SEO : {psi['seo']}/100")
+    score_a = onpage_a.get('score') if onpage_a else None
+    score_b = onpage_b.get('score') if onpage_b else None
+    if score_a is None or score_b is None:
+        manquant = "La page n'a pas pu etre lue."
+        return _indisponible(manquant), _indisponible(manquant)
 
-    if not composantes:
-        return _indisponible("La page n'a pas pu etre lue.")
-    return _mesure(sum(composantes) / len(composantes), preuves)
+    seo_a = (psi_a or {}).get('seo')
+    seo_b = (psi_b or {}).get('seo')
+    lighthouse_des_deux_cotes = seo_a is not None and seo_b is not None
+
+    def noter(score_onpage, seo, lignes):
+        if lighthouse_des_deux_cotes:
+            lignes = lignes + [f'Lighthouse SEO : {seo}/100']
+            return _mesure((score_onpage + seo) / 2, lignes)
+        return _mesure(score_onpage, lignes)
+
+    return (noter(score_a, seo_a, preuves_onpage(onpage_a)),
+            noter(score_b, seo_b, preuves_onpage(onpage_b)))
 
 
 # ---------------------------------------------------------------------------
@@ -467,24 +488,29 @@ def mesurer_autorite(serp: dict | None, hotes_a: int | None, hotes_b: int | None
         return indispo, indispo
 
     total = len(serp['requetes_verifiees'])
+    if not total:
+        return _indisponible('Aucun SERP verifie.'), _indisponible('Aucun SERP verifie.')
+
+    # Le compte de mentions n'entre dans le calcul que s'il existe des DEUX
+    # cotes, sinon un domaine serait note sur sa seule dominance SERP pendant
+    # que l'autre recoit un melange dominance + mentions : deux echelles
+    # differentes presentees comme un ecart.
+    mentions_des_deux_cotes = hotes_a is not None and hotes_b is not None
 
     def noter(positions, hotes):
-        if not total:
-            return _indisponible('Aucun SERP verifie.')
         # Presence en top 3 : le vrai signal de dominance sur une requete.
         top3 = sum(1 for rang in positions.values() if 1 <= rang <= 3)
         dominance = top3 / total * 100
         preuves = [f'Top 3 sur {top3} des {total} requetes communes']
-        score = dominance
-        if hotes is not None:
-            # Sature a 10 : une seule page de SERP est lue, on ne peut pas
-            # distinguer 10 hotes de 400.
-            score = dominance * 0.7 + min(100, hotes * 10) * 0.3
+        if mentions_des_deux_cotes:
             preuves.append(
                 f'{hotes} domaine(s) distinct(s) mentionnent la marque '
                 '(mentions, pas des liens entrants ; mesure saturee a 10)'
             )
-        return _mesure(score, preuves)
+            # Sature a 10 : une seule page de SERP est lue, on ne peut pas
+            # distinguer 10 hotes de 400.
+            return _mesure(dominance * 0.7 + min(100, hotes * 10) * 0.3, preuves)
+        return _mesure(dominance, preuves)
 
     return noter(serp['positions_a'], hotes_a), noter(serp['positions_b'], hotes_b)
 

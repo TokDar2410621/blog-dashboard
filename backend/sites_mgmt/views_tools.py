@@ -1632,15 +1632,13 @@ class PublicCompetitorCompareView(APIView):
 
         contenu_a, contenu_b = mesurer_contenu(serp, None, None)
         autorite_a, autorite_b = mesurer_autorite(serp, hotes_a, hotes_b)
+        seo_a, seo_b = mesurer_seo_technique(
+            _score_onpage(crawl_a, html_a), recolte['psi_a'],
+            _score_onpage(crawl_b, html_b), recolte['psi_b'],
+        )
 
         categories = [
-            {
-                'category': 'SEO technique',
-                'domain': mesurer_seo_technique(
-                    _score_onpage(crawl_a, html_a), recolte['psi_a']),
-                'competitor': mesurer_seo_technique(
-                    _score_onpage(crawl_b, html_b), recolte['psi_b']),
-            },
+            {'category': 'SEO technique', 'domain': seo_a, 'competitor': seo_b},
             {'category': 'Contenu', 'domain': contenu_a, 'competitor': contenu_b},
             {'category': 'Autorite percue', 'domain': autorite_a,
              'competitor': autorite_b},
