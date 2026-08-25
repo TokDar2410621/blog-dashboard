@@ -59,6 +59,13 @@ def _crawl_homepage_light(url: str) -> dict:
         }, allow_redirects=True)
         if r.status_code != 200:
             return {'error': f'HTTP {r.status_code}'}
+        # Meme garde-fou que le crawl de l'audit : un corps dans un encodage
+        # qu'on ne sait pas decoder ressortirait en binaire, et la page serait
+        # declaree sans titre ni H1 au lieu d'illisible.
+        from .views import _encodage_indecodable
+        erreur_encodage = _encodage_indecodable(r)
+        if erreur_encodage:
+            return {'error': erreur_encodage}
         # 50 Ko datait d'une epoque ou cette fonction rendait aussi le HTML
         # complet pour un scan de sous-chaine (retire depuis). Une page avec
         # beaucoup de CSS critique inline avant le <head><title> peut couper

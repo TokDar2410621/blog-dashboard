@@ -10182,6 +10182,36 @@ def _validate_generated_schema(jsonld) -> dict:
         return {'issues': [], 'blocking': False}
 
 
+def _encodage_indecodable(reponse) -> str | None:
+    """Rend un message d'erreur si le corps de la reponse n'est pas decodable.
+
+    Certains sites derriere un WAF repondent dans un encodage que nous n'avons
+    pas demande. Verifie en prod le 2026-08-25 :
+    www.berkshirehathaway.com rend `content-encoding: br` alors que notre
+    Accept-Encoding ne demandait que gzip et deflate. Sans decodeur brotli,
+    `r.text` etait du binaire, aucun `<title>` n'y etait trouvable, et le site
+    ressortait de l'audit sans titre, sans H1 et sans meta description. Un
+    verdict catastrophique et faux, montre a un prospect, sans la moindre
+    erreur dans les logs.
+
+    Le paquet `brotli` est desormais dans requirements.txt, donc `br` se
+    decode. Ce garde-fou couvre ce qui reste (zstd notamment) : mieux vaut une
+    erreur franche qu'une page declaree vide.
+    """
+    brut = reponse.headers.get('content-encoding')
+    # On n'agit que sur un encodage POSITIVEMENT identifie comme inconnu. Une
+    # valeur absente, vide ou d'un type inattendu se lit comme "pas
+    # d'encodage" : bloquer un crawl parce qu'un en-tete est bizarre serait
+    # pire que le probleme qu'on corrige.
+    if not isinstance(brut, str):
+        return None
+    encodage = brut.lower().strip()
+    connus = ('', 'identity', 'gzip', 'x-gzip', 'deflate', 'br')
+    if encodage and encodage not in connus:
+        return f'Encodage non decodable : {encodage}'
+    return None
+
+
 def _crawl_homepage(url: str, timeout: int = 8) -> dict:
     """Fetch a URL once and pull out the SEO signals we need to discover
     candidate keywords + render the audit result.
@@ -10207,6 +10237,9 @@ def _crawl_homepage(url: str, timeout: int = 8) -> dict:
         )
         if not r.ok:
             return {'error': f'HTTP {r.status_code}'}
+        erreur_encodage = _encodage_indecodable(r)
+        if erreur_encodage:
+            return {'error': erreur_encodage}
         html = r.text
         title_m = re.search(r'<title[^>]*>([^<]+)</title>', html, re.IGNORECASE)
 
