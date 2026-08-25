@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ConnectorPage } from "@/components/ConnectorPage";
-import { CONNECTOR_FEATURES } from "@/components/connector-features";
 
 export const metadata: Metadata = {
   title: "Gridar pour ChatGPT - ton SEO directement dans ChatGPT",
@@ -42,7 +41,6 @@ export default function GridarPourChatgptPage() {
         },
       ]}
       note="Les connecteurs custom demandent un compte ChatGPT Pro, Team ou Enterprise, ou le Developer Mode active."
-      features={CONNECTOR_FEATURES}
       related={[
         { href: "/mcp", label: "Vue d'ensemble MCP" },
         { href: "/gridar-pour-claude", label: "Claude" },

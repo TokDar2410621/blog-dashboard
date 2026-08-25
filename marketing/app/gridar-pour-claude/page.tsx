@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ConnectorPage } from "@/components/ConnectorPage";
-import { CONNECTOR_FEATURES } from "@/components/connector-features";
 
 export const metadata: Metadata = {
   title: "Gridar pour Claude - le SEO dans Claude et Claude Desktop",
@@ -49,7 +48,6 @@ export default function GridarPourClaudePage() {
           body: '"Audite mondomaine.com et priorise les corrections", "Compare mon site a mon concurrent principal".',
         },
       ]}
-      features={CONNECTOR_FEATURES}
       related={[
         { href: "/mcp", label: "Vue d'ensemble MCP" },
         { href: "/gridar-pour-chatgpt", label: "ChatGPT" },

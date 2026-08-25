@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ConnectorPage } from "@/components/ConnectorPage";
-import { CONNECTOR_FEATURES } from "@/components/connector-features";
 
 export const metadata: Metadata = {
   title: "Connecteur MCP de Gridar - le SEO dans ton IA",
@@ -40,7 +39,6 @@ export default function McpConnectorPage() {
           body: '"Audite mondomaine.com et donne-moi les 3 choses a corriger en premier." Ton IA appelle Gridar et te repond avec de vraies donnees.',
         },
       ]}
-      features={CONNECTOR_FEATURES}
       related={[
         { href: "/gridar-pour-chatgpt", label: "ChatGPT" },
         { href: "/gridar-pour-claude", label: "Claude" },

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ConnectorPage } from "@/components/ConnectorPage";
-import { CONNECTOR_FEATURES } from "@/components/connector-features";
 
 export const metadata: Metadata = {
   title: "Gridar pour tes agents - l'API SEO en MCP (Cursor, Claude Code)",
@@ -43,7 +42,6 @@ export default function GridarPourAgentPage() {
           body: "N'importe quel client MCP (SDK OpenAI, Anthropic, LangChain...) lit la decouverte OAuth du serveur et se branche. Le serveur suit le standard MCP (Streamable HTTP + OAuth 2.1).",
         },
       ]}
-      features={CONNECTOR_FEATURES}
       related={[
         { href: "/mcp", label: "Vue d'ensemble MCP" },
         { href: "/gridar-pour-chatgpt", label: "ChatGPT" },
