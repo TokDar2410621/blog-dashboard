@@ -41,6 +41,11 @@ export default function GridarPourChatgptPage() {
         },
       ]}
       note="Les connecteurs custom demandent un compte ChatGPT Pro, Team ou Enterprise, ou le Developer Mode active."
+      mockup={{
+        client: "ChatGPT",
+        prompt: "Audite demo-entreprise.ca et donne-moi les 3 priorités.",
+        tool: "site_seo_score",
+      }}
       related={[
         { href: "/mcp", label: "Vue d'ensemble MCP" },
         { href: "/gridar-pour-claude", label: "Claude" },

@@ -48,6 +48,11 @@ export default function GridarPourClaudePage() {
           body: '"Audite mondomaine.com et priorise les corrections", "Compare mon site a mon concurrent principal".',
         },
       ]}
+      mockup={{
+        client: "Claude",
+        prompt: "Audite demo-entreprise.ca et donne-moi les 3 priorités.",
+        tool: "site_seo_score",
+      }}
       related={[
         { href: "/mcp", label: "Vue d'ensemble MCP" },
         { href: "/gridar-pour-chatgpt", label: "ChatGPT" },

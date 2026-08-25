@@ -39,6 +39,11 @@ export default function McpConnectorPage() {
           body: '"Audite mondomaine.com et donne-moi les 3 choses a corriger en premier." Ton IA appelle Gridar et te repond avec de vraies donnees.',
         },
       ]}
+      mockup={{
+        client: "ChatGPT",
+        prompt: "Audite demo-entreprise.ca et donne-moi les 3 priorités.",
+        tool: "site_seo_score",
+      }}
       related={[
         { href: "/gridar-pour-chatgpt", label: "ChatGPT" },
         { href: "/gridar-pour-claude", label: "Claude" },
