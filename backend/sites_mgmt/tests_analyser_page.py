@@ -25,9 +25,11 @@ l'enchainement des etages dans `_analyser_page`.
 
 Run: python manage.py test sites_mgmt.tests_analyser_page
 """
+import os
 from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase
+from django.core.cache import cache
+from django.test import SimpleTestCase, TestCase
 
 from .views_tools import _analyser_page, _contexte_page, _fetch_page_jina
 
@@ -212,3 +214,42 @@ class AnalyserPageTests(SimpleTestCase):
         self.assertIsNotNone(r['brand'])
         self.assertTrue(all('general' not in q.lower() for q in r['queries']))
         self.assertGreaterEqual(len(r['queries']), 5)
+
+
+# ---------------------------------------------------------------------------
+class CompetitorGapViewSmokeTests(TestCase):
+    """Regression pour la vraie panne du 2026-08-25 : en cablant
+    PublicCompetitorGapView sur `_analyser_page`, une reference a l'ancienne
+    variable locale `meta` est restee dans la construction du payload
+    (`meta['brand']` au lieu de `analyse['brand']`). Aucun des 1277 tests
+    unitaires existants n'exerce cette vue de bout en bout jusqu'au payload,
+    donc c'est passe en production (500 sur facebook.com/tokamdarius.ca)
+    avant d'etre attrape par une verification manuelle en curl.
+
+    Ce test appelle la vraie vue via le client Django, en mockant seulement
+    la frontiere reseau (Serper, _analyser_page deja teste plus haut)."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_le_payload_utilise_bien_la_marque_et_le_secteur_de_analyser_page(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'cle-de-test'}):
+            with patch('sites_mgmt.views_tools._analyser_page') as analyser:
+                analyser.return_value = {
+                    'brand': 'Tokam Darius', 'sector': 'general',
+                    'sector_source': 'jina', 'queries': ['creation site web'] * 5,
+                    'queries_source': 'jina',
+                }
+                serp_vide = MagicMock()
+                serp_vide.status_code = 200
+                serp_vide.json.return_value = {'organic': []}
+                with patch('requests.post', return_value=serp_vide):
+                    r = self.client.post(
+                        '/api/public/competitor-gap/',
+                        data={'domain': 'tokamdarius.ca', 'competitors': 'concurrent.ca'},
+                        content_type='application/json',
+                    )
+        self.assertEqual(r.status_code, 200, r.content[:500])
+        corps = r.json()
+        self.assertEqual(corps['brand'], 'Tokam Darius')
+        self.assertEqual(corps['sector'], 'general')

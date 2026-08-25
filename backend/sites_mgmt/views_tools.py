@@ -959,8 +959,8 @@ class PublicCompetitorGapView(APIView):
 
         payload = {
             'domain': domain,
-            'brand': meta['brand'],
-            'sector': meta['sector'],
+            'brand': analyse['brand'],
+            'sector': analyse['sector'],
             'analyzed_at': datetime.utcnow().isoformat(),
             'competitors_detected': competitors,
             'total_gaps': len(gaps),
