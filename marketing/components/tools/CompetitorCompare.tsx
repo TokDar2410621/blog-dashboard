@@ -26,21 +26,35 @@ const API_BASE = "";
 
 type CategoryScore = {
   category: string;
-  domain_score: number;
-  competitor_score: number;
+  // null = la mesure n'a pas pu etre faite. Surtout pas 0, qui se lirait
+  // comme un verdict alors que c'est une absence de donnee.
+  domain_score: number | null;
+  competitor_score: number | null;
+  winner: "domain" | "competitor" | "tie";
+  available: boolean;
+  reason: string | null;
+  domain_evidence: string[];
+  competitor_evidence: string[];
   insight: string;
 };
 
 type CompareResult = {
   domain: string;
   competitor: string;
+  brand?: string;
+  competitor_brand?: string;
   overall_winner: "domain" | "competitor" | "tie";
-  domain_total_score: number;
-  competitor_total_score: number;
+  domain_total_score: number | null;
+  competitor_total_score: number | null;
+  categories_mesurees: number;
+  categories_total: number;
+  methodologie: string;
   categories: CategoryScore[];
+  summary: string;
   domain_advantages: string[];
   competitor_advantages: string[];
   action_items: { priority: "Haute" | "Moyenne" | "Basse", text: string }[];
+  queries_tested: string[];
 };
 
 function getWinnerStyle(isWinner: boolean) {
@@ -84,7 +98,7 @@ export function CompetitorCompare() {
 
   return (
     <>
-      <ToolImageHero imageSrc="/hero-versus.webp" title="Qui a la meilleure strategie SEO?" subtitle="Compare ton site a ton concurrent principal sur 20+ dimensions et decouvre comment le depasser.">
+      <ToolImageHero imageSrc="/hero-versus.webp" title="Qui a la meilleure strategie SEO?" subtitle="Compare ton site a ton concurrent principal sur 6 categories mesurees et decouvre comment le depasser.">
         <Card className="mb-8">
         <CardContent className="p-4">
           <form onSubmit={runAnalysis} className="flex flex-col gap-4">
@@ -153,7 +167,9 @@ export function CompetitorCompare() {
                 )}
                 <div className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Ton site</div>
                 <div className="text-xl font-bold text-zinc-100">{result.domain}</div>
-                <div className="text-4xl font-black text-emerald-400">{result.domain_total_score}<span className="text-xl text-zinc-500">/100</span></div>
+                <div className="text-4xl font-black text-emerald-400">
+                  {result.domain_total_score ?? "-"}<span className="text-xl text-zinc-500">/100</span>
+                </div>
               </CardContent>
             </Card>
 
@@ -164,16 +180,23 @@ export function CompetitorCompare() {
                 )}
                 <div className="text-sm font-semibold uppercase tracking-wide text-zinc-400">Concurrent</div>
                 <div className="text-xl font-bold text-zinc-100">{result.competitor}</div>
-                <div className="text-4xl font-black text-zinc-300">{result.competitor_total_score}<span className="text-xl text-zinc-500">/100</span></div>
+                <div className="text-4xl font-black text-zinc-300">
+                  {result.competitor_total_score ?? "-"}<span className="text-xl text-zinc-500">/100</span>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           <Card className="border-white/10 bg-white/[0.02]">
             <CardContent className="p-6">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200 mb-6">
-                Comparaison par categorie
-              </h3>
+              <div className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200">
+                  Comparaison par categorie
+                </h3>
+                <span className="text-xs text-zinc-500">
+                  {result.categories_mesurees}/{result.categories_total} categories mesurees
+                </span>
+              </div>
               <div className="space-y-6">
                 {(result.categories || []).map((cat, i) => (
                   <div key={i} className="space-y-2">
@@ -181,32 +204,69 @@ export function CompetitorCompare() {
                       <span className="font-medium text-zinc-300">{cat.category}</span>
                       <span className="text-xs text-zinc-500 italic hidden sm:block">{cat.insight}</span>
                     </div>
-                    <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
-                      <div className="flex flex-col gap-1 items-end">
-                        <span className="text-xs text-emerald-400">{cat.domain_score}/100</span>
-                        <div className="w-full bg-zinc-800 rounded-full h-2 flex justify-end">
-                          <div
-                            className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                            style={{ width: `${cat.domain_score}%` }}
-                          />
+
+                    {cat.available ? (
+                      <>
+                        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center">
+                          <div className="flex flex-col gap-1 items-end">
+                            <span className="text-xs text-emerald-400">{cat.domain_score}/100</span>
+                            <div className="w-full bg-zinc-800 rounded-full h-2 flex justify-end">
+                              <div
+                                className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${cat.domain_score ?? 0}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-zinc-600 text-xs">VS</div>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="text-xs text-zinc-400">{cat.competitor_score}/100</span>
+                            <div className="w-full bg-zinc-800 rounded-full h-2">
+                              <div
+                                className="bg-zinc-500 h-2 rounded-full transition-all duration-500"
+                                style={{ width: `${cat.competitor_score ?? 0}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
+                        {(cat.domain_evidence?.length || cat.competitor_evidence?.length) ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px] leading-relaxed text-zinc-500">
+                            <ul className="space-y-0.5 sm:text-right">
+                              {(cat.domain_evidence || []).map((p, j) => <li key={j}>{p}</li>)}
+                            </ul>
+                            <ul className="space-y-0.5">
+                              {(cat.competitor_evidence || []).map((p, j) => <li key={j}>{p}</li>)}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      /* Pas de barre, pas de zero. Un zero se lirait comme un
+                         verdict alors que c'est une absence de mesure. */
+                      <div className="rounded-md border border-dashed border-white/10 px-3 py-2 text-xs text-zinc-500">
+                        Non mesure{cat.reason ? ` : ${cat.reason}` : ""}
                       </div>
-                      <div className="text-zinc-600 text-xs">VS</div>
-                      <div className="flex flex-col gap-1 items-start">
-                        <span className="text-xs text-zinc-400">{cat.competitor_score}/100</span>
-                        <div className="w-full bg-zinc-800 rounded-full h-2">
-                          <div
-                            className="bg-zinc-500 h-2 rounded-full transition-all duration-500"
-                            style={{ width: `${cat.competitor_score}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
+              {result.methodologie && (
+                <p className="mt-6 border-t border-white/5 pt-4 text-[11px] leading-relaxed text-zinc-500">
+                  {result.methodologie}
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {result.summary && (
+            <Card className="border-white/10 bg-white/[0.02]">
+              <CardContent className="p-6">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200 mb-3">
+                  Ce qu'il faut retenir
+                </h3>
+                <p className="text-sm leading-relaxed text-zinc-400">{result.summary}</p>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-emerald-500/20 bg-emerald-500/[0.02]">
@@ -267,7 +327,7 @@ export function CompetitorCompare() {
           <EmailGate
             headline="Recois la comparaison complete avec plan d'action"
             bulletPoints={[
-              "Analyse de 20+ dimensions SEO",
+              "6 categories mesurees, preuves a l'appui",
               "Forces et faiblesses detaillees",
               "Opportunites de depassement",
               "Plan d'action prioritise"

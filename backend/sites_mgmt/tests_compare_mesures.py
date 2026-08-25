@@ -1,0 +1,444 @@
+"""Tests : les mesures reelles de la comparaison de deux domaines.
+
+Contexte du 2026-08-25. `PublicCompetitorCompareView` demandait a Gemini
+d'inventer six scores sur 100 a partir de trois champs texte. Trois des six
+categories ("Autorite percue", "Presence IA", "Strategie locale") n'avaient
+meme aucune donnee d'entree. Ce module remplace l'invention par de la mesure.
+
+Ce que ces tests protegent, par ordre d'importance :
+
+1. **Une categorie non mesurable rend None, jamais zero.** Un zero fantome
+   sur le concurrent lui fait perdre la categorie et rend le verdict faux sur
+   le site de quelqu'un d'autre. C'est le piege exact des quatre appels PSI de
+   views.py, qui font `(... or 0)`.
+2. **Une panne d'API ne se deguise pas en resultat.** Quota Gemini epuise ne
+   doit pas donner 0 contre 0 (match nul muet), quota Serper epuise ne doit
+   pas dire au visiteur que son site ne se classe nulle part.
+3. **Un ecart trop petit ne designe pas de gagnant.** Sur 12 requetes, le taux
+   de mention porte une marge d'erreur d'environ 10 points.
+
+Run: python manage.py test sites_mgmt.tests_compare_mesures
+"""
+import os
+from unittest.mock import MagicMock, patch
+
+from django.core.cache import cache
+from django.test import SimpleTestCase, TestCase
+
+from .compare_mesures import (
+    ECART_MINIMAL_SIGNIFICATIF, compter_hotes_mentionnant, departager,
+    mesurer_autorite, mesurer_contenu, mesurer_pagespeed,
+    mesurer_presence_ia, mesurer_seo_technique, mesurer_strategie_locale,
+    mesurer_ux, sonder_serp,
+)
+
+
+def reponse(code=200, json_data=None, text=''):
+    m = MagicMock()
+    m.status_code = code
+    m.json.return_value = json_data if json_data is not None else {}
+    m.text = text
+    return m
+
+
+# ---------------------------------------------------------------------------
+class DepartagerTests(SimpleTestCase):
+    """Le refus de designer un gagnant sur du bruit."""
+
+    def test_un_ecart_franc_designe_le_bon_gagnant(self):
+        self.assertEqual(departager(80, 40), 'domain')
+        self.assertEqual(departager(40, 80), 'competitor')
+
+    def test_un_ecart_sous_le_seuil_rend_une_egalite(self):
+        self.assertEqual(departager(60, 55), 'tie')
+        self.assertEqual(departager(55, 60), 'tie')
+
+    def test_le_seuil_exact_tranche(self):
+        self.assertEqual(departager(60, 60 - ECART_MINIMAL_SIGNIFICATIF), 'domain')
+
+    def test_une_mesure_absente_rend_une_egalite_jamais_une_defaite(self):
+        """Comparer un chiffre a une absence donnerait un faux verdict."""
+        self.assertEqual(departager(None, 90), 'tie')
+        self.assertEqual(departager(90, None), 'tie')
+        self.assertEqual(departager(None, None), 'tie')
+
+
+# ---------------------------------------------------------------------------
+class PageSpeedTests(SimpleTestCase):
+
+    def _psi(self, categories, audits=None):
+        return reponse(200, {'lighthouseResult': {
+            'categories': categories, 'audits': audits or {}}})
+
+    def test_extraction_nominale(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', return_value=self._psi(
+                {'performance': {'score': 0.42}, 'seo': {'score': 0.9},
+                 'accessibility': {'score': 0.75}},
+                {'largest-contentful-paint': {'numericValue': 3200.0},
+                 'cumulative-layout-shift': {'numericValue': 0.083}},
+            )):
+                r = mesurer_pagespeed('https://exemple.ca')
+        self.assertEqual(r['performance'], 42)
+        self.assertEqual(r['seo'], 90)
+        self.assertEqual(r['accessibilite'], 75)
+        self.assertEqual(r['lcp_s'], 3.2)
+        self.assertEqual(r['cls'], 0.083)
+
+    def test_une_categorie_absente_reste_none_et_ne_devient_pas_zero(self):
+        """Le piege `(... or 0)` des 4 appels PSI de views.py : une categorie
+        manquante devient un zero mesure, indiscernable d'un site
+        catastrophique. Sur une comparaison, ce zero fantome fait perdre la
+        categorie au concurrent."""
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', return_value=self._psi(
+                {'performance': {'score': None}, 'seo': {}},
+            )):
+                r = mesurer_pagespeed('https://exemple.ca')
+        self.assertIsNone(r['performance'])
+        self.assertIsNone(r['seo'])
+        self.assertIsNone(r['accessibilite'])
+
+    def test_sans_cle_rend_none(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': ''}):
+            self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+
+    def test_http_non_200_rend_none(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', return_value=reponse(429)):
+                self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+
+    def test_exception_reseau_ne_remonte_pas(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', side_effect=TimeoutError('boom')):
+                self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+
+
+# ---------------------------------------------------------------------------
+class SeoTechniqueEtUxTests(SimpleTestCase):
+
+    ONPAGE = {'score': 70, 'controles': [
+        {'cle': 'title_present', 'libelle': 'Balise title', 'poids': 15, 'reussi': True},
+        {'cle': 'h1_present', 'libelle': 'Balise H1', 'poids': 15, 'reussi': False},
+    ]}
+
+    def test_seo_combine_onpage_et_lighthouse(self):
+        r = mesurer_seo_technique(self.ONPAGE, {'seo': 90})
+        self.assertEqual(r['score'], 80)   # moyenne de 70 et 90
+        self.assertTrue(r['disponible'])
+        self.assertTrue(any('8 controles' in p for p in r['preuves']))
+
+    def test_seo_nomme_les_controles_rates_comme_preuve(self):
+        r = mesurer_seo_technique(self.ONPAGE, None)
+        self.assertEqual(r['score'], 70)
+        self.assertTrue(any('Balise H1' in p for p in r['preuves']))
+
+    def test_seo_sans_rien_est_indisponible_pas_zero(self):
+        r = mesurer_seo_technique(None, None)
+        self.assertIsNone(r['score'])
+        self.assertFalse(r['disponible'])
+        self.assertEqual(r['source'], 'indisponible')
+        self.assertTrue(r['raison'])
+
+    def test_ux_pondere_performance_et_accessibilite(self):
+        r = mesurer_ux({'performance': 50, 'accessibilite': 100,
+                        'lcp_s': 2.1, 'cls': 0.01})
+        self.assertEqual(r['score'], 70)   # 50*0.6 + 100*0.4
+        self.assertTrue(any('2.1 s' in p for p in r['preuves']))
+
+    def test_ux_sans_pagespeed_est_indisponible(self):
+        r = mesurer_ux(None)
+        self.assertIsNone(r['score'])
+        self.assertFalse(r['disponible'])
+
+    def test_ux_avec_une_seule_note_utilise_celle_la(self):
+        r = mesurer_ux({'performance': 80, 'accessibilite': None})
+        self.assertEqual(r['score'], 80)
+
+
+# ---------------------------------------------------------------------------
+class PresenceIaTests(SimpleTestCase):
+    """La mesure partagee : un appel d'IA lu pour les DEUX domaines."""
+
+    def test_un_seul_appel_par_requete_sert_les_deux_domaines(self):
+        """Le domaine n'est pas dans le prompt. Appeler une fois par domaine
+        ferait deux appels identiques dont les reponses different (aucune
+        temperature fixee) : on comparerait deux textes differents en payant
+        double."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.return_value = reponse(200, {'candidates': [
+                    {'content': {'parts': [{'text': 'Essaie alpha.ca, un bon choix.'}]}}]})
+                a, b = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(post.call_count, 2)   # 2 requetes, pas 4
+        self.assertEqual(a['score'], 100)
+        self.assertEqual(b['score'], 0)
+
+    def test_quota_epuise_ne_donne_pas_zero_contre_zero(self):
+        """Le piege de `_check_ai_mention` : tout est enferme dans
+        `if r.status_code == 200:` sans else, donc un 429 rend
+        `mentioned: False`, indiscernable d'un vrai "l'IA ne cite pas ce
+        site". Sur une comparaison ca donne un match nul muet."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+            with patch('requests.post', return_value=reponse(429)):
+                a, b = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        for mesure in (a, b):
+            self.assertIsNone(mesure['score'])
+            self.assertFalse(mesure['disponible'])
+            self.assertIn('quota', mesure['raison'].lower())
+
+    def test_les_requetes_ratees_sortent_du_denominateur(self):
+        """Une requete dont l'appel a echoue n'est pas une absence de mention."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.side_effect = [
+                    reponse(200, {'candidates': [
+                        {'content': {'parts': [{'text': 'Va voir alpha.ca'}]}}]}),
+                    reponse(500),
+                ]
+                a, _ = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(a['score'], 100)   # 1 sur 1 obtenue, pas 1 sur 2
+        self.assertTrue(any('sur 1' in p for p in a['preuves']))
+
+    def test_le_thinking_est_desactive(self):
+        """Sur gemini-2.5-flash le thinking est actif par defaut et ses jetons
+        comptent dans maxOutputTokens : la reflexion mange l'enveloppe et la
+        reponse revient sans cle `parts`."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.return_value = reponse(200, {'candidates': [
+                    {'content': {'parts': [{'text': 'rien'}]}}]})
+                mesurer_presence_ia(['q1'], 'alpha.ca', 'bravo.ca')
+        envoye = post.call_args.kwargs['json']
+        self.assertEqual(
+            envoye['generationConfig']['thinkingConfig']['thinkingBudget'], 0)
+
+    def test_sans_requetes_est_indisponible(self):
+        a, b = mesurer_presence_ia([], 'alpha.ca', 'bravo.ca')
+        self.assertFalse(a['disponible'])
+        self.assertFalse(b['disponible'])
+
+    def test_racine_de_marque_ne_matche_pas_a_l_interieur_d_un_mot(self):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.return_value = reponse(200, {'candidates': [
+                    {'content': {'parts': [{'text': 'Un cas notionnel, rien de plus.'}]}}]})
+                a, _ = mesurer_presence_ia(['q1'], 'notion.so', 'autre.ca')
+        self.assertEqual(a['score'], 0)
+
+
+# ---------------------------------------------------------------------------
+class SerpTests(SimpleTestCase):
+
+    def _serp(self, hotes):
+        return reponse(200, {'organic': [
+            {'link': 'https://%s/page' % h, 'position': i + 1}
+            for i, h in enumerate(hotes)]})
+
+    def test_les_deux_domaines_sont_lus_dans_le_meme_serp(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.return_value = self._serp(['alpha.ca', 'tiers.com', 'bravo.ca'])
+                r = sonder_serp(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(post.call_count, 2)   # 2 requetes pour 2 domaines
+        self.assertEqual(r['positions_a'], {'q1': 1, 'q2': 1})
+        self.assertEqual(r['positions_b'], {'q1': 3, 'q2': 3})
+
+    def test_le_www_est_retire_avant_comparaison(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            with patch('requests.post', return_value=self._serp(['www.alpha.ca'])):
+                r = sonder_serp(['q1'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(r['positions_a'], {'q1': 1})
+
+    def test_num_reste_a_10(self):
+        """Au-dela, le parametre est silencieusement plafonne (verifie en
+        direct le 2026-08-25 : num=20 rend 200 avec 8 resultats)."""
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            with patch('requests.post', return_value=self._serp([])) as post:
+                sonder_serp(['q1'], 'a.ca', 'b.ca')
+        self.assertEqual(post.call_args.kwargs['json']['num'], 10)
+
+    def test_tous_les_serp_en_echec_rend_none_pas_un_zero(self):
+        """Sans ca, une panne de quota annonce au visiteur que son site ne se
+        classe nulle part."""
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            with patch('requests.post', return_value=reponse(429)):
+                self.assertIsNone(sonder_serp(['q1'], 'a.ca', 'b.ca'))
+
+    def test_sans_cle_rend_none(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': ''}):
+            self.assertIsNone(sonder_serp(['q1'], 'a.ca', 'b.ca'))
+
+    def test_contenu_et_autorite_indisponibles_sans_serp(self):
+        for paire in (mesurer_contenu(None, None, None),
+                      mesurer_autorite(None, None, None)):
+            for mesure in paire:
+                self.assertIsNone(mesure['score'])
+                self.assertFalse(mesure['disponible'])
+
+    def test_contenu_note_la_largeur_de_positionnement(self):
+        serp = {'requetes_verifiees': ['q1', 'q2', 'q3', 'q4'],
+                'positions_a': {'q1': 1, 'q2': 2}, 'positions_b': {}}
+        a, b = mesurer_contenu(serp, None, None)
+        self.assertGreater(a['score'], b['score'])
+        self.assertEqual(b['score'], 0)      # mesure a zero, pas indisponible
+        self.assertTrue(b['disponible'])
+        self.assertTrue(any('2 SERP sur 4' in p for p in a['preuves']))
+
+    def test_autorite_dit_que_ce_ne_sont_pas_des_backlinks(self):
+        """Le repo s'est deja brule dessus : une ancienne cle
+        `total_referring_domains` alimentait 15 % d'un score composite sur
+        cette affirmation fausse. Serper n'expose aucun graphe de liens."""
+        serp = {'requetes_verifiees': ['q1', 'q2'],
+                'positions_a': {'q1': 1}, 'positions_b': {}}
+        a, _ = mesurer_autorite(serp, 6, 0)
+        preuve = ' '.join(a['preuves']).lower()
+        self.assertIn('mentions', preuve)
+        self.assertIn('pas des liens', preuve)
+
+    def test_compter_hotes_exclut_le_domaine_lui_meme(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            with patch('requests.post', return_value=self._serp(
+                    ['alpha.ca', 'www.alpha.ca', 'presse.com', 'annuaire.ca'])):
+                n = compter_hotes_mentionnant('Alpha', 'alpha.ca')
+        self.assertEqual(n, 2)
+
+    def test_compter_hotes_sans_marque_rend_none(self):
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}):
+            self.assertIsNone(compter_hotes_mentionnant('', 'alpha.ca'))
+
+
+# ---------------------------------------------------------------------------
+class StrategieLocaleTests(SimpleTestCase):
+
+    def test_balisage_telephone_et_villes_sont_comptes(self):
+        crawl = {'title': 'Plombier a Jonquiere', 'h1': '', 'meta_description': '',
+                 'body_snippet': 'Nous servons Chicoutimi et Jonquiere.'}
+        html = '<script type="application/ld+json">{"@type":"LocalBusiness"}</script> 418-555-1234'
+        r = mesurer_strategie_locale(crawl, html)
+        self.assertTrue(r['disponible'])
+        self.assertGreaterEqual(r['score'], 80)
+        preuves = ' '.join(r['preuves'])
+        self.assertIn('LocalBusiness', preuves)
+        self.assertIn('telephone', preuves)
+
+    def test_un_site_sans_ancrage_local_marque_bas_sans_etre_indisponible(self):
+        crawl = {'title': 'SaaS mondial', 'h1': '', 'meta_description': '',
+                 'body_snippet': 'Global platform.'}
+        r = mesurer_strategie_locale(crawl, '<html></html>')
+        self.assertEqual(r['score'], 0)
+        self.assertTrue(r['disponible'])   # mesure, pas absence de mesure
+
+    def test_crawl_en_erreur_est_indisponible(self):
+        r = mesurer_strategie_locale({'error': 'HTTP 500'}, '')
+        self.assertIsNone(r['score'])
+        self.assertFalse(r['disponible'])
+
+
+# ---------------------------------------------------------------------------
+class CompareViewTests(TestCase):
+    """La vue de bout en bout, jusqu'au payload.
+
+    Aucun test n'exercait cette vue avant aujourd'hui. Trois bugs vivants y
+    ont survecu jusqu'en production, tous visibles dans une capture d'ecran :
+
+    - `domain_total_score` n'etait jamais produite, donc la grosse carte de
+      score affichait un `/100` sans chiffre devant.
+    - `overall_winner` recevait le nom du domaine alors que le frontend teste
+      `=== "domain"` : aucun trophee ne s'affichait jamais.
+    - Les six scores etaient inventes par un LLM a partir de trois champs
+      texte.
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def _reussite(self, score=70):
+        return {'score': score, 'disponible': True, 'source': 'mesure',
+                'preuves': ['une preuve'], 'raison': None}
+
+    def _echec(self):
+        return {'score': None, 'disponible': False, 'source': 'indisponible',
+                'preuves': [], 'raison': 'Pas mesurable.'}
+
+    def _appeler(self, **surcharges):
+        base = {
+            'sites_mgmt.views._crawl_homepage': {
+                'title': 'Un titre', 'h1': 'Un H1', 'meta_description': 'Une description',
+                'h2_list': ['a'], 'body_snippet': '', '_html': '<html></html>',
+            },
+            'sites_mgmt.compare_mesures.mesurer_pagespeed': {
+                'performance': 60, 'seo': 80, 'accessibilite': 70,
+                'lcp_s': 2.0, 'cls': 0.02,
+            },
+            'sites_mgmt.views_tools._analyser_page': {
+                'brand': 'Marque', 'sector': 'saas', 'sector_source': 'jina',
+                'queries': ['requete une', 'requete deux'], 'queries_source': 'jina',
+            },
+        }
+        base.update(surcharges)
+        with patch('sites_mgmt.views._crawl_homepage', return_value=base['sites_mgmt.views._crawl_homepage']), \
+             patch('sites_mgmt.compare_mesures.mesurer_pagespeed', return_value=base['sites_mgmt.compare_mesures.mesurer_pagespeed']), \
+             patch('sites_mgmt.views_tools._analyser_page', return_value=base['sites_mgmt.views_tools._analyser_page']), \
+             patch('sites_mgmt.compare_mesures.mesurer_presence_ia', return_value=(self._reussite(90), self._reussite(30))), \
+             patch('sites_mgmt.compare_mesures.sonder_serp', return_value={
+                 'requetes_verifiees': ['requete une', 'requete deux'],
+                 'positions_a': {'requete une': 1}, 'positions_b': {}}), \
+             patch('sites_mgmt.compare_mesures.compter_hotes_mentionnant', return_value=3), \
+             patch('sites_mgmt.views_tools._recit_comparaison', return_value={
+                 'insights': {'Presence IA': 'Un commentaire.'},
+                 'summary': 'Un resume assez long pour passer la validation.',
+                 'domain_advantages': ['avantage A'],
+                 'competitor_advantages': ['avantage B'],
+                 'action_items': [{'priority': 'Haute', 'text': 'faire ceci'}],
+             }):
+            return self.client.post(
+                '/api/public/competitor-compare/',
+                data={'domain': 'alpha.ca', 'competitor': 'bravo.ca'},
+                content_type='application/json',
+            )
+
+    def test_le_payload_porte_les_totaux_que_le_frontend_affiche(self):
+        r = self._appeler()
+        self.assertEqual(r.status_code, 200, r.content[:400])
+        corps = r.json()
+        self.assertIsNotNone(corps['domain_total_score'])
+        self.assertIsNotNone(corps['competitor_total_score'])
+        self.assertIsInstance(corps['domain_total_score'], int)
+
+    def test_overall_winner_utilise_le_vocabulaire_du_frontend(self):
+        corps = self._appeler().json()
+        self.assertIn(corps['overall_winner'], ('domain', 'competitor', 'tie'))
+
+    def test_les_six_categories_sont_presentes_avec_leurs_preuves(self):
+        corps = self._appeler().json()
+        noms = [c['category'] for c in corps['categories']]
+        self.assertEqual(len(noms), 6)
+        self.assertIn('Presence IA', noms)
+        for cat in corps['categories']:
+            self.assertIn('available', cat)
+            self.assertIn('domain_evidence', cat)
+            self.assertIn('winner', cat)
+
+    def test_une_categorie_non_mesurable_rend_null_et_dit_pourquoi(self):
+        r = self._appeler(**{'sites_mgmt.compare_mesures.mesurer_pagespeed': None})
+        corps = r.json()
+        ux = [c for c in corps['categories'] if c['category'] == 'UX et design'][0]
+        self.assertIsNone(ux['domain_score'])
+        self.assertFalse(ux['available'])
+        self.assertTrue(ux['reason'])
+        # et elle ne doit pas polluer la moyenne
+        self.assertLess(corps['categories_mesurees'], corps['categories_total'])
+
+    def test_deux_fois_le_meme_domaine_est_refuse(self):
+        r = self.client.post(
+            '/api/public/competitor-compare/',
+            data={'domain': 'alpha.ca', 'competitor': 'alpha.ca'},
+            content_type='application/json',
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_la_methodologie_est_annoncee_dans_le_payload(self):
+        corps = self._appeler().json()
+        self.assertIn('mesur', corps['methodologie'].lower())
+        self.assertTrue(corps['queries_tested'])
