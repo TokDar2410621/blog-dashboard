@@ -18,6 +18,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/docs`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE}/api-docs`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE}/audit`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${SITE}/mcp`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE}/gridar-pour-chatgpt`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE}/gridar-pour-claude`, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE}/gridar-pour-agent`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE}/tools`, changeFrequency: "weekly", priority: 0.9 },
     {
       url: `${SITE}/tools/ai-visibility-checker`,

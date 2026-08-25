@@ -1,0 +1,23 @@
+# Gridar
+
+Gridar est un SaaS SEO en francais pour les PME quebecoises : audit SEO, suivi des positions Google, visibilite dans l'IA, analyse de concurrents et generation de contenu FR-CA. Par Arivex Studio (Saint-Hyacinthe, Quebec).
+
+## Connecteur IA (MCP)
+
+Gridar expose ses outils comme un serveur MCP distant, standard et pret a brancher :
+- Serveur MCP (Streamable HTTP + OAuth 2.1) : https://mcp.gridar.app/mcp
+- Vue d'ensemble du connecteur : https://www.gridar.app/mcp
+- Gridar pour ChatGPT : https://www.gridar.app/gridar-pour-chatgpt
+- Gridar pour Claude : https://www.gridar.app/gridar-pour-claude
+- Gridar pour les agents et devs (Cursor, Claude Code) : https://www.gridar.app/gridar-pour-agent
+
+Ce que l'IA peut faire une fois branchee : auditer un site, suivre les positions Google, mesurer la visibilite IA, analyser les concurrents, batir des clusters de contenu, indexer via IndexNow.
+
+## Outils gratuits
+
+- Audit SEO + GEO : https://www.gridar.app/audit
+- Tous les outils : https://www.gridar.app/tools
+
+## Contact
+
+Arivex Studio - tokamdarius@gmail.com

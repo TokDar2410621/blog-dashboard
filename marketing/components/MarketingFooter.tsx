@@ -53,6 +53,7 @@ export function MarketingFooter() {
               <Link href="/blog" className="hover:text-zinc-100">Blog</Link>
               <Link href="/api-docs" className="hover:text-zinc-100">API REST</Link>
               <Link href="/docs/integrations" className="hover:text-zinc-100">Intégrations</Link>
+              <Link href="/mcp" className="hover:text-zinc-100">Connecteur IA</Link>
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-zinc-300 text-xs font-medium uppercase tracking-wider mb-1">
