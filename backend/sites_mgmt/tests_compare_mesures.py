@@ -458,6 +458,23 @@ class StrategieLocaleTests(SimpleTestCase):
         self.assertTrue(r['disponible'])   # mesure, pas absence de mesure
         self.assertIn('Aucun balisage', ' '.join(r['preuves']))
 
+    def test_les_preuves_ne_se_contredisent_jamais(self):
+        """Vu en prod le 2026-08-25 : une page affichait "Zone desservie :
+        Montreal" ET "Aucun balisage local exploitable" l'une sous l'autre."""
+        r = mesurer_strategie_locale({'title': 'x'}, self._page({
+            '@type': 'Organization', 'areaServed': 'Montreal',
+        }))
+        preuves = ' '.join(r['preuves'])
+        self.assertIn('Montreal', preuves)
+        self.assertNotIn('Aucun balisage local exploitable', preuves)
+        self.assertIn('Aucun autre signal local', preuves)
+
+    def test_une_page_sans_aucun_signal_le_dit_une_seule_fois(self):
+        r = mesurer_strategie_locale({'title': 'x'}, '<html></html>')
+        preuves = ' '.join(r['preuves'])
+        self.assertIn('Aucun balisage local exploitable', preuves)
+        self.assertNotIn('Aucun autre signal local', preuves)
+
     def test_un_json_ld_casse_ne_fait_pas_planter(self):
         html = '<script type="application/ld+json">{ pas du json</script>'
         r = mesurer_strategie_locale({'title': 'x'}, html)

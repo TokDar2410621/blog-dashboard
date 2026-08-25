@@ -709,7 +709,14 @@ def mesurer_strategie_locale(crawl: dict | None, html: str) -> dict:
         points += 15
         preuves.append('Coordonnees geographiques declarees')
 
-    if not preuves[1:]:
+    # Les preuves doivent pouvoir se lire ensemble sans se contredire. Une
+    # premiere version ajoutait "Aucun balisage local exploitable" des que
+    # les signaux secondaires manquaient, y compris quand une localite AVAIT
+    # ete trouvee : la page affichait alors "Zone desservie : Montreal" juste
+    # au-dessus. Vu en prod le 2026-08-25.
+    if lieux and not (telephones or horaires or coordonnees):
+        preuves.append('Aucun autre signal local declare (telephone, heures, coordonnees)')
+    elif not lieux and not (telephones or horaires or coordonnees):
         preuves.append('Aucun balisage local exploitable sur la page')
 
     return _mesure(points, preuves)
