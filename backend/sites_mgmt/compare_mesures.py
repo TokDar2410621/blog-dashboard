@@ -583,51 +583,134 @@ def compter_hotes_mentionnant(marque: str, domaine: str) -> int | None:
 # ---------------------------------------------------------------------------
 # Categorie : Strategie locale
 # ---------------------------------------------------------------------------
-_INDICES_LOCAUX = (
-    'localbusiness', 'postaladdress', 'addresslocality', 'opening_hours',
-    'openinghours', 'geocoordinates',
-)
-_VILLES_QC = (
-    'montreal', 'québec', 'quebec', 'laval', 'gatineau', 'longueuil',
-    'sherbrooke', 'saguenay', 'chicoutimi', 'jonquière', 'jonquiere',
-    'trois-rivières', 'trois-rivieres', 'saint-hyacinthe', 'drummondville',
-    'lévis', 'levis', 'terrebonne', 'brossard', 'repentigny', 'granby',
-)
+def _blocs_jsonld(html: str) -> list:
+    """Rend les objets JSON-LD de la page, `@graph` aplati.
+
+    Le balisage structure est le seul endroit ou l'ancrage local d'une page se
+    lit de facon FERMEE : schema.org definit `addressLocality`, `areaServed`,
+    `telephone` et `openingHours`, et cette definition vaut pour tous les
+    sites du monde, pas seulement pour ceux qu'on a deja croises.
+    """
+    import json as _json
+
+    objets = []
+    for bloc in re.findall(
+        r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>',
+        html or '', re.I | re.DOTALL,
+    ):
+        try:
+            data = _json.loads(bloc.strip())
+        except Exception:
+            continue
+        file = data if isinstance(data, list) else [data]
+        while file:
+            item = file.pop()
+            if not isinstance(item, dict):
+                continue
+            objets.append(item)
+            graphe = item.get('@graph')
+            if isinstance(graphe, list):
+                file.extend(graphe)
+    return objets
+
+
+def _valeurs_imbriquees(objet, cle: str) -> list:
+    """Toutes les valeurs trouvees sous `cle`, a n'importe quelle profondeur.
+
+    schema.org autorise `address` en chaine, en objet ou en liste d'objets,
+    donc on ne peut pas supposer une forme unique. Les nombres comptent aussi :
+    `latitude` est souvent un float (`48.44`) et etait ignore quand seules les
+    chaines etaient collectees.
+    """
+    trouvees = []
+    file = [objet]
+    while file:
+        item = file.pop()
+        if isinstance(item, dict):
+            for k, v in item.items():
+                if k.lower() == cle.lower():
+                    if isinstance(v, bool):
+                        continue          # un booleen n'est pas une valeur ici
+                    if isinstance(v, (int, float)):
+                        trouvees.append(str(v))
+                    elif isinstance(v, str) and v.strip():
+                        trouvees.append(v.strip())
+                    elif isinstance(v, (dict, list)):
+                        file.append(v)
+                elif isinstance(v, (dict, list)):
+                    file.append(v)
+        elif isinstance(item, list):
+            file.extend(item)
+    return trouvees
 
 
 def mesurer_strategie_locale(crawl: dict | None, html: str) -> dict:
-    """Signaux d'ancrage local reellement presents dans la page.
+    """Ancrage local lu dans le balisage structure de la page.
 
-    Trois signaux verifiables : un balisage LocalBusiness, un numero de
-    telephone affiche, et des villes nommees dans le contenu. Un site sans
-    ambition locale marque bas ici sans que ce soit un defaut : c'est une
-    information, pas un reproche, et le recit doit le dire.
+    Pourquoi PAS une liste de villes
+    --------------------------------
+    Une version precedente comparait le texte de la page a une liste de
+    villes quebecoises codee en dur. Elle a ete retiree le 2026-08-25 : une
+    liste ecrite a la main ne connait que les villes qu'on a pensees. Un
+    commerce de Rimouski, de Val-d'Or ou de Gaspe absent de la liste se
+    voyait afficher "Aucune ville nommee dans le contenu lu" comme PREUVE,
+    donc une faussete presentee au visiteur a propos de son propre site. Une
+    liste ne repare que les cas deja connus et ment sur tous les autres.
+
+    Ce qui est lu ici vient de schema.org, un vocabulaire ferme et
+    documente : `addressLocality`, `areaServed`, `telephone`,
+    `openingHours`, `geo`. Cette definition vaut pour n'importe quel site, y
+    compris ceux qu'on n'a jamais vus. C'est aussi exactement ce qu'un
+    moteur de recherche lit pour comprendre l'ancrage local.
+
+    On ne regarde PAS le `@type`. Une premiere version comparait le type a
+    une liste (`LocalBusiness`, `Store`, `Restaurant`...), ce qui reintroduisait
+    le meme defaut : schema.org compte environ 200 sous-types de
+    `LocalBusiness`, et un plombier balise `Plumber` tombait a 65 au lieu de
+    100. Ce sont les PROPRIETES qui portent le signal local, pas l'etiquette
+    au-dessus. Un type invente demain fonctionnera donc sans changement.
+
+    Consequence assumee : un commerce qui nomme sa ville en toutes lettres
+    sans balisage marque bas. Le libelle le dit franchement (le balisage
+    manque), ce qui est vrai et actionnable, au lieu d'affirmer a tort que
+    la page ne cite aucun lieu.
     """
     if not crawl or crawl.get('error'):
         return _indisponible("La page n'a pas pu etre lue.")
 
-    bas = (html or '').lower()
-    texte = ' '.join(str(crawl.get(c) or '') for c in
-                     ('title', 'h1', 'meta_description', 'body_snippet')).lower()
-
-    balisage = any(indice in bas for indice in _INDICES_LOCAUX)
-    telephone = bool(re.search(r'(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}', bas))
-    villes = sorted({v for v in _VILLES_QC if v in texte or v in bas})
+    objets = _blocs_jsonld(html)
+    localites, telephones, horaires, coordonnees = [], [], [], []
+    for o in objets:
+        localites += _valeurs_imbriquees(o, 'addressLocality')
+        localites += _valeurs_imbriquees(o, 'areaServed')
+        telephones += _valeurs_imbriquees(o, 'telephone')
+        horaires += _valeurs_imbriquees(o, 'openingHours')
+        horaires += _valeurs_imbriquees(o, 'openingHoursSpecification')
+        coordonnees += _valeurs_imbriquees(o, 'latitude')
 
     points, preuves = 0, []
-    if balisage:
-        points += 40
-        preuves.append('Balisage LocalBusiness detecte')
+
+    # La localite desservie EST le signal local. Sans elle, le reste ne dit
+    # pas ou l'entreprise opere, donc elle porte le poids principal.
+    lieux = sorted({v for v in localites if v})[:4]
+    if lieux:
+        points += 45
+        preuves.append('Zone desservie declaree : ' + ', '.join(lieux))
     else:
-        preuves.append('Aucun balisage LocalBusiness')
-    if telephone:
-        points += 25
-        preuves.append('Numero de telephone affiche')
-    if villes:
-        points += min(35, 12 * len(villes))
-        preuves.append('Villes nommees : ' + ', '.join(villes[:4]))
-    else:
-        preuves.append('Aucune ville nommee dans le contenu lu')
+        preuves.append('Aucune localite declaree dans le balisage')
+
+    if telephones:
+        points += 20
+        preuves.append('Telephone dans le balisage')
+    if horaires:
+        points += 20
+        preuves.append("Heures d'ouverture declarees")
+    if coordonnees:
+        points += 15
+        preuves.append('Coordonnees geographiques declarees')
+
+    if not preuves[1:]:
+        preuves.append('Aucun balisage local exploitable sur la page')
 
     return _mesure(points, preuves)
 

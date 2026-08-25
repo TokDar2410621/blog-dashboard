@@ -375,24 +375,94 @@ class SerpTests(SimpleTestCase):
 
 # ---------------------------------------------------------------------------
 class StrategieLocaleTests(SimpleTestCase):
+    """L'ancrage local se lit dans le balisage schema.org, jamais dans une
+    liste de villes.
 
-    def test_balisage_telephone_et_villes_sont_comptes(self):
-        crawl = {'title': 'Plombier a Jonquiere', 'h1': '', 'meta_description': '',
-                 'body_snippet': 'Nous servons Chicoutimi et Jonquiere.'}
-        html = '<script type="application/ld+json">{"@type":"LocalBusiness"}</script> 418-555-1234'
-        r = mesurer_strategie_locale(crawl, html)
-        self.assertTrue(r['disponible'])
-        self.assertGreaterEqual(r['score'], 80)
-        preuves = ' '.join(r['preuves'])
-        self.assertIn('LocalBusiness', preuves)
-        self.assertIn('telephone', preuves)
+    Une version precedente comparait le texte a une liste de villes
+    quebecoises codee en dur. Retiree le 2026-08-25 : une liste ne connait
+    que les villes qu'on a pensees. Un commerce de Rimouski absent de la
+    liste se voyait afficher "Aucune ville nommee dans le contenu lu" comme
+    PREUVE, donc une faussete montree au visiteur a propos de son propre
+    site. schema.org est un vocabulaire ferme et documente, valable pour
+    n'importe quel site, y compris ceux qu'on n'a jamais vus.
+    """
 
-    def test_un_site_sans_ancrage_local_marque_bas_sans_etre_indisponible(self):
-        crawl = {'title': 'SaaS mondial', 'h1': '', 'meta_description': '',
-                 'body_snippet': 'Global platform.'}
-        r = mesurer_strategie_locale(crawl, '<html></html>')
+    def _page(self, jsonld):
+        return ('<script type="application/ld+json">' + json.dumps(jsonld)
+                + '</script>')
+
+    def test_un_commerce_pleinement_balise_marque_haut(self):
+        r = mesurer_strategie_locale({'title': 'Plomberie'}, self._page({
+            '@type': 'Plumber',
+            'address': {'@type': 'PostalAddress', 'addressLocality': 'Rimouski'},
+            'telephone': '418-555-1234',
+            'openingHours': 'Mo-Fr 08:00-17:00',
+            'geo': {'@type': 'GeoCoordinates', 'latitude': 48.44, 'longitude': -68.52},
+        }))
+        self.assertEqual(r['score'], 100)
+        self.assertIn('Rimouski', ' '.join(r['preuves']))
+
+    def test_le_type_schema_n_est_jamais_compare_a_une_liste(self):
+        """schema.org compte environ 200 sous-types de LocalBusiness. Une
+        premiere version comparait `@type` a une liste de 18 : un plombier
+        balise `Plumber` tombait a 65 au lieu de 100. Ce sont les PROPRIETES
+        qui portent le signal, pas l'etiquette."""
+        for type_schema in ('Plumber', 'Electrician', 'Bakery', 'NailSalon',
+                            'TypeInventeDemain', 'Thing'):
+            r = mesurer_strategie_locale({'title': 'x'}, self._page({
+                '@type': type_schema,
+                'address': {'addressLocality': 'Amqui'},
+                'telephone': '418-555-1234',
+            }))
+            self.assertEqual(r['score'], 65, type_schema)
+
+    def test_une_ville_hors_de_toute_liste_est_lue_normalement(self):
+        """Le coeur du correctif : Val-d'Or, Gaspe et Rimouski n'etaient dans
+        aucune liste et etaient declares inexistants."""
+        for ville in ("Val-d'Or", 'Gaspe', 'Rimouski', 'Amqui', 'Chibougamau'):
+            r = mesurer_strategie_locale({'title': 'x'}, self._page({
+                '@type': 'LocalBusiness',
+                'address': {'addressLocality': ville},
+            }))
+            self.assertIn(ville, ' '.join(r['preuves']), ville)
+
+    def test_une_ville_hors_quebec_est_lue_aussi(self):
+        """Le code ne doit pas supposer que les clients sont quebecois."""
+        r = mesurer_strategie_locale({'title': 'x'}, self._page({
+            '@type': 'Store', 'address': {'addressLocality': 'Marseille'},
+        }))
+        self.assertIn('Marseille', ' '.join(r['preuves']))
+
+    def test_area_served_compte_comme_zone_desservie(self):
+        r = mesurer_strategie_locale({'title': 'x'}, self._page({
+            '@type': 'ProfessionalService', 'areaServed': 'Bas-Saint-Laurent',
+        }))
+        self.assertIn('Bas-Saint-Laurent', ' '.join(r['preuves']))
+
+    def test_le_graphe_imbrique_est_aplati(self):
+        """schema.org autorise @graph et des objets imbriques : on ne peut pas
+        supposer une forme unique."""
+        r = mesurer_strategie_locale({'title': 'x'}, self._page({
+            '@graph': [
+                {'@type': 'WebSite'},
+                {'@type': 'Dentist',
+                 'address': {'@type': 'PostalAddress', 'addressLocality': 'Alma'}},
+            ],
+        }))
+        self.assertIn('Alma', ' '.join(r['preuves']))
+        self.assertEqual(r['score'], 45)   # la localite seule, sans tel ni horaires
+
+    def test_un_site_sans_balisage_marque_zero_mais_reste_mesure(self):
+        r = mesurer_strategie_locale({'title': 'SaaS mondial'}, '<html></html>')
         self.assertEqual(r['score'], 0)
         self.assertTrue(r['disponible'])   # mesure, pas absence de mesure
+        self.assertIn('Aucun balisage', ' '.join(r['preuves']))
+
+    def test_un_json_ld_casse_ne_fait_pas_planter(self):
+        html = '<script type="application/ld+json">{ pas du json</script>'
+        r = mesurer_strategie_locale({'title': 'x'}, html)
+        self.assertEqual(r['score'], 0)
+        self.assertTrue(r['disponible'])
 
     def test_crawl_en_erreur_est_indisponible(self):
         r = mesurer_strategie_locale({'error': 'HTTP 500'}, '')
