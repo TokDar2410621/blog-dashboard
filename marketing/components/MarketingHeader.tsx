@@ -38,7 +38,10 @@ export function MarketingHeader({ trail }: Props) {
   const authedHref = isAuthenticated ? "/sites" : "/login";
   const primaryCtaLabel = isAuthenticated ? "Tableau de bord" : "Commencer";
   const headerCtaLabel = isAuthenticated ? "Tableau de bord" : "Connexion";
-  const hideLoginAffordance = authLoading;
+  // Masque le lien texte secondaire pendant le probe de session ET une fois
+  // connecte : le bouton principal dit deja "Tableau de bord", inutile de
+  // l'afficher deux fois. Un visiteur connecte ne doit jamais lire "Connexion".
+  const hideLoginAffordance = authLoading || isAuthenticated;
 
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -191,11 +194,13 @@ export function MarketingHeader({ trail }: Props) {
                     Docs
                   </Link>
                 </SheetClose>
-                <SheetClose asChild>
-                  <Link href={authedHref} className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
-                    {headerCtaLabel}
-                  </Link>
-                </SheetClose>
+                {!hideLoginAffordance && (
+                  <SheetClose asChild>
+                    <Link href={authedHref} className="rounded-md px-2 py-2 text-zinc-300 hover:bg-white/5 hover:text-white">
+                      {headerCtaLabel}
+                    </Link>
+                  </SheetClose>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
