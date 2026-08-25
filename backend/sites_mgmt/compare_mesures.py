@@ -641,15 +641,43 @@ def mesurer_strategie_locale(crawl: dict | None, html: str) -> dict:
 # automatique seulement : si l'utilisateur nomme explicitement un de ces
 # domaines, on le respecte.
 _PLATEFORMES_NON_ACTIONNABLES = frozenset({
+    # Reseaux sociaux
     'facebook.com', 'instagram.com', 'linkedin.com', 'x.com', 'twitter.com',
-    'youtube.com', 'tiktok.com', 'pinterest.com', 'reddit.com',
-    'wikipedia.org', 'fr.wikipedia.org', 'en.wikipedia.org',
-    'google.com', 'maps.google.com', 'play.google.com', 'apple.com',
-    'yelp.ca', 'yelp.com', 'pagesjaunes.ca', 'yellowpages.ca',
-    'kijiji.ca', 'indeed.com', 'ca.indeed.com', 'glassdoor.ca',
-    'amazon.ca', 'amazon.com', 'ebay.ca', 'etsy.com',
-    'tripadvisor.ca', 'tripadvisor.com', 'booking.com',
+    'youtube.com', 'tiktok.com', 'pinterest.com', 'reddit.com', 'medium.com',
+    # Encyclopedies et geants
+    'wikipedia.org', 'google.com', 'apple.com', 'microsoft.com',
+    # Annuaires locaux
+    'yelp.ca', 'yelp.com', 'pagesjaunes.ca', 'yellowpages.ca', 'kijiji.ca',
+    'tripadvisor.ca', 'tripadvisor.com', 'booking.com', 'yaseo.ca',
+    # Sites d'emploi. Ajoutes le 2026-08-25 : sur "developpeur web
+    # chicoutimi", Google lit une recherche d'EMPLOI, pas une recherche de
+    # prestataire. Presenter Indeed comme le concurrent d'un pigiste n'est
+    # pas actionnable, et le trafic vise n'est pas le sien.
+    'indeed.com', 'jobillico.com', 'glassdoor.ca', 'glassdoor.com',
+    'jobboom.com', 'monster.ca', 'workopolis.com', 'emploiquebec.gouv.qc.ca',
+    'quebecemploi.gouv.qc.ca', 'neuvoo.ca', 'talent.com',
+    # Annuaires de logiciels et sites d'avis. Meme logique : ils trustent les
+    # requetes "meilleur logiciel X" sans etre des concurrents produit.
+    'capterra.ca', 'capterra.com', 'getapp.ca', 'getapp.com', 'g2.com',
+    'softwareadvice.com', 'trustpilot.com', 'clutch.co', 'producthunt.com',
+    # Places de marche
+    'amazon.ca', 'amazon.com', 'ebay.ca', 'etsy.com', 'walmart.ca',
 })
+
+
+def _est_plateforme(hote: str) -> bool:
+    """Vrai si l'hote est une plateforme non actionnable, sous-domaines inclus.
+
+    La correspondance exacte ne suffit pas : verifie en prod le 2026-08-25,
+    la decouverte a remonte `emplois.ca.indeed.com` comme concurrent d'un
+    developpeur pigiste alors que `indeed.com` figurait deja dans la liste.
+    Les plateformes servent leurs pages localisees depuis des sous-domaines
+    (`emplois.ca.indeed.com`, `ca.linkedin.com`, `fr.capterra.ca`), donc il
+    faut comparer sur le suffixe.
+    """
+    hote = (hote or '').lower()
+    return any(hote == p or hote.endswith('.' + p)
+               for p in _PLATEFORMES_NON_ACTIONNABLES)
 
 
 def decouvrir_concurrents(serps: list[dict], domaine: str, maximum: int = 3
@@ -673,7 +701,7 @@ def decouvrir_concurrents(serps: list[dict], domaine: str, maximum: int = 3
     for serp in serps:
         vus = set()
         for hote, rang in serp.get('hotes', []):
-            if not hote or hote == domaine or hote in _PLATEFORMES_NON_ACTIONNABLES:
+            if not hote or hote == domaine or _est_plateforme(hote):
                 continue
             if hote in vus:      # une seule voix par SERP, pas une par URL
                 continue
@@ -715,3 +743,33 @@ def trouver_ecarts(serps: list[dict], domaine: str, concurrents: list[str]
             'title': rival['titre'],
         })
     return ecarts
+
+
+def reperer_plateformes(serps: list[dict], domaine: str, maximum: int = 4
+                        ) -> list[dict]:
+    """Les plateformes qui occupent les requetes du site, avec leur frequence.
+
+    Elles sont ecartees de la liste des concurrents parce qu'on ne bat pas
+    Indeed ou Capterra sur leur terrain. Mais les taire serait perdre une
+    information utile : quand un annuaire trust la moitie des requetes d'un
+    metier, l'action n'est pas "faire mieux que lui", c'est "s'y faire
+    lister". C'est actionnable, juste differemment.
+    """
+    frequences = {}
+    for serp in serps:
+        vus = set()
+        for hote, _rang in serp.get('hotes', []):
+            if not hote or hote == domaine or not _est_plateforme(hote):
+                continue
+            if hote in vus:
+                continue
+            vus.add(hote)
+            frequences[hote] = frequences.get(hote, 0) + 1
+
+    total = len(serps) or 1
+    reperees = [
+        {'hote': h, 'requetes': n, 'part': round(n / total * 100)}
+        for h, n in frequences.items() if n >= 2
+    ]
+    reperees.sort(key=lambda p: (-p['requetes'], p['hote']))
+    return reperees[:maximum]

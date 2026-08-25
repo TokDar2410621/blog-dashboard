@@ -29,7 +29,8 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
 
 from .compare_mesures import (
-    collecter_serps, decouvrir_concurrents, trouver_ecarts,
+    collecter_serps, decouvrir_concurrents, reperer_plateformes,
+    trouver_ecarts,
 )
 
 
@@ -249,3 +250,50 @@ class GapViewTests(TestCase):
         corps = self._appeler(serps).json()
         self.assertEqual(corps['queries_checked'], 2)
         self.assertEqual(corps['queries_tested'], ['q1', 'q2'])
+
+
+# ---------------------------------------------------------------------------
+class PlateformesTests(SimpleTestCase):
+    """Les plateformes qu'on ecarte des concurrents, et pourquoi on les nomme
+    quand meme."""
+
+    def test_un_sous_domaine_de_plateforme_est_reconnu(self):
+        """Constate en prod le 2026-08-25 : la decouverte a remonte
+        `emplois.ca.indeed.com` comme concurrent d'un developpeur pigiste,
+        alors que `indeed.com` figurait deja dans la liste d'exclusion. Les
+        plateformes servent leurs pages localisees depuis des sous-domaines."""
+        serps = [
+            serp('q1', [('emplois.ca.indeed.com', 1), ('rival.ca', 2)]),
+            serp('q2', [('ca.linkedin.com', 1), ('rival.ca', 3)]),
+            serp('q3', [('fr.capterra.ca', 1), ('rival.ca', 2)]),
+            serp('q4', [('fr.getapp.ca', 1), ('rival.ca', 4)]),
+        ]
+        self.assertEqual(decouvrir_concurrents(serps, 'moi.ca'), ['rival.ca'])
+
+    def test_les_sites_d_emploi_ne_sont_pas_des_concurrents(self):
+        """Google lit "developpeur web chicoutimi" comme une recherche
+        d'EMPLOI. Presenter Indeed comme le concurrent d'un pigiste n'est pas
+        actionnable, et le trafic vise n'est pas le sien."""
+        serps = [serp(f'q{i}', [('jobillico.com', 1), ('monster.ca', 2)])
+                 for i in range(4)]
+        self.assertEqual(decouvrir_concurrents(serps, 'moi.ca'), [])
+
+    def test_les_plateformes_dominantes_sont_nommees_a_part(self):
+        serps = [
+            serp('q1', [('emplois.ca.indeed.com', 1), ('rival.ca', 2)]),
+            serp('q2', [('emplois.ca.indeed.com', 1)]),
+            serp('q3', [('emplois.ca.indeed.com', 2), ('ca.linkedin.com', 5)]),
+            serp('q4', [('ca.linkedin.com', 3)]),
+        ]
+        reperees = reperer_plateformes(serps, 'moi.ca')
+        self.assertEqual(reperees[0]['hote'], 'emplois.ca.indeed.com')
+        self.assertEqual(reperees[0]['requetes'], 3)
+        self.assertEqual(reperees[0]['part'], 75)
+
+    def test_une_plateforme_vue_une_seule_fois_n_est_pas_signalee(self):
+        serps = [serp('q1', [('yelp.ca', 9)]), serp('q2', []), serp('q3', [])]
+        self.assertEqual(reperer_plateformes(serps, 'moi.ca'), [])
+
+    def test_le_domaine_analyse_n_est_jamais_signale_comme_plateforme(self):
+        serps = [serp('q1', [('medium.com', 1)]), serp('q2', [('medium.com', 1)])]
+        self.assertEqual(reperer_plateformes(serps, 'medium.com'), [])
