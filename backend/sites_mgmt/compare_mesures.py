@@ -116,7 +116,22 @@ def mesurer_pagespeed(url: str, timeout: int = 45) -> dict | None:
     comparaison, un zero fantome fait perdre la categorie au concurrent et
     rend le verdict faux sur le site de quelqu'un d'autre. On reprend donc la
     version correcte, celle de `PageSpeedView` (views.py:2521).
+
+    Le resultat est cache 24 h. Mesure faite en prod le 2026-08-25 : PSI est
+    erratique, la meme URL passe de 9 s a plus de 75 s d'un appel a l'autre et
+    Lighthouse renvoie par intermittence un HTTP 500. A 45 s de timeout, c'est
+    a peu pres pile ou face. Un cache long est la reponse la moins couteuse :
+    la performance d'un site ne change pas d'une minute a l'autre, donc un
+    succes profite a tous les appels suivants sur le meme domaine. Seuls les
+    succes sont caches, un echec doit pouvoir etre retente.
     """
+    from django.core.cache import cache as cache_django
+
+    cle_cache = f'psi:v1:{url}'
+    en_cache = cache_django.get(cle_cache)
+    if en_cache is not None:
+        return en_cache
+
     cle = os.environ.get('PAGESPEED_API_KEY')
     if not cle:
         return None
@@ -154,13 +169,15 @@ def mesurer_pagespeed(url: str, timeout: int = 45) -> dict | None:
 
     lcp = metrique('largest-contentful-paint')
     cls = metrique('cumulative-layout-shift')
-    return {
+    resultat = {
         'performance': note('performance'),
         'seo': note('seo'),
         'accessibilite': note('accessibility'),
         'lcp_s': None if lcp is None else round(lcp / 1000, 2),
         'cls': None if cls is None else round(cls, 3),
     }
+    cache_django.set(cle_cache, resultat, timeout=86400)
+    return resultat
 
 
 # ---------------------------------------------------------------------------

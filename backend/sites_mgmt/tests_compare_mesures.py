@@ -68,6 +68,11 @@ class DepartagerTests(SimpleTestCase):
 # ---------------------------------------------------------------------------
 class PageSpeedTests(SimpleTestCase):
 
+    def setUp(self):
+        # Les resultats PSI sont caches 24 h par URL. Sans ce vidage, le
+        # premier test peuple le cache et les suivants recoivent sa reponse.
+        cache.clear()
+
     def _psi(self, categories, audits=None):
         return reponse(200, {'lighthouseResult': {
             'categories': categories, 'audits': audits or {}}})
@@ -114,6 +119,35 @@ class PageSpeedTests(SimpleTestCase):
         with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
             with patch('requests.get', side_effect=TimeoutError('boom')):
                 self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+
+    def test_un_succes_est_cache_et_evite_le_second_appel(self):
+        """PSI est erratique (9 s a plus de 75 s pour la meme URL, HTTP 500
+        par intermittence). Un cache long est la reponse la moins couteuse :
+        la performance d'un site ne change pas d'une minute a l'autre."""
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', return_value=self._psi(
+                    {'performance': {'score': 0.5}})) as get:
+                premier = mesurer_pagespeed('https://exemple.ca')
+                second = mesurer_pagespeed('https://exemple.ca')
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(premier, second)
+
+    def test_un_echec_n_est_pas_cache_et_reste_retentable(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get', return_value=reponse(500)) as get:
+                self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+                self.assertIsNone(mesurer_pagespeed('https://exemple.ca'))
+        self.assertEqual(get.call_count, 2)
+
+    def test_deux_domaines_ont_des_entrees_de_cache_distinctes(self):
+        with patch.dict(os.environ, {'PAGESPEED_API_KEY': 'k'}):
+            with patch('requests.get') as get:
+                get.side_effect = [self._psi({'performance': {'score': 0.9}}),
+                                   self._psi({'performance': {'score': 0.1}})]
+                a = mesurer_pagespeed('https://alpha.ca')
+                b = mesurer_pagespeed('https://bravo.ca')
+        self.assertEqual(a['performance'], 90)
+        self.assertEqual(b['performance'], 10)
 
 
 # ---------------------------------------------------------------------------
