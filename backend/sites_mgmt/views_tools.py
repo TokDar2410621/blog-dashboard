@@ -96,6 +96,42 @@ def _crawl_homepage_light(url: str) -> dict:
         return {'error': str(e)[:100]}
 
 
+def _fetch_page_jina(url: str, timeout: int = 20) -> dict | None:
+    """Recupere le texte propre d'une page via Jina Reader (r.jina.ai), un
+    service tiers qui rend le HTML en markdown lisible - titre, structure,
+    contenu reel - sans qu'on ait a parser le HTML nous-memes.
+
+    Chemin principal de lecture de page pour les outils publics, devant
+    `_crawl_homepage_light`. Notre crawl maison a coute une journee de
+    correctifs le 2026-08-24 pour des defauts de parsing HTML (H1 avec
+    balise imbriquee, script injecte dans le H1, troncature avant le titre
+    sur les pages a gros preambule) : Jina absorbe cette classe de bugs.
+    Verifie sur des sites reels (tokamdarius.ca, gridar.app, stripe.com) :
+    reponse propre en 3 a 4 secondes, contenu plus riche que le trio
+    title/H1/description qu'on extrayait nous-memes.
+
+    Rend None sur tout echec reseau/HTTP/vide : l'appelant retombe alors sur
+    `_crawl_homepage_light`. Aucune cle API utilisee (palier sans cle).
+    """
+    import requests as http_requests
+    try:
+        r = http_requests.get(
+            f'https://r.jina.ai/{url}',
+            timeout=timeout,
+            headers={'Accept': 'text/plain'},
+        )
+        if r.status_code != 200 or not r.text.strip():
+            return None
+        texte = r.text.strip()
+        titre = ''
+        if texte.startswith('Title:'):
+            titre = texte.split('\n', 1)[0][len('Title:'):].strip()
+        return {'title': titre, 'page_text': texte[:4000], 'source': 'jina'}
+    except Exception as e:
+        logger.info('Jina Reader indisponible pour %s: %s', url, str(e)[:100])
+        return None
+
+
 # Secteurs reconnus par la detection marque/secteur, LLM et heuristique de
 # repli confondus. Partages pour que les deux methodes parlent le meme
 # vocabulaire en aval (generation de requetes, affichage).
@@ -105,16 +141,33 @@ _SECTEURS_CONNUS = (
 )
 
 _SYSTEME_SECTEUR = (
-    "Tu es analyste marketing. On te donne le titre, le H1 et la description "
-    "de la page d'accueil d'une entreprise. Tu rends UNIQUEMENT un objet JSON "
-    "avec sa marque et son secteur d'activite reel, rien d'autre autour."
+    "Tu es analyste marketing. On te donne le contenu de la page d'accueil "
+    "d'une entreprise. Tu rends UNIQUEMENT un objet JSON avec sa marque et "
+    "son secteur d'activite reel, rien d'autre autour."
 )
+
+
+def _contexte_page(crawl: dict) -> str:
+    """Construit le bloc de contexte d'un prompt a partir d'un crawl, quelle
+    que soit sa source.
+
+    Deux formes possibles : `page_text` (Jina Reader - texte propre de toute
+    la page) ou le trio title/H1/meta_description (notre crawl maison, en
+    repli). Une seule fonction pour ne pas dupliquer ce branchement dans
+    chaque prompt.
+    """
+    if crawl.get('page_text'):
+        return crawl['page_text'][:1500]
+    return '\n'.join(filter(None, [
+        f"Titre : {(crawl.get('title') or '').strip()[:200]}",
+        f"H1 : {(crawl.get('h1') or '').strip()[:200]}",
+        f"Meta description : {(crawl.get('meta_description') or '').strip()[:300]}",
+    ]))
+
 
 _GABARIT_SECTEUR = """\
 Domaine : {domain}
-Titre : {title}
-H1 : {h1}
-Meta description : {description}
+{contexte}
 
 Rends un objet JSON, exactement cette forme :
 {{"brand": "...", "sector": "..."}}
@@ -126,22 +179,30 @@ Regles :
 - Ignore tout exemple, cas d'usage ou nom cite en demonstration sur la page :
   le secteur decrit l'entreprise elle-meme, pas ce dont sa page parle en
   passant.
+- Le texte peut venir d'une page de connexion, d'un mur de paiement ou d'un
+  bandeau de cookies plutot que du vrai contenu du site (ex. "Log in",
+  "Email or mobile number", "Forgot password?"). Si c'est le cas, rends
+  {{"brand": "", "sector": ""}} plutot que de deviner sur du vide.
 """
 
 
 def _detecter_marque_secteur_llm(crawl: dict, domain: str, timeout: int = 10) -> dict | None:
-    """DeepSeek lit title/H1/description et identifie marque + secteur.
+    """DeepSeek lit le contexte de la page et identifie marque + secteur.
 
     Rend None des que le resultat n'est pas exploitable ; jamais de
     dependance dure a un LLM sur ces routes publiques, l'appelant reprend
     l'heuristique de repli.
 
     Contrairement a un scan de sous-chaine, le modele distingue "cette
-    entreprise vend X" de "cette page mentionne X en exemple". C'est
-    precisement ce qui manquait le 2026-08-24 : la page d'accueil de Gridar
-    cite "restaurant a Montreal" comme cas d'usage dans un mockup, et affiche
-    le domaine fictif "boutique-demo.ca" dans un autre. Un scan de la page
-    entiere lisait "boutique" et concluait a tort que Gridar vend en ligne.
+    entreprise vend X" de "cette page mentionne X en exemple", et reconnait
+    un mur de connexion pour ce qu'il est. C'est precisement ce qui
+    manquait le 2026-08-24 : la page d'accueil de Gridar cite "restaurant a
+    Montreal" comme cas d'usage dans un mockup et affiche le domaine fictif
+    "boutique-demo.ca" ailleurs ; un scan de sous-chaine lisait "boutique"
+    et concluait a tort que Gridar vend en ligne. Meme jour, Jina Reader a
+    recupere la page de connexion de facebook.com au lieu du vrai contenu :
+    demander au modele de la reconnaitre plutot que de la deviner comme
+    contenu reel evite de fabriquer un faux secteur sur du vide.
     """
     import re
 
@@ -149,15 +210,12 @@ def _detecter_marque_secteur_llm(crawl: dict, domain: str, timeout: int = 10) ->
 
     if not crawl or crawl.get('error'):
         return None
-    title = (crawl.get('title') or '').strip()
-    h1 = (crawl.get('h1') or '').strip()
-    desc = (crawl.get('meta_description') or '').strip()
-    if not (title or h1 or desc):
+    contexte = _contexte_page(crawl)
+    if not contexte.strip():
         return None
 
     prompt = _GABARIT_SECTEUR.format(
-        domain=domain, title=title[:200], h1=h1[:200], description=desc[:300],
-        secteurs=', '.join(_SECTEURS_CONNUS),
+        domain=domain, contexte=contexte, secteurs=', '.join(_SECTEURS_CONNUS),
     )
     try:
         brut = call_deepseek(prompt, max_tokens=150, system=_SYSTEME_SECTEUR,
@@ -338,16 +396,14 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
 
 
 _SYSTEME_REQUETES_COMMERCIALES = (
-    "Tu es analyste marketing. On te donne le titre, le H1 et la description "
-    "de la page d'accueil d'une entreprise. Tu rends UNIQUEMENT un tableau "
-    "JSON de requetes commerciales, rien d'autre autour."
+    "Tu es analyste marketing. On te donne le contenu de la page d'accueil "
+    "d'une entreprise. Tu rends UNIQUEMENT un tableau JSON de requetes "
+    "commerciales, rien d'autre autour."
 )
 
 _GABARIT_REQUETES_COMMERCIALES = """\
 Entreprise : {brand} ({domain})
-Titre : {title}
-H1 : {h1}
-Meta description : {description}
+{contexte}
 
 Rends entre 5 et {maximum} requetes, en francais quebecois, qu'un CLIENT
 potentiel taperait pour trouver une entreprise comme celle-ci, en JSON, dans
@@ -359,14 +415,17 @@ Regles :
   c'est litteralement ce qu'on chercherait.
 - Deux a six mots par requete : decouverte de service, comparaisons, intention
   locale.
-- Si la page ne dit pas assez clairement ce que vend l'entreprise, rends un
+- Le texte peut venir d'une page de connexion, d'un mur de paiement ou d'un
+  bandeau de cookies plutot que du vrai contenu du site (ex. "Log in",
+  "Email or mobile number", "Forgot password?"). Si c'est le cas, ou si la
+  page ne dit pas assez clairement ce que vend l'entreprise, rends un
   tableau vide plutot que d'inventer.
 """
 
 
 def _requetes_commerciales_llm(crawl: dict, brand: str, domain: str,
                                n: int = 15, timeout: int = 15) -> list[str] | None:
-    """DeepSeek lit title/H1/description et genere directement les requetes
+    """DeepSeek lit le contexte de la page et genere directement les requetes
     commerciales qu'un client taperait, sans passer par une case de secteur.
 
     Rend None des que le resultat n'est pas exploitable ; l'appelant retombe
@@ -387,15 +446,12 @@ def _requetes_commerciales_llm(crawl: dict, brand: str, domain: str,
 
     if not crawl or crawl.get('error'):
         return None
-    title = (crawl.get('title') or '').strip()
-    h1 = (crawl.get('h1') or '').strip()
-    desc = (crawl.get('meta_description') or '').strip()
-    if not (title or h1 or desc):
+    contexte = _contexte_page(crawl)
+    if not contexte.strip():
         return None
 
     prompt = _GABARIT_REQUETES_COMMERCIALES.format(
-        brand=brand or domain, domain=domain, title=title[:200], h1=h1[:200],
-        description=desc[:300], maximum=n,
+        brand=brand or domain, domain=domain, contexte=contexte, maximum=n,
     )
     try:
         brut = call_deepseek(prompt, max_tokens=400,
@@ -437,6 +493,57 @@ def _requetes_commerciales_llm(crawl: dict, brand: str, domain: str,
             break
 
     return propres if len(propres) >= 3 else None
+
+
+def _analyser_page(domain: str, n_queries: int = 15) -> dict:
+    """Point d'entree unique des 3 outils publics qui ont besoin de marque,
+    secteur et requetes commerciales pour un domaine.
+
+    Trois etages, chacun ne s'execute que si le precedent n'a rien produit
+    d'exploitable :
+
+    1. Jina Reader + DeepSeek - lit le texte reel de la page, sans le crawl
+       regex maison. Le prompt DeepSeek sait reconnaitre un mur de connexion
+       ou de paiement et refuse de deviner dessus plutot que d'inventer.
+    2. Notre crawl maison + DeepSeek - repli pour les cas ou Jina echoue ou
+       tombe sur un mur que meme un DeepSeek prevenu ne peut pas traverser.
+       Constate le 2026-08-24 : Jina a recupere la page de connexion de
+       facebook.com, alors que notre crawl (signature de requete differente)
+       a recu le vrai contenu. Deux outils independants, deux traitements
+       differents par le meme serveur - avoir les deux en secours l'un de
+       l'autre couvre plus de cas qu'aucun des deux seul.
+    3. Generateur par secteur (Gemini + gabarits deterministes) - dernier
+       repli, ne depend d'aucun appel reseau garanti pour repondre.
+
+    Ne leve jamais : chaque etage a deja son propre filet, celui-ci les
+    enchaine.
+    """
+    jina = _fetch_page_jina(f'https://{domain}')
+    if jina:
+        meta = _detecter_marque_secteur_llm(jina, domain)
+        if meta:
+            queries = _requetes_commerciales_llm(jina, meta['brand'], domain, n=n_queries)
+            if queries:
+                return {
+                    'brand': meta['brand'], 'sector': meta['sector'],
+                    'sector_source': 'jina', 'queries': queries,
+                    'queries_source': 'jina',
+                }
+
+    # Etage 2 : le crawl maison, deja LLM-first + heuristique de repli.
+    crawl = _crawl_homepage_light(f'https://{domain}')
+    meta = _marque_et_secteur(crawl, domain)
+    queries = _requetes_commerciales_llm(crawl, meta['brand'], domain, n=n_queries)
+    queries_source = 'llm'
+    if not queries:
+        queries = _generate_commercial_queries(meta['brand'], meta['sector'], domain, n=n_queries)
+        queries_source = 'sector_fallback'
+
+    return {
+        'brand': meta['brand'], 'sector': meta['sector'],
+        'sector_source': meta['source'], 'queries': queries,
+        'queries_source': queries_source,
+    }
 
 
 def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
@@ -580,22 +687,15 @@ class PublicAiVisibilityView(APIView):
             return Response(cached)
 
         # Step 1: crawl homepage for brand/sector detection
-        homepage = f'https://{domain}'
-        crawl = _crawl_homepage_light(homepage)
-        meta = _marque_et_secteur(crawl, domain)
-        brand = meta['brand']
-        sector = meta['sector']
-        sector_source = meta['source']
-
-        # Step 2: generate commercial queries. DeepSeek d'abord, en lisant la
-        # page reelle : ne depend d'aucune case de secteur, donc marche aussi
-        # pour une entreprise hors des 13 verticales connues. Repli sur le
-        # generateur par secteur seulement si le LLM echoue.
-        queries = _requetes_commerciales_llm(crawl, brand, domain, n=15)
-        queries_source = 'llm'
-        if not queries:
-            queries = _generate_commercial_queries(brand, sector, domain, n=15)
-            queries_source = 'sector_fallback'
+        # Steps 1-2 : lecture de la page, marque/secteur, requetes
+        # commerciales. Jina Reader d'abord, notre crawl maison en repli
+        # (voir _analyser_page).
+        analyse = _analyser_page(domain, n_queries=15)
+        brand = analyse['brand']
+        sector = analyse['sector']
+        sector_source = analyse['sector_source']
+        queries = analyse['queries']
+        queries_source = analyse['queries_source']
 
         # Step 3: check AI mentions (parallel, Gemini only for now)
         ai_results = []
@@ -783,9 +883,10 @@ class PublicCompetitorGapView(APIView):
         if not competitors:
             competitors = []  # Will still work but with limited gap data
 
-        # Step 2: crawl homepage for brand/sector
-        crawl = _crawl_homepage_light(f'https://{domain}')
-        meta = _marque_et_secteur(crawl, domain)
+        # Step 2 : lecture de la page + requetes commerciales de test. Jina
+        # Reader d'abord, notre crawl maison en repli (voir _analyser_page).
+        analyse = _analyser_page(domain, n_queries=20)
+        test_queries = analyse['queries']
 
         # Step 3: get keywords that competitors rank for
         competitor_keywords = {}  # keyword -> {competitor, position, url, title}
@@ -805,14 +906,6 @@ class PublicCompetitorGapView(APIView):
             except Exception:
                 pass
             return (query, [])
-
-        # Generate test queries. DeepSeek d'abord, en lisant la page reelle ;
-        # repli sur le generateur par secteur seulement si le LLM echoue.
-        test_queries = _requetes_commerciales_llm(crawl, meta['brand'], domain, n=20)
-        if not test_queries:
-            test_queries = _generate_commercial_queries(
-                meta['brand'], meta['sector'], domain, n=20
-            )
 
         # Run all SERP checks in parallel
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -1194,17 +1287,9 @@ class PublicAiCitationCheckerView(APIView):
         if cached:
             return Response(cached)
             
-        crawl = _crawl_homepage_light(f'https://{domain_norm}')
-        brand_info = _marque_et_secteur(crawl, domain_norm)
-
-        # DeepSeek d'abord, en lisant la page reelle ; repli sur le
-        # generateur par secteur seulement si le LLM echoue. Pas de troisieme
-        # repli : `_generate_commercial_queries` rend toujours une liste non
-        # vide (gabarits generiques quand le secteur est 'general'), un filet
-        # de plus serait mort et repeterait le meme bug qu'il est cense eviter.
-        queries = _requetes_commerciales_llm(crawl, brand_info['brand'], domain_norm, n=8)
-        if not queries:
-            queries = _generate_commercial_queries(brand_info['brand'], brand_info['sector'], domain_norm, n=8)
+        # Jina Reader d'abord, notre crawl maison en repli, DeepSeek pour les
+        # requetes (voir _analyser_page).
+        queries = _analyser_page(domain_norm, n_queries=8)['queries']
             
         gemini_key = os.environ.get('GEMINI_API_KEY')
         if not gemini_key:
