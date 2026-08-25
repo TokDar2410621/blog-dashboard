@@ -32,6 +32,8 @@ type ConnectorPageProps = {
   steps: ConnectorStep[];
   related?: { href: string; label: string }[];
   note?: string;
+  /** Image de fond full-bleed du hero (sur fond noir). Sans elle, l'aurore animee sert de fond. */
+  imageSrc?: string;
 };
 
 /**
@@ -62,6 +64,7 @@ export function ConnectorPage({
   steps,
   related,
   note,
+  imageSrc,
 }: ConnectorPageProps) {
   const reduce = useReducedMotion();
   const features = CONNECTOR_FEATURES;
@@ -74,19 +77,47 @@ export function ConnectorPage({
       <main className="pb-20">
         {/* Hero avec fond anime */}
         <section className="relative flex min-h-[72vh] w-full flex-col items-center justify-center overflow-hidden px-4 py-20 text-center">
-          {/* Aurore vivante */}
-          <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-            <motion.div
-              className="absolute left-1/2 top-[-10%] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[130px]"
-              animate={reduce ? undefined : { x: [0, 50, -30, 0], y: [0, 30, -20, 0], scale: [1, 1.12, 0.96, 1] }}
-              transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-            />
-            <motion.div
-              className="absolute left-[22%] top-[12%] h-[340px] w-[340px] rounded-full bg-cyan-500/12 blur-[120px]"
-              animate={reduce ? undefined : { x: [0, -40, 30, 0], y: [0, 40, 10, 0], opacity: [0.5, 0.8, 0.55, 0.5] }}
-              transition={{ duration: 27, repeat: Infinity, ease: "easeInOut" }}
-            />
-          </div>
+          {/* Image de fond full-bleed (leger zoom lent), ou aurore vivante */}
+          {imageSrc ? (
+            <>
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10 bg-cover bg-center bg-no-repeat opacity-95"
+                style={{ backgroundImage: `url('${imageSrc}')` }}
+                animate={reduce ? undefined : { scale: [1, 1.08, 1] }}
+                transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -z-10"
+                style={{
+                  background:
+                    "radial-gradient(ellipse 60% 55% at center 40%, rgba(9,9,11,0.68) 0%, rgba(9,9,11,0.32) 46%, rgba(9,9,11,0.10) 78%)",
+                }}
+              />
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-1/2"
+                style={{
+                  background:
+                    "linear-gradient(to bottom, rgba(9,9,11,0) 0%, rgba(9,9,11,0.85) 62%, rgb(9,9,11) 100%)",
+                }}
+              />
+            </>
+          ) : (
+            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+              <motion.div
+                className="absolute left-1/2 top-[-10%] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[130px]"
+                animate={reduce ? undefined : { x: [0, 50, -30, 0], y: [0, 30, -20, 0], scale: [1, 1.12, 0.96, 1] }}
+                transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <motion.div
+                className="absolute left-[22%] top-[12%] h-[340px] w-[340px] rounded-full bg-cyan-500/12 blur-[120px]"
+                animate={reduce ? undefined : { x: [0, -40, 30, 0], y: [0, 40, 10, 0], opacity: [0.5, 0.8, 0.55, 0.5] }}
+                transition={{ duration: 27, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+          )}
           {/* Grille de profondeur */}
           <div
             aria-hidden
