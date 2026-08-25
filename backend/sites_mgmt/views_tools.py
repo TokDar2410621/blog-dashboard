@@ -11,6 +11,7 @@ All views follow the same pattern as PublicAuditView:
 import json
 import logging
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
