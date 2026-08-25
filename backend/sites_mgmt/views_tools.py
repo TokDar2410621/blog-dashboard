@@ -811,17 +811,26 @@ class PublicAiVisibilityView(APIView):
 class PublicCompetitorGapView(APIView):
     """POST /api/public/competitor-gap/ {domain, competitors?}
 
-    Public lead-magnet: finds keywords that competitors rank for but the
-    target domain does not. Uses Serper to compare SERP visibility.
+    Trouve les requetes commerciales ou un concurrent se classe et ou le
+    domaine analyse est absent.
 
-    Returns top 5 opportunities free, full report gated behind email.
+    Une seule passe de SERP alimente tout : les positions du domaine, les
+    concurrents (par frequence d'apparition) et les ecarts. L'ancienne version
+    depensait un appel pour une decouverte qui ne trouvait jamais rien, puis
+    vingt de plus pour un appariement structurellement impossible.
+
+    Renvoie les 5 meilleures occasions, le reste derriere la capture courriel.
     """
     authentication_classes = []
     permission_classes = []
     throttle_classes = [PublicToolThrottle]
 
+    N_REQUETES = 12
+
     def post(self, request):
-        import requests as http_requests
+        from .compare_mesures import (
+            collecter_serps, decouvrir_concurrents, trouver_ecarts,
+        )
 
         domain = _normalize_domain(request.data.get('domain', ''))
         if not domain:
@@ -830,140 +839,69 @@ class PublicCompetitorGapView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        cache_key = f'public-competitor-gap:v1:{domain}'
+        cache_key = f'public-competitor-gap:v2:{domain}'
         cached = cache.get(cache_key)
         if cached:
             return Response(cached)
 
-        # User-provided competitors (optional)
+        # Concurrents nommes par l'utilisateur (optionnel). Quand il en donne,
+        # on les respecte tels quels, meme si ce sont des plateformes que la
+        # decouverte automatique ecarterait.
         raw_competitors = request.data.get('competitors', [])
         if isinstance(raw_competitors, str):
             raw_competitors = [c.strip() for c in raw_competitors.split(',') if c.strip()]
-        provided_competitors = [_normalize_domain(c) for c in raw_competitors if _normalize_domain(c)]
+        provided = [_normalize_domain(c) for c in raw_competitors if _normalize_domain(c)]
 
-        serper_key = os.environ.get('SERPER_API_KEY')
-        if not serper_key:
+        if not os.environ.get('SERPER_API_KEY'):
             return Response(
                 {'error': 'Service temporairement indisponible.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        # Step 1: discover competitors if not provided
-        competitors = provided_competitors[:3]
+        # Etape 1 : les requetes commerciales du site, lues sur sa page
+        # d'accueil (Jina puis crawl maison, voir _analyser_page). Zero credit.
+        analyse = _analyser_page(domain, n_queries=self.N_REQUETES)
+        requetes = analyse['queries']
+
+        # Etape 2 : UNE passe de SERP. Tout le reste en decoule.
+        serps = collecter_serps(requetes)
+        if not serps:
+            payload = self._payload_vide(
+                domain, analyse, requetes,
+                "Aucun resultat de recherche n'a pu etre obtenu. Reessaie dans "
+                "quelques minutes.",
+            )
+            cache.set(cache_key, payload, timeout=300)
+            return Response(payload)
+
+        # Etape 3 : les concurrents sortent des memes SERP, par frequence.
+        competitors = provided[:3] or decouvrir_concurrents(serps, domain, maximum=3)
         if not competitors:
-            try:
-                r = http_requests.post(
-                    'https://google.serper.dev/search',
-                    headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
-                    json={'q': f'site:{domain}', 'num': 10, 'hl': 'fr', 'gl': 'ca'},
-                    timeout=10,
-                )
-                if r.status_code == 200:
-                    organic = r.json().get('organic', [])
-                    # Extract related searches for competitor discovery
-                    related = r.json().get('relatedSearches', [])
-                    related_queries = [rs.get('query', '') for rs in related[:3]]
+            payload = self._payload_vide(
+                domain, analyse, requetes,
+                "Aucun concurrent recurrent n'est ressorti des recherches "
+                "testees. Nomme un concurrent pour lancer la comparaison.",
+                serps=serps,
+            )
+            cache.set(cache_key, payload, timeout=3600)
+            return Response(payload)
 
-                    # Search for a related query to find competitors
-                    if related_queries:
-                        for rq in related_queries[:2]:
-                            cr = http_requests.post(
-                                'https://google.serper.dev/search',
-                                headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
-                                json={'q': rq, 'num': 10, 'hl': 'fr', 'gl': 'ca'},
-                                timeout=8,
-                            )
-                            if cr.status_code == 200:
-                                for item in cr.json().get('organic', []):
-                                    link = (item.get('link') or '').lower()
-                                    host = link.split('://', 1)[-1].split('/', 1)[0]
-                                    if host.startswith('www.'):
-                                        host = host[4:]
-                                    if host and host != domain and host not in competitors:
-                                        competitors.append(host)
-                                        if len(competitors) >= 3:
-                                            break
-                            if len(competitors) >= 3:
-                                break
-            except Exception:
-                logger.exception('Competitor discovery failed')
+        # Etape 4 : les ecarts, toujours dans les memes SERP.
+        gaps = trouver_ecarts(serps, domain, competitors)
 
-        if not competitors:
-            competitors = []  # Will still work but with limited gap data
-
-        # Step 2 : lecture de la page + requetes commerciales de test. Jina
-        # Reader d'abord, notre crawl maison en repli (voir _analyser_page).
-        analyse = _analyser_page(domain, n_queries=20)
-        test_queries = analyse['queries']
-
-        # Step 3: get keywords that competitors rank for
-        competitor_keywords = {}  # keyword -> {competitor, position, url, title}
-        domain_keywords = set()   # keywords where the domain appears
-
-        def _serp_check(query: str) -> tuple:
-            """Return (query, organic_results_list)."""
-            try:
-                r = http_requests.post(
-                    'https://google.serper.dev/search',
-                    headers={'X-API-KEY': serper_key, 'Content-Type': 'application/json'},
-                    json={'q': query, 'num': 20, 'hl': 'fr', 'gl': 'ca'},
-                    timeout=8,
-                )
-                if r.status_code == 200:
-                    return (query, r.json().get('organic', []))
-            except Exception:
-                pass
-            return (query, [])
-
-        # Run all SERP checks in parallel
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(_serp_check, test_queries))
-
-        for query, organic in results:
-            domain_found = False
-            for item in organic:
-                link = (item.get('link') or '').lower()
-                host = link.split('://', 1)[-1].split('/', 1)[0]
-                if host.startswith('www.'):
-                    host = host[4:]
-
-                if host == domain:
-                    domain_found = True
-                    domain_keywords.add(query)
-
-                if host in competitors and not domain_found:
-                    if query not in competitor_keywords:
-                        competitor_keywords[query] = {
-                            'keyword': query,
-                            'competitor': host,
-                            'position': item.get('position', 0),
-                            'url': item.get('link', ''),
-                            'title': item.get('title', ''),
-                        }
-
-        # Step 4: filter to gaps (competitor has it, domain does not)
-        gaps = [
-            v for k, v in competitor_keywords.items()
-            if k not in domain_keywords
-        ]
-
-        # Step 5: estimate opportunity scores
         from .keyword_intent import classify_intent
         for gap in gaps:
             intent = classify_intent(gap['keyword'])
             gap['intent'] = intent
-            # Opportunity score formula
-            commercial_boost = 1.3 if intent in ('commercial', 'transactional') else 1.0
-            position_factor = max(0, (20 - gap.get('position', 20)) / 20)
-            gap['opportunity_score'] = round(
-                min(100, position_factor * 60 * commercial_boost + 30)
-            )
-
-        # Sort by opportunity score
+            boost = 1.3 if intent in ('commercial', 'transactional') else 1.0
+            facteur = max(0, (20 - gap.get('position', 20)) / 20)
+            gap['opportunity_score'] = round(min(100, facteur * 60 * boost + 30))
         gaps.sort(key=lambda g: g.get('opportunity_score', 0), reverse=True)
 
-        # Estimate total monthly searches (rough)
-        estimated_monthly_searches = len(gaps) * 320  # rough avg
+        positions_domaine = [
+            s['requete'] for s in serps
+            if any(r['hote'] == domain for r in s.get('resultats', []))
+        ]
 
         payload = {
             'domain': domain,
@@ -971,8 +909,14 @@ class PublicCompetitorGapView(APIView):
             'sector': analyse['sector'],
             'analyzed_at': datetime.utcnow().isoformat(),
             'competitors_detected': competitors,
+            'competitors_source': 'fournis' if provided else 'deduits',
+            'queries_tested': [s['requete'] for s in serps],
+            'queries_checked': len(serps),
+            'domain_ranks_for': positions_domaine,
             'total_gaps': len(gaps),
-            'estimated_monthly_searches': estimated_monthly_searches,
+            # Une estimation de volume demanderait une API de volume de
+            # recherche qu'on n'a pas. Le compte de requetes, lui, est un fait.
+            'estimated_monthly_searches': None,
             'top_opportunities': [
                 {
                     'keyword': g['keyword'],
@@ -1013,6 +957,30 @@ class PublicCompetitorGapView(APIView):
 
         cache.set(cache_key, payload, timeout=3600)
         return Response(payload)
+
+    def _payload_vide(self, domain, analyse, requetes, message, serps=None):
+        """Resultat honnete quand il n'y a rien a montrer.
+
+        L'ancienne version rendait `total_gaps: 0` sans jamais dire que la
+        decouverte de concurrents avait echoue. Un zero muet se lit comme
+        "ton site n'a aucun retard", exactement l'inverse de la verite.
+        """
+        return {
+            'domain': domain,
+            'brand': analyse.get('brand', ''),
+            'sector': analyse.get('sector', ''),
+            'analyzed_at': datetime.utcnow().isoformat(),
+            'competitors_detected': [],
+            'competitors_source': 'aucun',
+            'queries_tested': [s['requete'] for s in serps] if serps else requetes,
+            'queries_checked': len(serps) if serps else 0,
+            'domain_ranks_for': [],
+            'total_gaps': 0,
+            'estimated_monthly_searches': None,
+            'notice': message,
+            'top_opportunities': [],
+            'gated': {'all_opportunities': [], 'remaining_count': 0},
+        }
 
 
 class PublicToolEventView(APIView):

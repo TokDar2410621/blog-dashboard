@@ -36,8 +36,18 @@ type GapResult = {
   sector: string;
   analyzed_at: string;
   competitors_detected: string[];
+  competitors_source?: "deduits" | "fournis" | "aucun";
+  queries_tested?: string[];
+  queries_checked?: number;
+  domain_ranks_for?: string[];
   total_gaps: number;
-  estimated_monthly_searches: number;
+  // null : on n'a pas d'API de volume de recherche. L'ancienne version
+  // affichait `total_gaps * 320`, un chiffre invente presente comme une
+  // estimation de trafic.
+  estimated_monthly_searches: number | null;
+  // Present quand il n'y a rien a montrer, pour expliquer POURQUOI. Un
+  // total_gaps: 0 muet se lit comme "ton site n'a aucun retard".
+  notice?: string;
   top_opportunities: Opportunity[];
   gated: {
     all_opportunities: Opportunity[];
@@ -225,25 +235,40 @@ export function CompetitorGapFinder() {
           {/* Summary hero */}
           <Card className="border-emerald-500/30 bg-emerald-500/[0.04]">
             <CardContent className="p-6 text-center">
-              <p className="text-sm text-zinc-400 mb-2">
-                Tes concurrents gagnent sur
-              </p>
-              <div className="text-5xl font-bold text-emerald-400 tabular-nums mb-1">
-                {result.total_gaps}
-              </div>
-              <p className="text-base text-zinc-200 mb-3">
-                mots-cles ou ton site est absent.
-              </p>
-              <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
-                <TrendingUp className="h-4 w-4 text-emerald-400" />
-                <span>
-                  Potentiel estime :{" "}
-                  <strong className="text-zinc-100">
-                    +{result.estimated_monthly_searches.toLocaleString("fr-CA")}
-                  </strong>{" "}
-                  recherches/mois
-                </span>
-              </div>
+              {result.notice ? (
+                /* Rien a montrer, mais on dit POURQUOI. Un zero muet se lit
+                   comme "ton site n'a aucun retard", l'inverse de la verite. */
+                <p className="text-base leading-relaxed text-zinc-300">
+                  {result.notice}
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-zinc-400 mb-2">
+                    Tes concurrents gagnent sur
+                  </p>
+                  <div className="text-5xl font-bold text-emerald-400 tabular-nums mb-1">
+                    {result.total_gaps}
+                  </div>
+                  <p className="text-base text-zinc-200 mb-3">
+                    mots-cles ou ton site est absent.
+                  </p>
+                  {typeof result.queries_checked === "number" && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-zinc-400">
+                      <TrendingUp className="h-4 w-4 text-emerald-400" />
+                      <span>
+                        Sur{" "}
+                        <strong className="text-zinc-100">
+                          {result.queries_checked}
+                        </strong>{" "}
+                        recherches reellement testees
+                        {result.domain_ranks_for?.length
+                          ? `, ton site en place ${result.domain_ranks_for.length}`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 

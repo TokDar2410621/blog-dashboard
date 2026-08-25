@@ -390,18 +390,21 @@ def _hote(lien: str) -> str:
     return hote.removeprefix('www.')
 
 
-def sonder_serp(requetes: list[str], domaine_a: str, domaine_b: str,
-                max_workers: int = 8) -> dict | None:
-    """Un appel Serper par requete, positions des DEUX domaines extraites.
+def collecter_serps(requetes: list[str], max_workers: int = 8) -> list[dict] | None:
+    """Un appel Serper par requete, TOUS les resultats organiques conserves.
 
-    C'est le principal gain face au code existant : `PublicCompetitorGapView`
-    depense une requete Serper par mot-cle et par domaine. Ici les deux sites
-    sont lus dans le meme SERP, donc quinze requetes coutent quinze credits
-    pour les deux, pas quinze chacun.
+    C'est la primitive partagee par les outils qui ont besoin de lire un SERP.
+    Un seul SERP contient tout le monde : le site analyse, ses concurrents,
+    les annuaires. Le lire une fois et en deriver ce dont chaque outil a
+    besoin coute une requete la ou l'ancien code en depensait une par domaine
+    et par mot-cle.
 
     Chaque resultat porte un `verifie` explicite. Un non-200 ne doit jamais se
     confondre avec "le site ne se classe pas" : sans ce drapeau, une panne de
     quota annonce au visiteur que son site n'est nulle part.
+
+    Rend None quand la cle manque ou qu'AUCUN SERP n'a pu etre obtenu, pour
+    que l'appelant distingue "rien trouve" de "rien regarde".
     """
     cle = os.environ.get('SERPER_API_KEY')
     if not cle or not requetes:
@@ -424,7 +427,17 @@ def sonder_serp(requetes: list[str], domaine_a: str, domaine_b: str,
             return {
                 'requete': question,
                 'verifie': True,
-                'hotes': [(_hote(o.get('link')), o.get('position') or 0) for o in organiques],
+                'hotes': [(_hote(o.get('link')), o.get('position') or 0)
+                          for o in organiques],
+                'resultats': [
+                    {
+                        'hote': _hote(o.get('link')),
+                        'position': o.get('position') or 0,
+                        'url': o.get('link') or '',
+                        'titre': o.get('title') or '',
+                    }
+                    for o in organiques
+                ],
             }
         except Exception:
             return {'requete': question, 'verifie': False}
@@ -433,6 +446,18 @@ def sonder_serp(requetes: list[str], domaine_a: str, domaine_b: str,
         resultats = list(pool.map(une_requete, requetes))
 
     verifies = [r for r in resultats if r.get('verifie')]
+    return verifies or None
+
+
+def sonder_serp(requetes: list[str], domaine_a: str, domaine_b: str,
+                max_workers: int = 8) -> dict | None:
+    """Positions des DEUX domaines, extraites des memes SERP.
+
+    Quinze requetes coutent quinze credits pour les deux domaines, pas quinze
+    chacun, et surtout les deux sites sont compares sur des pages de resultats
+    identiques plutot que sur deux interrogations separees.
+    """
+    verifies = collecter_serps(requetes, max_workers=max_workers)
     if not verifies:
         return None
 
@@ -605,3 +630,88 @@ def mesurer_strategie_locale(crawl: dict | None, html: str) -> dict:
         preuves.append('Aucune ville nommee dans le contenu lu')
 
     return _mesure(points, preuves)
+
+
+# ---------------------------------------------------------------------------
+# Decouverte de concurrents et ecarts de mots-cles
+# ---------------------------------------------------------------------------
+# Ces hotes trustent les SERP locaux sans etre des concurrents actionnables.
+# Dire a un plombier de Jonquiere qu'il "manque des mots-cles que Facebook
+# possede" ne lui donne aucune action. On les ecarte de la DECOUVERTE
+# automatique seulement : si l'utilisateur nomme explicitement un de ces
+# domaines, on le respecte.
+_PLATEFORMES_NON_ACTIONNABLES = frozenset({
+    'facebook.com', 'instagram.com', 'linkedin.com', 'x.com', 'twitter.com',
+    'youtube.com', 'tiktok.com', 'pinterest.com', 'reddit.com',
+    'wikipedia.org', 'fr.wikipedia.org', 'en.wikipedia.org',
+    'google.com', 'maps.google.com', 'play.google.com', 'apple.com',
+    'yelp.ca', 'yelp.com', 'pagesjaunes.ca', 'yellowpages.ca',
+    'kijiji.ca', 'indeed.com', 'ca.indeed.com', 'glassdoor.ca',
+    'amazon.ca', 'amazon.com', 'ebay.ca', 'etsy.com',
+    'tripadvisor.ca', 'tripadvisor.com', 'booking.com',
+})
+
+
+def decouvrir_concurrents(serps: list[dict], domaine: str, maximum: int = 3
+                          ) -> list[str]:
+    """Deduit les concurrents des SERP deja collectes, par frequence d'apparition.
+
+    Pourquoi cette methode : l'ancienne lisait `relatedSearches` sur une
+    requete `site:{domaine}`. Or Serper n'inclut PAS cette cle sur les
+    requetes `site:` (verifie en prod le 2026-08-25, seules `credits`,
+    `organic` et `searchParameters` sont rendues). La liste restait donc
+    toujours vide, sans erreur, et l'outil ne trouvait jamais un seul
+    concurrent tout en depensant une vingtaine de credits Serper pour un
+    resultat garanti nul.
+
+    Un domaine qui revient sur plusieurs des requetes commerciales du site
+    analyse se dispute reellement le meme terrain. C'est un signal direct,
+    lu dans des pages de resultats qu'on a deja payees.
+    """
+    frequences = {}
+    meilleures = {}
+    for serp in serps:
+        vus = set()
+        for hote, rang in serp.get('hotes', []):
+            if not hote or hote == domaine or hote in _PLATEFORMES_NON_ACTIONNABLES:
+                continue
+            if hote in vus:      # une seule voix par SERP, pas une par URL
+                continue
+            vus.add(hote)
+            frequences[hote] = frequences.get(hote, 0) + 1
+            meilleures[hote] = min(meilleures.get(hote, 99), rang or 99)
+
+    # Frequence d'abord, meilleur rang pour departager. Un hote vu une seule
+    # fois sur dix requetes est un passant, pas un concurrent : on exige deux
+    # apparitions des qu'il y a assez de SERP pour que ce soit significatif.
+    minimum = 2 if len(serps) >= 4 else 1
+    candidats = [h for h, n in frequences.items() if n >= minimum]
+    candidats.sort(key=lambda h: (-frequences[h], meilleures[h], h))
+    return candidats[:maximum]
+
+
+def trouver_ecarts(serps: list[dict], domaine: str, concurrents: list[str]
+                   ) -> list[dict]:
+    """Requetes ou un concurrent se classe et ou le domaine est absent.
+
+    Le domaine est declare absent d'une requete uniquement si on a REGARDE ce
+    SERP (`collecter_serps` ne rend que les SERP verifies), jamais parce qu'un
+    appel a echoue.
+    """
+    concurrents = set(concurrents)
+    ecarts = []
+    for serp in serps:
+        resultats = serp.get('resultats') or []
+        if any(r['hote'] == domaine for r in resultats):
+            continue     # le domaine se classe deja, ce n'est pas un ecart
+        rival = next((r for r in resultats if r['hote'] in concurrents), None)
+        if not rival:
+            continue
+        ecarts.append({
+            'keyword': serp['requete'],
+            'competitor': rival['hote'],
+            'position': rival['position'],
+            'url': rival['url'],
+            'title': rival['titre'],
+        })
+    return ecarts
