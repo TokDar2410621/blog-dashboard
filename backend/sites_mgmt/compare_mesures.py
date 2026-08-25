@@ -635,51 +635,6 @@ def mesurer_strategie_locale(crawl: dict | None, html: str) -> dict:
 # ---------------------------------------------------------------------------
 # Decouverte de concurrents et ecarts de mots-cles
 # ---------------------------------------------------------------------------
-# Ces hotes trustent les SERP locaux sans etre des concurrents actionnables.
-# Dire a un plombier de Jonquiere qu'il "manque des mots-cles que Facebook
-# possede" ne lui donne aucune action. On les ecarte de la DECOUVERTE
-# automatique seulement : si l'utilisateur nomme explicitement un de ces
-# domaines, on le respecte.
-_PLATEFORMES_NON_ACTIONNABLES = frozenset({
-    # Reseaux sociaux
-    'facebook.com', 'instagram.com', 'linkedin.com', 'x.com', 'twitter.com',
-    'youtube.com', 'tiktok.com', 'pinterest.com', 'reddit.com', 'medium.com',
-    # Encyclopedies et geants
-    'wikipedia.org', 'google.com', 'apple.com', 'microsoft.com',
-    # Annuaires locaux
-    'yelp.ca', 'yelp.com', 'pagesjaunes.ca', 'yellowpages.ca', 'kijiji.ca',
-    'tripadvisor.ca', 'tripadvisor.com', 'booking.com', 'yaseo.ca',
-    # Sites d'emploi. Ajoutes le 2026-08-25 : sur "developpeur web
-    # chicoutimi", Google lit une recherche d'EMPLOI, pas une recherche de
-    # prestataire. Presenter Indeed comme le concurrent d'un pigiste n'est
-    # pas actionnable, et le trafic vise n'est pas le sien.
-    'indeed.com', 'jobillico.com', 'glassdoor.ca', 'glassdoor.com',
-    'jobboom.com', 'monster.ca', 'workopolis.com', 'emploiquebec.gouv.qc.ca',
-    'quebecemploi.gouv.qc.ca', 'neuvoo.ca', 'talent.com',
-    # Annuaires de logiciels et sites d'avis. Meme logique : ils trustent les
-    # requetes "meilleur logiciel X" sans etre des concurrents produit.
-    'capterra.ca', 'capterra.com', 'getapp.ca', 'getapp.com', 'g2.com',
-    'softwareadvice.com', 'trustpilot.com', 'clutch.co', 'producthunt.com',
-    # Places de marche
-    'amazon.ca', 'amazon.com', 'ebay.ca', 'etsy.com', 'walmart.ca',
-})
-
-
-def _est_plateforme(hote: str) -> bool:
-    """Vrai si l'hote est une plateforme non actionnable, sous-domaines inclus.
-
-    La correspondance exacte ne suffit pas : verifie en prod le 2026-08-25,
-    la decouverte a remonte `emplois.ca.indeed.com` comme concurrent d'un
-    developpeur pigiste alors que `indeed.com` figurait deja dans la liste.
-    Les plateformes servent leurs pages localisees depuis des sous-domaines
-    (`emplois.ca.indeed.com`, `ca.linkedin.com`, `fr.capterra.ca`), donc il
-    faut comparer sur le suffixe.
-    """
-    hote = (hote or '').lower()
-    return any(hote == p or hote.endswith('.' + p)
-               for p in _PLATEFORMES_NON_ACTIONNABLES)
-
-
 def decouvrir_concurrents(serps: list[dict], domaine: str, maximum: int = 3
                           ) -> list[str]:
     """Deduit les concurrents des SERP deja collectes, par frequence d'apparition.
@@ -695,13 +650,39 @@ def decouvrir_concurrents(serps: list[dict], domaine: str, maximum: int = 3
     Un domaine qui revient sur plusieurs des requetes commerciales du site
     analyse se dispute reellement le meme terrain. C'est un signal direct,
     lu dans des pages de resultats qu'on a deja payees.
+
+    LIMITE CONNUE, NON RESOLUE
+    --------------------------
+    Cette fonction remonte parfois des hotes qui ne sont pas des concurrents
+    actionnables. Verifie en prod le 2026-08-25 : sur tokamdarius.ca (site
+    d'un developpeur pigiste), elle a rendu `emplois.ca.indeed.com`,
+    `ca.linkedin.com` et `jobillico.com`. Sur "developpeur web chicoutimi",
+    Google lit une recherche d'EMPLOI, pas une recherche de prestataire. Sur
+    notion.so, elle a rendu `fr.capterra.ca` et `fr.getapp.ca`, des annuaires
+    de logiciels.
+
+    Une liste noire de domaines a ete essayee puis RETIREE volontairement. Une
+    liste maintenue a la main n'est jamais complete : chaque site rencontre en
+    ajoute un, ce qui revient a coder pour chaque cas particulier au lieu de
+    resoudre le probleme. La ou le probleme est reellement pose, c'est en
+    amont : ces requetes n'ont pas une intention commerciale, donc elles
+    n'auraient jamais du entrer dans l'analyse.
+
+    Deux pistes structurelles, aucune implementee :
+      1. Juger l'intention d'une requete a la composition de son SERP. Une
+         page de resultats majoritairement occupee par des offres d'emploi
+         signale une intention d'emploi, quels que soient les domaines
+         precis. La requete sort alors de l'analyse entiere.
+      2. Faire qualifier l'intention en amont, au moment ou les requetes
+         commerciales sont generees, plutot que de filtrer les resultats
+         apres coup.
     """
     frequences = {}
     meilleures = {}
     for serp in serps:
         vus = set()
         for hote, rang in serp.get('hotes', []):
-            if not hote or hote == domaine or _est_plateforme(hote):
+            if not hote or hote == domaine:
                 continue
             if hote in vus:      # une seule voix par SERP, pas une par URL
                 continue
@@ -743,33 +724,3 @@ def trouver_ecarts(serps: list[dict], domaine: str, concurrents: list[str]
             'title': rival['titre'],
         })
     return ecarts
-
-
-def reperer_plateformes(serps: list[dict], domaine: str, maximum: int = 4
-                        ) -> list[dict]:
-    """Les plateformes qui occupent les requetes du site, avec leur frequence.
-
-    Elles sont ecartees de la liste des concurrents parce qu'on ne bat pas
-    Indeed ou Capterra sur leur terrain. Mais les taire serait perdre une
-    information utile : quand un annuaire trust la moitie des requetes d'un
-    metier, l'action n'est pas "faire mieux que lui", c'est "s'y faire
-    lister". C'est actionnable, juste differemment.
-    """
-    frequences = {}
-    for serp in serps:
-        vus = set()
-        for hote, _rang in serp.get('hotes', []):
-            if not hote or hote == domaine or not _est_plateforme(hote):
-                continue
-            if hote in vus:
-                continue
-            vus.add(hote)
-            frequences[hote] = frequences.get(hote, 0) + 1
-
-    total = len(serps) or 1
-    reperees = [
-        {'hote': h, 'requetes': n, 'part': round(n / total * 100)}
-        for h, n in frequences.items() if n >= 2
-    ]
-    reperees.sort(key=lambda p: (-p['requetes'], p['hote']))
-    return reperees[:maximum]

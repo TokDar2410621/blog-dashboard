@@ -829,8 +829,7 @@ class PublicCompetitorGapView(APIView):
 
     def post(self, request):
         from .compare_mesures import (
-            collecter_serps, decouvrir_concurrents, reperer_plateformes,
-            trouver_ecarts,
+            collecter_serps, decouvrir_concurrents, trouver_ecarts,
         )
 
         domain = _normalize_domain(request.data.get('domain', ''))
@@ -911,11 +910,6 @@ class PublicCompetitorGapView(APIView):
             'analyzed_at': datetime.utcnow().isoformat(),
             'competitors_detected': competitors,
             'competitors_source': 'fournis' if provided else 'deduits',
-            # Les annuaires et sites d'emploi sont ecartes des concurrents (on
-            # ne bat pas Indeed sur son terrain), mais les taire perdrait une
-            # information utile : quand une plateforme trust la moitie des
-            # requetes d'un metier, l'action est "s'y faire lister".
-            'platforms_detected': reperer_plateformes(serps, domain),
             'queries_tested': [s['requete'] for s in serps],
             'queries_checked': len(serps),
             'domain_ranks_for': positions_domaine,
@@ -978,7 +972,6 @@ class PublicCompetitorGapView(APIView):
             'analyzed_at': datetime.utcnow().isoformat(),
             'competitors_detected': [],
             'competitors_source': 'aucun',
-            'platforms_detected': [],
             'queries_tested': [s['requete'] for s in serps] if serps else requetes,
             'queries_checked': len(serps) if serps else 0,
             'domain_ranks_for': [],

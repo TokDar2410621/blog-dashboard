@@ -21,6 +21,17 @@ au visiteur comme un resultat, donc lisible comme "ton site n'a aucun retard".
 La correction derive TOUT d'une seule passe de SERP : positions du domaine,
 concurrents (par frequence d'apparition) et ecarts.
 
+LIMITE CONNUE, ASSUMEE
+----------------------
+La decouverte remonte parfois des hotes qui ne sont pas des concurrents
+actionnables : sites d'emploi sur une requete metier, annuaires de logiciels
+sur une requete produit. Une liste noire de domaines a ete essayee puis
+RETIREE : une liste maintenue a la main n'est jamais complete, et chaque site
+rencontre en ajoute un, ce qui revient a coder pour chaque cas particulier.
+Aucun test ici ne verifie donc l'exclusion d'un domaine nomme. Le probleme
+reel est en amont (l'intention de la requete), voir la docstring de
+`decouvrir_concurrents`.
+
 Run: python manage.py test sites_mgmt.tests_competitor_gap
 """
 from unittest.mock import MagicMock, patch
@@ -29,8 +40,7 @@ from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
 
 from .compare_mesures import (
-    collecter_serps, decouvrir_concurrents, reperer_plateformes,
-    trouver_ecarts,
+    collecter_serps, decouvrir_concurrents, trouver_ecarts,
 )
 
 
@@ -70,18 +80,6 @@ class DecouvrirConcurrentsTests(SimpleTestCase):
     def test_le_domaine_analyse_ne_peut_pas_etre_son_propre_concurrent(self):
         serps = [serp('q1', [('moi.ca', 1)]), serp('q2', [('moi.ca', 1)])]
         self.assertNotIn('moi.ca', decouvrir_concurrents(serps, 'moi.ca'))
-
-    def test_les_plateformes_non_actionnables_sont_ecartees(self):
-        """Dire a un plombier qu'il manque des mots-cles que Facebook possede
-        ne lui donne aucune action."""
-        serps = [
-            serp('q1', [('facebook.com', 1), ('rival.ca', 2)]),
-            serp('q2', [('facebook.com', 1), ('rival.ca', 3)]),
-            serp('q3', [('pagesjaunes.ca', 1), ('rival.ca', 2)]),
-            serp('q4', [('wikipedia.org', 1), ('rival.ca', 4)]),
-        ]
-        trouves = decouvrir_concurrents(serps, 'moi.ca')
-        self.assertEqual(trouves, ['rival.ca'])
 
     def test_une_seule_voix_par_serp_meme_avec_plusieurs_urls(self):
         serps = [
@@ -229,8 +227,9 @@ class GapViewTests(TestCase):
         self.assertEqual(corps['queries_checked'], 0)
         self.assertIn('notice', corps)
 
-    def test_les_concurrents_fournis_sont_respectes_tels_quels(self):
-        """Meme une plateforme que la decouverte automatique ecarterait."""
+    def test_les_concurrents_fournis_court_circuitent_la_decouverte(self):
+        """Quand l'utilisateur nomme un concurrent, on le prend tel quel sans
+        rien deduire des SERP."""
         serps = [serp('q1', [('facebook.com', 1)]), serp('q2', [('facebook.com', 2)])]
         corps = self._appeler(serps, corps={
             'domain': 'moi.ca', 'competitors': 'facebook.com'}).json()
@@ -250,50 +249,3 @@ class GapViewTests(TestCase):
         corps = self._appeler(serps).json()
         self.assertEqual(corps['queries_checked'], 2)
         self.assertEqual(corps['queries_tested'], ['q1', 'q2'])
-
-
-# ---------------------------------------------------------------------------
-class PlateformesTests(SimpleTestCase):
-    """Les plateformes qu'on ecarte des concurrents, et pourquoi on les nomme
-    quand meme."""
-
-    def test_un_sous_domaine_de_plateforme_est_reconnu(self):
-        """Constate en prod le 2026-08-25 : la decouverte a remonte
-        `emplois.ca.indeed.com` comme concurrent d'un developpeur pigiste,
-        alors que `indeed.com` figurait deja dans la liste d'exclusion. Les
-        plateformes servent leurs pages localisees depuis des sous-domaines."""
-        serps = [
-            serp('q1', [('emplois.ca.indeed.com', 1), ('rival.ca', 2)]),
-            serp('q2', [('ca.linkedin.com', 1), ('rival.ca', 3)]),
-            serp('q3', [('fr.capterra.ca', 1), ('rival.ca', 2)]),
-            serp('q4', [('fr.getapp.ca', 1), ('rival.ca', 4)]),
-        ]
-        self.assertEqual(decouvrir_concurrents(serps, 'moi.ca'), ['rival.ca'])
-
-    def test_les_sites_d_emploi_ne_sont_pas_des_concurrents(self):
-        """Google lit "developpeur web chicoutimi" comme une recherche
-        d'EMPLOI. Presenter Indeed comme le concurrent d'un pigiste n'est pas
-        actionnable, et le trafic vise n'est pas le sien."""
-        serps = [serp(f'q{i}', [('jobillico.com', 1), ('monster.ca', 2)])
-                 for i in range(4)]
-        self.assertEqual(decouvrir_concurrents(serps, 'moi.ca'), [])
-
-    def test_les_plateformes_dominantes_sont_nommees_a_part(self):
-        serps = [
-            serp('q1', [('emplois.ca.indeed.com', 1), ('rival.ca', 2)]),
-            serp('q2', [('emplois.ca.indeed.com', 1)]),
-            serp('q3', [('emplois.ca.indeed.com', 2), ('ca.linkedin.com', 5)]),
-            serp('q4', [('ca.linkedin.com', 3)]),
-        ]
-        reperees = reperer_plateformes(serps, 'moi.ca')
-        self.assertEqual(reperees[0]['hote'], 'emplois.ca.indeed.com')
-        self.assertEqual(reperees[0]['requetes'], 3)
-        self.assertEqual(reperees[0]['part'], 75)
-
-    def test_une_plateforme_vue_une_seule_fois_n_est_pas_signalee(self):
-        serps = [serp('q1', [('yelp.ca', 9)]), serp('q2', []), serp('q3', [])]
-        self.assertEqual(reperer_plateformes(serps, 'moi.ca'), [])
-
-    def test_le_domaine_analyse_n_est_jamais_signale_comme_plateforme(self):
-        serps = [serp('q1', [('medium.com', 1)]), serp('q2', [('medium.com', 1)])]
-        self.assertEqual(reperer_plateformes(serps, 'medium.com'), [])
