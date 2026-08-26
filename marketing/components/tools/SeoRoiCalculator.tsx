@@ -23,20 +23,29 @@ const API_BASE = "";
 
 type Scenario = {
   name: string;
+  assumed_growth_percent: number;
   year_one_revenue: number;
-  roi_percent: number;
-  break_even_month: number;
+  // null quand le budget est a zero : un ratio sans denominateur n'existe pas.
+  roi_percent: number | null;
+  // null = jamais rentable sur douze mois. Different de "rentable au mois 12".
+  break_even_month: number | null;
   monthly_revenue: number[];
+  totals: { net: number; total_cost: number; traffic_added: number };
 };
 
 type SeoRoiResult = {
   domain: string;
+  // Ce que le site rapporte deja, EXCLU des projections. L'ancienne version
+  // le comptait comme un gain du SEO, d'ou des ROI a six chiffres.
+  baseline_monthly_revenue: number;
+  revenue_per_visitor: number;
   scenarios: {
     conservative: Scenario;
-    moderate: Scenario;
-    aggressive: Scenario;
+    moderate?: Scenario;
+    aggressive?: Scenario;
   };
   insight: string;
+  methodologie: string;
 };
 
 export function SeoRoiCalculator() {
@@ -148,9 +157,14 @@ export function SeoRoiCalculator() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               { id: "conservative", data: result.scenarios.conservative, label: "Conservateur", color: "text-zinc-300", border: "border-white/10" },
-              { id: "moderate", data: result.scenarios.moderate, label: "Modere (Recommande)", color: "text-emerald-400", border: "border-emerald-500/50 ring-1 ring-emerald-500/20 bg-emerald-500/[0.02]" },
+              { id: "moderate", data: result.scenarios.moderate, label: "Modere", color: "text-emerald-400", border: "border-emerald-500/50 ring-1 ring-emerald-500/20 bg-emerald-500/[0.02]" },
               { id: "aggressive", data: result.scenarios.aggressive, label: "Agressif", color: "text-amber-400", border: "border-white/10" },
-            ].map((sc) => (
+            ]
+              // Quand l'utilisateur impose sa propre hypothese de croissance,
+              // le backend ne rend qu'un seul scenario : les autres sont
+              // absents plutot que remplis avec des valeurs inventees.
+              .filter((sc): sc is { id: string; data: Scenario; label: string; color: string; border: string } => Boolean(sc.data))
+              .map((sc) => (
               <Card key={sc.id} className={`${sc.border} flex flex-col`}>
                 <CardHeader className="pb-2">
                   <CardTitle className={`text-sm uppercase tracking-wide ${sc.color}`}>
@@ -159,17 +173,32 @@ export function SeoRoiCalculator() {
                 </CardHeader>
                 <CardContent className="flex-1 space-y-4">
                   <div>
-                    <div className="text-xs text-zinc-500 mb-1">Revenus (Annee 1)</div>
-                    <div className="text-2xl font-bold text-zinc-100">{formatCurrency(sc.data.year_one_revenue)}</div>
+                    {/* Le revenu SUPPLEMENTAIRE, pas le chiffre d'affaires
+                        total. Ce que le site rapporte deja est exclu. */}
+                    <div className="text-xs text-zinc-500 mb-1">
+                      Revenu supplementaire (an 1)
+                    </div>
+                    <div className="text-2xl font-bold text-zinc-100">
+                      {formatCurrency(sc.data.year_one_revenue)}
+                    </div>
+                    <div className="mt-1 text-[11px] text-zinc-500">
+                      hypothese : +{sc.data.assumed_growth_percent} % de trafic sur 12 mois
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-white/[0.02] p-2 rounded border border-white/5">
-                      <div className="text-[10px] text-zinc-500 uppercase">ROI</div>
-                      <div className="text-sm font-semibold text-zinc-300">+{sc.data.roi_percent}%</div>
+                      <div className="text-[10px] text-zinc-500 uppercase">Net</div>
+                      <div className="text-sm font-semibold text-zinc-300">
+                        {formatCurrency(sc.data.totals?.net ?? 0)}
+                      </div>
                     </div>
                     <div className="bg-white/[0.02] p-2 rounded border border-white/5">
                       <div className="text-[10px] text-zinc-500 uppercase">Rentabilite</div>
-                      <div className="text-sm font-semibold text-zinc-300">Mois {sc.data.break_even_month}</div>
+                      <div className="text-sm font-semibold text-zinc-300">
+                        {sc.data.break_even_month
+                          ? `Mois ${sc.data.break_even_month}`
+                          : "Pas en 12 mois"}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -184,16 +213,26 @@ export function SeoRoiCalculator() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* La barre porte `height` en pourcentage : son parent doit donc
+                  avoir une hauteur reelle. Sans le `h-full` sur la colonne et
+                  le conteneur `flex-1` autour de la barre, le pourcentage se
+                  resolvait contre une hauteur auto (donc zero) et les douze
+                  barres retombaient toutes sur `minHeight: 4px`. Vu en prod le
+                  2026-08-25 : douze traits plats identiques. */}
               <div className="h-48 w-full flex items-end gap-2 pt-4">
-                {(result.scenarios?.moderate?.monthly_revenue || []).map((rev, i) => {
-                  const maxRev = Math.max(...(result.scenarios?.moderate?.monthly_revenue || [0]));
+                {(() => {
+                  const revenus = result.scenarios?.moderate?.monthly_revenue || [];
+                  const maxRev = Math.max(0, ...revenus);
+                  return revenus.map((rev, i) => {
                   const height = maxRev > 0 ? (rev / maxRev) * 100 : 0;
                   return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative">
-                      <div 
-                        className="w-full bg-emerald-500/80 rounded-t-sm transition-all duration-500 group-hover:bg-emerald-400"
-                        style={{ height: `${height}%`, minHeight: '4px' }}
-                      />
+                    <div key={i} className="h-full flex-1 flex flex-col items-center gap-2 group relative">
+                      <div className="w-full flex-1 flex items-end">
+                        <div
+                          className="w-full bg-emerald-500/80 rounded-t-sm transition-all duration-500 group-hover:bg-emerald-400"
+                          style={{ height: `${height}%`, minHeight: '2px' }}
+                        />
+                      </div>
                       <div className="text-[10px] text-zinc-500">M{i+1}</div>
                       
                       <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-zinc-800 text-xs px-2 py-1 rounded text-zinc-200 whitespace-nowrap pointer-events-none transition-opacity">
@@ -201,12 +240,25 @@ export function SeoRoiCalculator() {
                       </div>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
               <p className="mt-6 text-sm text-zinc-400 bg-white/[0.02] p-4 rounded-md border border-white/5">
                 <Target className="h-4 w-4 inline mr-2 text-emerald-400" />
                 {result.insight}
               </p>
+              {result.baseline_monthly_revenue > 0 && (
+                <p className="mt-3 text-xs text-zinc-500">
+                  Ton site rapporte deja {formatCurrency(result.baseline_monthly_revenue)} par
+                  mois selon tes chiffres. Ce montant est exclu des projections
+                  ci-dessus : seul le revenu supplementaire y figure.
+                </p>
+              )}
+              {result.methodologie && (
+                <p className="mt-3 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-500">
+                  {result.methodologie}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -231,7 +283,7 @@ export function SeoRoiCalculator() {
                 </h3>
               </div>
               <p className="text-sm text-zinc-400 max-w-lg mx-auto">
-                Gridar optimise ton SEO pour atteindre le scenario agressif. Laisse-nous gerer la technique et le contenu pendant que tu clos tes ventes.
+                Ces projections reposent sur des hypotheses de croissance, pas sur une analyse de ton domaine. Gridar mesure ta position reelle et travaille a l'ameliorer.
               </p>
               <Link href="/login">
                 <Button className="bg-white text-zinc-950 hover:bg-zinc-200 font-semibold">

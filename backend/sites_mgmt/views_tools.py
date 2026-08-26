@@ -1144,105 +1144,200 @@ class PublicCanIRankView(APIView):
             return Response({'error': 'AI analysis failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Trois hypotheses de croissance, exprimees en gain de trafic TOTAL sur douze
+# mois. Ce sont des hypotheses affichees comme telles, pas des previsions : le
+# payload les expose et l'utilisateur peut les remplacer par la sienne via
+# `expected_growth_percent`.
+#
+# L'ancienne version composait un taux mensuel (jusqu'a +18 %/mois pendant un
+# an) sans jamais plafonner, ce qui donnait x12,2 de trafic en douze mois pour
+# le scenario "agressif" et x3,0 pour celui appele "conservateur". Rien ne
+# croit a ce rythme douze mois d'affilee : la croissance SEO demarre lentement,
+# accelere, puis plafonne.
+_HYPOTHESES = (
+    ('conservative', 'Conservateur', 0.30),
+    ('moderate', 'Modere', 0.70),
+    ('aggressive', 'Agressif', 1.50),
+)
+
+# Le SEO ne produit rien le premier mois. La courbe logistique ci-dessous place
+# son point d'inflexion au mois 5 : peu de gain avant, l'essentiel entre les
+# mois 4 et 9, un plateau ensuite.
+_MOIS_INFLEXION = 5.0
+_PENTE = 1.8
+
+
+def _fraction_du_gain(mois: int) -> float:
+    """Part du gain total atteinte au mois donne, entre 0 et 1.
+
+    Courbe en S normalisee pour partir de 0 au mois 0. Un gain qui arriverait
+    entierement des le premier mois serait aussi faux que la composition
+    infinie qu'on remplace.
+    """
+    import math
+
+    def logistique(m):
+        return 1.0 / (1.0 + math.exp(-(m - _MOIS_INFLEXION) / _PENTE))
+
+    depart = logistique(0)
+    plafond = logistique(12)
+    if plafond <= depart:
+        return 0.0
+    return max(0.0, min(1.0, (logistique(mois) - depart) / (plafond - depart)))
+
+
 class PublicSeoRoiCalculatorView(APIView):
+    """POST /api/public/seo-roi/ {domain, monthly_traffic, avg_conversion_rate,
+    avg_deal_value, monthly_seo_investment, expected_growth_percent?}
+
+    Projette le revenu INCREMENTAL qu'un gain de trafic peut produire, et le
+    compare a l'investissement.
+
+    Ce que cette vue ne fait pas, volontairement : deviner la croissance d'un
+    site en particulier. Le domaine sert d'etiquette, rien de plus, et le
+    payload le dit. Une projection reste une arithmetique appliquee a une
+    hypothese que l'utilisateur choisit.
+    """
     authentication_classes = []
     permission_classes = []
     throttle_classes = [PublicToolThrottle]
 
     def post(self, request):
-        domain = request.data.get('domain', '')
-        domain_norm = _normalize_domain(domain)
+        domain_norm = _normalize_domain(request.data.get('domain', ''))
         if not domain_norm:
-            return Response({'error': 'invalid domain'}, status=status.HTTP_400_BAD_REQUEST)
-            
+            return Response({'error': 'invalid domain'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            monthly_traffic = float(request.data.get('monthly_traffic', 1000))
-            avg_conversion_rate = float(request.data.get('avg_conversion_rate', 2.5)) / 100.0
-            avg_deal_value = float(request.data.get('avg_deal_value', 500))
-            monthly_seo_investment = float(request.data.get('monthly_seo_investment', 1000))
+            trafic = float(request.data.get('monthly_traffic', 1000))
+            taux_conv = float(request.data.get('avg_conversion_rate', 2.5)) / 100.0
+            valeur_client = float(request.data.get('avg_deal_value', 500))
+            investissement = float(request.data.get('monthly_seo_investment', 1000))
+            gain_demande = request.data.get('expected_growth_percent')
+            gain_demande = None if gain_demande in (None, '') else float(gain_demande) / 100.0
         except (ValueError, TypeError):
-            return Response({'error': 'invalid numeric inputs'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        def _calc_scenario(base_traffic, months, boost_rate, normal_rate):
-            data = []
-            current_traffic = base_traffic
-            cum_rev = 0
-            for i in range(1, months + 1):
-                rate = boost_rate if i <= 3 else normal_rate
-                current_traffic = current_traffic * (1 + rate)
-                leads = current_traffic * avg_conversion_rate
-                rev = leads * avg_deal_value
-                cum_rev += rev
-                cost = monthly_seo_investment * i
-                roi = ((cum_rev - cost) / cost * 100) if cost > 0 else 0
-                data.append({
-                    'month': i,
-                    'projected_traffic': int(current_traffic),
-                    'projected_leads': int(leads),
-                    'projected_revenue': round(rev, 2),
-                    'cumulative_revenue': round(cum_rev, 2),
-                    'roi_percentage': round(roi, 2)
+            return Response({'error': 'invalid numeric inputs'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if trafic < 0 or taux_conv < 0 or valeur_client < 0 or investissement < 0:
+            return Response({'error': 'les valeurs doivent etre positives'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        revenu_de_base = trafic * taux_conv * valeur_client
+
+        def scenario(gain_total: float, libelle: str) -> dict:
+            """Projette douze mois sur une hypothese de gain de trafic.
+
+            Seul le revenu INCREMENTAL est compte. L'ancienne version
+            additionnait le revenu total de chaque mois, donc le chiffre
+            d'affaires que le site produisait DEJA avant qu'un dollar ne soit
+            investi. Avec 1000 visiteurs, 1,5 % de conversion et 6500 $ par
+            client, cela creditait 97 500 $ par mois de business existant a un
+            budget SEO de 100 $, d'ou les ROI a six chiffres affiches en
+            production le 2026-08-25.
+            """
+            mensuel, cumul = [], 0.0
+            rentable_des = None
+            for mois in range(1, 13):
+                # Arrondi AVANT de deriver le revenu : le visiteur lit
+                # "30 visiteurs gagnes" et "2925 $", et 30 x 97,50 doit
+                # tomber juste s'il refait le calcul. Sur le trafic non
+                # arrondi, l'ecran affichait 30 visiteurs et 2906 $.
+                trafic_gagne = round(trafic * gain_total * _fraction_du_gain(mois))
+                revenu_incremental = trafic_gagne * taux_conv * valeur_client
+                cumul += revenu_incremental
+                cout = investissement * mois
+                roi = ((cumul - cout) / cout * 100) if cout > 0 else None
+                if rentable_des is None and cumul >= cout:
+                    rentable_des = mois
+                mensuel.append({
+                    'month': mois,
+                    'projected_traffic': int(round(trafic) + trafic_gagne),
+                    'traffic_gained': int(trafic_gagne),
+                    'projected_leads': round(trafic_gagne * taux_conv, 1),
+                    'projected_revenue': round(revenu_incremental, 2),
+                    'cumulative_revenue': round(cumul, 2),
+                    'cost_to_date': round(cout, 2),
+                    'roi_percentage': None if roi is None else round(roi, 1),
                 })
-            totals = {
-                'traffic_added': int(current_traffic - base_traffic),
-                'total_leads': sum(d['projected_leads'] for d in data),
-                'total_revenue': round(cum_rev, 2),
-                'total_cost': round(monthly_seo_investment * months, 2),
-            }
-            return {'monthly_projections': data, 'totals': totals}
-
-        scenarios = {
-            'conservative': _calc_scenario(monthly_traffic, 12, 0.15, 0.08),
-            'moderate': _calc_scenario(monthly_traffic, 12, 0.25, 0.12),
-            'aggressive': _calc_scenario(monthly_traffic, 12, 0.40, 0.18),
-        }
-        
-        break_even_month = None
-        for m in scenarios['moderate']['monthly_projections']:
-            if m['roi_percentage'] > 0:
-                break_even_month = m['month']
-                break
-                
-        year_one_roi_percent = scenarios['moderate']['monthly_projections'][-1]['roi_percentage']
-
-        # Reshape each scenario into the EXACT shape SeoRoiCalculator (frontend)
-        # reads: {name, year_one_revenue, roi_percent, break_even_month,
-        # monthly_revenue[]}. The frontend did scenarios.moderate.monthly_revenue
-        # .map() on a payload that only had monthly_projections -> TypeError.
-        def _summary(sc, label):
-            proj = sc.get('monthly_projections', [])
-            be = next((m['month'] for m in proj if m['roi_percentage'] > 0), 12)
+            cout_total = investissement * 12
             return {
-                'name': label,
-                'year_one_revenue': round(sc.get('totals', {}).get('total_revenue', 0)),
-                'roi_percent': round(proj[-1]['roi_percentage']) if proj else 0,
-                'break_even_month': be,
-                'monthly_revenue': [round(m['projected_revenue']) for m in proj],
-                'monthly_projections': proj,
-                'totals': sc.get('totals', {}),
+                'name': libelle,
+                'assumed_growth_percent': round(gain_total * 100),
+                'year_one_revenue': round(cumul),
+                'roi_percent': (None if cout_total <= 0
+                                else round((cumul - cout_total) / cout_total * 100)),
+                # None, pas 12 : "jamais rentable sur l'horizon" et "rentable
+                # au douzieme mois" sont deux resultats differents.
+                'break_even_month': rentable_des,
+                'monthly_revenue': [round(m['projected_revenue']) for m in mensuel],
+                'monthly_projections': mensuel,
+                'totals': {
+                    'traffic_added': mensuel[-1]['traffic_gained'],
+                    'total_leads': round(sum(m['projected_leads'] for m in mensuel), 1),
+                    'total_revenue': round(cumul, 2),
+                    'total_cost': round(cout_total, 2),
+                    'net': round(cumul - cout_total, 2),
+                },
             }
-        scenarios = {
-            'conservative': _summary(scenarios['conservative'], 'Conservateur'),
-            'moderate': _summary(scenarios['moderate'], 'Modere'),
-            'aggressive': _summary(scenarios['aggressive'], 'Agressif'),
-        }
 
-        insight = f"Avec un investissement de {monthly_seo_investment}$/mois, le scenario modere prevoit un ROI positif au mois {break_even_month if break_even_month else '12+'}."
-        gridar_advantage = "Gridar automatise la creation de contenu a grande echelle, ce qui permet d'atteindre le scenario agressif pour une fraction du cout d'une agence."
-        
+        if gain_demande is not None:
+            scenarios = {'moderate': scenario(gain_demande, 'Ton hypothese')}
+            reference = scenarios['moderate']
+        else:
+            scenarios = {cle: scenario(gain, libelle)
+                         for cle, libelle, gain in _HYPOTHESES}
+            reference = scenarios['moderate']
+
+        # Le ROI en pourcentage explose des que le budget est petit devant la
+        # valeur d'un client : c'est un ratio, pas une anomalie. Montrer ce
+        # qui le pilote evite qu'il se lise comme un chiffre sorti de nulle
+        # part. Avec 1,5 % de conversion et 6500 $ par client, un visiteur
+        # vaut 97,50 $ : trente visiteurs de plus payent un budget de 100 $
+        # trente fois. C'est vrai, et c'est verifiable par l'utilisateur sur
+        # ses propres chiffres.
+        valeur_visiteur = taux_conv * valeur_client
+        moteur = (
+            f"D'apres tes chiffres, un visiteur vaut {valeur_visiteur:.2f} $ "
+            f"({request.data.get('avg_conversion_rate', 2.5)} % de conversion "
+            f"x {valeur_client:.0f} $ par client)."
+        )
+
+        if reference['break_even_month']:
+            resume = (
+                f"{moteur} Sur l'hypothese {reference['name'].lower()} "
+                f"(+{reference['assumed_growth_percent']} % de trafic en un an), "
+                f"le revenu supplementaire depasse l'investissement au mois "
+                f"{reference['break_even_month']}."
+            )
+        else:
+            resume = (
+                f"{moteur} Sur l'hypothese {reference['name'].lower()} "
+                f"(+{reference['assumed_growth_percent']} % de trafic en un an), "
+                f"l'investissement n'est pas rembourse dans les douze mois."
+            )
+
         payload = {
             'domain': domain_norm,
             'inputs': {
-                'monthly_traffic': monthly_traffic,
+                'monthly_traffic': trafic,
                 'avg_conversion_rate': request.data.get('avg_conversion_rate', 2.5),
-                'avg_deal_value': avg_deal_value,
-                'monthly_seo_investment': monthly_seo_investment
+                'avg_deal_value': valeur_client,
+                'monthly_seo_investment': investissement,
             },
+            'baseline_monthly_revenue': round(revenu_de_base, 2),
+            'revenue_per_visitor': round(valeur_visiteur, 2),
             'scenarios': scenarios,
-            'break_even_month': break_even_month,
-            'year_one_roi_percent': year_one_roi_percent,
-            'insight': insight,
-            'gridar_advantage': gridar_advantage
+            'break_even_month': reference['break_even_month'],
+            'year_one_roi_percent': reference['roi_percent'],
+            'insight': resume,
+            'methodologie': (
+                "Seul le revenu SUPPLEMENTAIRE est compte : ce que ton site "
+                "rapporte deja n'entre pas dans le calcul. Le gain de trafic "
+                "suit une courbe qui demarre lentement puis plafonne, il ne "
+                "compose pas indefiniment. Les pourcentages de croissance sont "
+                "des hypotheses, pas une prevision propre a ton domaine."
+            ),
         }
         return Response(payload)
 
