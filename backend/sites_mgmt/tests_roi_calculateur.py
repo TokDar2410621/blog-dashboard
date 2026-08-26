@@ -174,3 +174,52 @@ class EntreesTests(BaseRoiTests):
         d = appeler(monthly_traffic=0).data
         self.assertEqual(d['baseline_monthly_revenue'], 0.0)
         self.assertEqual(d['scenarios']['moderate']['year_one_revenue'], 0)
+
+
+class TauxDeConversionTests(BaseRoiTests):
+    """Le taux de conversion est le chiffre que personne ne connait, et tout
+    le resultat lui est proportionnel."""
+
+    def test_le_taux_se_derive_du_nombre_de_demandes(self):
+        """Un commerce sait dire "j'ai eu 15 appels", pas "je convertis a
+        1,5 %". Le taux se derive de deux choses qu'il connait."""
+        d = appeler(monthly_leads=15).data
+        self.assertEqual(d['conversion_source'], 'derive_des_demandes')
+        self.assertEqual(d['inputs']['avg_conversion_rate'], 1.5)
+        self.assertEqual(d['inputs']['monthly_leads'], 15.0)
+        self.assertIn('15 demandes pour 1000 visiteurs', d['insight'])
+
+    def test_le_taux_saisi_reste_accepte(self):
+        d = appeler(avg_conversion_rate=3.2).data
+        self.assertEqual(d['conversion_source'], 'taux_saisi')
+        self.assertEqual(d['inputs']['avg_conversion_rate'], 3.2)
+        self.assertIsNone(d['inputs']['monthly_leads'])
+
+    def test_les_demandes_ont_priorite_sur_le_taux(self):
+        d = appeler(monthly_leads=50, avg_conversion_rate=99).data
+        self.assertEqual(d['inputs']['avg_conversion_rate'], 5.0)
+
+    def test_un_taux_tres_bas_est_accepte(self):
+        """Le formulaire imposait un plancher de 0,1 %. Un site a fort trafic
+        peut convertir a 0,05 %, valeur vraie et pourtant refusee."""
+        d = appeler(avg_conversion_rate=0.05).data
+        self.assertEqual(d['inputs']['avg_conversion_rate'], 0.05)
+        self.assertGreater(d['scenarios']['moderate']['year_one_revenue'], 0)
+
+    def test_la_fourchette_de_sensibilite_encadre_le_chiffre_saisi(self):
+        """Le revenu est proportionnel au taux : un chiffre unique laisserait
+        croire a une precision que l'entree n'a pas."""
+        d = appeler(monthly_leads=15).data
+        bas, milieu, haut = d['sensitivity']['points']
+        self.assertEqual(milieu['label'], 'Ton chiffre')
+        self.assertAlmostEqual(bas['conversion_percent'], 0.75, places=2)
+        self.assertAlmostEqual(haut['conversion_percent'], 3.0, places=2)
+        self.assertAlmostEqual(bas['year_one_revenue'] * 2,
+                               milieu['year_one_revenue'], delta=2)
+        self.assertAlmostEqual(haut['year_one_revenue'],
+                               milieu['year_one_revenue'] * 2, delta=2)
+
+    def test_des_demandes_sans_trafic_ne_divisent_pas_par_zero(self):
+        d = appeler(monthly_traffic=0, monthly_leads=15).data
+        self.assertEqual(d['conversion_source'], 'taux_saisi')
+        self.assertEqual(d['baseline_monthly_revenue'], 0.0)

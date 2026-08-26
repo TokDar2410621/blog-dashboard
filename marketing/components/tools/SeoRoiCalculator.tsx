@@ -39,6 +39,12 @@ type SeoRoiResult = {
   // le comptait comme un gain du SEO, d'ou des ROI a six chiffres.
   baseline_monthly_revenue: number;
   revenue_per_visitor: number;
+  conversion_source: "derive_des_demandes" | "taux_saisi";
+  inputs: { avg_conversion_rate: number; monthly_leads: number | null };
+  sensitivity: {
+    note: string;
+    points: { conversion_percent: number; year_one_revenue: number; label: string }[];
+  };
   scenarios: {
     conservative: Scenario;
     moderate?: Scenario;
@@ -51,7 +57,12 @@ type SeoRoiResult = {
 export function SeoRoiCalculator() {
   const [domain, setDomain] = useState("");
   const [monthlyTraffic, setMonthlyTraffic] = useState("1000");
+  // Par defaut on demande le nombre de DEMANDES par mois, pas le taux de
+  // conversion. Un commerce sait dire "j'ai eu 15 appels le mois passe" ; il
+  // ne sait pas dire "je convertis a 2 %". Le taux se derive des deux.
+  const [monthlyLeads, setMonthlyLeads] = useState("20");
   const [conversionRate, setConversionRate] = useState("2.5");
+  const [saisirLeTaux, setSaisirLeTaux] = useState(false);
   const [dealValue, setDealValue] = useState("500");
   const [seoInvestment, setSeoInvestment] = useState("2000");
 
@@ -70,7 +81,9 @@ export function SeoRoiCalculator() {
         body: JSON.stringify({
           domain: domain.trim(),
           monthly_traffic: Number(monthlyTraffic),
-          avg_conversion_rate: Number(conversionRate),
+          ...(saisirLeTaux
+            ? { avg_conversion_rate: Number(conversionRate) }
+            : { monthly_leads: Number(monthlyLeads) }),
           avg_deal_value: Number(dealValue),
           monthly_seo_investment: Number(seoInvestment),
         }),
@@ -110,10 +123,38 @@ export function SeoRoiCalculator() {
               <div className="space-y-1.5 lg:col-span-1">
                 <Label htmlFor="traffic" className="text-xs">Trafic mensuel</Label>
                 <Input id="traffic" type="number" value={monthlyTraffic} onChange={(e) => setMonthlyTraffic(e.target.value)} disabled={loading} required min="1" />
+                {/* Le trafic est devinable, contrairement au taux de
+                    conversion. Plutot que de laisser l'utilisateur inventer un
+                    chiffre, on lui dit ou lire le vrai. */}
+                <Link
+                  href="/sites"
+                  className="block text-[10px] text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+                >
+                  Tu ne connais pas ton trafic ?
+                </Link>
               </div>
               <div className="space-y-1.5 lg:col-span-1">
-                <Label htmlFor="conv" className="text-xs">Taux de conv. (%)</Label>
-                <Input id="conv" type="number" step="0.1" value={conversionRate} onChange={(e) => setConversionRate(e.target.value)} disabled={loading} required min="0.1" />
+                {saisirLeTaux ? (
+                  <>
+                    <Label htmlFor="conv" className="text-xs">Taux de conv. (%)</Label>
+                    {/* Pas de plancher a 0,1 : un site a fort trafic peut
+                        convertir a 0,05 %, et le formulaire refusait cette
+                        valeur pourtant vraie. */}
+                    <Input id="conv" type="number" step="0.01" value={conversionRate} onChange={(e) => setConversionRate(e.target.value)} disabled={loading} required min="0" />
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="leads" className="text-xs">Demandes / mois</Label>
+                    <Input id="leads" type="number" step="1" value={monthlyLeads} onChange={(e) => setMonthlyLeads(e.target.value)} disabled={loading} required min="0" placeholder="appels, formulaires" />
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSaisirLeTaux((v) => !v)}
+                  className="text-[10px] text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
+                >
+                  {saisirLeTaux ? "Je ne connais pas mon taux" : "Je connais mon taux de conversion"}
+                </button>
               </div>
               <div className="space-y-1.5 lg:col-span-1">
                 <Label htmlFor="deal" className="text-xs">Valeur client ($)</Label>
@@ -254,11 +295,50 @@ export function SeoRoiCalculator() {
                   ci-dessus : seul le revenu supplementaire y figure.
                 </p>
               )}
+              {result.sensitivity?.points?.length ? (
+                <div className="mt-4 rounded-md border border-white/5 bg-white/[0.02] p-4">
+                  <div className="mb-3 text-xs text-zinc-400">
+                    {result.sensitivity.note}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {result.sensitivity.points.map((pt) => (
+                      <div key={pt.label} className="text-center">
+                        <div className="text-[10px] uppercase tracking-wide text-zinc-500">
+                          {pt.label}
+                        </div>
+                        <div className="text-[11px] text-zinc-500">
+                          {pt.conversion_percent} %
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-zinc-200">
+                          {formatCurrency(pt.year_one_revenue)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {result.methodologie && (
                 <p className="mt-3 border-t border-white/5 pt-3 text-[11px] leading-relaxed text-zinc-500">
                   {result.methodologie}
                 </p>
               )}
+              {/* L'escalade honnete : on ne demande pas de creer un compte pour
+                  retenir de l'information, mais parce que Search Console est la
+                  seule facon d'arreter de deviner le trafic. */}
+              <div className="mt-4 rounded-md border border-emerald-500/20 bg-emerald-500/[0.03] p-4">
+                <p className="text-xs leading-relaxed text-zinc-300">
+                  Ces projections partent des chiffres que tu as saisis. Connecte
+                  Search Console a Gridar et le trafic reel de ton site remplace
+                  ton estimation.
+                </p>
+                <Link
+                  href="/sites"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+                >
+                  Utiliser mes vraies donnees
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
             </CardContent>
           </Card>
 

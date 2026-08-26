@@ -1210,11 +1210,25 @@ class PublicSeoRoiCalculatorView(APIView):
 
         try:
             trafic = float(request.data.get('monthly_traffic', 1000))
-            taux_conv = float(request.data.get('avg_conversion_rate', 2.5)) / 100.0
             valeur_client = float(request.data.get('avg_deal_value', 500))
             investissement = float(request.data.get('monthly_seo_investment', 1000))
             gain_demande = request.data.get('expected_growth_percent')
             gain_demande = None if gain_demande in (None, '') else float(gain_demande) / 100.0
+            # Le taux de conversion est le chiffre que personne ne connait, et
+            # tout le resultat lui est proportionnel. On accepte donc l'entree
+            # qu'un commerce peut REELLEMENT fournir : son nombre de demandes
+            # par mois. Un plombier ne sait pas dire "je convertis a 2 %", mais
+            # il sait dire "j'ai eu 15 appels le mois passe". Le taux se
+            # derive alors de deux choses qu'il connait, au lieu d'etre devine.
+            demandes = request.data.get('monthly_leads')
+            demandes = None if demandes in (None, '') else float(demandes)
+            if demandes is not None and trafic > 0:
+                taux_conv = demandes / trafic
+                source_conversion = 'derive_des_demandes'
+            else:
+                demandes = None
+                taux_conv = float(request.data.get('avg_conversion_rate', 2.5)) / 100.0
+                source_conversion = 'taux_saisi'
         except (ValueError, TypeError):
             return Response({'error': 'invalid numeric inputs'},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -1297,11 +1311,19 @@ class PublicSeoRoiCalculatorView(APIView):
         # trente fois. C'est vrai, et c'est verifiable par l'utilisateur sur
         # ses propres chiffres.
         valeur_visiteur = taux_conv * valeur_client
-        moteur = (
-            f"D'apres tes chiffres, un visiteur vaut {valeur_visiteur:.2f} $ "
-            f"({request.data.get('avg_conversion_rate', 2.5)} % de conversion "
-            f"x {valeur_client:.0f} $ par client)."
-        )
+        if source_conversion == 'derive_des_demandes':
+            moteur = (
+                f"{demandes:.0f} demandes pour {trafic:.0f} visiteurs, soit "
+                f"{taux_conv * 100:.2f} % de conversion. A "
+                f"{valeur_client:.0f} $ par client, un visiteur vaut "
+                f"{valeur_visiteur:.2f} $."
+            )
+        else:
+            moteur = (
+                f"D'apres tes chiffres, un visiteur vaut {valeur_visiteur:.2f} $ "
+                f"({taux_conv * 100:.2f} % de conversion x {valeur_client:.0f} $ "
+                f"par client)."
+            )
 
         if reference['break_even_month']:
             resume = (
@@ -1317,14 +1339,41 @@ class PublicSeoRoiCalculatorView(APIView):
                 f"l'investissement n'est pas rembourse dans les douze mois."
             )
 
+        # Le revenu projete est EXACTEMENT proportionnel au taux de conversion.
+        # Presenter un chiffre unique laisserait croire a une precision que
+        # l'entree n'a pas : si le taux reel est la moitie de celui saisi, tout
+        # le resultat est divise par deux. Montrer la fourchette rend cette
+        # dependance visible plutot que de l'enfouir.
+        revenu_reference = reference['year_one_revenue']
+        sensibilite = {
+            'note': (
+                'Le revenu projete est proportionnel au taux de conversion. '
+                'Voici le meme calcul si ton taux reel est deux fois plus bas '
+                'ou deux fois plus haut.'
+            ),
+            'points': [
+                {
+                    'conversion_percent': round(taux_conv * facteur * 100, 3),
+                    'year_one_revenue': round(revenu_reference * facteur),
+                    'label': libelle,
+                }
+                for facteur, libelle in ((0.5, 'Deux fois plus bas'),
+                                         (1.0, 'Ton chiffre'),
+                                         (2.0, 'Deux fois plus haut'))
+            ],
+        }
+
         payload = {
             'domain': domain_norm,
             'inputs': {
                 'monthly_traffic': trafic,
-                'avg_conversion_rate': request.data.get('avg_conversion_rate', 2.5),
+                'avg_conversion_rate': round(taux_conv * 100, 3),
+                'monthly_leads': demandes,
                 'avg_deal_value': valeur_client,
                 'monthly_seo_investment': investissement,
             },
+            'conversion_source': source_conversion,
+            'sensitivity': sensibilite,
             'baseline_monthly_revenue': round(revenu_de_base, 2),
             'revenue_per_visitor': round(valeur_visiteur, 2),
             'scenarios': scenarios,
