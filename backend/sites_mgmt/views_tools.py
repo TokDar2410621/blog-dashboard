@@ -574,7 +574,7 @@ def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
     tout `engine` autre que 'gemini', faisant passer un moteur non implemente
     pour un moteur qui ne cite jamais personne.
     """
-    from .moteurs_ia import interroger
+    from .moteurs_ia import formuler, interroger
 
     resultat = {
         'engine': engine, 'query': query, 'mentioned': False,
@@ -582,7 +582,9 @@ def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
         'source_urls': [], 'disponible': False, 'raison': None,
     }
 
-    reponse = interroger(engine, query, timeout=25)
+    # La requete est FORMULEE en question avant l'envoi : un mot-cle brut
+    # fait demander des precisions au lieu de nommer des produits.
+    reponse = interroger(engine, formuler(query), timeout=25)
     if not reponse['disponible']:
         resultat['raison'] = reponse['raison']
         resultat['error'] = reponse['raison']
@@ -592,9 +594,15 @@ def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
     resultat['disponible'] = True
     resultat['excerpt'] = texte[:500]
 
+    # Une IA ecrit "Notion", pas "notion.so". Chercher la chaine litterale du
+    # domaine ne detectait donc quasiment jamais une mention : notion.so
+    # ressortait a 0 % sur huit reponses qui parlaient toutes de Notion.
+    # Verifie en prod le 2026-08-27.
+    from .compare_mesures import _cite_le_domaine
+
     nu = domain.replace('www.', '').lower()
     bas = texte.lower()
-    resultat['mentioned'] = nu in bas
+    resultat['mentioned'] = _cite_le_domaine(texte, domain)
 
     trouves = re.findall(r'[a-z0-9][-a-z0-9]*\.[a-z]{2,}', bas)
     concurrents = []
@@ -604,8 +612,12 @@ def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
     resultat['competitors'] = concurrents[:10]
 
     if resultat['mentioned']:
-        idx = bas.index(nu)
-        resultat['position'] = bas[:idx].count('.') + 1
+        racine = nu.split('.')[0]
+        idx = bas.find(nu)
+        if idx < 0:
+            idx = bas.find(racine)
+        if idx >= 0:
+            resultat['position'] = bas[:idx].count('.') + 1
     return resultat
 
 
@@ -767,19 +779,22 @@ class PublicAiVisibilityView(APIView):
             for r in ai_results[:3]
         ]
 
-        # Per-engine breakdown (for now just Gemini, architecture ready for more)
+        # Detail par moteur, sur les reponses REELLEMENT obtenues. Compter
+        # les tentatives ratees affichait "gemini : 10 testees, 0 mention,
+        # taux 0 %" alors que Gemini n'avait rien repondu du tout : le meme
+        # zero silencieux qu'on corrige, reintroduit par la porte d'a cote.
         engine_breakdown = {}
-        for r in ai_results:
+        for r in obtenus:
             eng = r['engine']
-            if eng not in engine_breakdown:
-                engine_breakdown[eng] = {'total': 0, 'mentioned': 0}
-            engine_breakdown[eng]['total'] += 1
+            case = engine_breakdown.setdefault(eng, {'total': 0, 'mentioned': 0})
+            case['total'] += 1
             if r.get('mentioned'):
-                engine_breakdown[eng]['mentioned'] += 1
-        for eng in engine_breakdown:
-            t = engine_breakdown[eng]['total']
-            m = engine_breakdown[eng]['mentioned']
-            engine_breakdown[eng]['rate'] = round(m / t * 100) if t else 0
+                case['mentioned'] += 1
+        for eng, case in engine_breakdown.items():
+            case['rate'] = round(case['mentioned'] / case['total'] * 100) if case['total'] else 0
+        for eng, raison in moteurs_muets.items():
+            engine_breakdown[eng] = {'total': 0, 'mentioned': 0, 'rate': None,
+                                     'unavailable': raison}
 
         payload = {
             'domain': domain,
@@ -817,7 +832,10 @@ class PublicAiVisibilityView(APIView):
                         'competitors': r.get('competitors', [])[:5],
                         'excerpt': r.get('excerpt', '')[:200],
                     }
-                    for r in ai_results
+                    # Seulement les reponses obtenues : lister les tentatives
+                    # ratees remplissait le rapport de lignes "non mentionne"
+                    # avec un extrait vide, indiscernables d'un vrai resultat.
+                    for r in obtenus
                 ],
                 'competitor_only_count': len(competitor_only_queries),
             },

@@ -353,7 +353,7 @@ def mesurer_presence_ia(requetes: list[str], domaine_a: str, domaine_b: str,
     requetes dont l'appel a echoue sortent du denominateur, elles ne comptent
     pas comme des absences.
     """
-    from .moteurs_ia import LIBELLES, interroger, moteurs_configures
+    from .moteurs_ia import LIBELLES, formuler, interroger, moteurs_configures
 
     if not requetes:
         return _indisponible('Aucune requete a tester.'), _indisponible('Aucune requete a tester.')
@@ -369,7 +369,8 @@ def mesurer_presence_ia(requetes: list[str], domaine_a: str, domaine_b: str,
     travaux = [(m, q) for m in moteurs for q in requetes]
     obtenues, echecs = {}, {}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futurs = {pool.submit(interroger, m, q): (m, q) for m, q in travaux}
+        futurs = {pool.submit(interroger, m, formuler(q)): (m, q)
+                  for m, q in travaux}
         for fut in as_completed(futurs):
             cle = futurs[fut]
             try:

@@ -159,6 +159,31 @@ def _interroger_openai(question: str, timeout: int) -> dict:
     return _reponse('openai', texte)
 
 
+def formuler(requete: str) -> str:
+    """Transforme un mot-cle en question qu'un humain poserait vraiment.
+
+    On mesure si une IA cite un site quand on l'interroge sur un sujet. Or
+    envoyer le mot-cle BRUT ne pose pas de question : mesure en prod le
+    2026-08-27, "outil prise de notes collaboratif" fait repondre a
+    gpt-5-mini "pouvez-vous preciser : usage principal, notes personnelles,
+    reunion, cours...". Le modele ne nomme alors aucun produit, donc aucune
+    mention n'est detectable et TOUS les sites obtiennent 0 %.
+
+    La meme requete formulee en question rend "voici une selection d'outils
+    de prise de notes collaboratifs populaires..." et cite des produits.
+
+    On demande aussi des noms precis : sans ca, un modele repond volontiers
+    par des categories ("des outils de gestion de projet") sans jamais
+    nommer personne, ce qui rend la mesure vide de la meme facon.
+    """
+    requete = ' '.join(str(requete or '').split())
+    return (
+        f'{requete} : quelles sont les meilleures options ? '
+        'Nomme des entreprises, des produits ou des sites precis, '
+        'avec une courte phrase pour chacun.'
+    )
+
+
 def interroger(moteur: str, question: str, timeout: int = 25) -> dict:
     """Pose une question a un moteur. Ne leve jamais.
 

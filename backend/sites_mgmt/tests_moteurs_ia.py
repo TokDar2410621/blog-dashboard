@@ -177,3 +177,38 @@ class MoteurInconnuTests(SimpleTestCase):
         for moteur in ('gemini', 'openai'):
             self.assertIn(moteur, LIBELLES)
             self.assertTrue(LIBELLES[moteur])
+
+
+class FormulerTests(SimpleTestCase):
+    """Un mot-cle brut n'est pas une question.
+
+    Mesure en prod le 2026-08-27 : "outil prise de notes collaboratif" envoye
+    tel quel fait repondre a gpt-5-mini "pouvez-vous preciser : usage
+    principal, notes personnelles, reunion, cours...". Le modele ne nomme
+    aucun produit, donc aucune mention n'est detectable et TOUS les sites
+    obtiennent 0 %. La meme requete formulee en question fait citer des
+    produits.
+    """
+
+    def test_la_requete_devient_une_question(self):
+        from .moteurs_ia import formuler
+        q = formuler('outil prise de notes collaboratif')
+        self.assertIn('outil prise de notes collaboratif', q)
+        self.assertIn('?', q)
+
+    def test_des_noms_precis_sont_demandes(self):
+        """Sans ca, le modele repond par des categories sans nommer personne,
+        ce qui rend la mesure vide de la meme facon."""
+        from .moteurs_ia import formuler
+        q = formuler('plombier jonquiere').lower()
+        self.assertTrue(any(m in q for m in ('nomme', 'precis')))
+
+    def test_les_espaces_sont_normalises(self):
+        from .moteurs_ia import formuler
+        self.assertTrue(formuler('  plombier   jonquiere  ').startswith(
+            'plombier jonquiere :'))
+
+    def test_une_requete_vide_ne_plante_pas(self):
+        from .moteurs_ia import formuler
+        self.assertIsInstance(formuler(''), str)
+        self.assertIsInstance(formuler(None), str)
