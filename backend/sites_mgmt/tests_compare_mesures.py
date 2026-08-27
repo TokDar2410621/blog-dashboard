@@ -219,7 +219,7 @@ class PresenceIaTests(SimpleTestCase):
         ferait deux appels identiques dont les reponses different (aucune
         temperature fixee) : on comparerait deux textes differents en payant
         double."""
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': ''}):
             with patch('requests.post') as post:
                 post.return_value = reponse(200, {'candidates': [
                     {'content': {'parts': [{'text': 'Essaie alpha.ca, un bon choix.'}]}}]})
@@ -228,12 +228,46 @@ class PresenceIaTests(SimpleTestCase):
         self.assertEqual(a['score'], 100)
         self.assertEqual(b['score'], 0)
 
+    def test_chaque_requete_est_posee_a_chaque_moteur_configure(self):
+        """Deux moteurs configures : 2 requetes donnent 4 appels, et la
+        reponse dit lesquels ont repondu."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.side_effect = lambda url, **kw: (
+                    reponse(200, {'candidates': [{'content': {'parts': [
+                        {'text': 'Essaie alpha.ca'}]}}]})
+                    if 'googleapis' in url else
+                    reponse(200, {'choices': [{'message': {'content': 'Essaie alpha.ca'},
+                                               'finish_reason': 'stop'}]})
+                )
+                a, _ = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(post.call_count, 4)
+        preuves = ' '.join(a['preuves'])
+        self.assertIn('Gemini', preuves)
+        self.assertIn('ChatGPT', preuves)
+
+    def test_un_moteur_muet_ne_fait_pas_chuter_le_score(self):
+        """Gemini hors quota pendant qu'OpenAI repond : le score porte sur les
+        reponses obtenues, et le moteur muet est nomme."""
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': 'k'}):
+            with patch('requests.post') as post:
+                post.side_effect = lambda url, **kw: (
+                    reponse(429) if 'googleapis' in url else
+                    reponse(200, {'choices': [{'message': {'content': 'Essaie alpha.ca'},
+                                               'finish_reason': 'stop'}]})
+                )
+                a, _ = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
+        self.assertEqual(a['score'], 100)   # 2 reponses OpenAI, pas 2 sur 4
+        preuves = ' '.join(a['preuves'])
+        self.assertIn('sur 2 obtenue', preuves)
+        self.assertIn('Non joignable', preuves)
+
     def test_quota_epuise_ne_donne_pas_zero_contre_zero(self):
         """Le piege de `_check_ai_mention` : tout est enferme dans
         `if r.status_code == 200:` sans else, donc un 429 rend
         `mentioned: False`, indiscernable d'un vrai "l'IA ne cite pas ce
         site". Sur une comparaison ca donne un match nul muet."""
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': ''}):
             with patch('requests.post', return_value=reponse(429)):
                 a, b = mesurer_presence_ia(['q1', 'q2'], 'alpha.ca', 'bravo.ca')
         for mesure in (a, b):
@@ -243,7 +277,7 @@ class PresenceIaTests(SimpleTestCase):
 
     def test_les_requetes_ratees_sortent_du_denominateur(self):
         """Une requete dont l'appel a echoue n'est pas une absence de mention."""
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': ''}):
             with patch('requests.post') as post:
                 post.side_effect = [
                     reponse(200, {'candidates': [
@@ -258,7 +292,7 @@ class PresenceIaTests(SimpleTestCase):
         """Sur gemini-2.5-flash le thinking est actif par defaut et ses jetons
         comptent dans maxOutputTokens : la reflexion mange l'enveloppe et la
         reponse revient sans cle `parts`."""
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': ''}):
             with patch('requests.post') as post:
                 post.return_value = reponse(200, {'candidates': [
                     {'content': {'parts': [{'text': 'rien'}]}}]})
@@ -273,7 +307,7 @@ class PresenceIaTests(SimpleTestCase):
         self.assertFalse(b['disponible'])
 
     def test_racine_de_marque_ne_matche_pas_a_l_interieur_d_un_mot(self):
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'k', 'OPENAI_API_KEY': ''}):
             with patch('requests.post') as post:
                 post.return_value = reponse(200, {'candidates': [
                     {'content': {'parts': [{'text': 'Un cas notionnel, rien de plus.'}]}}]})

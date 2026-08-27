@@ -353,30 +353,57 @@ def mesurer_presence_ia(requetes: list[str], domaine_a: str, domaine_b: str,
     requetes dont l'appel a echoue sortent du denominateur, elles ne comptent
     pas comme des absences.
     """
+    from .moteurs_ia import LIBELLES, interroger, moteurs_configures
+
     if not requetes:
         return _indisponible('Aucune requete a tester.'), _indisponible('Aucune requete a tester.')
 
-    reponses = {}
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futurs = {pool.submit(_demander_gemini, q): q for q in requetes}
-        for fut in as_completed(futurs):
-            question = futurs[fut]
-            try:
-                reponses[question] = fut.result()
-            except Exception:
-                reponses[question] = None
-
-    obtenues = {q: t for q, t in reponses.items() if t}
-    if not obtenues:
-        indispo = _indisponible("Aucune reponse d'IA obtenue (quota ou cle).")
+    moteurs = moteurs_configures()
+    if not moteurs:
+        indispo = _indisponible("Aucun moteur d'IA configure.")
         return indispo, indispo
 
+    # Une reponse par couple (moteur, requete), et chacune sert les DEUX
+    # domaines : la question posee ne contient pas le domaine, donc relancer
+    # par domaine paierait deux fois pour comparer deux textes differents.
+    travaux = [(m, q) for m in moteurs for q in requetes]
+    obtenues, echecs = {}, {}
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futurs = {pool.submit(interroger, m, q): (m, q) for m, q in travaux}
+        for fut in as_completed(futurs):
+            cle = futurs[fut]
+            try:
+                r = fut.result()
+            except Exception:
+                r = {'disponible': False, 'raison': 'Appel interrompu.'}
+            if r.get('disponible'):
+                obtenues[cle] = r['texte']
+            else:
+                echecs.setdefault(cle[0], r.get('raison') or 'Indisponible.')
+
+    if not obtenues:
+        detail = ' '.join(f'{LIBELLES.get(m, m)} : {r}' for m, r in echecs.items())
+        indispo = _indisponible(
+            ("Aucune reponse d'IA obtenue. " + detail).strip())
+        return indispo, indispo
+
+    # Les moteurs qui n'ont pas repondu sortent du denominateur. Les compter
+    # comme des non-mentions ferait chuter le score pour une panne.
+    repondants = sorted({m for m, _ in obtenues})
+    libelles = ', '.join(LIBELLES.get(m, m) for m in repondants)
+
     def noter(domaine):
-        cites = [q for q, t in obtenues.items() if _cite_le_domaine(t, domaine)]
+        cites = [q for (m, q), t in obtenues.items() if _cite_le_domaine(t, domaine)]
         taux = len(cites) / len(obtenues) * 100
-        preuves = [f'Cite dans {len(cites)} reponse(s) sur {len(obtenues)} testee(s)']
+        preuves = [
+            f'Cite dans {len(cites)} reponse(s) sur {len(obtenues)} obtenue(s)',
+            f'Moteurs interroges : {libelles}',
+        ]
         if cites:
             preuves.append('Par exemple : ' + cites[0])
+        if echecs:
+            preuves.append('Non joignable : ' + ', '.join(
+                LIBELLES.get(m, m) for m in sorted(echecs)))
         return _mesure(taux, preuves)
 
     return noter(domaine_a), noter(domaine_b)

@@ -560,66 +560,53 @@ def _analyser_page(domain: str, n_queries: int = 15) -> dict:
 
 
 def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
-    """Check if a domain is mentioned in an AI engine's response to a query.
+    """Le domaine est-il cite quand on pose `query` a ce moteur ?
 
-    Currently uses Gemini (free tier). Architecture supports adding more engines.
-    Returns dict with: engine, query, mentioned, position, competitors, excerpt.
+    Rend un dict portant `disponible` : quand il est faux, le moteur n'a PAS
+    repondu et le resultat ne doit pas entrer dans un taux de mention.
+
+    C'est le correctif principal. L'ancienne version enfermait tout dans
+    `if r.status_code == 200:` sans `else`, seul appel Gemini du fichier dans
+    ce cas. Quota epuise (429) rendait donc `mentioned: False`, strictement
+    indiscernable d'un vrai "l'IA ne cite pas ce site". Le 2026-08-27, avec le
+    quota epuise, l'outil affichait 0 % a tous les visiteurs sans dire que
+    c'etait une panne. Elle traversait aussi sans un seul appel reseau pour
+    tout `engine` autre que 'gemini', faisant passer un moteur non implemente
+    pour un moteur qui ne cite jamais personne.
     """
-    result = {
-        'engine': engine,
-        'query': query,
-        'mentioned': False,
-        'position': None,
-        'competitors': [],
-        'excerpt': '',
-        'source_urls': [],
+    from .moteurs_ia import interroger
+
+    resultat = {
+        'engine': engine, 'query': query, 'mentioned': False,
+        'position': None, 'competitors': [], 'excerpt': '',
+        'source_urls': [], 'disponible': False, 'raison': None,
     }
 
-    gemini_key = os.environ.get('GEMINI_API_KEY')
-    if not gemini_key:
-        result['error'] = 'API key not configured'
-        return result
+    reponse = interroger(engine, query, timeout=25)
+    if not reponse['disponible']:
+        resultat['raison'] = reponse['raison']
+        resultat['error'] = reponse['raison']
+        return resultat
 
-    if engine == 'gemini':
-        try:
-            import requests as http_requests
-            r = http_requests.post(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-                # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
-                # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
-                # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
-                # s'est retrouvee en clair dans les logs Railway sur un 429.
-                headers={'x-goog-api-key': gemini_key},
-                json={
-                    'contents': [{'parts': [{'text': query}]}],
-                    'generationConfig': {'maxOutputTokens': 500},
-                },
-                timeout=20,
-            )
-            if r.status_code == 200:
-                text = r.json()['candidates'][0]['content']['parts'][0]['text']
-                result['excerpt'] = text[:500]
-                dom_bare = domain.replace('www.', '')
-                text_lower = text.lower()
-                result['mentioned'] = dom_bare in text_lower
+    texte = reponse['texte']
+    resultat['disponible'] = True
+    resultat['excerpt'] = texte[:500]
 
-                # Detect competitor mentions (common domains in the text)
-                import re
-                urls_found = re.findall(r'[a-z0-9][-a-z0-9]*\.[a-z]{2,}', text_lower)
-                competitors = []
-                for u in urls_found:
-                    if u != dom_bare and u not in ('e.g', 'i.e', 'etc.'):
-                        if u not in competitors:
-                            competitors.append(u)
-                result['competitors'] = competitors[:10]
+    nu = domain.replace('www.', '').lower()
+    bas = texte.lower()
+    resultat['mentioned'] = nu in bas
 
-                if result['mentioned']:
-                    idx = text_lower.index(dom_bare)
-                    result['position'] = text_lower[:idx].count('.') + 1
-        except Exception as e:
-            result['error'] = str(e)[:100]
+    trouves = re.findall(r'[a-z0-9][-a-z0-9]*\.[a-z]{2,}', bas)
+    concurrents = []
+    for u in trouves:
+        if u != nu and u not in ('e.g', 'i.e') and u not in concurrents:
+            concurrents.append(u)
+    resultat['competitors'] = concurrents[:10]
 
-    return result
+    if resultat['mentioned']:
+        idx = bas.index(nu)
+        resultat['position'] = bas[:idx].count('.') + 1
+    return resultat
 
 
 def _compute_visibility_score(results: list[dict]) -> dict:
@@ -634,10 +621,17 @@ def _compute_visibility_score(results: list[dict]) -> dict:
 
     Returns dict with score and breakdown.
     """
+    # Seules les reponses REELLEMENT obtenues entrent dans le denominateur.
+    # Un moteur en panne ou hors quota compte sinon comme une non-mention, et
+    # fait chuter le score pour une raison qui n'a rien a voir avec le site.
+    # Les resultats anterieurs a `disponible` sont acceptes tels quels.
+    results = [r for r in results if r.get('disponible', True)]
+
     total = len(results)
     if total == 0:
-        return {'score': 0, 'mention_rate': 0, 'citation_rate': 0,
-                'share_of_voice': 0, 'position_score': 0}
+        return {'score': None, 'mention_rate': None, 'citation_rate': None,
+                'share_of_voice': None, 'position_score': None,
+                'disponible': False}
 
     mentions = sum(1 for r in results if r.get('mentioned'))
     mention_rate = (mentions / total) * 100
@@ -661,11 +655,16 @@ def _compute_visibility_score(results: list[dict]) -> dict:
     total_mentions_all = mentions + len(all_competitors)
     share_of_voice = (mentions / total_mentions_all * 100) if total_mentions_all > 0 else 0
 
+    # `citation_rate` pesait 0,20 alors que `source_urls` n'est ecrit nulle
+    # part dans le backend : 20 des 100 points etaient inatteignables, donc le
+    # score plafonnait vers 70 pour un site parfaitement cite. Le poids est
+    # redistribue sur les trois composantes qui mesurent vraiment quelque
+    # chose, et `citation_rate` reste expose a 0 pour ne pas casser le
+    # frontend.
     score = round(
-        mention_rate * 0.40
-        + avg_position_score * 0.25
-        + citation_rate * 0.20
-        + share_of_voice * 0.15
+        mention_rate * 0.50
+        + avg_position_score * 0.30
+        + share_of_voice * 0.20
     )
     score = max(0, min(100, score))
 
@@ -715,18 +714,31 @@ class PublicAiVisibilityView(APIView):
         queries = analyse['queries']
         queries_source = analyse['queries_source']
 
-        # Step 3: check AI mentions (parallel, Gemini only for now)
+        # Step 3 : chaque requete est posee a CHAQUE moteur configure. Un
+        # moteur sans cle n'est pas interroge et n'apparait pas comme "0
+        # mention" ; un moteur qui echoue le dit, au lieu de faire chuter le
+        # score pour une panne.
+        from .moteurs_ia import LIBELLES, moteurs_configures
+
+        moteurs = moteurs_configures()
         ai_results = []
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = {
-                pool.submit(_check_ai_mention, q, domain, 'gemini'): q
-                for q in queries
-            }
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = [pool.submit(_check_ai_mention, q, domain, m)
+                       for m in moteurs for q in queries]
             for fut in as_completed(futures):
                 try:
                     ai_results.append(fut.result())
                 except Exception:
                     pass
+
+        obtenus = [r for r in ai_results if r.get('disponible')]
+        moteurs_repondants = sorted({r['engine'] for r in obtenus})
+        moteurs_muets = {}
+        for r in ai_results:
+            if not r.get('disponible'):
+                moteurs_muets.setdefault(r['engine'], r.get('raison') or 'Indisponible.')
+        moteurs_muets = {m: raison for m, raison in moteurs_muets.items()
+                         if m not in moteurs_repondants}
 
         # Step 4: compute scores
         scores = _compute_visibility_score(ai_results)
@@ -779,8 +791,17 @@ class PublicAiVisibilityView(APIView):
             'ai_visibility_score': scores['score'],
             'scores_breakdown': scores,
             'engine_breakdown': engine_breakdown,
-            'total_queries_tested': len(ai_results),
-            'total_mentions': sum(1 for r in ai_results if r.get('mentioned')),
+            # Le compte porte sur les reponses REELLEMENT obtenues. Annoncer
+            # "15 requetes testees" alors que le moteur etait hors quota
+            # laissait croire a une mesure qui n'a jamais eu lieu.
+            'total_queries_tested': len(obtenus),
+            'total_mentions': sum(1 for r in obtenus if r.get('mentioned')),
+            'engines_answered': [LIBELLES.get(m, m) for m in moteurs_repondants],
+            'engines_unavailable': [
+                {'engine': LIBELLES.get(m, m), 'reason': raison}
+                for m, raison in sorted(moteurs_muets.items())
+            ],
+            'measurement_available': bool(obtenus),
             'top_competitors': top_competitors[:3],  # Free: 3
             'sample_queries': sample_queries,  # Free: 3
             # Gated data
