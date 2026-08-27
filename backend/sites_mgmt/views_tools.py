@@ -337,7 +337,12 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
                 f"Return ONLY a JSON array of strings, no explanations."
             )
             r = http_requests.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
+                # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
+                # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
+                # s'est retrouvee en clair dans les logs Railway sur un 429.
+                headers={'x-goog-api-key': gemini_key},
                 json={'contents': [{'parts': [{'text': prompt}]}]},
                 timeout=15,
             )
@@ -579,7 +584,12 @@ def _check_ai_mention(query: str, domain: str, engine: str) -> dict:
         try:
             import requests as http_requests
             r = http_requests.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
+                # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
+                # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
+                # s'est retrouvee en clair dans les logs Railway sur un 429.
+                headers={'x-goog-api-key': gemini_key},
                 json={
                     'contents': [{'parts': [{'text': query}]}],
                     'generationConfig': {'maxOutputTokens': 500},
@@ -1114,7 +1124,12 @@ class PublicCanIRankView(APIView):
         import requests as http_requests
         try:
             r = http_requests.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
+                # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
+                # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
+                # s'est retrouvee en clair dans les logs Railway sur un 429.
+                headers={'x-goog-api-key': gemini_key},
                 json={
                     'contents': [{'parts': [{'text': prompt}]}],
                     'generationConfig': {'thinkingConfig': {'thinkingBudget': 0}},
@@ -1429,7 +1444,12 @@ class PublicAiCitationCheckerView(APIView):
             )
             try:
                 r = http_requests.post(
-                    f'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}',
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                    # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
+                    # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
+                    # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
+                    # s'est retrouvee en clair dans les logs Railway sur un 429.
+                    headers={'x-goog-api-key': gemini_key},
                     json={'contents': [{'parts': [{'text': prompt}]}]},
                     timeout=15,
                 )
