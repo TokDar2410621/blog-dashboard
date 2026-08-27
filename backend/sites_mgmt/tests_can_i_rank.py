@@ -174,9 +174,22 @@ class SansLlmTests(BaseCirTests):
         self.assertEqual(r.status_code, 200)
         self.assertTrue(r.data['overall_score'] >= 0)
 
-    def test_un_verdict_invente_par_le_modele_est_rejete(self):
-        d = self.appeler(recit=json.dumps({'verdict': 'IMBATTABLE', 'quick_wins': []})).data
-        self.assertIn(d['verdict'], ('Facile', 'Possible', 'Difficile', 'Tres difficile'))
+    def test_le_verdict_ne_peut_pas_contredire_le_score(self):
+        """Vu en prod le 2026-08-27 : un site absent du top 10, note 30/100,
+        s'est vu attribuer le verdict "Facile" par le modele. Le verdict
+        derive desormais du score mesure, le modele ne le produit plus."""
+        d = self.appeler(occupants=(('rival.ca', 1), ('autre.ca', 2)),
+                         crawl={'title': 'Boulangerie', 'h1': 'Pains',
+                                'meta_description': '', 'h2_list': [],
+                                'body_snippet': '', '_html': '<html></html>'},
+                         recit=json.dumps({'verdict': 'Facile', 'quick_wins': []})).data
+        self.assertLess(d['overall_score'], 45)
+        self.assertIn(d['verdict'], ('Difficile', 'Tres difficile'))
+
+    def test_un_bon_score_donne_un_bon_verdict(self):
+        d = self.appeler(occupants=(('moi.ca', 1),)).data
+        self.assertGreaterEqual(d['overall_score'], 45)
+        self.assertIn(d['verdict'], ('Facile', 'Possible'))
 
     def test_sans_serp_la_vue_le_dit_au_lieu_de_deviner(self):
         """Sans la page de resultats il n'y a rien a mesurer. Repondre quand
