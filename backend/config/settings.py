@@ -187,6 +187,12 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
+            # Formateur qui masque les secrets APRES rendu complet, donc y
+            # compris dans les tracebacks. Le 2026-08-27 la cle Gemini est
+            # partie en clair dans les logs Railway via le message d'une
+            # HTTPError : les cles sont desormais en en-tetes (correctif a la
+            # source) et ceci est la ceinture pour le code futur.
+            '()': 'config.log_redaction.FormateurMasque',
             'format': '[{levelname}] {asctime} {name} {message}',
             'style': '{',
         },
