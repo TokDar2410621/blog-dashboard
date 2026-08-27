@@ -670,9 +670,13 @@ class ArticleGenerator:
         self.log(f'[SEARCH] Gemini: "{query}"')
 
         response = requests.post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-            params={'key': os.environ['GEMINI_API_KEY']},
-            headers={'Content-Type': 'application/json'},
+            'https://generativelanguage.googleapis.com/v1beta/models/'
+            f'{MODELE_GEMINI}:generateContent',
+            # La cle passe par un en-tete, jamais par l'URL : elle finit sinon
+            # dans le message des exceptions HTTP, donc dans les logs.
+            # Vecu le 2026-08-27 sur un autre appel.
+            headers={'Content-Type': 'application/json',
+                     'x-goog-api-key': os.environ['GEMINI_API_KEY']},
             json={
                 'contents': [{'parts': [{'text': f'''Tu es un chercheur expert.
 Recherche et analyse les informations les plus recentes sur: "{query}"

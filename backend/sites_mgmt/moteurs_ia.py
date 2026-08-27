@@ -53,9 +53,25 @@ LIBELLES = {
     'openai': 'ChatGPT (OpenAI)',
 }
 
+# Alias qui suit le modele Flash courant, plutot qu'une version figee.
+# Le 2026-08-27, apres rotation de la cle, `gemini-2.5-flash` a commence a
+# rendre 404 : "This model is no longer available to new users". L'ancienne
+# cle avait un acces herite, la nouvelle non. Une version epinglee redevient
+# donc invalide sans qu'une seule ligne de code bouge, et l'outil declare le
+# moteur indisponible pour toujours.
+#
+# Suivre l'alias est aussi le bon comportement sur le fond : on mesure ce que
+# l'IA de Google repond AUJOURD'HUI, donc ce que le prospect voit.
+# (`gemini-3.6-flash`, suggere par le message d'erreur, rend un 400 sur notre
+# corps de requete ; `gemini-flash-latest` accepte `thinkingConfig` et repond
+# en 3,6 s.)
+# Source unique du nom de modele. Quatre autres fichiers l'epinglaient
+# separement et se sont tous casses le meme jour a la rotation de la cle.
+MODELE_GEMINI = 'gemini-flash-latest'
+
 _GEMINI_URL = (
     'https://generativelanguage.googleapis.com/v1beta/models/'
-    'gemini-2.5-flash:generateContent'
+    f'{MODELE_GEMINI}:generateContent'
 )
 _OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 _MODELE_OPENAI = 'gpt-5-mini'

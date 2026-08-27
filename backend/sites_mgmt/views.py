@@ -42,6 +42,10 @@ from .rank_display import keyword_display_rank, DEFAULT_WINDOW
 
 logger = logging.getLogger(__name__)
 
+# Nom du modele Gemini, centralise : une version epinglee redevient 404 des
+# qu'une cle neuve n'a plus l'acces herite (vecu le 2026-08-27).
+from .moteurs_ia import MODELE_GEMINI
+
 
 def _markdown_to_html(text):
     """Convert Markdown to HTML for sites that store content as HTML."""
@@ -1757,7 +1761,7 @@ Contenu (debut): {content[:1500]}
 Reponds UNIQUEMENT avec un JSON: {{"tags": ["tag1", "tag2", ...]}}"""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -1905,7 +1909,7 @@ Respond in JSON only (no markdown):
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=MODELE_GEMINI,
         contents=[prompt],
     )
     text = (response.text or '').strip()
@@ -2055,7 +2059,7 @@ Respond in JSON only (no markdown blocks):
 }}"""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -2138,7 +2142,7 @@ Respond in JSON format only (no markdown, no code blocks):
 }}"""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -2227,7 +2231,7 @@ Respond in JSON format only (no markdown, no code blocks):
 }}"""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -2408,7 +2412,7 @@ Respond in JSON only (no markdown, no code blocks):
 
                 client = genai.Client(api_key=gemini_key)
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=MODELE_GEMINI,
                     contents=[prompt],
                 )
 
@@ -2656,7 +2660,7 @@ class LinkSuggestionsView(APIView):
             )
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -2949,7 +2953,7 @@ Respond in strict JSON (no markdown, no code fences) with this exact shape:
 - Keep answers / step texts concise (<= 400 chars, plain text, no markdown)."""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[detect_prompt],
             )
             raw = self._strip_code_fence(response.text or '')
@@ -3093,7 +3097,7 @@ Respond in JSON only (no markdown blocks):
 }}"""
 
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
 
@@ -3407,7 +3411,7 @@ Respond with JSON only (no markdown code fences):
 
             client = genai.Client(api_key=gemini_key)
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[prompt],
             )
             text = (response.text or '').strip()
@@ -3898,7 +3902,7 @@ The answers array MUST have exactly {len(questions)} entries, in the same order.
 
                     client = genai.Client(api_key=gemini_key)
                     g_resp = client.models.generate_content(
-                        model="gemini-2.5-flash",
+                        model=MODELE_GEMINI,
                         contents=[prompt],
                     )
                     text = (g_resp.text or '').strip()
@@ -4050,7 +4054,7 @@ Respond with JSON only (no markdown):
 
             client = genai.Client(api_key=gemini_key)
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=MODELE_GEMINI,
                 contents=[
                     genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
                     prompt,
@@ -6132,7 +6136,7 @@ assigned to one cluster (pillar OR spoke). Skip the article if it's truly off-to
                 from google import genai
                 client = genai.Client(api_key=gemini_key)
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=MODELE_GEMINI,
                     contents=[prompt],
                 )
                 text = (response.text or '').strip()

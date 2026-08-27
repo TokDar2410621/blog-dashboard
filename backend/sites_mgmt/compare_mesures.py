@@ -267,60 +267,6 @@ def mesurer_ux(psi: dict | None) -> dict:
 # ---------------------------------------------------------------------------
 # Categorie : Presence IA
 # ---------------------------------------------------------------------------
-_GEMINI_URL = (
-    'https://generativelanguage.googleapis.com/v1beta/models/'
-    'gemini-2.5-flash:generateContent'
-)
-
-
-def _demander_gemini(question: str, timeout: int = 20) -> str | None:
-    """Pose une question a Gemini et rend le texte, ou None sur echec.
-
-    Deux differences volontaires avec `_check_ai_mention` (views_tools.py:549),
-    qui a deux chemins de zero silencieux :
-
-    1. Un statut non-200 rend None, pas une reponse vide. Chez
-       `_check_ai_mention`, tout est enferme dans `if r.status_code == 200:`
-       sans `else` et sans `raise_for_status`, seul appel Gemini du fichier
-       dans ce cas. Quota epuise (429) = `mentioned: False` pour tout le
-       monde, indiscernable d'un vrai "l'IA ne cite pas ce site". Sur une
-       comparaison ca donnerait 0 contre 0, un match nul muet.
-
-    2. `thinkingBudget: 0`. Sur gemini-2.5-flash le thinking est actif par
-       defaut et ses jetons comptent dans `maxOutputTokens`. Avec un budget de
-       500, la reflexion mange l'enveloppe, la reponse revient en
-       `finishReason: MAX_TOKENS` avec un `content` sans cle `parts`, et le
-       KeyError est avale plus haut. Deuxieme zero silencieux, intermittent
-       donc plus difficile a voir que le premier.
-    """
-    cle = os.environ.get('GEMINI_API_KEY')
-    if not cle:
-        return None
-    try:
-        r = http_requests.post(
-            _GEMINI_URL,
-            params={'key': cle},
-            json={
-                'contents': [{'parts': [{'text': question}]}],
-                'generationConfig': {
-                    'maxOutputTokens': 700,
-                    'thinkingConfig': {'thinkingBudget': 0},
-                },
-            },
-            timeout=timeout,
-        )
-        if r.status_code != 200:
-            logger.info('Gemini HTTP %s sur une requete de comparaison', r.status_code)
-            return None
-        parts = (r.json().get('candidates') or [{}])[0] \
-            .get('content', {}).get('parts') or []
-        texte = ''.join(p.get('text', '') for p in parts).strip()
-        return texte or None
-    except Exception as e:
-        logger.info('Gemini indisponible : %s', str(e)[:120])
-        return None
-
-
 def _cite_le_domaine(texte: str, domaine: str) -> bool:
     """Cherche le domaine dans une reponse d'IA, sans faux positif evident.
 

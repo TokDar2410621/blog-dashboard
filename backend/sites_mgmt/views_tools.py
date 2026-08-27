@@ -23,6 +23,10 @@ from rest_framework.views import APIView
 
 logger = logging.getLogger(__name__)
 
+# Nom du modele Gemini, source unique. Une version epinglee redevient 404 des
+# qu'une cle neuve n'a plus l'acces herite (vecu le 2026-08-27).
+from .moteurs_ia import MODELE_GEMINI
+
 
 class PublicToolThrottle(_AnonRateThrottle):
     """3 analyses per IP per minute for public tool endpoints."""
@@ -337,7 +341,8 @@ def _generate_commercial_queries(brand: str, sector: str, domain: str, n: int = 
                 f"Return ONLY a JSON array of strings, no explanations."
             )
             r = http_requests.post(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                'https://generativelanguage.googleapis.com/v1beta/models/'
+                f'{MODELE_GEMINI}:generateContent',
                 # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
                 # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
                 # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
@@ -1612,7 +1617,8 @@ class PublicAiCitationCheckerView(APIView):
             )
             try:
                 r = http_requests.post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+                    'https://generativelanguage.googleapis.com/v1beta/models/'
+                f'{MODELE_GEMINI}:generateContent',
                     # La cle passe par un en-tete, jamais par l'URL : `raise_for_status()`
                     # met l'URL COMPLETE dans le message d'exception, que `logger.exception`
                     # ecrit ensuite dans les logs. Constate le 2026-08-27, la cle Gemini
