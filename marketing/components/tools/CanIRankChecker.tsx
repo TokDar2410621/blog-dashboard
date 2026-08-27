@@ -25,6 +25,10 @@ const API_BASE = "";
 type Factor = {
   name: string;
   score: number;
+  // Le fait mesure derriere la note. Chaque score doit pouvoir se justifier :
+  // c'est la difference avec la version precedente, ou les cinq facteurs
+  // etaient produits par un modele a partir de trois champs texte.
+  evidence?: string;
 };
 
 type QuickWin = {
@@ -34,7 +38,11 @@ type QuickWin = {
 
 type Competitor = {
   domain: string;
-  authority: number;
+  // Le rang REEL dans les resultats de recherche. Il n'y a plus d'"authority" :
+  // Serper n'expose aucune donnee de liens, et l'ancienne version demandait au
+  // modele d'inventer ce score sur des domaines qu'il inventait aussi.
+  position: number;
+  title?: string;
 };
 
 type CanIRankResult = {
@@ -45,7 +53,9 @@ type CanIRankResult = {
   factors: Factor[];
   quick_wins: QuickWin[];
   top_competitors: Competitor[];
-  estimated_time_to_rank: string;
+  // Position actuelle du site sur ce mot-cle, ou null s'il est absent du top 10.
+  current_position: number | null;
+  methodologie?: string;
 };
 
 function getScoreColor(s: number) {
@@ -201,12 +211,16 @@ export function CanIRankChecker() {
                   Verdict: {result.verdict}
                 </span>
                 <p className="text-sm text-zinc-400">
-                  Selon notre analyse, tes chances de ranker sur <strong>"{result.keyword}"</strong> avec <strong>{result.domain}</strong> sont de {result.overall_score}%.
+                  Position de <strong>{result.domain}</strong> sur{" "}
+                  <strong>&quot;{result.keyword}&quot;</strong> :{" "}
+                  {result.current_position
+                    ? `actuellement #${result.current_position}`
+                    : "absent des 10 premiers resultats"}
+                  .
                 </p>
-                <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-zinc-300 mt-2">
-                  <Clock className="h-4 w-4 text-emerald-400" />
-                  <span>Temps estime: {result.estimated_time_to_rank}</span>
-                </div>
+                {/* Plus de "temps estime" : il n'avait aucune base. Un delai
+                    de positionnement dependrait de donnees de liens dont on ne
+                    dispose pas. */}
               </div>
             </CardContent>
           </Card>
@@ -230,9 +244,19 @@ export function CanIRankChecker() {
                           style={{ width: `${Math.min(100, factor.score)}%` }}
                         />
                       </div>
+                      {factor.evidence && (
+                        <p className="text-[11px] leading-relaxed text-zinc-500">
+                          {factor.evidence}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
+                {result.methodologie && (
+                  <p className="mt-5 border-t border-white/5 pt-4 text-[11px] leading-relaxed text-zinc-500">
+                    {result.methodologie}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -262,14 +286,14 @@ export function CanIRankChecker() {
           <Card className="border-white/10 bg-white/[0.02]">
             <CardContent className="p-5">
               <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-200 mb-4">
-                Top Concurrents Actuels
+                Qui occupe la page aujourd&apos;hui
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {(result.top_competitors || []).map((comp, i) => (
                   <div key={i} className="flex items-center justify-between p-3 rounded border border-white/5 bg-zinc-900/50">
                     <span className="text-sm text-zinc-300 truncate mr-2">{comp.domain}</span>
                     <span className="text-xs font-mono px-2 py-0.5 bg-zinc-800 rounded text-emerald-400">
-                      DA {comp.authority}
+                      #{comp.position}
                     </span>
                   </div>
                 ))}
