@@ -195,3 +195,56 @@ class EntreesTests(BaseCirTests):
     def test_le_mot_cle_est_normalise_et_borne(self):
         d = self.appeler(keyword='  plombier    jonquiere  ').data
         self.assertEqual(d['keyword'], 'plombier jonquiere')
+
+
+class AccentsTests(BaseCirTests):
+    """Le mot-cle tape sans accents doit matcher une page qui en porte.
+
+    Constate en prod le 2026-08-27 : tokamdarius.ca etait classe #1 sur
+    "developpeur web jonquiere" et l'outil affichait "Pertinence 0/100, le
+    mot-cle n'apparait ni dans le titre, ni dans le H1..." alors que le titre
+    etait "Tokam Darius | Developpeur Web a Jonquiere" (avec accents). Deux
+    affirmations contradictoires cote a cote, dont une fausse, montrees au
+    proprietaire du site.
+    """
+
+    ACCENTUE = {
+        'title': 'Tokam Darius | Developpeur Web a Jonquiere'.replace('e', 'e'),
+        'h1': 'Developpeur web au Quebec', 'meta_description': '',
+        'h2_list': [], 'body_snippet': '', '_html': '<html></html>',
+    }
+
+    def test_un_titre_accentue_matche_un_mot_cle_sans_accents(self):
+        crawl = dict(self.ACCENTUE)
+        crawl['title'] = 'Tokam Darius | D\u00e9veloppeur Web \u00e0 Jonqui\u00e8re'
+        d = self.appeler(crawl=crawl, keyword='developpeur web jonquiere').data
+        pert = [f for f in d['factors'] if f['name'] == 'Pertinence du contenu'][0]
+        self.assertGreater(pert['score'], 0)
+        self.assertIn('le titre', pert['evidence'])
+
+    def test_un_mot_cle_accentue_matche_une_page_sans_accents(self):
+        crawl = dict(self.ACCENTUE)
+        crawl['title'] = 'Developpeur Web a Jonquiere'
+        d = self.appeler(crawl=crawl,
+                         keyword='d\u00e9veloppeur web jonqui\u00e8re').data
+        pert = [f for f in d['factors'] if f['name'] == 'Pertinence du contenu'][0]
+        self.assertGreater(pert['score'], 0)
+
+    def test_un_site_classe_premier_n_est_pas_declare_hors_sujet(self):
+        """Le scenario exact vu en prod, de bout en bout."""
+        crawl = dict(self.ACCENTUE)
+        crawl['title'] = 'Tokam Darius | D\u00e9veloppeur Web \u00e0 Jonqui\u00e8re'
+        d = self.appeler(occupants=(('moi.ca', 1),), crawl=crawl,
+                         keyword='developpeur web jonquiere').data
+        self.assertEqual(d['current_position'], 1)
+        pert = [f for f in d['factors'] if f['name'] == 'Pertinence du contenu'][0]
+        self.assertGreater(pert['score'], 0, "classe #1 mais declare hors sujet")
+
+    def test_un_mot_cle_reellement_absent_reste_a_zero(self):
+        """La normalisation ne doit pas rendre tout le monde pertinent."""
+        crawl = dict(self.ACCENTUE)
+        crawl['title'] = 'Boulangerie artisanale'
+        crawl['h1'] = 'Nos pains'
+        d = self.appeler(crawl=crawl, keyword='developpeur web jonquiere').data
+        pert = [f for f in d['factors'] if f['name'] == 'Pertinence du contenu'][0]
+        self.assertEqual(pert['score'], 0)

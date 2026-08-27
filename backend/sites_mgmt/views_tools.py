@@ -1055,6 +1055,27 @@ Regles :
 """
 
 
+def _sans_accents(texte: str) -> str:
+    """Minuscules sans accents, pour comparer un mot-cle a du contenu.
+
+    Sans ca, "developpeur web jonquiere" ne matchait pas un titre affichant
+    "Developpeur Web a Jonquiere" avec ses accents. Constate en prod le
+    2026-08-27 sur tokamdarius.ca : le site etait classe #1 sur la recherche,
+    et l'outil affichait "Pertinence du contenu 0/100, le mot-cle n'apparait
+    ni dans le titre, ni dans le H1..." alors que le titre etait exactement
+    "Tokam Darius | Developpeur Web a Jonquiere". Deux affirmations
+    contradictoires cote a cote, dont une fausse, montrees au proprietaire du
+    site.
+
+    On normalise les DEUX cotes : l'utilisateur tape rarement les accents,
+    et la page les porte presque toujours.
+    """
+    import unicodedata
+
+    decompose = unicodedata.normalize('NFD', str(texte or '').lower())
+    return ''.join(c for c in decompose if not unicodedata.combining(c))
+
+
 def _analyser_positionnement(domaine: str, mot_cle: str) -> dict | None:
     """Faits mesures sur la capacite d'un site a se classer sur un mot-cle.
 
@@ -1081,12 +1102,12 @@ def _analyser_positionnement(domaine: str, mot_cle: str) -> dict | None:
 
     # Ou le mot-cle apparait-il reellement sur la page d'accueil ? C'est le
     # signal de pertinence le plus direct, et il se lit sans rien deviner.
-    mots = [m for m in re.split(r'\W+', mot_cle.lower()) if len(m) > 2]
+    mots = [m for m in re.split(r'\W+', _sans_accents(mot_cle)) if len(m) > 2]
     champs = {
-        'le titre': (crawl.get('title') or '').lower(),
-        'le H1': (crawl.get('h1') or '').lower(),
-        'la meta description': (crawl.get('meta_description') or '').lower(),
-        'le contenu': (crawl.get('body_snippet') or '').lower(),
+        'le titre': _sans_accents(crawl.get('title')),
+        'le H1': _sans_accents(crawl.get('h1')),
+        'la meta description': _sans_accents(crawl.get('meta_description')),
+        'le contenu': _sans_accents(crawl.get('body_snippet')),
     }
     presence = [nom for nom, texte in champs.items()
                 if mots and all(m in texte for m in mots)]
