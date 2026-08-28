@@ -883,7 +883,8 @@ class PublicCompetitorGapView(APIView):
 
     def post(self, request):
         from .compare_mesures import (
-            collecter_serps, decouvrir_concurrents, trouver_ecarts,
+            collecter_serps, decouvrir_concurrents,
+            filtrer_intention_commerciale, trouver_ecarts,
         )
 
         domain = _normalize_domain(request.data.get('domain', ''))
@@ -928,6 +929,23 @@ class PublicCompetitorGapView(APIView):
             cache.set(cache_key, payload, timeout=300)
             return Response(payload)
 
+        # Etape 2bis : ecarter les requetes dont le SERP ne sert pas un
+        # acheteur. "developpeur django python quebec" est ambigu a la
+        # lecture, mais sa page de resultats est pleine d'offres d'emploi :
+        # c'est Google qui tranche l'intention, et son verdict est
+        # autoritaire puisque c'est ce que les gens obtiennent.
+        serps, requetes_ecartees = filtrer_intention_commerciale(serps)
+        if not serps:
+            payload = self._payload_vide(
+                domain, analyse, requetes,
+                "Les recherches testees ne servent pas des acheteurs "
+                "(offres d'emploi, definitions, documentation). Nomme un "
+                "concurrent pour cibler l'analyse.",
+            )
+            payload['queries_dropped'] = requetes_ecartees
+            cache.set(cache_key, payload, timeout=3600)
+            return Response(payload)
+
         # Etape 3 : les concurrents sortent des memes SERP, par frequence.
         competitors = provided[:3] or decouvrir_concurrents(serps, domain, maximum=3)
         if not competitors:
@@ -966,6 +984,9 @@ class PublicCompetitorGapView(APIView):
             'competitors_source': 'fournis' if provided else 'deduits',
             'queries_tested': [s['requete'] for s in serps],
             'queries_checked': len(serps),
+            # Les requetes ecartees sont NOMMEES : un compte qui baisse sans
+            # explication se lirait comme une mesure incomplete.
+            'queries_dropped': requetes_ecartees,
             'domain_ranks_for': positions_domaine,
             'total_gaps': len(gaps),
             # Une estimation de volume demanderait une API de volume de

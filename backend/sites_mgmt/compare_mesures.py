@@ -40,6 +40,7 @@ Deux principes d'equite
    surtout comparaison faite sur un texte identique plutot que sur deux
    generations differentes.
 """
+import json
 import logging
 import os
 import re
@@ -788,3 +789,112 @@ def trouver_ecarts(serps: list[dict], domaine: str, concurrents: list[str]
             'title': rival['titre'],
         })
     return ecarts
+
+
+# ---------------------------------------------------------------------------
+# Intention d'une requete, jugee sur sa page de resultats
+# ---------------------------------------------------------------------------
+_SYSTEME_INTENTION = (
+    "Tu juges l'intention derriere une recherche Google, a partir des titres "
+    "reellement renvoyes. Tu rends uniquement du JSON brut."
+)
+
+_GABARIT_INTENTION = """\
+Pour chaque recherche ci-dessous, voici les premiers titres que Google renvoie
+vraiment.
+
+{tableau}
+
+Une recherche est COMMERCIALE si la page de resultats sert quelqu'un qui veut
+ACHETER un produit, ENGAGER un prestataire ou CHOISIR un fournisseur.
+
+Elle ne l'est PAS si les resultats servent quelqu'un qui cherche un EMPLOI, une
+DEFINITION, un TUTORIEL, une documentation technique, ou un site precis qu'il
+connait deja.
+
+Rends la liste des recherches commerciales, exactement telles qu'ecrites,
+dans cette forme : {{"commerciales": ["recherche un", "recherche deux"]}}
+
+Juge sur les TITRES, pas sur la formulation de la recherche : c'est la page de
+resultats qui revele ce que Google a compris de l'intention.
+"""
+
+
+def filtrer_intention_commerciale(serps: list[dict], timeout: int = 20
+                                  ) -> tuple[list[dict], list[str]]:
+    """Ne garde que les requetes dont le SERP sert un acheteur.
+
+    Rend (serps_gardes, requetes_ecartees).
+
+    Pourquoi juger sur le SERP et pas sur la requete
+    ------------------------------------------------
+    "developpeur django python quebec" est REELLEMENT ambigu : un client qui
+    veut engager pourrait taper exactement ca. Le gabarit de generation
+    demande deja "ce qu'un CLIENT taperait" et produit quand meme ces
+    requetes, parce que la formulation seule ne tranche pas.
+
+    Ce qui tranche, c'est ce que Google renvoie. Verifie en prod le
+    2026-08-27 sur tokamdarius.ca : les deux seuls ecarts remontes etaient
+    "developpeur django python quebec" et "developpeur frontend backend
+    saguenay", tous deux occupes par des sites d'emploi. Google a decide que
+    ces recherches servent des chercheurs d'emploi, et c'est autoritaire :
+    c'est ce que les gens obtiennent reellement.
+
+    Pourquoi un modele et pas une liste
+    -----------------------------------
+    Reconnaitre "cette page est pleine d'offres d'emploi" par une liste de
+    sites d'emploi ne marche que pour les sites deja connus, et rate tous les
+    autres. Une liste de mots ("emploi", "poste", "carriere") rate les autres
+    langues et les autres formulations. Le modele lit les titres et comprend,
+    ce qui couvre aussi l'intention informationnelle ou navigationnelle sans
+    rien enumerer. Voir la regle "pas de liste noire".
+
+    En cas d'echec du modele, TOUT est garde : perdre des requetes sur une
+    panne serait pire que le defaut qu'on corrige.
+    """
+    from .llm import call_deepseek
+
+    if not serps:
+        return serps, []
+
+    lignes = []
+    for s in serps:
+        titres = [r['titre'] for r in (s.get('resultats') or [])[:5] if r.get('titre')]
+        if titres:
+            lignes.append(f"- \"{s['requete']}\" : " + ' | '.join(t[:70] for t in titres))
+    if not lignes:
+        return serps, []
+
+    try:
+        brut = call_deepseek(
+            _GABARIT_INTENTION.format(tableau='\n'.join(lignes)),
+            max_tokens=600, system=_SYSTEME_INTENTION, timeout=timeout,
+        )
+    except Exception:
+        logger.exception('jugement d intention indisponible')
+        return serps, []
+    if not brut:
+        return serps, []
+
+    bloc = re.search(r'\{.*\}', brut, re.DOTALL)
+    if not bloc:
+        return serps, []
+    try:
+        data = json.loads(bloc.group(0))
+        gardees = data['commerciales']
+    except Exception:
+        return serps, []
+    if not isinstance(gardees, list) or not gardees:
+        # Un modele qui rejette TOUT est plus probablement en train de se
+        # tromper que d'avoir raison : on ne vide pas l'analyse sur son avis.
+        return serps, []
+
+    # Le modele ne peut que RETIRER des requetes, jamais en inventer.
+    connues = {s['requete'] for s in serps}
+    gardees = {g for g in gardees if isinstance(g, str) and g in connues}
+    if not gardees:
+        return serps, []
+
+    retenus = [s for s in serps if s['requete'] in gardees]
+    ecartees = sorted(connues - gardees)
+    return retenus, ecartees

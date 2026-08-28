@@ -34,13 +34,15 @@ reel est en amont (l'intention de la requete), voir la docstring de
 
 Run: python manage.py test sites_mgmt.tests_competitor_gap
 """
+import json
 from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
 from django.test import SimpleTestCase, TestCase
 
 from .compare_mesures import (
-    collecter_serps, decouvrir_concurrents, trouver_ecarts,
+    collecter_serps, decouvrir_concurrents, filtrer_intention_commerciale,
+    trouver_ecarts,
 )
 
 
@@ -189,7 +191,12 @@ class GapViewTests(TestCase):
                 'queries': ['q1', 'q2', 'q3', 'q4'], 'queries_source': 'jina',
             }):
                 with patch('sites_mgmt.compare_mesures.collecter_serps',
-                           return_value=serps):
+                           return_value=serps),                      patch('sites_mgmt.llm.call_deepseek', return_value=''):
+                    # Le filtre d'intention appelle DeepSeek. Sans ce mock, la
+                    # suite ferait un vrai appel reseau : non deterministe, et
+                    # un test ne doit jamais dependre d'un service tiers.
+                    # Une reponse vide fait garder toutes les requetes, ce qui
+                    # est le comportement teste ici.
                     return self.client.post(
                         '/api/public/competitor-gap/',
                         data=corps or {'domain': 'moi.ca'},
@@ -249,3 +256,93 @@ class GapViewTests(TestCase):
         corps = self._appeler(serps).json()
         self.assertEqual(corps['queries_checked'], 2)
         self.assertEqual(corps['queries_tested'], ['q1', 'q2'])
+
+
+# ---------------------------------------------------------------------------
+class IntentionTests(SimpleTestCase):
+    """L'intention se juge sur le SERP, pas sur la formulation.
+
+    Constate en prod le 2026-08-27 sur tokamdarius.ca : les deux seuls ecarts
+    remontes etaient "developpeur django python quebec" et "developpeur
+    frontend backend saguenay", tous deux occupes par des sites d'emploi.
+
+    Le gabarit de generation demande DEJA "ce qu'un CLIENT taperait", et ces
+    requetes sont sorties quand meme : la formulation seule est reellement
+    ambigue, un client qui veut engager pourrait taper exactement ca. Ce qui
+    tranche, c'est ce que Google renvoie.
+    """
+
+    def _serps(self):
+        return [
+            serp('developpeur web montreal', [('agence.ca', 1)]),
+            serp('developpeur django python quebec', [('emplois.indeed.com', 1)]),
+        ]
+
+    def test_une_requete_a_intention_d_emploi_est_ecartee(self):
+        reponse = json.dumps({'commerciales': ['developpeur web montreal']})
+        with patch('sites_mgmt.llm.call_deepseek', return_value=reponse):
+            gardes, ecartees = filtrer_intention_commerciale(self._serps())
+        self.assertEqual([s['requete'] for s in gardes], ['developpeur web montreal'])
+        self.assertEqual(ecartees, ['developpeur django python quebec'])
+
+    def test_le_modele_ne_peut_pas_inventer_une_requete(self):
+        reponse = json.dumps({'commerciales': ['une requete jamais testee']})
+        with patch('sites_mgmt.llm.call_deepseek', return_value=reponse):
+            gardes, ecartees = filtrer_intention_commerciale(self._serps())
+        self.assertEqual(len(gardes), 2)   # rien de valide, on garde tout
+        self.assertEqual(ecartees, [])
+
+    def test_un_modele_muet_garde_toutes_les_requetes(self):
+        """Perdre des requetes sur une panne serait pire que le defaut."""
+        for mauvaise in ('', 'pas du json', '{"commerciales": []}', '{}'):
+            with patch('sites_mgmt.llm.call_deepseek', return_value=mauvaise):
+                gardes, ecartees = filtrer_intention_commerciale(self._serps())
+            self.assertEqual(len(gardes), 2, mauvaise)
+            self.assertEqual(ecartees, [])
+
+    def test_une_panne_du_modele_ne_remonte_pas(self):
+        with patch('sites_mgmt.llm.call_deepseek', side_effect=RuntimeError('boom')):
+            gardes, ecartees = filtrer_intention_commerciale(self._serps())
+        self.assertEqual(len(gardes), 2)
+
+    def test_les_titres_reels_sont_donnes_au_modele(self):
+        """Le jugement porte sur ce que Google renvoie, pas sur la requete."""
+        with patch('sites_mgmt.llm.call_deepseek', return_value='{}') as appel:
+            filtrer_intention_commerciale(self._serps())
+        prompt = appel.call_args.args[0]
+        self.assertIn('emplois.indeed.com page', prompt)   # le titre du resultat
+        self.assertIn('TITRES', prompt)
+
+    def test_une_liste_vide_de_serps_ne_plante_pas(self):
+        self.assertEqual(filtrer_intention_commerciale([]), ([], []))
+
+
+class GapAvecIntentionTests(TestCase):
+    """La vue, filtre d'intention compris."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_les_requetes_ecartees_sont_nommees_dans_la_reponse(self):
+        """Un compte de requetes qui baisse sans explication se lirait comme
+        une mesure incomplete."""
+        import os
+        serps = [
+            serp('plombier montreal', [('rival.ca', 1)]),
+            serp('emploi plombier', [('indeed.com', 1)]),
+        ]
+        with patch.dict(os.environ, {'SERPER_API_KEY': 'k'}), \
+             patch('sites_mgmt.views_tools._analyser_page', return_value={
+                 'brand': 'Moi', 'sector': 'plumbing', 'sector_source': 'jina',
+                 'queries': ['plombier montreal', 'emploi plombier'],
+                 'queries_source': 'jina'}), \
+             patch('sites_mgmt.compare_mesures.collecter_serps', return_value=serps), \
+             patch('sites_mgmt.llm.call_deepseek',
+                   return_value=json.dumps({'commerciales': ['plombier montreal']})):
+            r = self.client.post('/api/public/competitor-gap/',
+                                 data={'domain': 'moi.ca'},
+                                 content_type='application/json')
+        corps = r.json()
+        self.assertEqual(corps['queries_dropped'], ['emploi plombier'])
+        self.assertEqual(corps['queries_checked'], 1)
+        self.assertNotIn('indeed.com', str(corps['competitors_detected']))
