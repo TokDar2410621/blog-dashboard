@@ -60,6 +60,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.85,
     },
+    // Landings SEO ecrites a la main, une par groupe de requetes mesure dans
+    // Search Console et verifie absent du top 10 le 2026-08-30.
+    ...[
+      "logiciel-referencement-automatique",
+      "calendrier-editorial-seo",
+      "maillage-interne-automatique",
+      "referencement-pme-quebec",
+      "rapport-seo-automatique",
+    ].map((slug) => ({
+      url: `${SITE}/${slug}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.85,
+    })),
     { url: `${SITE}/privacy`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE}/terms`, changeFrequency: "yearly", priority: 0.3 },
   ];
