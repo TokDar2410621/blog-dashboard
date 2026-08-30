@@ -64,9 +64,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Search Console et verifie absent du top 10 le 2026-08-30.
     ...[
       "logiciel-referencement-automatique",
-      "calendrier-editorial-seo",
-      "maillage-interne-automatique",
       "referencement-pme-quebec",
+      "audit-technique-site-web",
+      "redaction-seo-quebec",
       "rapport-seo-automatique",
     ].map((slug) => ({
       url: `${SITE}/${slug}`,
