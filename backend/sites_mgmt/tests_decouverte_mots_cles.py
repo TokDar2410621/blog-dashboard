@@ -165,3 +165,77 @@ class DecouverteTests(SimpleTestCase):
         self.assertEqual(r['occasions'], [])
         self.assertIn('resultats', r['note'].lower())
         self.assertEqual(r['credits']['autocomplete'], 5)
+
+
+class PertinenceMetierTests(SimpleTestCase):
+    """Le tri metier, fait AVANT de depenser des credits de SERP.
+
+    Constate en prod le 2026-08-27 sur tokamdarius.ca : l'expansion par
+    suffixes remontait "creation site web quebec adresse postale",
+    "... telecom", "... service client". Google suggere bien ces requetes et
+    leur SERP reste commercial, donc ni l'autocompletion ni le filtre
+    d'intention ne les ecarte. Seul le contexte METIER le permet.
+    """
+
+    CANDIDATS = [
+        'creation site web quebec',
+        'creation site web quebec adresse postale',
+        'creation site web quebec telecom',
+    ]
+
+    def _trier(self, reponse):
+        from .decouverte_mots_cles import filtrer_pertinence_metier
+        with patch('sites_mgmt.llm.call_deepseek', return_value=reponse):
+            return filtrer_pertinence_metier(self.CANDIDATS, 'Developpeur web au Quebec')
+
+    def test_le_bruit_d_expansion_est_ecarte(self):
+        import json
+        gardes, ecartes = self._trier(json.dumps(
+            {'pertinentes': ['creation site web quebec']}))
+        self.assertEqual(gardes, ['creation site web quebec'])
+        self.assertEqual(len(ecartes), 2)
+        self.assertIn('creation site web quebec telecom', ecartes)
+
+    def test_le_modele_ne_peut_pas_inventer_un_mot_cle(self):
+        import json
+        gardes, ecartes = self._trier(json.dumps(
+            {'pertinentes': ['un mot cle jamais suggere']}))
+        self.assertEqual(gardes, self.CANDIDATS)   # rien de valide, on garde tout
+        self.assertEqual(ecartes, [])
+
+    def test_un_modele_muet_garde_tout(self):
+        """Perdre le pipeline sur une panne serait pire que le bruit."""
+        for mauvaise in ('', 'pas du json', '{"pertinentes": []}', '{}'):
+            gardes, ecartes = self._trier(mauvaise)
+            self.assertEqual(gardes, self.CANDIDATS, mauvaise)
+            self.assertEqual(ecartes, [])
+
+    def test_une_panne_du_modele_ne_remonte_pas(self):
+        from .decouverte_mots_cles import filtrer_pertinence_metier
+        with patch('sites_mgmt.llm.call_deepseek', side_effect=RuntimeError('boom')):
+            gardes, _ = filtrer_pertinence_metier(self.CANDIDATS, 'contexte')
+        self.assertEqual(gardes, self.CANDIDATS)
+
+    def test_sans_contexte_metier_aucun_tri_n_est_tente(self):
+        from .decouverte_mots_cles import filtrer_pertinence_metier
+        with patch('sites_mgmt.llm.call_deepseek') as appel:
+            gardes, _ = filtrer_pertinence_metier(self.CANDIDATS, '')
+        appel.assert_not_called()
+        self.assertEqual(gardes, self.CANDIDATS)
+
+    def test_le_tri_a_lieu_avant_la_verification_serp(self):
+        """C'est ce qui economise les credits : filtrer 200 candidats a 40
+        evite 160 appels SERP."""
+        with patch('sites_mgmt.decouverte_mots_cles.elargir_par_autocomplete',
+                   return_value=(self.CANDIDATS, 20)), \
+             patch('sites_mgmt.decouverte_mots_cles.filtrer_pertinence_metier',
+                   return_value=(['creation site web quebec'], self.CANDIDATS[1:])) as tri, \
+             patch('sites_mgmt.compare_mesures.collecter_serps',
+                   return_value=[serp('creation site web quebec', [('rival.ca', 1)])]) as serper, \
+             patch('sites_mgmt.compare_mesures.filtrer_intention_commerciale',
+                   side_effect=lambda s: (s, [])):
+            r = decouvrir_mots_cles_absents('moi.ca', ['seo'], contexte='Dev web')
+        tri.assert_called_once()
+        self.assertEqual(serper.call_args.args[0], ['creation site web quebec'])
+        self.assertEqual(r['credits']['serp'], 1)      # pas 3
+        self.assertEqual(len(r['ecartees_hors_sujet']), 2)

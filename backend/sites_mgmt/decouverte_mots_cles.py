@@ -96,7 +96,96 @@ def elargir_par_autocomplete(semences: list[str], langue: str = 'fr',
     return sortie, len(requetes)
 
 
+_SYSTEME_PERTINENCE = (
+    "Tu tries des suggestions de recherche Google. Tu gardes celles qu'un "
+    "client potentiel taperait pour trouver l'entreprise decrite. Tu rends "
+    "uniquement du JSON brut."
+)
+
+_GABARIT_PERTINENCE = """Entreprise : {contexte}
+
+Voici des suggestions de recherche que Google propose. Garde UNIQUEMENT celles
+qu'un client potentiel taperait pour trouver ou choisir cette entreprise.
+
+{liste}
+
+Ecarte :
+- les variantes ou l'autocompletion a colle un mot sans rapport avec l'offre
+  (exemples : "... adresse postale", "... service client", "... telecom",
+  "... horaire d'ouverture" quand ce n'est pas le sujet)
+- les recherches qui visent une AUTRE entreprise nommee
+- les recherches d'emploi, de definition, de tutoriel ou de formation
+- les variantes qui ne sont qu'une reformulation de la meme intention : garde
+  la plus naturelle, ecarte les doublons
+
+Rends exactement ce JSON, avec les suggestions gardees telles qu'ecrites :
+{{"pertinentes": ["suggestion une", "suggestion deux"]}}
+"""
+
+
+def filtrer_pertinence_metier(candidats: list[str], contexte: str,
+                              timeout: int = 25) -> tuple[list[str], list[str]]:
+    """Ecarte le bruit d'expansion AVANT de depenser des credits de SERP.
+
+    Rend (gardes, ecartes).
+
+    L'expansion par suffixes fait remonter des completions reelles mais hors
+    sujet. Constate en prod le 2026-08-27 sur tokamdarius.ca : sur 37
+    occasions rendues, une bonne part etait
+    "creation site web quebec adresse postale",
+    "creation site web quebec telecom",
+    "creation site web quebec service client". Google suggere bien ces
+    requetes et leur SERP reste commercial, donc ni l'autocompletion ni le
+    filtre d'intention ne les ecarte. Seul le CONTEXTE METIER le permet.
+
+    Ce tri se fait avant la verification SERP : filtrer 200 candidats a 40
+    economise 160 credits, en plus de nettoyer le resultat.
+
+    Le modele ne peut que RETIRER, jamais ajouter (intersection avec les
+    candidats connus). S'il est muet, en panne, illisible, ou s'il rejette
+    tout, TOUT est garde : perdre le pipeline sur une panne serait pire que
+    le bruit qu'on retire.
+    """
+    import json as _json
+    import re as _re
+
+    from .llm import call_deepseek
+
+    if not candidats or not contexte:
+        return candidats, []
+
+    liste = '\n'.join(f'- {c}' for c in candidats)
+    try:
+        brut = call_deepseek(
+            _GABARIT_PERTINENCE.format(contexte=contexte[:400], liste=liste),
+            max_tokens=1500, system=_SYSTEME_PERTINENCE, timeout=timeout,
+        )
+    except Exception:
+        logger.exception('tri de pertinence metier indisponible')
+        return candidats, []
+    if not brut:
+        return candidats, []
+
+    bloc = _re.search(r'\{.*\}', brut, _re.DOTALL)
+    if not bloc:
+        return candidats, []
+    try:
+        gardes = _json.loads(bloc.group(0))['pertinentes']
+    except Exception:
+        return candidats, []
+    if not isinstance(gardes, list) or not gardes:
+        return candidats, []
+
+    connus = set(candidats)
+    gardes = [g for g in gardes if isinstance(g, str) and g in connus]
+    if not gardes:
+        return candidats, []
+    ecartes = [c for c in candidats if c not in set(gardes)]
+    return gardes, ecartes
+
+
 def decouvrir_mots_cles_absents(domaine: str, semences: list[str],
+                                contexte: str = '',
                                 max_verifications: int = 60,
                                 langue: str = 'fr', pays: str = 'ca') -> dict:
     """Mots-cles ou `domaine` n'apparait pas encore, avec leurs preuves.
@@ -125,6 +214,12 @@ def decouvrir_mots_cles_absents(domaine: str, semences: list[str],
             'note': "L'autocompletion n'a rien rendu (cle Serper absente ou "
                     "semences vides).",
         }
+
+    # Tri metier AVANT la verification : l'expansion par suffixes fait
+    # remonter des completions reelles mais hors sujet, et chaque SERP coute
+    # un credit. Filtrer ici nettoie le resultat ET reduit la depense.
+    from .decouverte_mots_cles import filtrer_pertinence_metier
+    candidats, hors_sujet = filtrer_pertinence_metier(candidats, contexte)
 
     a_verifier = candidats[:max_verifications]
     serps = collecter_serps(a_verifier)
@@ -176,6 +271,7 @@ def decouvrir_mots_cles_absents(domaine: str, semences: list[str],
         'occasions': occasions,
         'deja_present': deja_present,
         'ecartees_intention': ecartees,
+        'ecartees_hors_sujet': hors_sujet,
         'concurrents_identifies': sorted(concurrents),
         'credits': {
             'autocomplete': credits_autocomplete,
