@@ -2,13 +2,16 @@
 /**
  * Gridar MCP server - HTTP transport (Streamable HTTP).
  *
- * Same 43 tools as the stdio entry, but hosted as an HTTP service so MCP
+ * Same tools as the stdio entry, but hosted as an HTTP service so MCP
  * clients (Claude Desktop, Claude Code, Cursor, Codex) can connect via URL
  * instead of installing the npm package locally.
  *
  *   - POST /mcp           : MCP Streamable HTTP transport (initialize +
  *                           tool calls). Optional GET/DELETE for SSE.
  *   - GET  /health        : healthcheck for Railway.
+ *   - GET  /.well-known/mcp/server-card.json
+ *                         : metadonnees publiques pour les annuaires MCP,
+ *                           lisibles sans jeton.
  *
  * Auth: every request must carry `Authorization: Bearer btb_xxx` (the
  * user's Gridar API token). The token is propagated to api.ts via
@@ -29,10 +32,17 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import express, { type Request, type Response } from "express";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import {
+  isInitializeRequest,
+  LATEST_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "@modelcontextprotocol/sdk/types.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpServer } from "./index.js";
+import { createMcpServer, tools } from "./index.js";
 import { withRequestToken } from "./api.js";
+
+/** Une seule source pour la version annoncee (/health et la server card). */
+const SERVER_VERSION = "0.7.0";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const REQUIRE_AUTH = process.env.MCP_REQUIRE_AUTH !== "false";
@@ -95,7 +105,7 @@ app.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     name: "gridar-mcp",
-    version: "0.7.0",
+    version: SERVER_VERSION,
     transport: "streamable-http",
     oauth: true,
   });
@@ -229,6 +239,38 @@ app.get("/.well-known/oauth-protected-resource", (_req, res) => {
     authorization_servers: [PUBLIC_BASE],
     scopes_supported: ["mcp:full"],
     bearer_methods_supported: ["header"],
+  });
+});
+
+// 5.2b - Server card (SEP-2127 draft).
+//
+// Pourquoi: POST /mcp repond 401 sans jeton, donc les scanners d'annuaires
+// (Smithery et compagnie) ne peuvent pas lire tools/list pour nous indexer.
+// Cette carte publie la meme information sans exposer de donnees client.
+//
+// La liste d'outils est derivee du registre reel et les versions de protocole
+// viennent du SDK: rien a re-synchroniser a la main quand un outil bouge.
+app.get("/.well-known/mcp/server-card.json", (_req, res) => {
+  res.json({
+    $schema:
+      "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+    version: "1.0",
+    protocolVersion: LATEST_PROTOCOL_VERSION,
+    supportedProtocolVersions: SUPPORTED_PROTOCOL_VERSIONS,
+    serverInfo: {
+      name: "gridar-mcp",
+      title: "Gridar",
+      version: SERVER_VERSION,
+    },
+    description:
+      "SEO toolkit for Quebec sites: audits, Google.ca rankings, keywords, AI-search visibility.",
+    iconUrl: "https://www.gridar.app/brand/gridar-mark-512.png",
+    documentationUrl: "https://www.gridar.app/mcp",
+    websiteUrl: "https://www.gridar.app",
+    transport: { type: "streamable-http", endpoint: "/mcp" },
+    capabilities: { tools: {} },
+    authentication: { required: true, schemes: ["bearer", "oauth2"] },
+    tools: tools.map((t) => ({ name: t.name, description: t.description })),
   });
 });
 
