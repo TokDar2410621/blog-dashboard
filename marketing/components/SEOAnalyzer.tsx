@@ -51,6 +51,22 @@ interface KeywordResult {
   family_primary?: boolean;
 }
 
+// Etat de chaque fournisseur pour cet appel. Une liste courte ne se lit pas
+// sans lui : Google ne sert pas toujours de bloc "recherches associees", et ce
+// silence ne se distingue pas d'une panne sans cette information.
+interface KeywordSourceState {
+  statut:
+    | "ok"
+    | "aucun_resultat"
+    | "echec"
+    | "non_configure"
+    | "delai_depasse";
+  message: string;
+  related_searches?: number;
+  people_also_ask?: number;
+  long_tail?: number;
+}
+
 interface SEOAnalyzerProps {
   title: string;
   excerpt: string;
@@ -343,6 +359,10 @@ export function SEOAnalyzer({
   const [kwSeed, setKwSeed] = useState("");
   const [kwLoading, setKwLoading] = useState(false);
   const [kwResults, setKwResults] = useState<KeywordResult[] | null>(null);
+  const [kwSources, setKwSources] = useState<Record<
+    string,
+    KeywordSourceState
+  > | null>(null);
 
   const [psiUrl, setPsiUrl] = useState<string>(articleUrl ?? "");
   const [psiLoading, setPsiLoading] = useState<null | "mobile" | "desktop">(null);
@@ -1067,7 +1087,9 @@ export function SEOAnalyzer({
       if (!res.ok) throw new Error("Keyword research failed");
       const data = await res.json();
       setKwResults(data.keywords || []);
+      setKwSources(data.sources || null);
     } catch {
+      setKwSources(null);
       toast.error(
         lang === "fr"
           ? "Erreur recherche de mots-cles"
@@ -2150,11 +2172,34 @@ export function SEOAnalyzer({
 
           {kwResults && kwResults.length === 0 && (
             <p className="text-xs text-muted-foreground">
+              {/* "Aucun mot-cle trouve" affirmait une mesure. Quand les deux
+                  fournisseurs se sont tus, la verite est qu'on ne sait pas :
+                  le detail par source est affiche juste en dessous. */}
               {lang === "fr"
-                ? "Aucun mot-cle trouve."
-                : "No keywords found."}
+                ? "Aucun mot-cle rendu pour cette requete."
+                : "No keywords returned for this query."}
             </p>
           )}
+
+          {/* Etat des sources. Affiche seulement ce qui n'a pas repondu
+              normalement : quand tout va bien, la liste parle d'elle-meme et
+              une ligne verte de plus ne ferait qu'ajouter du bruit. */}
+          {kwSources &&
+            Object.entries(kwSources)
+              .filter(([, etat]) => etat.statut !== "ok")
+              .map(([nom, etat]) => (
+                <p
+                  key={nom}
+                  className={`text-xs ${
+                    etat.statut === "echec"
+                      ? "text-amber-500"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  <span className="font-medium capitalize">{nom}</span>{" "}
+                  {etat.message}
+                </p>
+              ))}
 
           {kwResults && kwResults.length > 0 && (
             <div className="space-y-3 pt-1">

@@ -2476,6 +2476,26 @@ class KeywordResearchView(APIView):
         else:
             hl, gl = 'fr', 'ca'
 
+        # Etat de chaque fournisseur, rendu avec les mots-cles. Sans lui, une
+        # liste courte ne se lit pas : le 2026-09-01, le meme seed a rendu 22
+        # mots-cles le matin et 10 l'apres-midi, parce que Google n'a pas
+        # servi de bloc relatedSearches sur le second appel. Serper repondait
+        # pourtant 200 avec des resultats organiques. Rien dans la reponse ne
+        # permettait de distinguer "cette source n'avait rien de plus" de
+        # "cette source est tombee", et les deux appellent des decisions
+        # opposees. Un fournisseur muet ne prouve pas l'absence de mots-cles.
+        etat_serper = {
+            'statut': 'non_configure',
+            'related_searches': 0,
+            'people_also_ask': 0,
+            'message': "Cle Serper absente : le SERP n'a pas ete interroge.",
+        }
+        etat_gemini = {
+            'statut': 'non_configure',
+            'long_tail': 0,
+            'message': "Cle Gemini absente : aucune variante generee.",
+        }
+
         # 1) Serper : relatedSearches + peopleAlsoAsk
         if serper_key:
             try:
@@ -2491,21 +2511,84 @@ class KeywordResearchView(APIView):
                 )
                 if resp.status_code == 200:
                     data = resp.json() or {}
+                    n_rel = n_paa = 0
                     for item in data.get('relatedSearches') or []:
                         q = (item or {}).get('query')
                         if q:
                             collected.append((q, 'serper_related'))
+                            n_rel += 1
                     for item in data.get('peopleAlsoAsk') or []:
                         q = (item or {}).get('question')
                         if q:
                             collected.append((q, 'serper_paa'))
+                            n_paa += 1
+                    etat_serper = {
+                        'statut': 'ok' if (n_rel or n_paa) else 'aucun_resultat',
+                        'related_searches': n_rel,
+                        'people_also_ask': n_paa,
+                        'message': '' if (n_rel or n_paa) else (
+                            'Google a repondu sans bloc "recherches associees" '
+                            'ni "les gens demandent aussi" pour cette requete. '
+                            'Ces blocs ne sont pas garantis et varient d\'un '
+                            'appel a l\'autre : leur absence ne dit pas qu\'il '
+                            'n\'existe pas de requetes voisines.'
+                        ),
+                    }
+                else:
+                    etat_serper = {
+                        'statut': 'echec',
+                        'related_searches': 0,
+                        'people_also_ask': 0,
+                        'message': (
+                            f'Serper a repondu {resp.status_code}. Les '
+                            'recherches associees et les questions manquent '
+                            'a cette liste.'
+                        ),
+                    }
+                    logger.warning(
+                        'Serper keyword research HTTP %s', resp.status_code
+                    )
             except http_requests.Timeout:
+                etat_serper = {
+                    'statut': 'echec',
+                    'related_searches': 0,
+                    'people_also_ask': 0,
+                    'message': (
+                        'Delai depasse en interrogeant Serper. Les recherches '
+                        'associees et les questions manquent a cette liste.'
+                    ),
+                }
                 logger.warning('Serper keyword research timeout')
             except Exception as e:
+                etat_serper = {
+                    'statut': 'echec',
+                    'related_searches': 0,
+                    'people_also_ask': 0,
+                    # Tronque : le detail va au journal, pas dans une reponse
+                    # d'API.
+                    'message': (
+                        f'Appel Serper en echec ({type(e).__name__}). Les '
+                        'recherches associees et les questions manquent a '
+                        'cette liste.'
+                    ),
+                }
                 logger.warning('Serper keyword research failed: %s', e)
 
         # 2) Gemini : generate 10 long-tail variants
-        if gemini_key and (deadline - time.monotonic()) > 2.0:
+        if gemini_key and (deadline - time.monotonic()) <= 2.0:
+            # Le budget de 60 s est parti dans l'appel Serper. Avant, cette
+            # etape etait sautee sans laisser aucune trace : la liste
+            # arrivait amputee de ses 10 variantes sans que rien ne le dise.
+            etat_gemini = {
+                'statut': 'delai_depasse',
+                'long_tail': 0,
+                'message': (
+                    'Budget de temps epuise avant l etape de generation. Les '
+                    'variantes longue traine manquent a cette liste.'
+                ),
+            }
+            logger.warning('Gemini long-tail skipped: time budget exhausted')
+        elif gemini_key:
             try:
                 from google import genai
 
@@ -2535,10 +2618,29 @@ Respond in JSON only (no markdown, no code blocks):
                     text = text.strip()
 
                 parsed = json.loads(text)
+                n_gen = 0
                 for kw in parsed.get('keywords') or []:
                     if isinstance(kw, str) and kw.strip():
                         collected.append((kw.strip(), 'gemini_longtail'))
+                        n_gen += 1
+                etat_gemini = {
+                    'statut': 'ok' if n_gen else 'aucun_resultat',
+                    'long_tail': n_gen,
+                    'message': '' if n_gen else (
+                        'Le modele a repondu sans proposer de variante '
+                        'exploitable.'
+                    ),
+                }
             except Exception as e:
+                etat_gemini = {
+                    'statut': 'echec',
+                    'long_tail': 0,
+                    'message': (
+                        f'Generation des variantes en echec '
+                        f'({type(e).__name__}). Les variantes longue traine '
+                        'manquent a cette liste.'
+                    ),
+                }
                 logger.warning('Gemini long-tail generation failed: %s', e)
 
         # 3) Dedoublonnage en chaine exacte, inchange : il n'ecarte que des
@@ -2570,7 +2672,13 @@ Respond in JSON only (no markdown, no code blocks):
         # ecrite, ni ici ni en TODO.
         self._regrouper(keywords)
 
-        return Response({'keywords': keywords})
+        # `sources` accompagne toujours la liste, meme quand tout va bien :
+        # un champ qui n'apparait qu'en cas de probleme se lit comme une
+        # alerte, alors qu'il sert d'abord a dire ce qui a ete mesure.
+        return Response({
+            'keywords': keywords,
+            'sources': {'serper': etat_serper, 'gemini': etat_gemini},
+        })
 class PageSpeedView(APIView):
     """Fetch Core Web Vitals + category scores from Google PageSpeed Insights."""
     permission_classes = [IsAuthenticated]

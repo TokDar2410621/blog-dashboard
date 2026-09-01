@@ -16,10 +16,20 @@ sortaient comme trois lignes sans lien. Elles sont maintenant reliees par une
 famille, pas fusionnees : un mot-cle efface est invisible, un doublon reste
 sous les yeux et se juge.
 
-Tout est hors ligne : ces methodes ne font ni reseau ni base de donnees.
+Le troisieme, trouve en verifiant les deux premiers : la reponse ne disait pas
+quelles sources avaient repondu. Le meme seed a rendu 22 mots-cles le matin et
+10 l'apres-midi parce que Google n'a pas servi de bloc "recherches associees"
+sur le second appel, et rien ne permettait de distinguer ce silence d'une
+panne. La reponse porte maintenant `sources`.
+
+Tout est hors ligne : le reseau est bouchonne, ces tests ne touchent ni Serper
+ni Gemini ni la base de donnees.
 
 Run: python manage.py test sites_mgmt.tests_recherche_mots_cles
 """
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 from django.test import SimpleTestCase
 
 from .views import KeywordResearchView
@@ -233,3 +243,118 @@ class GardesDuRegroupementTests(SimpleTestCase):
         ])
 
         self.assertEqual(familles(items), 2)
+
+
+class EtatDesSourcesTests(SimpleTestCase):
+    """La reponse doit dire ce qui a ete interroge et ce qui a repondu.
+
+    Contexte du 2026-09-01 : le meme seed a rendu 22 mots-cles le matin et 10
+    l'apres-midi. Serper avait repondu 200 avec des resultats organiques mais
+    sans bloc "recherches associees". Rien dans la reponse ne distinguait
+    "cette source n'avait rien de plus" de "cette source est tombee", alors
+    que les deux appellent des decisions opposees.
+    """
+
+    URL = '/api/v1/keyword-research/'
+
+    def appeler(self, reponse_serper=None, erreur_serper=None,
+                reponse_gemini='{"keywords": ["variante une", "variante deux"]}',
+                cles=('serper', 'gemini')):
+        """Joue la vue avec les deux fournisseurs bouchonnes."""
+        from rest_framework.test import APIRequestFactory
+        from rest_framework.request import Request
+        from rest_framework.parsers import JSONParser
+
+        env = {}
+        if 'serper' in cles:
+            env['SERPER_API_KEY'] = 'test'
+        if 'gemini' in cles:
+            env['GEMINI_API_KEY'] = 'test'
+
+        def poste(*a, **kw):
+            if erreur_serper is not None:
+                raise erreur_serper
+            return reponse_serper
+
+        genai = MagicMock()
+        genai.Client.return_value.models.generate_content.return_value = SimpleNamespace(
+            text=reponse_gemini,
+        )
+
+        brut = APIRequestFactory().post(
+            self.URL,
+            {'seed_keyword': 'sablage de plancher montreal', 'language': 'fr'},
+            format='json',
+        )
+        req = Request(brut, parsers=[JSONParser()])
+        vue = KeywordResearchView()
+        vue.request = req
+        with patch.dict('os.environ', env, clear=True), \
+                patch('sites_mgmt.views.http_requests.post', side_effect=poste), \
+                patch.dict('sys.modules', {'google': MagicMock(genai=genai),
+                                           'google.genai': genai}):
+            return vue.post(req).data
+
+    def serp(self, related=(), paa=(), code=200):
+        rep = MagicMock()
+        rep.status_code = code
+        rep.json.return_value = {
+            'relatedSearches': [{'query': q} for q in related],
+            'peopleAlsoAsk': [{'question': q} for q in paa],
+        }
+        return rep
+
+    def test_tout_repond_les_deux_sources_sont_ok(self):
+        d = self.appeler(reponse_serper=self.serp(
+            related=['sablage plancher prix'], paa=['Combien coute un sablage ?'],
+        ))
+
+        self.assertEqual(d['sources']['serper']['statut'], 'ok')
+        self.assertEqual(d['sources']['serper']['related_searches'], 1)
+        self.assertEqual(d['sources']['serper']['people_also_ask'], 1)
+        self.assertEqual(d['sources']['gemini']['statut'], 'ok')
+        self.assertEqual(d['sources']['gemini']['long_tail'], 2)
+
+    def test_serper_repond_sans_bloc_ce_n_est_pas_un_echec(self):
+        """Le cas reellement rencontre : 200, mais aucun des deux blocs."""
+        d = self.appeler(reponse_serper=self.serp())
+
+        self.assertEqual(d['sources']['serper']['statut'], 'aucun_resultat')
+        self.assertIn('ne dit pas', d['sources']['serper']['message'])
+        # La liste vit quand meme grace a Gemini : c'est justement pourquoi la
+        # liste courte pouvait passer inapercue.
+        self.assertEqual(len(d['keywords']), 2)
+
+    def test_serper_en_erreur_http_est_un_echec_declare(self):
+        d = self.appeler(reponse_serper=self.serp(code=429))
+
+        self.assertEqual(d['sources']['serper']['statut'], 'echec')
+        self.assertIn('429', d['sources']['serper']['message'])
+
+    def test_une_exception_reseau_ne_fuit_pas_dans_la_reponse(self):
+        d = self.appeler(erreur_serper=ValueError('cle=SECRET123 refusee'))
+
+        self.assertEqual(d['sources']['serper']['statut'], 'echec')
+        # Le detail part au journal, jamais dans une reponse d'API.
+        self.assertNotIn('SECRET123', d['sources']['serper']['message'])
+        self.assertIn('ValueError', d['sources']['serper']['message'])
+
+    def test_une_source_non_configuree_le_dit(self):
+        d = self.appeler(reponse_serper=self.serp(), cles=('gemini',))
+
+        self.assertEqual(d['sources']['serper']['statut'], 'non_configure')
+        self.assertIn('absente', d['sources']['serper']['message'])
+
+    def test_gemini_sans_variante_exploitable(self):
+        d = self.appeler(reponse_serper=self.serp(related=['sablage plancher']),
+                         reponse_gemini='{"keywords": []}')
+
+        self.assertEqual(d['sources']['gemini']['statut'], 'aucun_resultat')
+        self.assertEqual(d['sources']['gemini']['long_tail'], 0)
+
+    def test_le_bloc_sources_est_toujours_la_meme_quand_tout_va_bien(self):
+        """Un champ qui n'apparait qu'en cas de probleme se lit comme une alerte."""
+        d = self.appeler(reponse_serper=self.serp(related=['a'], paa=['b ?']))
+
+        self.assertIn('sources', d)
+        self.assertEqual(set(d['sources']), {'serper', 'gemini'})
