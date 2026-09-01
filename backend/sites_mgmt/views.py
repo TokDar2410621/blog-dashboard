@@ -2365,6 +2365,19 @@ class KeywordResearchView(APIView):
         deadline = time.monotonic() + 60.0
         collected = []  # list of (keyword, source)
 
+        # Meme convention que les autres appels Serper de ce fichier (ex.
+        # ligne ~3153) : sans hl/gl, Serper repond dans une locale par defaut
+        # qui n'est pas le francais, quel que soit `language` demande. Avant
+        # ce correctif, seule l'etape Gemini plus bas tenait compte de
+        # `language` ; Serper rendait des relatedSearches/PAA en anglais
+        # meme pour language='fr' (verifie le 2026-09-01).
+        if language == 'en':
+            hl, gl = 'en', 'us'
+        elif language == 'es':
+            hl, gl = 'es', 'es'
+        else:
+            hl, gl = 'fr', 'ca'
+
         # 1) Serper â€” relatedSearches + peopleAlsoAsk
         if serper_key:
             try:
@@ -2375,7 +2388,7 @@ class KeywordResearchView(APIView):
                         'X-API-KEY': serper_key,
                         'Content-Type': 'application/json',
                     },
-                    json={'q': seed_keyword, 'num': 10},
+                    json={'q': seed_keyword, 'num': 10, 'hl': hl, 'gl': gl},
                     timeout=min(30.0, remaining),
                 )
                 if resp.status_code == 200:
