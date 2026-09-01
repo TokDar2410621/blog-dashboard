@@ -2183,7 +2183,7 @@ class SEOSynonymsView(APIView):
     """Generate synonyms, variants and translations for a keyword using Gemini.
 
     Used by the frontend SEO analyzer to perform semantic keyword matching
-    (e.g. 'SEO' should match 'rÃ©fÃ©rencement' in French content).
+    (e.g. 'SEO' should match 'référencement' in French content).
     """
     permission_classes = [IsAuthenticated]
 
@@ -2222,7 +2222,7 @@ Target language: {lang_label}
 Rules:
 - Return short terms (1-3 words each).
 - Include the keyword itself if it's the most natural form.
-- Include common translations between French and English so a French article using "rÃ©fÃ©rencement" matches the keyword "SEO".
+- Include common translations between French and English so a French article using "référencement" matches the keyword "SEO".
 - Do NOT include generic unrelated words.
 
 Respond in JSON format only (no markdown, no code blocks):
@@ -2305,12 +2305,12 @@ class KeywordResearchView(APIView):
     permission_classes = [IsAuthenticated]
 
     COMMERCIAL_TOKENS = (
-        'prix', 'price', 'acheter', 'buy', 'cost', 'cout', 'coÃ»t', 'pas cher',
+        'prix', 'price', 'acheter', 'buy', 'cost', 'cout', 'coût', 'pas cher',
         'cheap', 'deal', 'promo', 'discount', 'tarif', 'abonnement', 'subscription',
     )
     TRANSACTIONAL_TOKENS = (
-        'commander', 'order', 'telecharger', 'tÃ©lÃ©charger', 'download',
-        'inscription', 'signup', 'sign up', 'reserver', 'rÃ©server', 'book',
+        'commander', 'order', 'telecharger', 'télécharger', 'download',
+        'inscription', 'signup', 'sign up', 'reserver', 'réserver', 'book',
         'login', 'se connecter',
     )
     NAVIGATIONAL_TOKENS = (
@@ -2320,11 +2320,109 @@ class KeywordResearchView(APIView):
     INFORMATIONAL_TOKENS = (
         'comment', 'how', 'pourquoi', 'why', 'qu\'est-ce', 'what is', 'what',
         'guide', 'tutoriel', 'tutorial', 'exemple', 'example', 'definition',
-        'dÃ©finition', 'qui', 'who', 'quand', 'when',
+        'définition', 'qui', 'who', 'quand', 'when',
     )
 
+    # Mots-outils du francais. Classe grammaticale FERMEE : articles,
+    # determinants, prepositions de liaison, coordination, determinants
+    # interrogatifs. Elle ne s'allonge pas quand un client change de metier,
+    # de ville ou de marque, contrairement a une liste de synonymes de "prix"
+    # ou d'abreviations de villes, qui elles n'ont pas de fin.
+    # Propriete de securite : un oubli ici fait rater un regroupement, jamais
+    # un regroupement de trop, parce que retirer un jeton de plus ne peut que
+    # RAPPROCHER deux cles. La liste reste donc volontairement courte.
+    # Sont absents expres, chaque cas verifie par execution :
+    # - "sur", "sous", "dans", "par", "avant", "apres" : elles portent une
+    #   relation. Avec "sur" dedans, "isolation sur plancher" et "isolation
+    #   plancher" tombaient dans la meme famille pendant que "sous" restait
+    #   porteur ; l'asymetrie fabriquait une famille fausse.
+    # - "sans", "pas", "ni", "non" : negation. "sablage sans poussiere" n'est
+    #   pas "sablage poussiere", ce sont deux devis.
+    # - "comment", "combien", "pourquoi", "quand" : ce sont exactement les
+    #   jetons que _estimate_intent lit plus haut pour rendre 'informational'.
+    #   Les retirer faisait tomber "comment sabler un plancher" et "sabler un
+    #   plancher" dans une famille dont le representant porte l'autre
+    #   intention.
+    # - "ou", que la suppression des accents rend indiscernable de "ou".
+    _MOTS_OUTILS = frozenset({
+        'le', 'la', 'les', 'l', 'un', 'une', 'des', 'du', 'de', 'd',
+        'au', 'aux', 'a', 'en', 'et', 'pour',
+        'quel', 'quelle', 'quels', 'quelles',
+    })
+
+    # Serper rend des chaines lues sur un vrai SERP ; Gemini rend des chaines
+    # generees dont rien n'atteste qu'un humain les tape. Le representant
+    # d'une famille vient donc de Serper. related passe avant paa parce
+    # qu'une question est une mauvaise cible de page et un bon titre de
+    # section, et qu'elle reste de toute facon rendue. Sur l'ordre de collecte
+    # actuel (bloc Serper puis bloc Gemini) cette regle ne change aucune
+    # sortie mesuree ; elle tient le jour ou l'ordre des blocs bouge ou
+    # qu'une source s'intercale.
+    _PRIORITE_SOURCE = {
+        'serper_related': 0,
+        'serper_paa': 1,
+        'gemini_longtail': 2,
+    }
+
+    def _cle_famille(self, keyword):
+        """Ensemble non ordonne des mots porteurs d'un mot-cle, ou None.
+
+        Mesure du 2026-09-01, seed "sablage de plancher montreal" : parmi les
+        22 mots-cles rendus, "Sablage de plancher Montreal prix", "prix
+        sablage de plancher montreal" et "quel prix pour sablage plancher
+        montreal" se reduisent au meme ensemble {sablage, plancher, montreal,
+        prix}. Le dedoublonnage en chaine exacte les rendait comme trois
+        lignes sans lien visible.
+
+        Egalite stricte des ensembles, jamais de seuil de similarite : deux
+        requetes qui different d'un seul mot porteur ("residentiel" contre
+        "commercial", "Terrebonne" contre "Montreal") sont deux pages a
+        ecrire, et sur le meme run un seuil de similarite de chaine les
+        rapprochait plus que les vraies variantes.
+        """
+        jetons = re.findall(r'[a-z0-9]+', _strip_accents_lower(keyword))
+        porteurs = {j for j in jetons if j not in self._MOTS_OUTILS}
+        return frozenset(porteurs) if porteurs else None
+
+    def _regrouper(self, keywords):
+        """Marque les variantes d'une meme requete sans en supprimer aucune.
+
+        Modifie les dicts sur place. Un mot-cle supprime est invisible pour
+        l'utilisateur, donc une fusion a tort effacerait une ligne sans
+        laisser de trace lisible. Un doublon, lui, reste sous les yeux et se
+        juge. Sur les 22 resultats mesures le 2026-09-01, le regroupement
+        forme une seule famille de 3 et laisse passer les 22 lignes.
+
+        family_size vaut 1 quand aucune variante n'a ete trouvee. C'est une
+        mesure ("rien ne se repete"), pas une absence de mesure : le champ
+        est toujours present.
+        """
+        familles = {}
+        for rang, item in enumerate(keywords):
+            cle = self._cle_famille(item['keyword'])
+            if cle is None:
+                # Chaine faite uniquement de mots-outils : aucun mot porteur a
+                # comparer. Cle sentinelle unique pour qu'elle reste seule au
+                # lieu de tomber dans une famille fourre-tout avec toutes ses
+                # semblables.
+                cle = ('_sans_mot_porteur', rang)
+            familles.setdefault(cle, []).append(item)
+
+        for numero, membres in enumerate(familles.values()):
+            # min() est stable : a priorite de source egale, la premiere
+            # occurrence collectee reste le representant, exactement le
+            # comportement actuel.
+            representant = min(
+                membres,
+                key=lambda m: self._PRIORITE_SOURCE.get(m['source'], 99),
+            )
+            for membre in membres:
+                membre['family_id'] = numero
+                membre['family_size'] = len(membres)
+                membre['family_primary'] = membre is representant
+
     def _estimate_intent(self, keyword):
-        """Infer intent from keyword tokens â€” lightweight heuristic."""
+        """Infer intent from keyword tokens with a lightweight heuristic."""
         kw = keyword.lower()
         for token in self.TRANSACTIONAL_TOKENS:
             if token in kw:
@@ -2378,7 +2476,7 @@ class KeywordResearchView(APIView):
         else:
             hl, gl = 'fr', 'ca'
 
-        # 1) Serper â€” relatedSearches + peopleAlsoAsk
+        # 1) Serper : relatedSearches + peopleAlsoAsk
         if serper_key:
             try:
                 remaining = max(1.0, deadline - time.monotonic())
@@ -2406,7 +2504,7 @@ class KeywordResearchView(APIView):
             except Exception as e:
                 logger.warning('Serper keyword research failed: %s', e)
 
-        # 2) Gemini â€” generate 10 long-tail variants
+        # 2) Gemini : generate 10 long-tail variants
         if gemini_key and (deadline - time.monotonic()) > 2.0:
             try:
                 from google import genai
@@ -2443,7 +2541,8 @@ Respond in JSON only (no markdown, no code blocks):
             except Exception as e:
                 logger.warning('Gemini long-tail generation failed: %s', e)
 
-        # 3) Dedupe case-insensitively, preserving the first occurrence's source
+        # 3) Dedoublonnage en chaine exacte, inchange : il n'ecarte que des
+        # chaines strictement identiques a la casse et aux espaces pres.
         seen = set()
         keywords = []
         seed_norm = seed_keyword.lower().strip()
@@ -2457,6 +2556,19 @@ Respond in JSON only (no markdown, no code blocks):
                 'source': source,
                 'estimated_intent': self._estimate_intent(kw),
             })
+
+        # 4) Familles de variantes. Test du 2026-09-01 sur "sablage de
+        # plancher montreal" : 22 mots-cles rendus dont 3 formulations de la
+        # meme demande de prix, sorties comme 3 lignes sans lien visible. On
+        # les relie au lieu de les fusionner : les 22 restent, family_id dit
+        # lesquelles se repetent.
+        # Reste dehors et c'est assume : "combien coute sablage plancher
+        # montreal", 4e formulation de prix du meme run. La rapprocher exige
+        # de declarer que "combien coute" vaut "prix", puis "tarif", "cout",
+        # "soumission", "estimation", "budget". Les facons de demander un prix
+        # en francais quebecois n'ont pas de fin ; cette table n'est pas
+        # ecrite, ni ici ni en TODO.
+        self._regrouper(keywords)
 
         return Response({'keywords': keywords})
 class PageSpeedView(APIView):

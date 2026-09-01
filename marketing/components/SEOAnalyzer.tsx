@@ -43,6 +43,12 @@ interface KeywordResult {
   keyword: string;
   source: KeywordSource;
   estimated_intent: "informational" | "commercial" | "navigational" | "transactional";
+  // Familles de variantes. Optionnelles : une reponse d'un backend anterieur
+  // au correctif du 2026-09-01 ne les porte pas, et l'affichage doit alors
+  // rester celui d'avant plutot que d'afficher un compte vide.
+  family_id?: number;
+  family_size?: number;
+  family_primary?: boolean;
 }
 
 interface SEOAnalyzerProps {
@@ -2179,21 +2185,50 @@ export function SEOAnalyzer({
                       {lang === "fr" ? group.labelFr : group.labelEn}
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {items.map((item, i) => (
-                        <Badge
-                          key={`${group.source}-${i}`}
-                          variant="secondary"
-                          className="cursor-pointer hover:bg-primary/20 transition-colors text-xs font-normal"
-                          title={`${item.estimated_intent} - ${
-                            lang === "fr"
-                              ? "Cliquer pour copier"
-                              : "Click to copy"
-                          }`}
-                          onClick={() => copyKeyword(item.keyword)}
-                        >
-                          {item.keyword}
-                        </Badge>
-                      ))}
+                      {items.map((item, i) => {
+                        // Les variantes d'une meme requete sont reliees, jamais
+                        // fusionnees : les faire disparaitre priverait d'un
+                        // libelle qu'on ne peut plus juger. On montre donc le
+                        // lien, et les autres formulations restent affichees
+                        // dans leur propre groupe de source.
+                        const soeurs =
+                          item.family_size && item.family_size > 1
+                            ? kwResults.filter(
+                                (k) =>
+                                  k.family_id === item.family_id &&
+                                  k.keyword !== item.keyword,
+                              )
+                            : [];
+                        const infobulle = [
+                          item.estimated_intent,
+                          soeurs.length
+                            ? `${
+                                lang === "fr"
+                                  ? "même requête, autrement formulée"
+                                  : "same query, worded differently"
+                              } : ${soeurs.map((s) => s.keyword).join(" / ")}`
+                            : null,
+                          lang === "fr" ? "Cliquer pour copier" : "Click to copy",
+                        ]
+                          .filter(Boolean)
+                          .join(" - ");
+                        return (
+                          <Badge
+                            key={`${group.source}-${i}`}
+                            variant="secondary"
+                            className="cursor-pointer hover:bg-primary/20 transition-colors text-xs font-normal"
+                            title={infobulle}
+                            onClick={() => copyKeyword(item.keyword)}
+                          >
+                            {item.keyword}
+                            {soeurs.length > 0 && (
+                              <span className="ml-1 opacity-60">
+                                +{soeurs.length}
+                              </span>
+                            )}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 );

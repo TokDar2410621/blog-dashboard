@@ -415,11 +415,18 @@ const ProofShareToggleArgs = z
 const KeywordResearchArgs = z
   .object({
     seed: z.string().min(1).describe("Seed keyword to expand from (required)"),
-    language: z.enum(["fr", "en", "es"]).optional(),
-    country: z
-      .string()
+    // Pas de champ `country`. Il existait, il etait documente "reserved; not
+    // used by backend yet", et api.ts le jetait : un parametre accepte qui ne
+    // fait rien se lit comme une capacite. Le pays vient de `language`, comme
+    // pour tous les autres appels Serper du backend, et le defaut est deja le
+    // Canada. Une exception sur ce seul outil serait une deuxieme facon de
+    // dire la meme chose.
+    language: z
+      .enum(["fr", "en", "es"])
       .optional()
-      .describe("ISO 3166-1 alpha-2, e.g. 'ca' (reserved; not used by backend yet)"),
+      .describe(
+        "Drives the Google locale sent to Serper. Omitted defaults to fr, which the backend maps to gl=ca / hl=fr (Quebec).",
+      ),
   })
   .strict();
 
@@ -1036,7 +1043,7 @@ const tools: ToolDef[] = [
   {
     name: "gridar_keyword_research",
     description:
-      "Discover related keywords + monthly volumes + difficulty from a seed. Uses Serper + Gemini.",
+      "Expand a seed keyword into related queries. Sources: Serper Google SERP (relatedSearches, peopleAlsoAsk) plus Gemini long-tail variants, merged and deduplicated, the seed itself removed. Locale follows `language`; fr maps to Google Canada. Returns {keywords: [{keyword, source, estimated_intent, family_id, family_size, family_primary}]}. `estimated_intent` is guessed from words present in the keyword text, it is not measured on the SERP. `family_*` links rewordings of one query: same family_id means the same demand phrased differently, family_primary marks the wording to target. This tool returns NO search volume and NO keyword difficulty, because nothing behind it measures either one: never report, derive or estimate those numbers from this output. A provider that fails contributes nothing silently, which is not evidence that no such keywords exist.",
     schema: KeywordResearchArgs,
     handler: (input) => keywordResearch(input),
   },

@@ -497,12 +497,12 @@ export async function suggestCompetitors(siteId: number, body?: Record<string, u
 export async function keywordResearch(body: {
   seed?: string;
   language?: "fr" | "en" | "es";
-  country?: string;
 }) {
   // Backend (KeywordResearchView) reads `seed_keyword` + `language` from the
   // POST body. The tool exposes the nicer `seed` alias, so remap it here or
   // the seed never reaches the server ("Le mot-cle de depart est requis").
-  // `country` is not consumed server-side, so it is intentionally dropped.
+  // Le champ `country` a ete retire du schema : il etait accepte puis jete
+  // ici meme. Le pays est derive de `language` cote backend.
   return request<Record<string, unknown>>(`/keyword-research/`, {
     method: "POST",
     body: JSON.stringify({
