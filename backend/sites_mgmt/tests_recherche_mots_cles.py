@@ -358,3 +358,38 @@ class EtatDesSourcesTests(SimpleTestCase):
 
         self.assertIn('sources', d)
         self.assertEqual(set(d['sources']), {'serper', 'gemini'})
+
+    def test_l_appel_serper_ne_porte_pas_de_ciblage_pays(self):
+        """Garde de non-regression sur une mesure, pas sur un gout.
+
+        Le 2026-09-01, ajouter gl=ca a fait tomber relatedSearches et
+        peopleAlsoAsk a zero sur deux requetes consecutives, alors que hl=fr
+        seul rendait 10 recherches associees. Cette vue ne lit jamais les
+        resultats organiques : le ciblage pays ne lui apporte rien et lui
+        coute ses deux sources Serper. Si ce test casse, c'est que quelqu'un a
+        reharmonise cet appel avec les autres du fichier sans refaire la
+        mesure.
+        """
+        vu = {}
+
+        def poste(*a, **kw):
+            vu.update(kw.get('json') or {})
+            return self.serp(related=['sablage plancher prix'])
+
+        from rest_framework.test import APIRequestFactory
+        from rest_framework.request import Request
+        from rest_framework.parsers import JSONParser
+
+        brut = APIRequestFactory().post(
+            self.URL, {'seed_keyword': 'sablage plancher', 'language': 'fr'},
+            format='json',
+        )
+        req = Request(brut, parsers=[JSONParser()])
+        vue = KeywordResearchView()
+        vue.request = req
+        with patch.dict('os.environ', {'SERPER_API_KEY': 'test'}, clear=True),                 patch('sites_mgmt.views.http_requests.post', side_effect=poste):
+            vue.post(req)
+
+        self.assertEqual(vu.get('hl'), 'fr')
+        self.assertNotIn('gl', vu)
+        self.assertNotIn('location', vu)

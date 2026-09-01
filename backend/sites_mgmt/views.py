@@ -2463,18 +2463,34 @@ class KeywordResearchView(APIView):
         deadline = time.monotonic() + 60.0
         collected = []  # list of (keyword, source)
 
-        # Meme convention que les autres appels Serper de ce fichier (ex.
-        # ligne ~3153) : sans hl/gl, Serper repond dans une locale par defaut
-        # qui n'est pas le francais, quel que soit `language` demande. Avant
-        # ce correctif, seule l'etape Gemini plus bas tenait compte de
-        # `language` ; Serper rendait des relatedSearches/PAA en anglais
-        # meme pour language='fr' (verifie le 2026-09-01).
+        # `hl` seul, SANS `gl`, et c'est la seule exception du fichier.
+        #
+        # Les autres appels Serper d'ici envoient les deux parce qu'ils lisent
+        # les resultats organiques, ou le pays change qui se classe. Cette vue
+        # ne lit jamais l'organique : elle ne consomme que relatedSearches et
+        # peopleAlsoAsk. Or ce sont exactement les deux blocs que le ciblage
+        # geographique fait disparaitre. Mesure du 2026-09-01, deux requetes,
+        # meme cle, appels consecutifs :
+        #
+        #   hl=fr gl=ca              related=0    paa=0
+        #   hl=fr + location Quebec  related=0    paa=0
+        #   hl=fr seul               related=10   paa=0..4
+        #   aucun des deux           related=10   paa=0
+        #
+        # Ajouter gl a rendu la langue correcte et supprime au passage deux
+        # des trois sources de la vue, sans rien signaler : la liste continuait
+        # de sortir 10 mots-cles, tous produits par Gemini. `hl` fixe deja la
+        # langue des suggestions, et la geographie voulue est portee par la
+        # requete elle-meme ("... montreal"), pas par un parametre.
+        #
+        # Ne pas "reharmoniser" cet appel avec les autres sans refaire la
+        # mesure ci-dessus.
         if language == 'en':
-            hl, gl = 'en', 'us'
+            hl = 'en'
         elif language == 'es':
-            hl, gl = 'es', 'es'
+            hl = 'es'
         else:
-            hl, gl = 'fr', 'ca'
+            hl = 'fr'
 
         # Etat de chaque fournisseur, rendu avec les mots-cles. Sans lui, une
         # liste courte ne se lit pas : le 2026-09-01, le meme seed a rendu 22
@@ -2506,7 +2522,7 @@ class KeywordResearchView(APIView):
                         'X-API-KEY': serper_key,
                         'Content-Type': 'application/json',
                     },
-                    json={'q': seed_keyword, 'num': 10, 'hl': hl, 'gl': gl},
+                    json={'q': seed_keyword, 'num': 10, 'hl': hl},
                     timeout=min(30.0, remaining),
                 )
                 if resp.status_code == 200:
