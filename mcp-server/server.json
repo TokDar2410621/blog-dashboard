@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "app.gridar/gridar",
+  "title": "Gridar",
+  "description": "SEO toolkit for Quebec sites: audits, Google.ca rankings, keywords, AI-search visibility.",
+  "version": "0.7.0",
+  "websiteUrl": "https://www.gridar.app/mcp",
+  "repository": {
+    "url": "https://github.com/TokDar2410621/blog-dashboard",
+    "source": "github",
+    "subfolder": "mcp-server"
+  },
+  "icons": [
+    {
+      "src": "https://www.gridar.app/brand/gridar-mark-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.gridar.app/mcp"
+    }
+  ]
+}
