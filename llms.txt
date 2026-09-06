@@ -1,0 +1,77 @@
+# Gridar
+
+> SaaS SEO en francais pour les PME du Quebec. Audite un site, suit les positions Google, mesure la visibilite dans les reponses d'IA, genere et publie du contenu FR-CA. Par Arivex Studio.
+
+Depot monolithique proprietaire. Six livrables partent d'ici : une API Django, un site Next.js
+qui porte aussi le dashboard, un serveur MCP, un noeud n8n, un plugin WordPress et un blog
+heberge pour les clients.
+
+Verifie le 2026-09-06. `README.md` decrit une organisation ANTERIEURE et trompeuse : il annonce
+un frontend `src/` en Vite (ce dossier n'existe plus) et un backend heberge sur Render (c'est
+Railway). Se fier a ce fichier-ci, pas au README, pour la structure et le deploiement.
+
+## Structure reelle
+
+- [backend/](backend/) : Django 5 + DRF + Postgres. Toute la logique metier vit dans
+  `backend/sites_mgmt/`, dont `views.py` qui fait environ 11 000 lignes et sert de hub.
+  Sert `api.gridar.app`.
+- [marketing/](marketing/) : Next.js 16 + React 19 + Tailwind v4 + shadcn. Contient le site
+  public ET le dashboard client (`marketing/components/dashboard/`). Sert `gridar.app`.
+- [mcp-server/](mcp-server/) : serveur Model Context Protocol en TypeScript, transports stdio
+  et HTTP. Sert `mcp.gridar.app`. Les outils sont declares dans `src/index.ts`, les appels
+  vers l'API dans `src/api.ts`.
+- [public-blog/](public-blog/) : blog Next.js pour les clients en mode heberge.
+- [n8n-node/](n8n-node/) : noeud communautaire n8n (`n8n-nodes-gridar`). Construit, PAS publie
+  sur npm.
+- [wordpress-plugin/gridar-connector/](wordpress-plugin/gridar-connector/) : plugin WordPress
+  v1.0.0 avec son `readme.txt`. Construit, PAS soumis au repertoire officiel.
+- [docs/](docs/) : documentation produit FR-CA, servie sur `/docs`.
+- [e2e/](e2e/), [cypress/](cypress/) : tests de bout en bout.
+
+## Commandes
+
+- Tests backend : `cd backend && python manage.py test sites_mgmt` (1497 tests au 2026-09-06).
+  Un fichier de tests par sujet, nomme `tests_<sujet>.py`, docstring en francais qui donne le
+  fait mesure ayant motive le test.
+- Build du site : `cd marketing && npx next build`
+- Build du serveur MCP : `cd mcp-server && npm run build` (tsc ; `prepare` le relance a
+  l'installation, donc Railway reconstruit seul).
+- `manage.py check` n'est PAS un test. Lancer la suite avant tout commit.
+
+## Deploiement
+
+- Railway deploie automatiquement a chaque push sur `main`, et redeploie TOUS les services du
+  depot, meme ceux dont aucun fichier n'a change. Un push coupe donc les sessions MCP en cours.
+- Vercel est MANUEL : `npx vercel --prod --cwd marketing`. Pousser ne met pas le site a jour.
+- Railway s'opere en CLI, jamais par MCP :
+  `railway link -p f54c6070-57ae-4818-9364-9d0301ae8f61 -e production -s <service>`.
+  Services : `blog-dashboard` (backend), `romantic-embrace` (serveur MCP).
+- Suivre les logs jusqu'a confirmation apres chaque deploiement, jamais dire "deploye" sur la
+  foi du push.
+
+## Pieges verifies
+
+- `railway run <cmd>` injecte les variables de production mais l'hote Postgres n'est resolvable
+  que depuis le reseau Railway. Pour toute commande qui touche la base, utiliser
+  `railway ssh "<cmd>"`.
+- `views.py` est en CRLF sans declaration de codage. Un editeur qui sauve en cp1252 y recree du
+  mojibake double-encode en silence, et le fichier reste du Python valide. Ecrire en UTF-8
+  explicite et verifier apres coup.
+- Serper : `num > 10` est plafonne sans erreur, `relatedSearches` est absent des requetes
+  `site:`, et tout ciblage geographique (`gl`, `location`) SUPPRIME `relatedSearches` et
+  `peopleAlsoAsk`. Voir le commentaire de `KeywordResearchView` dans `backend/sites_mgmt/views.py`.
+- Les appels Anthropic passent en HTTP brut. La pensee adaptative est active par defaut et
+  casse `content[0]['text']` : la desactiver et balayer les blocs pour trouver le texte.
+
+## Conventions
+
+- Prose en francais, zero em-dash, dans le code comme dans les commits.
+- Les commentaires disent POURQUOI, avec le fait mesure qui a motive le choix.
+- Ne jamais presenter une absence de donnee comme une mesure. Distinguer "mesure et absent" de
+  "pas mesure", et le dire dans la charge utile.
+- Aucune liste de valeurs codee a la main pour un ensemble ouvert.
+- Aucun secret dans une URL : les cles passent par un en-tete.
+
+## Contact
+
+Arivex Studio, tokamdarius@gmail.com
