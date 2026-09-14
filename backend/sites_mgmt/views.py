@@ -5428,9 +5428,25 @@ class BillingWebhookView(APIView):
 
         return Response({'received': True})
 
+    @staticmethod
+    def _as_plain_dict(obj):
+        """StripeObject -> plain dict, recursively.
+
+        Stripe SDK 12+ dropped the dict interface from StripeObject, so every
+        handler's `data.get(...)` raised AttributeError and, because post()
+        swallows handler exceptions to ack Stripe, the failure stayed silent:
+        subscription changes, failed payments and credit purchases were
+        acknowledged but never applied (seen in prod on 2026-09-13).
+        Converting once here keeps every handler on plain dicts.
+        """
+        to_dict = getattr(obj, 'to_dict', None)
+        if callable(to_dict):
+            return to_dict()
+        return obj if isinstance(obj, dict) else {}
+
     def _dispatch(self, event):
         event_type = event['type']
-        data = event['data']['object']
+        data = self._as_plain_dict(event['data']['object'])
 
         if event_type in (
             'customer.subscription.created',
@@ -5476,6 +5492,9 @@ class BillingWebhookView(APIView):
                         break
 
         period_end = data.get('current_period_end')
+        if not period_end and items:
+            # Stripe API 2025-03-31+ moved current_period_end onto the items.
+            period_end = items[0].get('current_period_end')
         if period_end:
             from datetime import datetime, timezone as tz
             sub_obj.current_period_end = datetime.fromtimestamp(period_end, tz=tz.utc)
