@@ -5125,6 +5125,43 @@ PLAN_PRICE_ENV_LEGACY = {
     'agency': ['STRIPE_PRICE_AGENCY_LEGACY'],
 }
 
+# A subscription in one of these statuses still grants its plan. Anything else
+# (canceled, incomplete, incomplete_expired, paused) means no paid access.
+LIVE_SUBSCRIPTION_STATUSES = ('active', 'trialing', 'past_due', 'unpaid')
+
+# Written in the metadata of every Checkout session Gridar creates. The Stripe
+# account is shared with other products (QR Studio, Publiar) and every endpoint
+# receives every product's events, so a credit pack is only applied when the
+# session was created here.
+STRIPE_APP_MARKER = 'gridar'
+
+
+def plan_for_price(price_id):
+    """Plan slug for a Stripe price id, current envs then legacy ones, or None."""
+    if not price_id:
+        return None
+    for plan_key, env_key in PLAN_PRICE_ENV.items():
+        if os.environ.get(env_key) == price_id:
+            return plan_key
+    for plan_key, env_keys in PLAN_PRICE_ENV_LEGACY.items():
+        if any(os.environ.get(k) == price_id for k in env_keys):
+            return plan_key
+    return None
+
+
+def pick_authoritative_subscription(subscriptions):
+    """The subscription whose state the customer should mirror, or None.
+
+    Stripe lists newest first. The newest LIVE subscription wins; only when none
+    is live does the newest one apply. Taking the newest blindly would let a
+    failed plan change, or an old subscription still renewing, downgrade a
+    paying client.
+    """
+    live = [s for s in subscriptions if s.get('status') in LIVE_SUBSCRIPTION_STATUSES]
+    if live:
+        return live[0]
+    return subscriptions[0] if subscriptions else None
+
 
 def _get_or_create_subscription(user):
     sub, _ = Subscription.objects.get_or_create(user=user)
@@ -5238,6 +5275,7 @@ class BillingCreditsCheckoutView(APIView):
                 success_url=f'{frontend_base}/billing?credits=success',
                 cancel_url=f'{frontend_base}/billing?credits=cancel',
                 metadata={
+                    'app': STRIPE_APP_MARKER,
                     'user_id': str(request.user.id),
                     'pack': pack,
                     'credits': str(CREDIT_PACKS[pack]['credits']),
@@ -5320,9 +5358,9 @@ class BillingCheckoutView(APIView):
                 success_url=f'{frontend_base}/billing?status=success',
                 cancel_url=f'{frontend_base}/billing?status=cancel',
                 allow_promotion_codes=True,
-                metadata={'user_id': str(request.user.id), 'plan': plan},
+                metadata={'app': STRIPE_APP_MARKER, 'user_id': str(request.user.id), 'plan': plan},
                 subscription_data={
-                    'metadata': {'user_id': str(request.user.id), 'plan': plan},
+                    'metadata': {'app': STRIPE_APP_MARKER, 'user_id': str(request.user.id), 'plan': plan},
                 },
             )
         except Exception as e:
@@ -5428,9 +5466,25 @@ class BillingWebhookView(APIView):
 
         return Response({'received': True})
 
+    @staticmethod
+    def _as_plain_dict(obj):
+        """StripeObject -> plain dict, recursively.
+
+        Stripe SDK 12+ dropped the dict interface from StripeObject, so every
+        handler's `data.get(...)` raised AttributeError and, because post()
+        swallows handler exceptions to ack Stripe, the failure stayed silent:
+        subscription changes, failed payments and credit purchases were
+        acknowledged but never applied (seen in prod on 2026-09-13).
+        Converting once here keeps every handler on plain dicts.
+        """
+        to_dict = getattr(obj, 'to_dict', None)
+        if callable(to_dict):
+            return to_dict()
+        return obj if isinstance(obj, dict) else {}
+
     def _dispatch(self, event):
         event_type = event['type']
-        data = event['data']['object']
+        data = self._as_plain_dict(event['data']['object'])
 
         if event_type in (
             'customer.subscription.created',
@@ -5445,49 +5499,110 @@ class BillingWebhookView(APIView):
         elif event_type == 'checkout.session.completed':
             self._handle_checkout_completed(data)
 
-    def _handle_subscription_event(self, event_type, data):
+    def _handle_subscription_event(self, event_type, data, remote_subscriptions=None):
+        """Mirror the customer's authoritative Stripe subscription.
+
+        The event is a trigger, not the state. A customer can hold several
+        subscriptions (an upgrade through /billing/checkout/ creates a second
+        one) and events arrive out of order, so applying the event object as-is
+        let an old subscription's cancellation or renewal overwrite a paying
+        client. The customer's subscriptions are re-read from Stripe and the
+        authoritative one applied. When Stripe cannot be read, the event object
+        is used, but an event about another subscription never overwrites a
+        live paid one.
+        """
         customer_id = data.get('customer')
-        sub_obj = Subscription.objects.filter(stripe_customer_id=customer_id).first()
+        rows = Subscription.objects.filter(stripe_customer_id=customer_id).order_by('pk')
+        sub_obj = rows.first()
         if not sub_obj:
             logger.warning(
                 'Stripe sub event for unknown customer_id=%s (event=%s)',
                 customer_id, event_type,
             )
             return
+        if rows.count() > 1:
+            logger.warning(
+                'Stripe customer_id=%s shared by %d Subscription rows; syncing pk=%s only',
+                customer_id, rows.count(), sub_obj.pk,
+            )
 
-        sub_obj.stripe_subscription_id = data.get('id', '')
-        sub_obj.status = data.get('status', 'active')
-        sub_obj.cancel_at_period_end = bool(data.get('cancel_at_period_end'))
+        subscriptions = remote_subscriptions
+        if subscriptions is None:
+            subscriptions = self._customer_subscriptions(customer_id)
+        if subscriptions:
+            state = pick_authoritative_subscription(subscriptions)
+        else:
+            state = data
+            foreign = (
+                data.get('id') and sub_obj.stripe_subscription_id
+                and data.get('id') != sub_obj.stripe_subscription_id
+            )
+            if foreign and sub_obj.plan != 'free' and sub_obj.status in LIVE_SUBSCRIPTION_STATUSES:
+                logger.warning(
+                    'Stripe subscriptions unreadable: ignoring %s for %s, user=%s holds live %s',
+                    event_type, data.get('id'), sub_obj.user_id, sub_obj.stripe_subscription_id,
+                )
+                return
+        self._apply_subscription_state(sub_obj, state, event_type)
 
-        # Determine plan from price id - check current then legacy envs.
-        items = data.get('items', {}).get('data', [])
-        if items:
-            price_id = items[0].get('price', {}).get('id', '')
-            matched = False
-            for plan_key, env_key in PLAN_PRICE_ENV.items():
-                if os.environ.get(env_key) == price_id:
-                    sub_obj.plan = plan_key
-                    matched = True
-                    break
-            if not matched:
-                for plan_key, env_keys in PLAN_PRICE_ENV_LEGACY.items():
-                    if any(os.environ.get(k) == price_id for k in env_keys):
-                        sub_obj.plan = plan_key
-                        break
+    def _customer_subscriptions(self, customer_id):
+        """The customer's subscriptions, newest first; None if Stripe cannot be read."""
+        import stripe
+        try:
+            listing = stripe.Subscription.list(customer=customer_id, status='all', limit=10)
+        except stripe.StripeError as exc:
+            logger.warning(
+                'Stripe subscriptions unreadable for customer_id=%s: %s',
+                customer_id, type(exc).__name__,
+            )
+            return None
+        return self._as_plain_dict(listing).get('data') or []
 
-        period_end = data.get('current_period_end')
+    def _apply_subscription_state(self, sub_obj, state, event_type):
+        status_value = state.get('status') or ''
+        items = (state.get('items') or {}).get('data') or []
+        live = status_value in LIVE_SUBSCRIPTION_STATUSES
+
+        # A paid plan with no Stripe subscription id was granted by hand (admin,
+        # staff accounts). Losing a Stripe subscription it never had must not
+        # take it away.
+        if not live and sub_obj.plan != 'free' and not sub_obj.stripe_subscription_id:
+            logger.warning(
+                'Stripe %s: plan %s of user=%s was granted outside Stripe, left unchanged',
+                event_type, sub_obj.plan, sub_obj.user_id,
+            )
+            return
+
+        if state.get('id'):
+            sub_obj.stripe_subscription_id = state['id']
+        sub_obj.cancel_at_period_end = bool(state.get('cancel_at_period_end'))
+
+        if live:
+            sub_obj.status = status_value
+            price_id = ((items[0].get('price') or {}).get('id') if items else '') or ''
+            plan = plan_for_price(price_id)
+            if plan:
+                sub_obj.plan = plan
+        else:
+            # No live subscription: paid access ends. A first checkout still
+            # 'incomplete' never grants the plan before its payment clears.
+            sub_obj.plan = 'free'
+            sub_obj.status = (
+                'canceled' if status_value in ('', 'canceled', 'incomplete_expired') else status_value
+            )
+
+        period_end = state.get('current_period_end')
+        if not period_end and items:
+            # Stripe API 2025-03-31+ moved current_period_end onto the items.
+            period_end = items[0].get('current_period_end')
         if period_end:
             from datetime import datetime, timezone as tz
             sub_obj.current_period_end = datetime.fromtimestamp(period_end, tz=tz.utc)
 
-        if event_type == 'customer.subscription.deleted':
-            sub_obj.plan = 'free'
-            sub_obj.status = 'canceled'
-
         sub_obj.save()
         logger.info(
-            'Stripe webhook subscription updated: user=%s plan=%s status=%s',
-            sub_obj.user_id, sub_obj.plan, sub_obj.status,
+            'Stripe subscription synced (%s): user=%s plan=%s status=%s',
+            event_type, sub_obj.user_id, sub_obj.plan, sub_obj.status,
         )
 
     def _handle_invoice_payment_failed(self, invoice):
@@ -5540,6 +5655,14 @@ class BillingWebhookView(APIView):
         if session.get('mode') != 'payment':
             return
         metadata = session.get('metadata') or {}
+        if metadata.get('app') != STRIPE_APP_MARKER:
+            # Shared Stripe account: this session belongs to another product,
+            # whose user_id means nothing here.
+            logger.info(
+                'Checkout session %s ignored: not created by Gridar (app=%r)',
+                session.get('id'), metadata.get('app'),
+            )
+            return
         pack = metadata.get('pack')
         user_id = metadata.get('user_id')
         credits_str = metadata.get('credits')
