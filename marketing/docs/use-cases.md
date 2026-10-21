@@ -1,274 +1,273 @@
 # Recettes pratiques
 
-Scénarios concrets pour utiliser Gridar. Du débutant à l'agence, du B2C au B2B, du court terme au long terme.
+Scénarios concrets que Gridar permet de bout en bout aujourd'hui, du travailleur autonome à l'agence. Les résultats SEO dépendent de ta niche, de ton site et de ta concurrence : aucune recette ne promet un chiffre de trafic.
 
-## Recette 1 : Lancer un blog SEO PME en 30 jours
+## Recette 1 : Lancer un blog SEO de PME
 
-**Profil** : tu as un site avec 0 article. Tu veux que dans 1 mois, tu commences à recevoir des visites depuis Google.
+**Profil** : ton site n'a pas encore d'articles. Tu veux commencer à apparaître dans Google sur les questions de tes clients.
 
-**Plan** : Solo (29.99$/mois) ou Pro (89.99$/mois) selon volume.
+**Plan** : Solo (29.99$/mois, 8 articles générés par mois) ou Pro (89.99$/mois, 60 articles).
 
-**Semaine 1 - Setup (3-4 heures total)**
-- Connecte ton site (mode WordPress / Shopify / Webflow / hébergé selon stack)
-- Configure Site Settings : Knowledge base (300 mots qui résument ton entreprise), EEAT (auteur), Branding scan
-- Connecte Google Search Console
-- Identifie 5-10 mots-clés cibles via Recherche de mots-clés
-- Active le tracking pour ces mots-clés
+**Étape 1 - Mise en place**
+- Connecte ton site : [WordPress](connect/wordpress.md), [Shopify](connect/shopify.md), [Webflow](connect/webflow.md) ou [hébergé](connect/hosted.md).
+- Paramètres → General → **Modèle d'affaires** : il oriente l'angle éditorial des articles.
+- Paramètres → **Auteur (EEAT)** : bio, compétences, liens LinkedIn et site personnel.
+- Paramètres → Integrations → **Base de connaissances** : tes services, ta zone, ta façon de travailler. L'IA s'appuie sur ces faits plutôt que d'en inventer.
+- Paramètres → **Call-to-action** : le texte et l'URL que Gridar place en conclusion de chaque article généré.
+- Paramètres → **Search Console** : connecte ta propriété. Voir [Search Console](gsc.md).
+- **Suivi des positions** → « Suggerer avec l'IA » pour une première liste, puis garde les mots-clés qui comptent pour ton chiffre d'affaires.
 
-**Semaine 2-3 - Production (1-2 articles/jour)**
-- Pour chaque mot-clé : Brief de contenu → Génère article → Audit → Ajustements manuels (10 min) → Publie
-- Insère les articles dans ton sitemap (auto en mode hébergé / WP / Shopify / Webflow)
-- Crée un Topic cluster naturel : 1 pillar page (long, ex 2500 mots) + 5-8 cluster articles (moyens, 1000-1500 mots) qui linkent vers la pillar
+**Étape 2 - Production**
+- Page **Générer un article** : prépare le sujet avec le **Brief de contenu**, **People Also Ask + FAQ schema** et **Questions Reddit / Quora**, puis applique le brief au formulaire.
+- Site WordPress, Shopify ou Webflow : l'article part en ligne dès la fin de la génération. Lance d'abord avec **Aperçu seulement (ne pas publier)** si tu veux relire.
+- Site hébergé : l'article arrive en brouillon. Ouvre-le depuis **Articles**.
+- Dans l'éditeur, passe la carte **Lexique FR-CA** et l'audit, corrige les chiffres signalés sans source, change l'image de couverture si elle tombe à côté, puis publie.
 
-**Semaine 4 - Indexation + monitoring**
-- Soumets ton sitemap à Google Search Console (Settings → Sitemaps → Add)
-- Crée un compte Bing Webmaster (5 min, ramène 5-10 % de trafic)
-- Monitor les positions chaque jour (auto via le rank tracker)
-- Patiente 2-4 semaines pour les premiers indexations
+**Étape 3 - Indexation et suivi**
+- **Audit du site** → **Verifier l'indexation** : compare ton sitemap à ce que Google montre.
+- Clique **Snapshot maintenant** dans **Suivi des positions** pour relever tes mots-clés. Une position s'affiche une fois constante sur plusieurs relevés.
+- Consulte le **Rapport hebdo** chaque semaine ; il s'imprime en PDF.
 
-**Résultats attendus** :
-- 15-25 articles publiés
-- 50-200 visiteurs Google par mois (bas si niche très compétitive, plus élevé si niche locale Québec)
-- 2-5 mots-clés en top 30 Google
-- Premier article featured snippet possible si tu as bien suivi le PAA workflow
+Détails de la génération : [Générer un article](generate-article.md).
 
-## Recette 2 : Sortir d'un content slump (site existant qui chute)
+## Recette 2 : Relancer un site existant qui stagne
 
-**Profil** : tu as 100+ articles publiés depuis des années. Le trafic stagne ou baisse.
+**Profil** : tu as déjà beaucoup d'articles publiés. Le trafic stagne ou baisse.
 
-**Diagnostic (Day 1)**
-1. Connecte GSC → vois le déclin précisément
-2. **Audit global** : score moyen + articles avec < 70/100
-3. **Content decay** : articles qui perdent du trafic
-4. **Topic clusters** : identifie ceux désorganisés
-5. **Liens cassés** + **Cannibalisation** : nettoie d'abord ces hygiène SEO
+**Prérequis** : Search Console connecté. Sans lui, la détection de déclin n'a pas de données.
 
-**Action plan (Week 1-2)**
-- **Top 10 articles en decay** (ceux qui perdaient le plus de trafic) :
-  - Ré-écris l'introduction (l'IA peut générer une nouvelle intro à partir du contenu existant)
-  - Ajoute une section FAQ depuis PAA actuel
-  - Mets à jour les chiffres / dates
-  - Réindexe via GSC ("Demander une indexation")
-- **5 articles en cannibalisation** : merge les paires en gardant le meilleur, redirige l'autre via Redirection 301
+**Diagnostic**
+1. **Audit global SEO** : la distribution des scores de tous tes articles, pour repérer les plus faibles.
+2. **Détection de déclin** : les pages dont les impressions Search Console chutent entre deux périodes.
+3. **Topic clusters** : les regroupements thématiques de ton site et les articles qui manquent à chaque groupe.
+4. **Liens cassés** et **Maillage interne** : les liens morts et les articles orphelins (sans lien entrant).
 
-**Long terme (mois 2-3)**
-- Identifie 3 topic clusters incomplets → écris les articles de comblement
-- Améliore le maillage interne (tool Link Graph) → boost les articles orphelins
-- Si possible, gagne 5-10 backlinks de qualité (HARO, partenariats, podcast invité)
+**Plan d'action**
+- **Articles en déclin** : mets à jour les chiffres et les dates, ajoute une FAQ tirée de People Also Ask, puis demande une réindexation dans Search Console. Sur un site hébergé, l'autopilote en mode « Refresh first » cible les articles dont les impressions baissent et les régénère avec des données à jour : Paramètres → Autopilote, puis **Lancer maintenant (1 article)** pour en traiter un à la demande.
+- **Doublons** : garde le meilleur des deux articles et redirige l'autre avec **Redirections 301**.
+- **Orphelins** : ajoute des liens depuis les articles proches. Le graphe du **Maillage interne** te montre lesquels.
+- **Clusters incomplets** : **Construire tout le cluster** prépare un prompt par page manquante, maillage interne compris. Ces prompts se donnent à un agent IA ; ils ne consomment pas ton quota.
 
-**Résultats attendus** : retournement de trend en 2-3 mois. Souvent +30-60 % de trafic vs creux.
+**Ensuite** : relance la détection de déclin chaque mois pour vérifier que les pages remontent.
 
-## Recette 3 : Agence SEO - onboarding nouveau client
+## Recette 3 : Agence - gérer plusieurs sites clients
 
-**Profil** : tu es consultant SEO ou agence. Tu signes un client à 2000-5000$/mois pour gérer son SEO.
+**Profil** : tu es consultant SEO ou agence et tu gères le contenu de plusieurs clients.
 
-**Setup (jour 1, ~2h)**
-- Plan Agence (199.99$/mois) - jusqu'à 5 clients
-- Crée un site Gridar pour le client (slot #N/5)
-- Connecte le CMS du client (WP / Shopify / Webflow selon)
-- Configure Site Settings avec leurs infos (nom, EEAT auteur, knowledge base)
-- Connecte leur GSC (demande accès au client)
-- White-label : remplace le branding par le tien dans les rapports clients
+**Plan** : Agence (199.99$/mois) : 5 sites, 200 articles générés par mois au total, 100 mots-clés suivis au total, API et MCP à 200 requêtes/h. Au-delà de 5 sites : bouton **Nous contacter** sur [/billing](https://www.gridar.app/billing).
 
-**Recherche initiale (jour 2-3, ~6h)**
-- Analyse de leur site actuel (Audit global)
-- Analyse 3 concurrents directs (Outils → Analyse concurrent)
-- Identifie 30-50 mots-clés cibles (Keyword research + PAA + Trends Québec)
-- Active rank tracking sur ces 30-50 keywords
-- Map leur catalogue de produits/services aux clusters de keywords
+**Onboarding d'un client**
+- Ajoute le site et connecte son CMS (chaque site compte dans la limite de 5).
+- Remplis pour lui Modèle d'affaires, Auteur (EEAT), Base de connaissances et Call-to-action.
+- Search Console : la connexion se fait avec un compte Google qui a accès à la propriété du client. Demande-lui de t'ajouter comme utilisateur dans Search Console.
+- Ajoute ses mots-clés au **Suivi des positions**. Les quotas d'articles et de mots-clés se partagent entre tous tes clients : répartis-les.
 
-**Plan editorial (mois 1)**
-- Pillar pages : 5-8 sur leurs services principaux
-- Cluster pages : 30-50 articles supports
-- Calendrier : 8-12 articles/mois (Pro = 60/mois si tu génères tout ; Agence = 200/mois pour absorber 5 clients)
-- Brief chaque article via Content Brief → review humaine 10 min → publication
+**Recherche**
+- **Audit du site** et **Opportunités SEO** : pour chaque mot-clé à intention commerciale ou transactionnelle, Gridar propose une page à créer.
+- **Analyseur SERP** et les outils publics [Comparaison de concurrents](https://www.gridar.app/tools/competitor-compare) et [Competitor Gap Finder](https://www.gridar.app/tools/competitor-gap) pour situer le client face à ses concurrents.
 
-**Reporting client (mensuel)**
-- Génère le rapport white-label PDF avec ton logo
-- Envoie aux clients par email automatisé (cron + webhook)
-- Inclut : exec summary, top 5 articles, mouvement de positions, recommandations
+**Suivi**
+- **Santé de tous mes sites** (vue multi-sites du tableau de bord) : repère le client qui demande de l'attention.
+- **Rapport hebdo** de chaque site : articles de la semaine, mouvements de positions, redirections. Le bouton **Imprimer / PDF** produit le document à envoyer.
 
-**Marges**
-- Coût Gridar : 199.99$ + crédits éventuels (~50-100$)
-- Tu factures le client : 2000-5000$ minimum
-- Marge : 90 %+ après ton temps
+**Limites à connaître** : Gridar n'a pas de rapport en marque blanche ni d'envoi automatique de rapports aux clients. Le PDF porte les données du site ; l'envoi reste à faire de ton côté.
 
-## Recette 4 : E-commerce Shopify - SEO produits
+## Recette 4 : Boutique Shopify - du contenu qui mène aux produits
 
-**Profil** : tu vends sur Shopify, tu veux du contenu blog qui drive du trafic vers tes pages produits.
+**Profil** : tu vends sur Shopify et tu veux des articles qui amènent des visiteurs vers tes fiches produits.
 
-**Stratégie** : "TOFU/MOFU/BOFU" content pyramid
+**Stratégie** : couvrir les trois étapes de la décision d'achat.
 
-**TOFU (Top of Funnel) - éducation**
-- 60 % de tes articles
-- Sujets génériques liés à ton industrie
-- Volume keyword fort, intent informationnel
-- But : faire connaître la marque, trafic Google
+**Découverte (éducation)**
+- Sujets larges liés à ton industrie, intention informationnelle.
+- But : faire connaître la marque.
 
 Ex (boutique de café) :
-- "Comment infuser un café au pour-over"
-- "Différence entre arabica et robusta"
-- "Histoire du café au Québec"
+- « Comment infuser un café au pour-over »
+- « Différence entre arabica et robusta »
+- « Histoire du café au Québec »
 
-**MOFU (Middle of Funnel) - comparaison**
-- 30 % de tes articles
-- Comparaisons, guides d'achat, classements
-- Intent : commercial investigation
-
-Ex :
-- "Top 10 cafés bio au Québec en 2026"
-- "Cafetière à piston vs Aeropress : laquelle choisir ?"
-- "Quel café pour quelle préparation"
-
-**BOFU (Bottom of Funnel) - conversion**
-- 10 % de tes articles
-- Articles commerciaux ciblant ton produit
-- Intent : transactionnel
+**Comparaison**
+- Guides d'achat, comparatifs, classements.
+- Intention : le visiteur compare avant d'acheter.
 
 Ex :
-- "Pourquoi notre café X est noté 95/100 par les juges"
-- "Comparatif : café X vs café Y, quelle différence"
+- « Cafetière à piston ou Aeropress : laquelle choisir ? »
+- « Quel café pour quelle préparation »
 
-**Maillage** : chaque article TOFU/MOFU link vers les produits Shopify pertinents (CTA dans le contenu, encart sticky en bas, related products). L'IA fait ça automatiquement via le maillage interne si tu lui dis dans la knowledge base "lier subtilement vers /products/[X] quand pertinent".
+**Achat**
+- Articles qui présentent ton produit face au besoin du client.
+- Intention : transactionnelle.
 
-**Volume** : 8-15 articles/mois suffit pour démarrer. 6 mois = 60-90 articles → couverture topique sérieuse.
+Ex :
+- « Comment choisir un café en grains pour une machine espresso »
+- « Abonnement café : ce qui est inclus et comment ça marche »
 
-## Recette 5 : SaaS B2B - thought leadership
+**Mener vers les produits** : Paramètres → **Call-to-action** place ton texte et ton lien (une collection, une fiche produit) en conclusion de chaque article généré. Dans l'éditeur, ajoute à la main les liens vers les produits cités.
 
-**Profil** : tu vends un SaaS à des PME. Long sales cycle, décideur = lead à éduquer.
+**À savoir sur Shopify** : l'article est publié en ligne dès la fin de la génération. Relis en mode **Aperçu seulement** d'abord si tu veux valider le texte avant qu'il soit visible. Les tags sont envoyés séparés par des virgules : évite les virgules dans un tag.
 
-**Stratégie** : positionnement de leader d'opinion
+## Recette 5 : SaaS B2B - articles de fond
 
-**Format** : articles longs (2500-4000 mots), data-driven, citations d'experts.
+**Profil** : tu vends un logiciel à des entreprises. Le cycle de vente est long et le décideur s'informe avant de te parler.
 
-**Sources de contenus** :
-1. **Données internes** : analyses de tes propres data (anonymisées). Ex : "Étude : combien de PME québécoises automatisent leur facturation en 2026 ?"
-2. **Keyword research** sur problèmes de tes prospects
-3. **Community questions** (Reddit / Quora / forums B2B)
-4. **Competitor gap analysis** : ce dont les concurrents ne parlent pas
+**Format** : longueur **Long** (2500 à 3500 mots), un problème précis par article, des données que tu peux sourcer.
 
-**EEAT critique** : ton EEAT auteur (Site Settings) doit être SOLIDE. Bio, credentials, LinkedIn vérifiable, posts originaux, citation par d'autres sites du domaine.
+**Sources de sujets**
+1. **Tes données internes** : ce que tu observes chez tes clients (anonymisé). Mets ces faits dans la **Base de connaissances** pour que l'IA s'en serve.
+2. **Questions Reddit / Quora** sur la page **Générer un article** : les mots exacts de tes prospects.
+3. **People Also Ask + FAQ schema** : les questions que Google associe au sujet.
+4. **[Competitor Gap Finder](https://www.gridar.app/tools/competitor-gap)** : les requêtes où tes concurrents apparaissent et toi non.
 
-**Publication cadence** : 4-6 articles/mois (qualité > quantité). Plan Pro suffit.
+**Auteur** : remplis Paramètres → **Auteur (EEAT)** avec soin : bio, compétences, LinkedIn. Pour ce public, l'auteur compte autant que le texte.
 
-**Distribution** : LinkedIn (post natif qui résume + lien), newsletter mensuelle de tes derniers articles, email aux prospects qualifiés.
+**Cadence** : quelques articles par mois suffisent ; Solo couvre 8 articles générés par mois. Relis chaque chiffre : l'audit de l'éditeur signale ceux qui n'ont pas de source.
 
-## Recette 6 : Blog perso / freelance
+**Distribution** : un post LinkedIn natif qui résume l'article avec le lien, et l'article envoyé aux prospects qui posent cette question.
 
-**Profil** : tu es freelance, ton blog est ton CV + ta machine à leads.
+## Recette 6 : Blog perso / travailleur autonome
 
-**Plan** : Solo (29.99$/mois) ou Free pour tester.
+**Profil** : tu es pigiste ou consultant. Ton blog prouve ton expertise et t'amène des demandes.
+
+**Plan** : Essai pour tester (1 article par mois, sans suivi de mots-clés), puis Solo (29.99$/mois).
 
 **Stratégie** :
-- 1-2 articles par mois suffit
-- Sujets : tes spécialités + études de cas anonymisées
-- 50-50 : articles techniques (preuve de compétence) et études de cas (preuve sociale)
-- EEAT auteur ULTRA important : c'est TOI qu'on évalue
-- Knowledge base : 500 mots sur ton parcours, ta zone d'expertise, tes valeurs
+- Un ou deux articles par mois suffisent.
+- Sujets : tes spécialités et des études de cas anonymisées.
+- Alterne articles techniques (preuve de compétence) et études de cas (preuve par l'exemple).
+- Auteur (EEAT) très soigné : c'est toi qu'on évalue.
+- Base de connaissances : ton parcours, tes spécialités, ta façon de travailler.
+- Type d'article **Récit personnel** pour les retours d'expérience.
 
-**Conversion** : chaque article inclut un CTA discret en fin pour book un call ou télécharger un freebie. Pas de pop-up agressif.
+**Conversion** : Paramètres → **Call-to-action** (ex. « Réserve un appel de 20 minutes » + ton lien de prise de rendez-vous). Gridar le place en conclusion de chaque article généré.
 
-**Mots-clés** : long-tail + très spécifiques. Volume bas mais intent ultra-qualifié.
+**Mots-clés** : longue traîne, très spécifiques. Peu de recherches, mais une intention claire.
 
-Ex (freelance dev React) :
-- "Comment déboguer une fuite mémoire dans un useEffect React"
-- "Mon retour après 6 mois de Tanstack Router en prod"
-- "Étude de cas : comment j'ai migré un client Next.js 12 → 15"
+Ex (pigiste React) :
+- « Comment déboguer une fuite mémoire dans un useEffect React »
+- « Mon retour après six mois de TanStack Router en production »
+- « Étude de cas : migrer un client de Next.js 12 à 15 »
 
 ## Recette 7 : Blog québécois bilingue
 
-**Profil** : tu cibles à la fois le marché québécois (FR-CA) et le marché anglo-canadien / US (EN).
+**Profil** : tu vises à la fois le Québec (français) et le marché anglophone.
 
-**Stratégie** : 1 site avec 2 langues activées + traduction automatique.
-
-**Setup** :
-- Site Settings → Langues : `[fr, en]`, default = fr
-- Lexique FR-CA activé pour FR (terms québécois auto-appliqués)
-- GSC vérifiée à la racine du domaine (couvre les 2 langues)
+**Mise en place** :
+- Paramètres → **Langues** : active `fr` et `en`, avec le français par défaut.
+- Search Console vérifiée sur tout le domaine (`sc-domain:tonsite.ca`) pour couvrir les deux langues.
 
 **Workflow** :
-1. Génère l'article en FR-CA (audience principale Québec)
-2. Bouton "Traduire" → version EN générée en draft
-3. Révise rapidement (les noms propres, conventions canadiennes vs américaines)
-4. Publie EN
-5. Hreflang auto déclare les 2 versions à Google
+1. Génère l'article en français.
+2. Passe-le dans la carte **Lexique FR-CA** de l'éditeur : la génération n'applique pas le lexique d'elle-même.
+3. Dans l'éditeur, **Traduire** → **Traduire en EN** crée la version anglaise, liée à l'original, avec le même statut que l'original (un brouillon reste brouillon).
+4. Relis la version anglaise (noms propres, conventions canadiennes) et publie.
+5. Sur le tableau de bord, la carte **Santé hreflang multi-langue** liste les articles dont une traduction manque.
 
-**Volume idéal** :
-- 70 % articles FR-CA (40-50/mois sur Pro)
-- 30 % articles EN (10-15/mois sur Pro)
+**À savoir** :
+- Sur le blog hébergé, les versions sont reliées par un sélecteur de langue visible sur la page. Le blog n'ajoute pas de balises `hreflang` dans l'en-tête HTML.
+- Le suivi des positions relève les mots-clés français sur Google Canada et les mots-clés anglais sur Google États-Unis. Tiens-en compte si ta clientèle anglophone est canadienne.
 
-**Tracking** : `KeywordTracker` permet de tracker des mots-clés différents par langue (`gl=ca&hl=fr` pour FR, `gl=ca&hl=en` pour EN).
+Voir [Traduction](translation.md).
 
-## Recette 8 : Programmatic SEO
+## Recette 8 : Génération en volume par l'API
 
-**Profil** : tu as un dataset (annuaire de villes, catalogue de produits, base de données). Tu veux générer 1000+ articles automatiquement.
+**Profil** : tu as un jeu de données (villes, produits, services) et tu veux une page par ligne.
 
-**Avant de lire** : programmatic SEO = générer beaucoup de pages similaires à partir d'un template + données. Risque Google "thin content" si fait sans valeur. À utiliser avec discernement.
+**Avant de lire** : générer beaucoup de pages presque identiques expose tout le domaine à une pénalité « contenu mince ». Chaque page doit apporter une information propre à sa ligne. À utiliser avec discernement.
 
-**Workflow** :
-1. Plan Agence (200 articles/mois) ou Enterprise (volume sur mesure)
-2. Préparer ton dataset : CSV / JSON avec les variations (1 row = 1 article)
-3. Générer via API REST en boucle :
+**Prérequis**
+- Plan **Pro** (60 articles/mois, 30 requêtes/h) ou **Agence** (200 articles/mois, 200 requêtes/h). Pour plus : bouton **Nous contacter** sur [/billing](https://www.gridar.app/billing).
+- Un jeton d'API (voir [API](api.md)).
+- Paramètres → General → **Modèle d'affaires** et Paramètres → **Auteur (EEAT)** remplis : sans eux, l'API répond `422 Onboarding incomplet`.
+- Un chemin de livraison configuré, sinon l'API répond `409 delivery_blocked`.
+
+**Le piège de l'anti-cannibalisation** : Gridar refuse un titre trop proche d'un article existant. Des titres comme « X à Montréal », « X à Laval » se ressemblent assez pour être refusés. Passe un `title` explicite pour chaque ligne : le contrôle saute, et c'est à toi de rendre chaque page distincte.
 
 ```python
-import requests, csv
+import csv
+import time
 
-token = "btb_xxx"
-site_id = 12
+import requests
 
-with open("villes_quebec.csv") as f:
+TOKEN = "btb_xxx"
+SITE_ID = 12
+URL = f"https://api.gridar.app/api/v1/sites/{SITE_ID}/generate/"
+
+with open("villes_quebec.csv", encoding="utf-8") as f:
     for row in csv.DictReader(f):
         ville = row["nom"]
-        requests.post(
-            f"https://api.gridar.app/api/v1/sites/{site_id}/generate/",
-            headers={"Authorization": f"Bearer {token}"},
-            json={
-                "topic": f"Meilleur électricien à {ville} en 2026",
-                "type": "local",
-                "language": "fr",
-                "keywords": f"électricien {ville}, électricien {ville} pas cher",
-            },
-            timeout=120,
-        )
+        payload = {
+            "topic": f"installation d'une borne de recharge résidentielle à {ville}",
+            "title": f"Installer une borne de recharge à {ville} : étapes et coûts",
+            "type": "guide",
+            "length": "medium",
+            "language": "fr",
+            "keywords": f"borne de recharge {ville}, installation borne {ville}",
+        }
+        while True:
+            r = requests.post(
+                URL,
+                headers={"Authorization": f"Bearer {TOKEN}"},
+                json=payload,
+                timeout=300,  # une génération prend une à deux minutes
+            )
+            if r.status_code == 429:
+                time.sleep(int(r.headers.get("Retry-After", "60")))
+                continue
+            break
+        if r.status_code == 402:
+            print("Quota atteint, arrêt.")
+            break
+        if not r.ok:
+            print(ville, r.status_code, r.text[:200])
 ```
 
-4. Modère les résultats : audit global, supprime les articles low-quality, ajoute du contenu unique (témoignages clients par ville).
+**Après la génération** : passe l'**Audit global SEO**, supprime les pages faibles et ajoute à chaque page ce qu'elle seule peut dire (données locales réelles, photos du lieu, avis de clients de cette ville).
 
-**Risques** :
-- Google peut deindex en bulk si trop de "near-duplicates" (mêmes paragraphes répétés ville par ville)
-- Solution : injecte du contenu unique par row (vraies données locales : population, climat, témoignages, photos différentes)
+## Recette 9 : Newsletter à partir des articles
 
-**Gain** : un site programmatique bien fait = des dizaines de milliers de visiteurs/mois sur des keywords low-volume mais cumulés.
+**Profil** : tu as une infolettre et tu veux que tes articles l'alimentent sans double travail.
 
-## Recette 9 : Newsletter from articles
+**Stratégie** : RSS vers infolettre, avec un outil tiers.
 
-**Profil** : tu as une newsletter, tu veux que tes articles servent aussi à la newsletter sans double-travail.
+1. Repère le flux RSS de ton blog : en mode hébergé, c'est `https://<domaine de ton blog>/rss.xml`. Sur WordPress, Shopify ou Webflow, utilise le flux de ton CMS. En [mode externe](connect/external.md), c'est à ton frontend de le générer.
+2. Branche ce flux dans Mailchimp, Substack, Beehiiv ou SendFox via leur intégration RSS.
+3. Chaque article publié alimente l'envoi, selon la cadence choisie dans l'outil.
 
-**Stratégie** : RSS-to-newsletter via outil tiers.
+Format conseillé : un résumé hebdomadaire qui regroupe les articles de la semaine, plutôt qu'un courriel par article.
 
-1. Active RSS sur ton site (auto en mode hébergé, configure pour autres modes via [external.md](connect/external.md))
-2. Branche le RSS dans Mailchimp / Substack / Beehiiv / SendFox via leur intégration RSS
-3. Tes articles publiés = email envoyé automatiquement (selon ta cadence)
+## Recette 10 : Après une chute brutale de trafic
 
-Format Beehiiv recommandé : digest hebdomadaire ("This week's articles") qui regroupe les 3-5 articles publiés. Évite l'email spam.
-
-## Recette 10 : Recovery après pénalité Google
-
-**Profil** : tu as eu une chute soudaine de trafic après un Google Update. Pénalité algorithmique probable.
+**Profil** : ton trafic a chuté d'un coup après une mise à jour de Google. Pénalité algorithmique probable.
 
 **Diagnostic** :
-1. **Audit global** : repère les articles avec score < 60/100
-2. **Plagiarism check** : si tu as scrapé ou si l'IA a généré du contenu trop générique
-3. **EEAT** : signal expertise faible ?
-4. **Backlinks toxiques** : audit via Ahrefs / Majestic (outil tiers)
+1. **Audit global SEO** : repère les articles au score le plus bas.
+2. **Originalité** : vérifie les articles trop génériques ou trop proches d'autres sources, avec la carte **Originalité + Détection IA** de l'éditeur quand le module est activé, sinon avec un vérificateur externe.
+3. **Auteur (EEAT)** : ton profil d'auteur est-il complet et vérifiable ?
+4. **Backlinks toxiques** : Gridar n'analyse pas les backlinks. Utilise Ahrefs, Majestic ou un équivalent.
 
-**Plan de recovery (3-6 mois)**
-1. Supprime / désindexe les articles low-quality (`<meta name="robots" content="noindex">`)
-2. Re-écris en profondeur tes top 10 articles (300+ ajouts, restructuration, FAQ)
-3. Renforce ton EEAT (auteur identifié, photo, bio, credentials, sameAs vers profils sociaux)
-4. Schema.org Article + Person + Organization sur tout le site
-5. Désavoue les backlinks toxiques via Google Disavow Tool
-6. Demande une réindexation via GSC
-7. Patiente. Recovery = lent (3-6 mois). Pas de quick win.
+**Plan de relance** :
+1. Supprime ou passe en `noindex` les articles sans valeur.
+2. Réécris en profondeur tes meilleurs articles : faits vérifiés, exemples vécus, FAQ.
+3. Renforce ton profil d'auteur (photo, bio, compétences, liens vers tes profils).
+4. Désavoue les backlinks toxiques avec l'outil de désaveu de Google.
+5. Demande une réindexation des pages corrigées dans Search Console.
+6. Suis la **Détection de déclin** chaque mois. Une relance prend du temps, sans raccourci.
 
-**Si pénalité manuelle** : contestation via "Manual actions" dans GSC. Réponse Google sous 2-4 semaines.
+**Si pénalité manuelle** : Search Console → « Actions manuelles », corrige ce qui est signalé, puis demande un réexamen.
+
+## Recette 11 : Site maison livré par un agent IA
+
+**Profil** : ton site est une application maison (Next.js, Astro, React...) sans CMS. Gridar ne peut pas y publier directement. Tu travailles avec un agent de code comme Claude Code.
+
+**Plan** : Pro ou Agence (le MCP et l'API demandent un jeton `btb_`).
+
+**Mise en place** :
+1. Paramètres → General → **Mode de livraison** → « Via un agent ».
+2. Connecte le serveur MCP de Gridar à ton agent (voir [Intégrations](integrations.md)).
+
+**Boucle de travail** :
+1. Génère tes articles dans Gridar. Ils restent en brouillon dans la file de construction, sans être publiés sur une URL Gridar.
+2. Les **Opportunités SEO** et les mots-clés informationnels non couverts y ajoutent des briefs de pages.
+3. Ton agent récupère la file (`gridar_pull_build_queue`), construit chaque page dans ton dépôt, déploie, puis confirme avec `gridar_mark_page_built` en donnant l'URL en ligne.
+4. À cette confirmation, Gridar enregistre l'URL et l'annonce à IndexNow (Bing, Yandex, Seznam, Naver ; Google n'utilise pas IndexNow).

@@ -1,82 +1,95 @@
 # Plans, crédits et quotas
 
-Pricing transparent : 5 paliers + crédits à la pièce pour les pics ponctuels.
+Quatre plans mensuels, plus des crédits à la pièce quand ton quota d'articles est épuisé.
 
 ## Plans
 
-| | Essai | Solo | Pro | Agence | Enterprise |
-|---|---|---|---|---|---|
-| Prix CAD/mois | **0$** | **29.99$** | **89.99$** ⭐ | **199.99$** | sur mesure |
-| Sites | 1 | 1 | 2 | 5 | 5+ |
-| Articles / mois | 1 | 8 | 60 | 200 | sur mesure |
-| Mots-clés tracking | 0 | 10 + GSC | 30 + GSC + alertes | 100 + alertes | sur mesure |
-| Audit IA | basique | + brief de contenu | bulk + topic clusters | bulk + topic clusters | + |
-| Lexique FR-CA | ❌ | ✓ | ✓ | ✓ | ✓ |
-| Rapport PDF | ❌ | mensuel | hebdomadaire | hebdomadaire | hebdomadaire |
-| API REST | ❌ | ❌ | 30 req/h | 200 req/h | sur mesure |
-| Multi-domaines | ❌ | ❌ | ❌ | ✓ | ✓ |
-| White-label | ❌ | ❌ | ❌ | ✓ | ✓ |
-| Support | community | email <72h | email <48h | <8h | SLA + dédié |
+| | Essai | Solo | Pro | Agence |
+|---|---|---|---|---|
+| Prix CAD/mois | **0$** | **29.99$** | **89.99$** | **199.99$** |
+| Sites | 1 | 1 | 2 | 5 |
+| Articles générés / mois | 1 | 8 | 60 | 200 |
+| Mots-clés suivis | 0 | 10 | 30 | 100 |
+| Accès par jeton (API REST, connecteur MCP, n8n) | ❌ | ❌ | 30 req/h | 200 req/h |
 
-⭐ = le plus populaire.
+Sites, articles, mots-clés et accès par jeton : ce sont les limites que l'application applique selon ton plan. Le plan Essai ne demande pas de carte.
 
-Tarifs en CAD, taxes québécoises (TPS+TVQ) ajoutées au checkout. Annulation en un clic, pas de lock-in.
+Les prix affichés sont en CAD. Le paiement passe par Stripe Checkout et accepte les codes promo.
+
+### Plus de 5 sites ou besoin sur mesure
+
+Aucun plan au-delà d'Agence n'est en libre-service. Écris à `tokamdarius@gmail.com` avec le sujet "Plan Enterprise - demande sur mesure" (bouton **Nous contacter** sur `/billing`).
 
 ## Crédits à la pièce
 
-Quand ton quota mensuel est épuisé, tu peux acheter des crédits one-time pour continuer à générer ce mois-là. Les crédits **n'expirent jamais** et sont reportés d'un mois à l'autre.
+1 crédit = 1 article généré. Les crédits servent seulement quand ton quota mensuel est épuisé. Ils **n'expirent jamais** : ton solde passe d'un mois à l'autre.
 
-| Pack | Crédits | Prix | $/article |
-|---|---|---|---|
-| Petit boost | 10 | 25$ | 2.50$ |
-| Boost moyen ⭐ | 50 | 99$ | 1.98$ |
-| Gros volume | 200 | 299$ | 1.50$ |
+| Pack | Crédits | Prix |
+|---|---|---|
+| Petit boost | 10 | 25$ |
+| Boost moyen | 50 | 99$ |
+| Gros volume | 200 | 299$ |
 
-Les crédits sont consommés **uniquement après** que le quota mensuel soit épuisé. Tu ne perds donc jamais des crédits achetés en sur-utilisant ton plan - le quota gratuit est toujours dépensé en premier.
+Achat : `/billing` → carte **Crédits achetés** → bouton **Acheter** sous le pack → Stripe Checkout. Les crédits arrivent sur ton solde quand Stripe confirme le paiement. Un même paiement ne peut pas être crédité deux fois.
 
-Achat : `/billing` → card "Crédits achetés" → choisis un pack → Stripe Checkout → crédits ajoutés à ton solde après paiement.
+Quand une génération est bloquée faute de quota, le générateur propose aussi les boutons **+10 crédits · 25$** et **+50 crédits · 99$**.
+
+La carte **Crédits achetés** affiche ton solde et l'historique de tes 30 dernières transactions.
+
+## Ce qui consomme ton quota
+
+Seules ces actions décomptent un article (ou un crédit) :
+
+- **Générer un article** : générateur du tableau de bord, `POST /api/v1/sites/<id>/generate/`, outil MCP `gridar_generate_article`.
+- **Générer un article frère traduit** : `POST /api/v1/sites/<id>/articles/<slug>/generate-sister-article/`, outil MCP `gridar_generate_sister_article`.
+- **Générer une landing par IA** : `POST /api/v1/sites/<id>/landings/generate/`, outil MCP `gridar_generate_landing`.
+
+Un aperçu (mode dry run du générateur) ne consomme rien. Un article ou une landing créés à la main non plus.
+
+Par jeton, chaque appel compte aussi dans ta limite horaire. Voir [API REST publique](api.md).
 
 ## Mécanique de quota détaillée
 
 ### Quota mensuel d'articles
 
-- **Reset** : 1er de chaque mois UTC (pas de pro-rata)
-- **Mesuré au moment de la génération réussie** (un dry_run ne consomme rien)
-- **Visible sur** : `/billing` (barre de progression) + sidebar dashboard (indicateur compact)
-- **Indicateur** :
-  - Vert : usage < 70 %
-  - Orange : 70-99 % (banner "Plus que X articles ce mois")
-  - Rouge : 100 % atteint, pas de crédits → bouton désactivé + inline upgrade card
-  - Ambre : 100 % atteint mais crédits dispo → notice "Tu utilises maintenant tes crédits"
+- **Reset** : le compteur suit le mois civil en UTC (clé `AAAA-MM`). Un nouveau mois repart à zéro. Pas de pro-rata.
+- **Décompte** : après une génération réussie. Une génération qui échoue ne consomme rien.
+- **Où le voir** :
+  - `/billing` : barre "Articles ce mois-ci", rouge à partir de 90 %.
+  - Barre latérale du tableau de bord : indicateur compact, ambre à partir de 80 %, rouge quand le quota et les crédits sont épuisés.
+  - Générateur d'articles : bannière à partir de 70 %.
+- **Bannière du générateur** :
+  - 70 à 99 % : "Plus que X articles ce mois-ci".
+  - 100 % avec des crédits : "Tu utilises maintenant tes crédits".
+  - 100 % sans crédit : génération bloquée, boutons pour acheter des crédits ou voir les plans.
 
 ### Logique de consommation
 
-Pour chaque génération réussie :
+Pour chaque génération :
 
-1. **Quota mensuel non épuisé** → on incrémente le compteur mensuel (gratuit pour toi, déjà payé via abonnement)
-2. **Quota mensuel épuisé + crédits ≥ 1** → on décrémente 1 crédit
-3. **Quota et crédits épuisés** → HTTP 402 + bouton "Acheter des crédits" + "Voir les plans"
+1. **Quota mensuel non épuisé** → le compteur du mois augmente de 1.
+2. **Quota épuisé + crédits ≥ 1** → ton solde baisse de 1 crédit.
+3. **Quota et crédits épuisés** → la génération est refusée : HTTP 402 avec `"quota_exceeded": true`.
 
-Cette logique garantit que tu ne **gaspilles jamais** un crédit acheté tant que ton plan a encore du quota disponible.
+Ton quota inclus passe toujours avant tes crédits achetés.
 
 ### Limites de sites
 
-Vérifié au moment de **créer un nouveau site** (connecter un WP/Shopify/Webflow ou créer un blog hébergé).
+Vérifiée quand tu **crées un nouveau site** : blog hébergé, connexion WordPress, Shopify ou Webflow.
 
 | Plan | Limite |
 |---|---|
 | Essai / Solo | 1 |
 | Pro | 2 |
 | Agence | 5 |
-| Enterprise | sur mesure |
 
-Si tu downgrades vers un plan avec moins de sites, tes sites existants restent (rien n'est supprimé). Tu ne pourras simplement pas en créer de nouveaux tant que tu n'es pas en-dessous de la limite.
+- Seuls tes sites actifs comptent.
+- **Reconnecter** un site WordPress, Shopify ou Webflow déjà connecté ne prend pas de place : Gridar retrouve le site existant.
+- Limite atteinte → HTTP 402 avec `"limit_type": "sites"`.
 
-**Reconnect** d'un site existant ne consomme PAS un slot supplémentaire (on détecte que le site existe déjà).
+### Limites de mots-clés suivis
 
-### Limites de mots-clés trackés
-
-Comptées **across tous tes sites**, pas par site. Donc un user Pro avec 30 mots-clés peut les répartir 15+15 sur 2 sites, ou 30+0.
+Comptées **sur l'ensemble de tes sites actifs**, pas par site. Un compte Pro avec 30 mots-clés peut les répartir 15 + 15 sur 2 sites, ou 30 + 0.
 
 | Plan | Limite |
 |---|---|
@@ -84,37 +97,21 @@ Comptées **across tous tes sites**, pas par site. Donc un user Pro avec 30 mots
 | Solo | 10 |
 | Pro | 30 |
 | Agence | 100 |
-| Enterprise | sur mesure |
 
-Si tu downgrades, tes mots-clés existants restent actifs mais tu ne pourras plus en ajouter tant que tu n'es pas sous la limite.
-
-**Réactiver** un mot-clé désactivé ne consomme pas un slot (déjà compté dans ton total).
+- **Réactiver** un mot-clé retiré compte comme un ajout : il te faut une place libre.
+- Limite atteinte → HTTP 402 avec `"limit_type": "keywords"`.
 
 ## Stripe - facturation
 
-- **Méthodes acceptées** : carte (Visa, MC, Amex, Discover), Apple Pay, Google Pay
-- **Devise** : CAD (Stripe convertit automatiquement si ta carte est USD/EUR)
-- **Taxes** : TPS 5 % + TVQ 9.975 % auto-calculées et facturées si Québec
-- **Factures** : générées automatiquement, accessibles via le portail Stripe (`/billing` → "Gérer mon abonnement")
-- **Annulation** : un clic dans le portail Stripe. Pas de pro-rata - ton accès continue jusqu'à la fin de la période payée
-- **Sécurité** : on ne touche jamais à tes infos de carte (PCI-DSS via Stripe)
+- **Souscription** : `/billing` → bouton **Souscrire** (ou **Passer à** suivi du nom du plan) → Stripe Checkout.
+- **Gérer mon abonnement** : ce bouton, visible avec un plan payant actif, ouvre le portail client Stripe. C'est là que tu modifies ta carte, consultes tes factures et annules.
+- **Données de carte** : Stripe les traite. Gridar garde seulement les identifiants Stripe de ton client et de ton abonnement.
 
-## Upgrade / Downgrade en cours d'abonnement
+## Changer de plan ou annuler
 
-**Upgrade** (Solo → Pro par ex.) : effet immédiat. Stripe pro-rata l'écart. Tu accèdes aux features Pro tout de suite.
+- **Changement de plan** : Gridar lit ton plan dans les événements que Stripe lui envoie. Le nouveau plan et ses limites s'appliquent dès que Stripe confirme le changement.
+- **Annulation en fin de période** : `/billing` affiche "Annulation effective le" suivi de la date de fin.
+- **Fin de l'abonnement** : ton compte repasse au plan Essai. Rien n'est supprimé : tes sites restent actifs, tes mots-clés restent dans ta liste, tes articles publiés restent en ligne. Les limites de l'Essai s'appliquent : pas de nouveau site tant que tu en as un actif, aucun nouveau mot-clé, 1 article généré par mois.
+- **Paiement refusé au renouvellement** : ton abonnement passe en statut `past_due`. Ton plan et ses limites restent en place jusqu'à ce que Stripe annule l'abonnement.
 
-**Downgrade** (Pro → Solo) : effet à la fin de ta période en cours. Tes sites/mots-clés au-dessus de la nouvelle limite ne sont pas supprimés (mais figés en lecture).
-
-**Cancel** : effet à la fin de la période. Plan = `free` à expiration. Tes sites passent en `is_active=False`. Tes articles publiés sur leur CMS natif (WP/Shopify/Webflow) restent en place.
-
-## Plan Enterprise
-
-Pour les besoins qui sortent du cadre :
-- 5+ sites
-- Volume custom (1000+ articles/mois, 500+ mots-clés)
-- White-label complet (ta marque, ton domaine pour le dashboard)
-- Intégrations privées (CRM custom, n8n self-hosted, ERP)
-- SLA contractuel (uptime, response time)
-- Comptable dédié + onboarding personnalisé
-
-Contact : `tokamdarius@gmail.com` avec sujet "Plan Enterprise - demande sur mesure".
+Voir aussi : [API REST publique](api.md), [Intégrations](integrations.md), [FAQ](faq.md).

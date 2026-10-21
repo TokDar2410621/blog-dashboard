@@ -28,7 +28,7 @@ export function DocsShell({ slug, content }: Props) {
               Documentation
             </span>
             <a
-              href="https://github.com/TokDar2410621/blog-dashboard/tree/main/docs"
+              href="https://github.com/TokDar2410621/blog-dashboard/tree/main/marketing/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[11px] text-zinc-500 hover:text-zinc-200 inline-flex items-center gap-1"

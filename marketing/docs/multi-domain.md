@@ -1,107 +1,103 @@
-# Comparaison multi-domaines (Agence)
+# Vue multi-sites
 
-Vue cross-sites pour les agences qui gèrent plusieurs blogs clients. Disponible **plan Agence et Enterprise** uniquement.
+Deux pages te montrent tous tes sites d'un coup : **Comparaison multi-sites** (`/compare`) et **Santé de tous mes sites** (`/dashboard/overview`). Elles existent sur tous les plans. Le nombre de sites que tu peux créer dépend de ton plan : 1 en Essai et Solo, 2 en Pro, 5 en Agence. Voir [Plans, crédits et quotas](plans-credits.md).
 
-## Accès
+## Comparaison multi-sites (`/compare`)
 
-Sites → bouton **Comparer mes sites** (en bas de la page Sites) → `/compare`.
+### Accès
 
-## Vue d'ensemble
+Page Sites → bouton **Comparer mes sites** (en bas de la page).
 
-Tableau comparatif de tous tes sites actifs, avec pour chaque ligne :
+### Totaux
 
-| Colonne | Description |
+Quatre compteurs en haut de page :
+
+- Sites actifs sur le total de tes sites
+- Articles publiés
+- Vues totales
+- Mots-clés suivis
+
+### Tableau par site
+
+Une ligne par site. Un site inactif apparaît grisé.
+
+| Colonne | Contenu |
+|---|---|
+| Site | Nom + domaine, lien vers le tableau de bord du site |
+| Articles | Articles publiés, brouillons entre parenthèses |
+| Vues | Total des vues des articles publiés |
+| Langues | Nombre d'articles publiés par langue |
+| GSC | Google Search Console connectée ou non |
+| EEAT | Profil auteur rempli ou non (bio ou rôle) |
+| Mots-clés | Mots-clés suivis actifs |
+| Redirections | Redirections 301 actives |
+
+L'icône en bout de ligne ouvre le tableau de bord du site.
+
+### Couverture
+
+Deux cartes sous le tableau :
+
+- **Couverture Google Search Console** : combien de tes sites ont GSC connecté.
+- **Couverture profil auteur EEAT** : combien de tes sites ont un profil auteur rempli.
+
+### Limite
+
+La page lit les articles des sites hébergés et des sites branchés sur une base de données externe. Un site WordPress, Shopify ou Webflow y apparaît sans statistiques : les zéros et les croix de sa ligne ne reflètent pas l'état réel du site. Pour ces sites, ouvre leur tableau de bord.
+
+## Santé de tous mes sites (`/dashboard/overview`)
+
+### Où la trouver
+
+Sélecteur de sites → bouton **Voir vue multi-sites** (visible dès que tu as plus d'un site).
+
+### Colonnes fiables
+
+| Colonne | Contenu |
 |---|---|
 | Site | Nom + domaine |
-| Plan | Le plan associé (héritage du compte ou per-site override Enterprise) |
-| Articles | Total publiés + articles ce mois |
-| Score SEO moyen | Moyenne pondérée sur tous les articles publiés |
-| Mots-clés trackés | Combien + position moyenne |
-| Top 10 % | Combien de mots-clés en top 10 Google |
-| Tendance positions | Variation 30j (📈 +3 / 📉 -7 / ⏸ stable) |
-| Trafic estimé / mois | Via GSC si connecté, sinon estimation depuis positions × volume |
+| SEO Score | Score SEO composite du site, de 0 à 100 : vert à partir de 70, ambre de 40 à 69, rouge en dessous |
+| Decay | Nombre d'articles en baisse sur 30 jours dans Google Search Console |
+| Action | Bouton **Ouvrir** vers le tableau de bord du site |
 
-Chaque ligne cliquable → ouvre le dashboard du site dans un nouvel onglet.
+Sans GSC connecté, la colonne Decay affiche **GSC requis**. Si l'accès GSC a expiré, elle affiche **Reconnecter GSC**. Les deux mènent aux réglages GSC du site. Voir [Google Search Console](gsc.md).
 
-## Filtres + tris
+### Colonnes pas encore branchées
 
-- **Filtrer par** : plan, langue, statut (actif / inactif), CMS (WP / Shopify / etc.)
-- **Trier par** : n'importe quelle colonne, asc/desc
-- **Sélectionner** plusieurs sites → actions bulk (voir ci-dessous)
+Les colonnes **AI Visibility**, **Trafic organique** et **Alertes** ne sont pas encore calculées à partir de tes données. Ignore-les pour l'instant.
 
-## Actions bulk
+## Automatiser un rapport par site
 
-Une fois plusieurs sites cochés :
+La page Comparaison n'a pas d'équivalent par jeton API. Pour un rapport automatisé, passe par l'[API REST publique](api.md) (plans Pro et Agence) :
 
-- **Auditer tous** : lance un audit SEO global sur les sites sélectionnés. Résultat agrégé.
-- **Snapshot positions** : crawl SERP immédiat pour tous les sites. Compte dans ton quota API.
-- **Exporter en CSV** : tableau Excel-friendly avec toutes les métriques. Utile pour rapports clients.
-- **Email digest groupé** : envoie un seul email PDF qui couvre tous les sites sélectionnés.
-
-## Comparaison de mots-clés
-
-**Onglet "Mots-clés"** sur la page Compare.
-
-Tableau croisé : ligne = mot-clé, colonne = site, cellule = position du site sur ce mot-clé.
-
-Détecte :
-- **Mots-clés communs** : que plusieurs de tes sites ciblent (potentielle cannibalisation cross-domains)
-- **Mots-clés exclusifs** : qu'un seul site cible (opportunités de partage de contenu)
-- **Gaps** : mots-clés où tu classes top 30 sur 1 site mais pas du tout sur les autres
-
-Utile pour orchestrer ta stratégie de contenu cross-clients.
-
-## Rapport "client" (white-label)
-
-**Sidebar Compare → Rapport client**
-
-Génère un PDF par site sélectionné, avec :
-- Page 1 : exec summary (score SEO, articles publiés, top 10 %, trafic estimé)
-- Page 2 : top 5 articles (par trafic / par position)
-- Page 3 : tendances mots-clés (graphique 90j)
-- Page 4 : recommandations (articles en decay, gaps, audits à corriger)
-- Page 5 : crédits (ton logo, ton agence, contact)
-
-**White-label** :
-- Agence : ton logo en haut + nom de ton agence dans le footer + ton contact
-- Le client ne voit pas "Gridar" sauf en mention discrète "Powered by"
-- Customizable dans Site Settings → onglet "White-label" (Agence uniquement)
-
-## API multi-domain
+1. `GET /api/v1/sites/` pour la liste de tes sites et leurs `id`.
+2. Pour chaque site :
+   - `GET /api/v1/sites/<id>/seo-score/` : score composite + actions à mener.
+   - `GET /api/v1/sites/<id>/keywords/` : mots-clés suivis + dernière position connue.
+   - `GET /api/v1/sites/<id>/proof/summary/` : impressions et clics gagnés d'après GSC.
+   - `GET /api/v1/sites/<id>/digest/weekly/` : articles publiés dans la semaine, plus gros mouvements de positions. Sites hébergés et sites à base externe seulement.
 
 ```bash
-curl -H "Authorization: Bearer btb_xxx" \
-  https://api.gridar.app/api/v1/multi-domain-stats/
+#!/bin/bash
+# Rapport mensuel : score SEO de chaque site
+# GRIDAR_TOKEN contient ton jeton btb_xxx (variable d'environnement, jamais en dur)
+for ID in $(curl -s -H "Authorization: Bearer $GRIDAR_TOKEN" \
+    https://api.gridar.app/api/v1/sites/ | jq '.results[].id'); do
+  curl -s -H "Authorization: Bearer $GRIDAR_TOKEN" \
+    "https://api.gridar.app/api/v1/sites/$ID/seo-score/"
+done
 ```
 
-Retourne le JSON équivalent du tableau comparatif. Pratique pour brancher dans un dashboard client custom (Notion / Airtable / Google Sheets via Zapier).
+Chaque appel compte dans ta limite horaire : 30 requêtes/heure en Pro, 200 en Agence.
 
-## Limites de plan
+## Partager les résultats d'un site avec ton client
 
-| | Agence (199.99$) | Enterprise |
-|---|---|---|
-| Sites comparables | 5 | sur mesure |
-| Bulk audits / mois | 100 | sur mesure |
-| Rapports PDF white-label | illimités | illimités |
-| Export CSV | ✅ | ✅ |
+Chaque site peut avoir une **page de preuve publique** en lecture seule : `https://www.gridar.app/proof/<token>`. Elle montre les impressions et les clics gagnés d'après Google Search Console. Active-la depuis le tableau de bord du site ou par l'API (`POST /api/v1/sites/<id>/proof/share/`). Tu peux la révoquer à tout moment : l'URL répond alors 404.
 
-## Recettes pour agence SEO
+## Recette : onboarding d'un nouveau client
 
-### Onboarding d'un nouveau client
-
-1. Connecte le site du client (5 min selon le mode)
-2. Configure Site Settings (Knowledge base, EEAT, GSC) - 10 min
-3. Génère 5-10 articles de seed pour démarrer le content cluster - 1h IA + 30 min de révision
-4. Configure 10-15 mots-clés tracking
-5. Envoie le rapport client #1 par email après 7j
-
-Tu factures le client pour ton expertise + setup. Notre coût pour toi : 1 slot site + ~30 articles du quota.
-
-### Reporting mensuel automatisé
-
-1. Crée un script (ou cron / GitHub Action) qui appelle `GET /api/v1/multi-domain-stats/` chaque 1er du mois
-2. Filtre les sites du client X
-3. Génère le rapport PDF white-label via UI ou via API (endpoint en dev)
-4. Email automatique au client
-
-Gain : 1 jour/mois économisé par client. Avec 10 clients = 10 jours/mois récupérés.
+1. Connecte le site du client. Voir [Connecter un site](connect/README.md).
+2. Dans les réglages du site, remplis le **modèle d'affaires** et la **bio de l'auteur** : la génération refuse de partir sans ces deux champs. Voir [Réglages du site](site-settings.md).
+3. Connecte Google Search Console. Voir [Google Search Console](gsc.md).
+4. Ajoute les mots-clés à suivre, dans la limite de ton plan.
+5. Active la page de preuve publique et envoie le lien à ton client.

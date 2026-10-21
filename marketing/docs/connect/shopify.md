@@ -1,76 +1,78 @@
 # Connecter Shopify
 
-Pour les boutiques Shopify (tous plans). Articles publiés directement dans `taboutique.com/blogs/news/article-slug` via l'Admin API.
+Pour les boutiques Shopify. Gridar publie les articles dans le blog natif de ta boutique via l'Admin API, sur ton domaine.
 
 ## Pré-requis
 
-- Boutique Shopify active
-- Accès admin (`Manage apps`)
-- Au moins un blog créé (Shopify en crée un par défaut intitulé "News")
+- Une boutique Shopify active
+- Le droit de créer une app dans l'admin de la boutique
+- Au moins un blog dans la boutique (Shopify en crée un par défaut, "News")
 
 ## Étapes
 
 ### 1. Crée une Custom App dans Shopify
 
-1. Shopify Admin → Settings → **Apps and sales channels**
-2. **Develop apps** (en haut à droite, peut nécessiter d'activer le développement d'app - clique le toggle si demandé)
-3. **Create an app** → nomme-la `Gridar`
-4. Onglet **Configuration** → **Admin API integration** → **Configure**
-5. Cherche et coche le scope `write_content` (et/ou `read_content`)
-6. **Save**
-7. Onglet **API credentials** → **Install app**
-8. Une fenêtre montre le **Admin API access token** (commence par `shpat_`)
-9. **Copie-le immédiatement** - il ne sera plus affiché
+Le dialog Gridar rappelle ces étapes et pointe vers la doc Shopify :
+
+1. Shopify Admin → Settings → **Apps and sales channels** → **Develop apps**
+2. **Create an app**, nomme-la `Gridar`
+3. Onglet **Configuration** → Admin API access scopes → coche `write_content`
+4. **Install app**, puis copie l'**Admin API access token** (il commence par `shpat_`). Copie-le tout de suite : Shopify ne l'affiche qu'une fois.
 
 ### 2. Connecte dans Gridar
 
-Sites → **Connecter Shopify**. Tu remplis :
+Sur `/sites`, clique **Shopify**. Le dialog "Connecter ta boutique Shopify" compte deux étapes.
 
-- **Domaine** : `monstore.myshopify.com` (le sous-domaine technique, pas le custom domain). Si tu colles `https://monstore.myshopify.com/admin`, on extrait le bon hostname automatiquement.
-- **Token** : le `shpat_xxx` collé tel quel.
+**Étape 1** : remplis
 
-Étape 2 du dialog : on liste tes blogs Shopify (généralement "News"). Choisis lequel reçoit les articles.
+- **Domaine .myshopify.com** : le domaine technique (`monstore.myshopify.com`), pas ton domaine custom. Gridar accepte aussi `https://monstore.myshopify.com/admin` ou `monstore` seul, et en extrait le bon domaine.
+- **Admin API access token** : le `shpat_...` collé tel quel.
 
-### 3. Ce qu'on fait sous le capot
+Clique **Vérifier la connexion**. Gridar appelle `shop.json` pour valider le token, puis `blogs.json` pour lister tes blogs.
 
-1. `GET admin/api/.../shop.json` → valide le token + récupère le shop name + custom_domain
-2. `GET admin/api/.../blogs.json` → liste les blogs disponibles
-3. Tu choisis un blog → on stocke `shopify_blog_id`
-4. Scan branding sur ton custom domain (ou `monstore.myshopify.com` si pas de custom)
-5. Création de la `Site` row, redirection
+**Étape 2** : l'écran affiche "Connecté à {nom de la boutique}" avec le domaine public, la devise et la locale. L'encart **Branding détecté** montre le branding lu sur ton domaine public (ou sur `.myshopify.com` si tu n'en as pas). Décoche **Appliquer** pour le régler plus tard.
 
-### 4. Comportement après publication
+Choisis le blog qui reçoit les articles (le premier est présélectionné), puis clique **Connecter**. Tu arrives sur le dashboard du site.
 
-Article généré via Gridar → `POST admin/api/.../blogs/<id>/articles.json`. URL finale :
-- Si tu as un custom domain : `taboutique.com/blogs/news/article-slug`
-- Sinon : `monstore.myshopify.com/blogs/news/article-slug`
+## Ce qui se passe à la génération
 
-L'article respecte le template Liquid de ta boutique - même typo, mêmes header/footer que ton storefront.
+Gridar envoie un `POST` à `admin/api/2024-10/blogs/<id>/articles.json`. L'article est **publié tout de suite** (le champ `published_at` est rempli), y compris quand il vient de l'autopilote. Il prend le template Liquid de ta boutique : même typo, mêmes header et footer que ton storefront.
+
+URL finale : `taboutique.com/blogs/<handle-du-blog>/<handle-de-l-article>` (ex : `/blogs/news/...` pour le blog "News"), ou `monstore.myshopify.com/blogs/...` sans domaine custom.
+
+Pour relire avant publication, coche **Aperçu seulement (ne pas publier)** dans le formulaire de génération : rien n'est envoyé à Shopify.
 
 ## Champs Shopify utilisés
 
-| Notre champ | Shopify | Note |
+| Champ Gridar | Champ Shopify | Note |
 |---|---|---|
 | Titre | `title` | |
-| Slug | `handle` | URL-safe, on slug-ifie si besoin |
+| Slug | `handle` | |
 | Contenu | `body_html` | Markdown converti en HTML |
-| Excerpt | `summary_html` | Apparaît dans listings |
-| Auteur | `author` | Hérite du `default_author` du Site |
-| Tags | `tags` | CSV |
-| Cover | `image.src` | URL externe (Pexels par défaut) |
-| Statut | `published_at` | Set = published, null = draft |
+| Extrait | `summary_html` | Apparaît dans les listes d'articles |
+| Auteur | `author` | **Auteur par défaut** du site (Paramètres → Auteur), sinon "Admin" |
+| Tags | `tags` | Liste séparée par des virgules |
+| Couverture | `image.src` | URL de l'image de couverture trouvée à la génération |
+| Statut | `published_at` | Rempli = publié |
 
 ## Limites
 
-- **Pas de catégories** : Shopify a `tags` uniquement (pas de hiérarchie). Notre topic clusters reste calculé en interne mais ne mappe pas à Shopify.
-- **Suppression définitive** : Shopify ne fait pas de soft-delete. Si tu supprimes un article via Gridar, c'est irréversible côté Shopify.
-- **Custom domain** : on lit le custom domain depuis l'API Shopify et l'utilise pour le branding scan. Si Shopify ne le reporte pas (rare), on utilise `myshopify.com`.
+- **Pas de catégories** : Shopify n'a que des tags. Les topic clusters restent calculés dans Gridar.
+- **Titre en double possible** : le contenu envoyé commence par le titre en H1. Selon ton thème, le titre peut apparaître deux fois.
+- **Suppression définitive** : supprimer un article depuis Gridar le supprime dans Shopify, sans corbeille.
+- **Domaine custom** : Gridar le lit dans la réponse de Shopify et s'en sert comme domaine du site. Sans domaine custom, il garde `monstore.myshopify.com`.
+
+## Changer le token ou le blog
+
+Refais la connexion depuis `/sites` avec le même domaine `.myshopify.com` : Gridar met à jour le token et le blog choisi sur le site existant.
 
 ## Dépannage
 
-| Erreur | Cause | Fix |
+| Message | Cause | Solution |
 |---|---|---|
-| "Token invalide ou révoqué" | `shpat_` mal copié ou app désinstallée | Re-générer le token côté Shopify, re-coller |
-| "Domaine Shopify introuvable" | Faute de frappe ou store fermé | Confirme l'orthographe `monstore.myshopify.com` |
-| "Token sans permission write_content" | Scope manquant | Custom App → Configuration → Admin API → coche `write_content` → Save → re-installer |
-| "Cette boutique n'a aucun blog" | Tu as supprimé tous les blogs | Shopify Admin → Online Store → Blog posts → Manage blogs → New blog |
+| "Token invalide ou révoqué - vérifie le Admin API access token." | Token mal copié ou app désinstallée | Génère un nouveau token dans la custom app et recolle-le |
+| "Token Shopify trop court - colle bien le Admin API access token." | Copie tronquée | Recopie le token complet |
+| "Domaine Shopify introuvable - vérifie l'orthographe du sous-domaine .myshopify.com." | Faute de frappe ou boutique fermée | Vérifie `monstore.myshopify.com` |
+| "Token sans la permission 'write_content' - re-créé la custom app avec le scope write_content." | Scope manquant | Custom App → Configuration → coche `write_content` → Save → réinstalle l'app |
+| "Cette boutique n'a aucun blog." | Aucun blog dans la boutique | Shopify Admin → Online Store → Blog posts → Manage blogs → crée un blog |
+| "Limite de sites atteinte (x/y)..." | Ton plan est plein | Supprime un site ou change de plan sur `/billing` |

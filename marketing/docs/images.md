@@ -1,148 +1,140 @@
 # Gestion des images
 
-3 sources d'images intégrées + upload manuel + alt-text auto par IA. Tout vit dans la **galerie d'images** du site.
+Quatre façons de mettre une image dans un article : recherche Pexels, recherche Google Images, génération par IA (couverture seulement) et upload. Le texte alternatif peut être proposé par l'IA, à la demande. Les fichiers que tu uploades et les images que tu génères vont dans ta bibliothèque **Images**.
 
-## Galerie
+## Bibliothèque d'images
 
-**Sidebar → Images**
+**Barre latérale → Images**
 
-Liste toutes les images uploadées sur ce site (cover images, illustrations dans les articles, OG images). Pour chaque image :
-- Aperçu thumbnail
-- Nom de fichier
-- Source (`pexels` / `serper` / `ai_gen` / `manual_upload`)
-- Alt-text (modifiable inline)
-- URL publique (à coller dans un article ou page)
-- Articles qui l'utilisent
-- Bouton supprimer
+La bibliothèque contient les images uploadées et les images générées par IA. Elle appartient à ton compte : tu y retrouves les mêmes images depuis chacun de tes sites. Elle affiche les 500 plus récentes.
 
-Filtres : par source, par usage (cover / inline / OG), par date.
+- zone d'upload : glisse-dépose ou **parcourez**, plusieurs fichiers à la fois
+- **Rechercher une image...** : filtre par nom de fichier
+- pour chaque image : aperçu, nom de fichier, bouton **Copier URL** (l'adresse à coller dans un article ou une page)
 
-## 4 sources d'images
+La bibliothèque n'a pas de suppression, pas de filtre par source, pas de texte alternatif et ne montre pas les articles qui utilisent une image. Les photos choisies sur Pexels ou Google Images n'y figurent pas : Gridar ne les copie pas (voir plus bas).
 
-### 1. Pexels (gratuit, recommandé par défaut)
+## Où ajouter une image
 
-API Pexels : photos haute qualité sous license CC0 (réutilisation libre, même commerciale).
+| Endroit | Sources |
+|---|---|
+| Éditeur → **Paramètres** → **Image de couverture** | URL, **Pexels**, **Google Images**, **Générer (IA)** |
+| Éditeur → barre d'outils → **Image** (fenêtre **Insérer une image**) | **Pexels**, **Upload**, **URL** |
+| Éditeur → glisser-déposer ou coller dans la zone Markdown | Upload direct à l'endroit du curseur |
+| Bibliothèque **Images** | Upload, puis **Copier URL** |
 
-- Recherche par mot-clé (FR ou EN)
-- Filtres : portrait / paysage / carré, taille
-- Prévisualisation avant insertion
-- Stocké chez nous quand tu insères (pour stabilité - si Pexels delete, ton article continue de fonctionner)
+Dans l'**Aperçu en direct** de l'éditeur, clique une image pour la remplacer : **Insérer une image** s'ouvre avec une recherche Pexels sur son texte alternatif.
 
-Activé par défaut sur tous les sites. Aucune config requise. **Nécessite** que `PEXELS_API_KEY` soit set côté nous (déjà fait pour la prod).
+## 1. Pexels
 
-### 2. Serper Images (Google Images)
+Recherche dans la banque de photos Pexels, 15 résultats par recherche, avec le nom du photographe. Disponible sans réglage, pour la couverture et dans le corps de l'article.
 
-API Serper : résultats Google Images réels.
+Gridar insère l'adresse de la photo chez Pexels : l'image reste hébergée par Pexels et n'est pas copiée chez Gridar. Vérifie que la licence Pexels couvre ton usage.
 
-- Plus de variété que Pexels
-- **Attention licence** : Google Images contient des images sous copyright. À toi de vérifier la licence avant utilisation commerciale (filtre "Creative Commons" disponible).
-- Stocké chez nous à l'insertion
+## 2. Google Images
 
-À activer dans Site Settings → Images → "Use Serper for image search".
+Onglet **Google Images** de l'image de couverture : 20 résultats Google Images, avec le site source.
 
-### 3. Génération IA
+- Plus de choix que Pexels.
+- **Attention aux droits** : ces images appartiennent aux sites qui les publient. Vérifie la licence de chaque image avant un usage commercial.
+- Comme pour Pexels, Gridar insère l'adresse d'origine : si le site source retire l'image, elle disparaît de ton article.
 
-Crée une image custom à partir d'un prompt. Backend supporte DALL-E 3 (par défaut) et Stable Diffusion.
+## 3. Génération par IA
 
-- Prompt : description de l'image en EN (les modèles d'image fonctionnent mieux en EN même si ton article est en FR)
-- Style : photo réaliste / illustration / 3D / vector
-- Aspect ratio : 1:1 / 16:9 / 9:16 / 4:3
-- Coût : ~0.04$/image DALL-E 3, gratuit pour SD si self-hosted
+Onglet **Générer (IA)** de l'image de couverture :
 
-Disponible sur les plans Pro et Agence. Désactivé en Solo et Free.
+1. **Décrivez l'image souhaitée...**
+2. Lance la génération : l'aperçu s'affiche
+3. **Utiliser cette image** l'applique en couverture
 
-### 4. Upload manuel
+Gridar ajoute à ta description des consignes fixes : image de couverture de blog de qualité, style professionnel et moderne, sans texte, lettres, filigrane ni typographie. Le format est fixe (16:9, une image PNG). Il n'y a pas de choix de style ni de proportions. L'image générée rejoint ta bibliothèque avec une adresse permanente.
 
-Drag-drop ou click-to-upload depuis la galerie ou directement dans l'éditeur.
+Si la génération renvoie une erreur, prends une photo Pexels, une image Google ou un upload.
 
-- Formats : JPG, PNG, WebP, GIF, SVG
-- Taille max : 5 MB par image
-- Compression auto en WebP côté nous (qualité 85, ~30 % de gain)
-- Stocké sur Backblaze B2 + CDN Cloudflare
+## 4. Upload
 
-## Alt-text auto par IA
+Glisse-dépose dans l'éditeur ou dans la bibliothèque, colle une image dans la zone Markdown, ou passe par l'onglet **Upload** d'**Insérer une image**.
 
-Quand tu insères une image (depuis n'importe quelle source), on génère automatiquement un alt-text :
+- Formats acceptés : JPEG, PNG, GIF, WebP
+- Taille maximale : 5 Mo par image
+- Le fichier est stocké tel quel par Gridar, sans compression ni redimensionnement
+- Adresse permanente de la forme `/api/images/<uuid>/`, servie avec un cache navigateur long
 
-- Modèle : Claude Sonnet voit l'image (vision) et écrit une description courte (15-25 mots)
-- Inclut le **contexte de ton article** : le keyword cible, le sujet → l'alt-text est SEO-pertinent, pas juste descriptif
-- Langue : matche celle de l'article (FR par défaut, EN/ES selon)
-- Modifiable manuellement après insertion
+Une image uploadée est publique : toute personne qui a son adresse peut l'afficher.
 
-Important pour le SEO : Google utilise l'alt-text pour Image Search + accessibilité (lecteurs d'écran).
+## Texte alternatif (alt)
 
-## Optimisation auto
+Dans **Insérer une image**, le champ **Texte alternatif** :
 
-Toute image servie depuis notre infra (mode hébergé) ou stockée chez nous (autres modes) passe par :
+- se remplit avec la description Pexels ou, à défaut, ta recherche
+- pour un upload, reprend le nom du fichier ; pour une URL, vaut "image"
+- laissé vide, il devient "image", que l'audit SEO compte comme générique : remplace-le
+- bouton **IA** : un modèle de vision regarde l'image et propose un texte alternatif de moins de 125 caractères, dans la langue de l'article, en tenant compte du titre et du mot-clé principal (le premier tag) quand il s'intègre sans forcer. Il ajoute une description d'une phrase sous le champ.
 
-- **Compression WebP** : 30-50 % de gain de poids vs JPG
-- **Responsive `srcset`** : 3 tailles auto (mobile/tablet/desktop)
-- **Lazy loading** : `loading="lazy"` natif sur toutes les images
-- **CDN Cloudflare** : edge cache 30 jours
+La suggestion IA se déclenche seulement quand tu cliques **IA** : rien n'est automatique. Une image glissée-déposée ou collée dans la zone Markdown prend elle aussi le nom du fichier comme texte alternatif. L'image de couverture n'a pas de champ de texte alternatif.
 
-Score PageSpeed Insights de tes pages → +20-30 points si tu utilises notre stack vs un upload nu.
+## Images des articles générés
 
-## OG image (partages sociaux)
+Quand Gridar génère un article :
 
-L'image qui apparaît quand tu partages ton article sur Facebook / X / LinkedIn / Slack.
+- **Couverture** : une photo Unsplash liée au sujet ; à défaut, une image générée par IA via un service externe.
+- **Images du corps** : photos Unsplash ou images Google trouvées pendant la recherche. Leur texte alternatif reprend la description demandée ou le titre de l'image Google.
 
-Configurable :
-- **Per-article** : champ "Cover image" dans l'éditeur. Si présent, c'est l'OG image.
-- **Site default** : Site Settings → Branding → "Image OG par défaut". Utilisée si l'article n'a pas de cover.
+Ces images sont liées à leur adresse d'origine, pas copiées. Vérifie les droits des images Google avant publication.
 
-Format recommandé : 1200×630px. Plus petit = recoupé. Plus grand = recompressé (peut perdre en qualité).
+Selon le mode du site, la couverture part avec l'article sur Shopify et Webflow. WordPress ne la reçoit pas : ajoute l'image mise en avant dans WordPress.
 
-L'OG image est injectée dans `<meta property="og:image" content="...">` automatiquement à la publication.
+## Image Open Graph (partages sociaux)
 
-## Image SEO (suggestions)
+L'image qui apparaît quand ton article est partagé sur Facebook, X, LinkedIn ou Slack.
 
-**Articles → un article → Audit → onglet Images**
+- **Par article** : l'**Image de couverture**. Sur le blog hébergé, elle devient l'image Open Graph de la page de l'article.
+- **Par défaut** : **Paramètres → Branding → Image Open Graph par défaut**. Format recommandé : 1200×630. Sur le blog hébergé, elle sert aux pages du blog qui ne déclarent pas leur propre image, comme la page d'accueil.
 
-Pour chaque image dans l'article :
-- Alt-text présent ?
-- Alt-text contient le keyword cible ?
-- Format (PNG/JPG/WebP) ?
-- Taille de fichier raisonnable (< 200 KB recommandé) ?
-- Dimensions cohérentes avec l'usage ?
+Sur le blog hébergé, une page d'article sans couverture ne déclare pas d'image Open Graph : mets une couverture sur chaque article. Sur les autres modes, c'est ton site ou ton CMS qui écrit les balises Open Graph.
 
-Boutons :
-- **Régénérer alt-text** (avec contexte SEO)
-- **Compresser** (re-encode en WebP)
-- **Resize** (génère 3 tailles responsive)
+## Images dans l'audit SEO
+
+Éditeur → vue **SEO** → **Audit** :
+
+- **Images & alt-text** : nombre d'images, images sans alt, alts génériques ("image", "photo", moins de 5 caractères), alts en double, alts de plus de 125 caractères
+- **Image de couverture** : présente ou manquante
+
+L'audit signale. Il ne compresse pas, ne redimensionne pas et ne réécrit pas les alts : corrige-les toi-même ou avec le bouton **IA** d'**Insérer une image**.
 
 ## Endpoints API
 
-Pour l'automation :
+Pour l'automatisation, sur `https://api.gridar.app` :
 
-| Endpoint | Méthode | Usage |
+| Endpoint | Entrée | Usage |
 |---|---|---|
-| `POST /api/upload-image/` | multipart/form-data | Upload une image |
-| `GET /api/pexels/search/?query=...` | GET | Search Pexels |
-| `GET /api/serper/images/?query=...` | GET | Search Google Images |
-| `POST /api/generate-image/` | JSON `{prompt, style}` | IA gen |
-| `GET /api/images/<uuid>/` | GET | Serve une image stockée |
-| `POST /api/image-suggest/` | JSON `{image_url, context}` | Génère un alt-text |
+| `POST /api/upload-image/` | multipart, champ `image` | Upload, renvoie `url` |
+| `GET /api/sites/<id>/images/` | | Liste la bibliothèque (500 plus récentes) |
+| `POST /api/sites/<id>/images/upload/` | multipart, champ `image` | Upload dans la bibliothèque |
+| `GET /api/pexels/search/?query=...` | `page`, `per_page` (30 maximum) | Recherche Pexels |
+| `GET /api/serper/images/?query=...` | | Recherche Google Images (20 résultats) |
+| `POST /api/generate-image/` | JSON `{prompt}` | Génère une image 16:9, renvoie `image` (base64), `mime_type`, `image_url` |
+| `GET /api/images/<uuid>/` | | Sert une image stockée (public) |
+| `POST /api/image-suggest/` | JSON `{image_url, article_title, keyword, language}` | Renvoie `alt_text`, `filename_slug`, `description` |
 
-Tous nécessitent JWT auth (pas l'API REST publique pour l'instant).
-
-## Coûts
-
-- **Pexels** : gratuit (10 000 req/mois sur leur plan free)
-- **Serper Images** : compte dans ton quota Serper SERP (~0.005$/req)
-- **DALL-E 3** : ~0.04$/image générée, facturé à nous puis répercuté en crédits IA
-- **Upload + stockage** : inclus dans tous les plans (jusqu'à 1 GB/site, 10 GB Agence)
+Ces routes demandent une session connectée au tableau de bord (JWT), sauf `GET /api/images/<uuid>/` qui est public. La clé API `btb_` de l'[API v1](api.md) n'y donne pas accès.
 
 ## Limites
 
-- Pas d'éditeur d'image intégré (crop / filtres / texte sur image). Utilise Canva / Photopea avant upload.
-- Pas de bibliothèque de templates / mockups pré-faits (sur la roadmap Q4 2026).
-- Pas de watermarking automatique.
+- Pas d'éditeur d'image intégré (recadrage, filtres, texte sur image). Prépare tes images avant l'upload.
+- Pas de compression ni de redimensionnement automatique : optimise tes fichiers avant l'upload.
+- Pas de suppression d'image depuis la bibliothèque.
+- Pas de bibliothèque de gabarits ni de mockups.
+- Pas de filigrane automatique.
 
 ## Dépannage
 
 | Erreur | Cause | Action |
 |---|---|---|
-| "PEXELS_API_KEY non configurée" | Env var manquante | Sur ta prod : ajouter la clé dans les env vars |
-| "Image trop volumineuse" | > 5 MB | Compresser via TinyPNG ou Squoosh |
-| Alt-text retourne vide | Vision API down ou rate limit | Réessaie. Si persistant, écris l'alt-text manuellement |
-| Image n'apparaît pas dans Open Graph | Cover image manquant + pas de OG default | Ajoute une cover ou set un OG default |
+| "Type de fichier non supporte (JPEG, PNG, GIF, WebP uniquement)" | Format refusé (SVG, HEIC...) | Convertis en JPEG, PNG ou WebP |
+| "Fichier trop volumineux (max 5 Mo)" | Image de plus de 5 Mo | Compresse-la (TinyPNG, Squoosh) |
+| "Limite de requetes Pexels atteinte, reessayez plus tard" | Trop de recherches Pexels en peu de temps | Attends quelques minutes |
+| "PEXELS_API_KEY non configuree" ou "SERPER_API_KEY non configuree" | Service de recherche non configuré côté Gridar | Signale-le au support |
+| "Impossible de telecharger l'image" (bouton **IA**) | L'adresse de l'image ne répond pas ou bloque Gridar | Vérifie l'URL, ou écris le texte alternatif toi-même |
+| Erreur de génération d'image ou quota épuisé | Le service de génération ne répond pas | Réessaie plus tard, ou utilise une autre source |
+| L'image n'apparaît pas au partage social | Article sans image de couverture | Ajoute une couverture (sur le blog hébergé, l'image par défaut ne s'applique pas aux articles) |

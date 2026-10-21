@@ -63,7 +63,7 @@ export const DOCS_NAV: { label: string; slug: string; section?: boolean }[] = [
   { label: "Demarrer", slug: "", section: true },
   { label: "Vue d'ensemble", slug: "" },
   { label: "Demarrage rapide", slug: "getting-started" },
-  { label: "Reference Site Settings", slug: "site-settings" },
+  { label: "Parametres du site", slug: "site-settings" },
 
   { label: "Connecter ton site", slug: "connect", section: true },
   { label: "Comparaison des modes", slug: "connect" },
@@ -86,12 +86,12 @@ export const DOCS_NAV: { label: string; slug: string; section?: boolean }[] = [
 
   { label: "Compte et facturation", slug: "plans-credits", section: true },
   { label: "Plans, credits et quotas", slug: "plans-credits" },
-  { label: "Multi-domaines (Agence)", slug: "multi-domain" },
+  { label: "Multi-sites", slug: "multi-domain" },
   { label: "API REST publique", slug: "api" },
   { label: "Integrations (MCP, n8n)", slug: "integrations" },
 
   { label: "Recettes pratiques", slug: "use-cases", section: true },
-  { label: "10 use cases", slug: "use-cases" },
+  { label: "11 use cases", slug: "use-cases" },
 
   { label: "Aide", slug: "faq", section: true },
   { label: "FAQ", slug: "faq" },
