@@ -1,49 +1,47 @@
 # Gridar
 
-> SEO content on autopilot for Quebec PMEs.
-> 12 SEO agents in one product. Generate, audit and publish articles to WordPress, Shopify, Webflow or a hosted blog - without touching your code.
+> SEO content for Quebec SMBs, bilingual FR-CA.
+> Generate, audit and deliver articles to WordPress, Shopify, Webflow, a blog hosted by Gridar, or your own site.
 
-**Made by [Arivex Studio](https://arivex.ca).**
+**Made by [Arivex Studio](https://arivex.ca).** App: <https://www.gridar.app> · API: <https://api.gridar.app> · Docs: <https://www.gridar.app/docs>
 
 ## What it does
 
-Gridar bundles 12 specialized SEO agents into one SaaS:
+- **Article generation** (FR / EN / ES, 7 article types): SERP research, writing, images, internal links, delivered to the site's CMS or stored as a draft for hosted and external sites.
+- **Delivery check**: Gridar detects how each site receives content (CMS, external database, hosted blog, agent mode) and blocks generation when nothing would reach the site.
+- **Audits**: per-article SEO audit, bulk audit, site audit with Google indexation coverage, PageSpeed.
+- **Keywords and SERP**: keyword research (related searches + People Also Ask, no search volume), rank tracking on manual snapshots, SERP analyzer, content briefs.
+- **Content health**: content decay (Google Search Console), topic clusters, internal link map, broken links, redirects.
+- **Search Console**: OAuth connection, real queries, proof page, sitemap resubmission (API / MCP).
+- **IndexNow** submission (Bing and participating engines) through the API and MCP.
+- **Integrations**: public REST API (Pro and Agency plans), hosted MCP server with 69 tools, n8n workflows over HTTP.
+- **Free public tools** (no account) under [/tools](https://www.gridar.app/tools) and [/audit](https://www.gridar.app/audit).
 
-- **ArticleGenerator** - Claude + Serper, FR/EN/ES, 7 archetypes
-- **AuditEngine** - 0-100 SEO score + actionable suggestions
-- **BriefBuilder** - search intent, outline, FAQ, entities
-- **KeywordResearch** - Serper + Gemini cross-checked volumes
-- **RankTracker** - daily SERP snapshots, geo-restricted to Quebec by default
-- **ContentDecay** - flags articles losing >30% traffic
-- **TopicClusters** - semantic grouping of your content
-- **LinkGraph** - internal linking opportunities
-- **BrokenLinkChecker** - periodic 404 crawl
-- **PlagiarismChecker** - detect copy-paste with the wider web
-- **ReadabilityScorer** - Flesch + lexical complexity
-- **PageSpeedAuditor** - Core Web Vitals via Google PSI
-
-Plus: GSC OAuth, hreflang for multilingual, weekly digests, multi-domain dashboards, Stripe billing with credits, public REST API, MCP server, n8n community node.
+Known gaps are listed in the docs: no scheduled jobs run in production yet, and dashboard AI visibility is not wired to any AI engine (the free checker is).
 
 ## Architecture
 
 | Layer | Stack | Hosted on |
 |---|---|---|
-| Backend | Django 5 + DRF + Postgres | Render |
-| Frontend | React 19 + Vite + TypeScript + Tailwind v4 + shadcn/ui | Vercel |
-| AI | Anthropic Claude, Gemini, Serper, Google PSI | Pay-per-use |
-| Payments | Stripe Subscriptions + one-time credits | Stripe |
-| Integrations | MCP server (`@gridar/mcp-server`), n8n node (`n8n-nodes-gridar`), public REST API | npm + self-hosted |
+| Backend | Django 5.2 + DRF + Postgres | Railway (`api.gridar.app`) |
+| App + marketing site + docs | Next.js 16 + React 19 + TypeScript + Tailwind | Vercel (`www.gridar.app`) |
+| Hosted customer blogs | Next.js 14 (`public-blog/`) | Vercel |
+| MCP server | Node + `@modelcontextprotocol/sdk`, Streamable HTTP + OAuth 2.1 | Railway (`mcp.gridar.app`) |
+| AI and data | Anthropic Claude (DeepSeek fallback), Gemini, OpenAI (free AI visibility tool), Serper, Google PageSpeed, Voyage AI | Pay-per-use |
+| Payments | Stripe subscriptions + one-time credit packs | Stripe |
 
 ## Repo layout
 
 ```
-backend/                  Django project
-src/                      React frontend
-public-blog/              Next.js public blog (hosted-mode customers)
-docs/                     User-facing product documentation (FR-CA)
-mcp-server/               Model Context Protocol server (npm package)
-n8n-node/                 n8n community node (npm package)
-cypress/                  E2E tests
+backend/                  Django project (API, generation, audits, billing)
+marketing/                Next.js app: dashboard, marketing pages, free tools
+marketing/docs/           User-facing product documentation (FR-CA), served at /docs
+public-blog/              Next.js blog for hosted-mode customers
+mcp-server/               Model Context Protocol server (hosted + npm package)
+n8n-node/                 n8n node (not published on npm)
+wordpress-plugin/         WordPress connector plugin (not published)
+e2e/                      Playwright tests against production
+cypress/                  Cypress E2E tests
 ```
 
 ## Local development
@@ -51,21 +49,27 @@ cypress/                  E2E tests
 ```bash
 # Backend
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 
-# Frontend (separate terminal)
+# App (separate terminal)
+cd marketing
 npm install
 npm run dev
-
-# Visit http://localhost:5173
 ```
+
+Tests: `cd backend && python manage.py test sites_mgmt` for the backend. The root `package.json` keeps the Cypress and brand-asset scripts.
+
+## Deployment
+
+- Backend: Railway deploys on push to `main`.
+- App (`marketing/`): manual deploy with `npx vercel --prod --cwd marketing`. A push alone does not update production.
 
 ## Documentation
 
-User-facing docs live in [docs/](docs/) and are served at [/docs/*](https://gridar.app/docs).
+User-facing docs live in [marketing/docs/](marketing/docs/) and are served at <https://www.gridar.app/docs>.
 
 ## License
 

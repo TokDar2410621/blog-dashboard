@@ -202,9 +202,10 @@ Oui. En mode hébergé et en mode agent, les articles sont dans la base de Grida
 
 Gridar n'entraîne aucun modèle. Le produit appelle les API de fournisseurs tiers, chacun avec ses propres conditions :
 
-- Anthropic (rédaction) et DeepSeek (secours quand Anthropic ne répond pas) ;
+- Anthropic (rédaction) ;
+- DeepSeek : secours de la rédaction quand Anthropic ne répond pas, et moteur des outils gratuits sans compte (lecture du secteur et des requêtes à tester d'après ta page d'accueil publique, commentaires des résultats) ;
 - Google Gemini (audit d'article, recherche de secours, traduction) ;
-- OpenAI et Gemini (tests de visibilité dans les moteurs IA) ;
+- OpenAI et Gemini (outil gratuit de visibilité IA) ;
 - Voyage AI (mémoire du site) ;
 - Serper (résultats Google) ;
 - Originality.ai (détection IA et plagiat, quand le module est activé) ;
@@ -214,7 +215,7 @@ Gridar n'entraîne aucun modèle. Le produit appelle les API de fournisseurs tie
 
 Pour exercer tes droits (accès, rectification, suppression du compte), écris à `tokamdarius@gmail.com`. La [politique de confidentialité](https://www.gridar.app/privacy) décrit le traitement et les délais. Le tableau de bord n'a pas de bouton de suppression de compte.
 
-Certains sous-traitants traitent tes données hors du Canada. Le secours DeepSeek est une API chinoise : il ne s'active que lorsqu'Anthropic ne répond pas.
+Certains sous-traitants traitent tes données hors du Canada. DeepSeek est une API chinoise. Dans le tableau de bord, il ne prend le relais que lorsqu'Anthropic ne répond pas : ton contenu ne lui est envoyé que dans ce cas. Les outils gratuits sans compte l'appellent à chaque analyse, avec le texte public de la page d'accueil analysée.
 
 ## Nouveautés
 

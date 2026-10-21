@@ -2,6 +2,21 @@
 
 Mises à jour récentes du produit. Format : `YYYY-MM-DD - feature/fix - description`.
 
+## En préparation
+
+Sans date. Ces chantiers sont commencés dans le code, pas encore livrés :
+
+- Mesure réelle de la visibilité IA dans le tableau de bord (Gemini et ChatGPT), à la place de la version simulée retirée en octobre 2026.
+- Tâches planifiées côté serveur : autopilote, relevé quotidien des positions, publication des articles planifiés.
+- Bouton de construction d'un cluster complet dans la page Topic clusters (aujourd'hui par l'API et le connecteur MCP).
+- Term Map de l'éditeur alimentée par le vrai top 10 Google.
+
+## 2026-10
+
+- **2026-10-21** - fix - Plus aucun chiffre simulé dans le tableau de bord. Retirés : les colonnes Visibilité IA, Trafic organique et Alertes de la vue multi-sites ; le Share of Voice, la courbe d'historique et les icônes SERP du suivi des positions ; les colonnes concurrentes de la Term Map. La visibilité IA du tableau de bord affiche qu'elle n'est pas encore branchée au lieu de résultats simulés.
+- **2026-10-21** - fix - Limites de l'API affichées alignées sur celles appliquées : 30 requêtes par heure en Pro, 200 en Agence, pas d'accès en Essai et Solo.
+- **2026-10-21** - docs - Documentation revue page par page contre le code.
+
 ## 2026-09
 
 - **2026-09-01** - feature - Connecteur MCP publié sur le registre officiel MCP (namespace `app.gridar`, serveur distant). Une server card publique décrit le transport, l'authentification et les 69 outils, pour que les annuaires MCP puissent l'indexer sans jeton.
