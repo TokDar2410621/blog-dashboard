@@ -158,7 +158,7 @@ Pour un site construit à la main (Next.js, React...) que Gridar ne peut pas pub
 | POST | `/sites/<id>/ai-visibility/suggest/` | Suggestions de prompts à suivre (`count` : 6 par défaut, de 3 à 12) |
 | POST | `/sites/<id>/ai-visibility/run/` | Lance une série de vérifications (`prompt_id` optionnel) |
 
-> `POST /ai-visibility/run/` n'interroge encore aucun moteur IA : les résultats sont simulés et la réponse le dit (`"mocked": true`). Le score de `summary/` se calcule sur ces résultats.
+> Aucun moteur IA n'est encore branché : `POST /ai-visibility/run/` répond `501` avec `"code": "ai_visibility_unavailable"` et n'écrit rien. `summary/` renvoie `"available": false`, une `note` et des compteurs à 0 ; les résultats de l'ancienne version simulée sont exclus. L'outil gratuit <https://www.gridar.app/tools/ai-visibility-checker> mesure Gemini et ChatGPT.
 
 ### Autopilote
 

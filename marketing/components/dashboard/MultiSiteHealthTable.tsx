@@ -12,7 +12,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { authFetch } from "@/lib/api-client";
@@ -38,20 +37,6 @@ type DecayResponse = {
    * instead of pretending we have zero decay. */
   unavailable?: "gsc_not_configured" | "gsc_reauth_required";
 };
-
-/**
- * Deterministic pseudo-random number in [0, 1) seeded by `seed`.
- * Used for V1 mocks (AI visibility, organic traffic, alerts) so the row
- * does not jitter between renders. Replace with real API once shipped.
- */
-function mulberry32(seed: number): number {
-  let s = (seed * 1000 + 1) >>> 0;
-  s = (s + 0x6d2b79f5) >>> 0;
-  let t = s;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
 
 function scoreColorClasses(score: number | null | undefined): string {
   if (score === null || score === undefined) return "text-muted-foreground";
@@ -152,11 +137,6 @@ export function MultiSiteHealthTable({
       const decayUnavailable: DecayResponse["unavailable"] | undefined =
         !site.gsc_property_url ? "gsc_not_configured" : decay?.data?.unavailable;
 
-      // V1 mocks - clearly labeled with "NEW" / mock badges in the cells.
-      const aiVisibility = Math.round(mulberry32(site.id) * 100);
-      const organicTraffic = Math.round(mulberry32(site.id + 7) * 12000);
-      const alertsCount = Math.round(mulberry32(site.id + 13) * 5);
-
       return {
         site,
         seoScore,
@@ -164,9 +144,6 @@ export function MultiSiteHealthTable({
         decayCount,
         decayLoading,
         decayUnavailable,
-        aiVisibility,
-        organicTraffic,
-        alertsCount,
       };
     });
   }, [sites, seoQueries, decayQueries]);
@@ -178,10 +155,7 @@ export function MultiSiteHealthTable({
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead className="font-medium">Site</TableHead>
             <TableHead className="font-medium">SEO Score</TableHead>
-            <TableHead className="font-medium">AI Visibility</TableHead>
-            <TableHead className="font-medium">Trafic organique</TableHead>
             <TableHead className="font-medium">Decay</TableHead>
-            <TableHead className="font-medium">Alertes</TableHead>
             <TableHead className="font-medium text-right">Action</TableHead>
           </TableRow>
         </TableHeader>
@@ -199,9 +173,6 @@ export function MultiSiteHealthTable({
                     </div>
                   </TableCell>
                   <TableCell><Skeleton className="h-7 w-14" /></TableCell>
-                  <TableCell><Skeleton className="h-7 w-14" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-10" /></TableCell>
                   <TableCell className="text-right">
                     <Skeleton className="h-8 w-20 ml-auto" />
@@ -216,9 +187,6 @@ export function MultiSiteHealthTable({
                   decayCount,
                   decayLoading,
                   decayUnavailable,
-                  aiVisibility,
-                  organicTraffic,
-                  alertsCount,
                 }) => (
                   <TableRow key={site.id}>
                     <TableCell>
@@ -240,25 +208,6 @@ export function MultiSiteHealthTable({
                       ) : (
                         <ScoreCell score={seoScore} />
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <ScoreCell score={aiVisibility} />
-                        <Badge
-                          variant="outline"
-                          className="border-primary/40 text-primary text-[10px] font-mono uppercase tracking-wider px-1.5 py-0"
-                        >
-                          New
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm font-mono tabular-nums">
-                        {formatNumber(organicTraffic)}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-1">
-                        / mo
-                      </span>
                     </TableCell>
                     <TableCell>
                       {decayLoading ? (
@@ -291,19 +240,6 @@ export function MultiSiteHealthTable({
                           {decayCount}
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 text-sm font-mono tabular-nums",
-                          alertsCount > 0
-                            ? "text-destructive"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        {alertsCount}
-                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button asChild size="sm" variant="outline">

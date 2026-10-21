@@ -203,19 +203,19 @@ export default function ApiDocs() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
             <div className="border border-white/10 rounded-lg p-4 bg-zinc-950/40">
-              <div className="font-semibold text-zinc-100">Essai (gratuit)</div>
+              <div className="font-semibold text-zinc-100">Essai et Solo</div>
               <div className="text-zinc-400 mt-1">Pas d&apos;accès API.</div>
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-4 bg-emerald-500/[0.06]">
               <div className="font-semibold text-zinc-100">Pro</div>
               <div className="text-zinc-400 mt-1">
-                60 requêtes / heure / utilisateur
+                30 requêtes / heure / utilisateur
               </div>
             </div>
             <div className="border border-white/10 rounded-lg p-4 bg-zinc-950/40">
               <div className="font-semibold text-zinc-100">Agence</div>
               <div className="text-zinc-400 mt-1">
-                600 requêtes / heure / utilisateur
+                200 requêtes / heure / utilisateur
               </div>
             </div>
           </div>

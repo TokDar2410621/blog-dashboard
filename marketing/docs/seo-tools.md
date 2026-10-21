@@ -91,11 +91,11 @@ API : `GET /api/v1/sites/<id>/strategic-opportunities/`, `POST .../refresh/` (8 
 
 Tu y listes les prompts à suivre, c'est-à-dire les questions qu'un client poserait à un assistant IA. Le bouton **Suggerer des prompts** en fait proposer par Claude (6 par défaut) d'après le nom, le domaine, la description et les mots-clés suivis de ton site ; rien n'est ajouté sans ton choix.
 
-**Limite actuelle** : les résultats de cette page sont simulés. Aucun moteur IA n'est interrogé depuis le dashboard ; l'écran l'indique (« Les resultats sont mockes en V1 »). Le score, les citations et les courbes ne mesurent donc pas encore ta présence dans ChatGPT, Perplexity, Gemini, SearchGPT ou Claude.
+**Limite actuelle** : aucun moteur IA n'est encore interrogé depuis le dashboard. Un bandeau le dit en haut de la page, et les boutons **Lancer un check** et **Recheck** sont désactivés. Le score, les mentions et le détail par moteur restent à 0. Les résultats de l'ancienne version simulée sont ignorés.
 
 Pour une mesure réelle, utilise l'outil gratuit AI Visibility Checker décrit plus bas : il interroge Gemini et, si sa clé est configurée, ChatGPT.
 
-API : `GET/POST /api/v1/sites/<id>/ai-visibility/prompts/`, `POST .../ai-visibility/suggest/`, `POST .../ai-visibility/run/`, `GET .../ai-visibility/summary/`. La réponse de `run` porte `mocked: true`.
+API : `GET/POST /api/v1/sites/<id>/ai-visibility/prompts/`, `POST .../ai-visibility/suggest/`, `POST .../ai-visibility/run/`, `GET .../ai-visibility/summary/`. Pour l'instant, `run` répond `501` avec `code: "ai_visibility_unavailable"`, et `summary` renvoie `available: false` avec une `note`.
 
 ## Brief de contenu
 
@@ -172,6 +172,8 @@ Ajoute des mots-clés cibles, puis clique **Snapshot maintenant** : Gridar lit l
 - **A confirmer** (avec « deja vu #X », la meilleure position observée) si ton site apparaît dans moins de la moitié des relevés
 - **Hors top 100** s'il n'apparaît dans aucun des 5 derniers relevés
 - **Jamais releve** si aucun relevé n'existe encore
+
+En haut de la page, trois cartes : **Position moyenne** (sur les positions stables), **Top 10** (positions stables dans le top 10) et **Hors top 50** (mots-clés au-delà de la 50e place au dernier relevé).
 
 La colonne **Derniere verif.** donne la date du dernier relevé. Une ligne dépliée montre l'historique du mot-clé sur 90 jours. À partir de 3 relevés, une alerte apparaît quand le dernier chute de 5 places ou plus sous la médiane des précédents, ou sort des résultats.
 

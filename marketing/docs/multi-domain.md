@@ -51,7 +51,7 @@ La page lit les articles des sites hébergés et des sites branchés sur une bas
 
 Sélecteur de sites → bouton **Voir vue multi-sites** (visible dès que tu as plus d'un site).
 
-### Colonnes fiables
+### Colonnes
 
 | Colonne | Contenu |
 |---|---|
@@ -61,10 +61,6 @@ Sélecteur de sites → bouton **Voir vue multi-sites** (visible dès que tu as 
 | Action | Bouton **Ouvrir** vers le tableau de bord du site |
 
 Sans GSC connecté, la colonne Decay affiche **GSC requis**. Si l'accès GSC a expiré, elle affiche **Reconnecter GSC**. Les deux mènent aux réglages GSC du site. Voir [Google Search Console](gsc.md).
-
-### Colonnes pas encore branchées
-
-Les colonnes **AI Visibility**, **Trafic organique** et **Alertes** ne sont pas encore calculées à partir de tes données. Ignore-les pour l'instant.
 
 ## Automatiser un rapport par site
 

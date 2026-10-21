@@ -967,6 +967,9 @@ export type AiVisibilitySummary = {
   total_prompts: number;
   breakdown_by_engine: Record<AiVisibilityEngine, AiVisibilityEngineBreakdown>;
   delta_7d: number;
+  /** false tant qu'aucun moteur IA n'est interroge depuis le tableau de bord. */
+  available?: boolean;
+  note?: string | null;
 };
 
 export type AiVisibilityPrompt = {

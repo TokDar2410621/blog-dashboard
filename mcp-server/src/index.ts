@@ -967,14 +967,14 @@ const tools: ToolDef[] = [
   {
     name: "gridar_ai_visibility_summary",
     description:
-      "AI Visibility tracker: returns aggregated metrics describing how often the site is cited in LLM responses (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). Output: {score (weighted 0-100), total_mentions, cited_pages_count, total_checks, total_prompts, breakdown_by_engine: {engine: {total_checks, cited_count, cite_rate}}, delta_7d}. Use this to show users their AI-search visibility (the next-gen SEO metric).",
+      "AI Visibility tracker: returns aggregated metrics describing how often the site is cited in LLM responses (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). Output: {score (weighted 0-100), total_mentions, cited_pages_count, total_checks, total_prompts, breakdown_by_engine: {engine: {total_checks, cited_count, cite_rate}}, delta_7d, available, note}. No AI engine is queried from the dashboard yet: available is false, the counts are 0, and note says so. Results from the former simulation are excluded. Do not present these numbers as measured AI visibility.",
     schema: SiteIdOnly,
     handler: (input) => aiVisibilitySummary(input.site_id),
   },
   {
     name: "gridar_run_ai_visibility",
     description:
-      "Trigger an AI Visibility check series for a site's tracked prompts. Creates one AiVisibilityResult per (prompt, engine) pair across all 5 engines (ChatGPT, Perplexity, Gemini, SearchGPT, Claude). V1: results are mocked plausibly so the user can validate the UI before external LLM APIs are wired. Pass prompt_id to re-check only a single prompt.",
+      "Trigger an AI Visibility check series for a site's tracked prompts. Not available yet: no AI engine is wired to the dashboard, so the endpoint answers 501 with code ai_visibility_unavailable and writes nothing. Tell the user, and point to the free checker at https://www.gridar.app/tools/ai-visibility-checker (Gemini + ChatGPT). Pass prompt_id to target a single prompt once available.",
     schema: RunAiVisibilityArgs,
     handler: (input) => {
       const { site_id, ...body } = input;

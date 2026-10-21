@@ -8,7 +8,6 @@ import {
   type TermMapTermRow,
   type TermMapUrlCol,
 } from "./TermMapHeatmap";
-import { seededRandom } from "./heatmapColor";
 import {
   Tabs,
   TabsContent,
@@ -60,70 +59,14 @@ export interface ScorePanelProps extends ScoreInputs {
   /** When provided, used instead of recomputing - lets the parent debounce. */
   precomputed?: { total: number; sub: SubScores };
   /**
-   * Optional pre-computed Term Map. When omitted, the panel mocks data
-   * client-side from `terms`. V2: populated by `gridar_serp_analyze`.
+   * Optional Term Map built from the real top 10 SERP. When omitted, the
+   * Term Map tab is hidden: no competitor column is ever made up.
    */
   termMap?: {
     terms: TermMapTermRow[];
     urls: TermMapUrlCol[];
   };
   termMapLoading?: boolean;
-}
-
-/**
- * Build a deterministic mock Term Map from the existing TermUsage list.
- *
- * TODO(v2): replace this with the response from `gridar_serp_analyze`, which
- * returns the real top 10 SERP URLs and their per-term frequencies. The
- * "Toi" column comes from `TermUsage.current`.
- */
-function buildMockTermMap(terms: TermUsage[]): {
-  terms: TermMapTermRow[];
-  urls: TermMapUrlCol[];
-} {
-  // 10 fake URL labels - kept short so they fit in the column headers.
-  const FAKE_URLS = [
-    "wikipedia",
-    "moz.com",
-    "ahrefs",
-    "semrush",
-    "hubspot",
-    "neilpatel",
-    "backlinko",
-    "search-engine-journal",
-    "yoast",
-    "contentking",
-  ];
-
-  const urls: TermMapUrlCol[] = [
-    { label: "Toi", url: "Ton article actuel" },
-    ...FAKE_URLS.map((label) => ({ label, url: `https://${label}.com` })),
-  ];
-
-  const sorted = [...terms]
-    .sort((a, b) => b.importance - a.importance)
-    .slice(0, 30);
-
-  const rows: TermMapTermRow[] = sorted.map((u) => {
-    const rng = seededRandom(u.term);
-    const frequency_per_url: Record<string, number> = {
-      Toi: u.current,
-    };
-    // Generate a plausible distribution around the target range. Higher
-    // importance terms get higher frequencies across competing URLs.
-    const targetMid = (u.target[0] + u.target[1]) / 2;
-    for (const label of FAKE_URLS) {
-      // Bias the distribution: most URLs land near targetMid, with some
-      // extremes. importance scales the spread.
-      const base = targetMid * (0.4 + rng() * 1.4);
-      const jitter = rng() * targetMid * 0.6;
-      const v = Math.max(0, Math.round(base + jitter - targetMid * 0.3));
-      frequency_per_url[label] = v;
-    }
-    return { term: u.term, frequency_per_url };
-  });
-
-  return { terms: rows, urls };
 }
 
 /**
@@ -156,12 +99,7 @@ export function ScorePanel(props: ScorePanelProps) {
     props.language,
   ]);
 
-  // V1: mock the term map client-side. V2 will pass `termMap` from a real
-  // backend call (gridar_serp_analyze) and skip this fallback entirely.
-  const termMap = useMemo(() => {
-    if (props.termMap) return props.termMap;
-    return buildMockTermMap(props.terms);
-  }, [props.termMap, props.terms]);
+  const termMap = props.termMap;
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -194,7 +132,7 @@ export function ScorePanel(props: ScorePanelProps) {
         <Tabs defaultValue="termes" className="rounded-lg border bg-card p-3">
           <TabsList className="w-full">
             <TabsTrigger value="termes">Termes</TabsTrigger>
-            <TabsTrigger value="termmap">Term Map</TabsTrigger>
+            {termMap && <TabsTrigger value="termmap">Term Map</TabsTrigger>}
           </TabsList>
           <TabsContent value="termes" className="pt-3">
             <TermUsageTracker
@@ -203,15 +141,17 @@ export function ScorePanel(props: ScorePanelProps) {
               activeTerm={props.activeTerm}
             />
           </TabsContent>
-          <TabsContent value="termmap" className="pt-3">
-            <TermMapHeatmap
-              terms={termMap.terms}
-              urls={termMap.urls}
-              loading={props.termMapLoading}
-              onTermClick={props.onTermClick}
-              activeTerm={props.activeTerm}
-            />
-          </TabsContent>
+          {termMap && (
+            <TabsContent value="termmap" className="pt-3">
+              <TermMapHeatmap
+                terms={termMap.terms}
+                urls={termMap.urls}
+                loading={props.termMapLoading}
+                onTermClick={props.onTermClick}
+                activeTerm={props.activeTerm}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
         <p className="text-[10px] leading-relaxed text-muted-foreground italic px-1">

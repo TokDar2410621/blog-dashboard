@@ -31,13 +31,13 @@ Trois panneaux redimensionnables :
 
 - **Gauche** : titre, extrait (méta description), puis la zone Markdown avec sa barre d'outils : Gras, Italique, Titre H2, Titre H3, Lien, Image, Code, Citation, Liste. Glisse-dépose ou colle une image dans la zone : elle est uploadée et insérée.
 - **Centre** : **Aperçu en direct** (couverture, titre, extrait, contenu). Clique une image de l'aperçu pour la remplacer.
-- **Droite** : **Content Score** de 0 à 100 et ses sous-scores : Mots-clés (25 %), Structure (20 %), Lisibilité (20 %), OQLF (FR-CA) (15 %), E-E-A-T (10 %), Originalité (10 %). Dessous, deux onglets : **Termes** (usage de tes termes cibles dans le texte) et **Term Map**.
+- **Droite** : **Content Score** de 0 à 100 et ses sous-scores : Mots-clés (25 %), Structure (20 %), Lisibilité (20 %), OQLF (FR-CA) (15 %), E-E-A-T (10 %), Originalité (10 %). Dessous, l'onglet **Termes** : usage de tes termes cibles dans le texte.
 
 Sur mobile, les boutons **Éditeur**, **Aperçu en direct** et **Score** alternent entre les panneaux.
 
 Le Content Score se calcule dans ton navigateur, à partir d'heuristiques, et peut différer du score de la vue SEO. Le **mot-clé principal est le premier tag** de l'article ; les tags suivants (jusqu'à 10 au total) servent de termes secondaires. Sans tags, le score n'a pas de mot-clé à mesurer.
 
-L'onglet **Term Map** n'affiche pas encore de données concurrentes réelles : seule la colonne **Toi** vient de ton texte, les autres colonnes sont simulées. Fie-toi à l'onglet **Termes**.
+L'onglet **Term Map** (fréquence de chaque terme chez les concurrents du top 10) n'apparaît que lorsque des données SERP réelles existent pour l'article. Aujourd'hui, aucune page ne les fournit : seul l'onglet **Termes** s'affiche.
 
 ### Vue SEO
 

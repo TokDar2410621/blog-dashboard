@@ -250,7 +250,7 @@ Pour un site construit à la main que Gridar ne peut pas publier lui-même. Dans
 | `gridar_ai_visibility_summary` | Score de visibilité IA du site (0 à 100), détail par moteur et évolution sur 7 jours |
 | `gridar_run_ai_visibility` | Lance une série de vérifications sur les prompts suivis du site |
 
-> `gridar_run_ai_visibility` n'interroge encore aucun moteur IA : ses résultats sont simulés, et le score de `gridar_ai_visibility_summary` se calcule sur ces résultats. Les prompts à suivre s'ajoutent depuis le tableau de bord ou l'[API](api.md).
+> Aucun moteur IA n'est encore branché : `gridar_run_ai_visibility` renvoie une erreur `501` (`ai_visibility_unavailable`) sans rien écrire, et `gridar_ai_visibility_summary` renvoie `available: false` avec des compteurs à 0. Les prompts à suivre s'ajoutent depuis le tableau de bord ou l'[API](api.md).
 
 #### Autopilote
 
