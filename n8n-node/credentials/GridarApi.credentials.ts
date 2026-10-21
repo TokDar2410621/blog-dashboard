@@ -8,7 +8,7 @@ import {
 export class GridarApi implements ICredentialType {
 	name = 'gridarApi';
 	displayName = 'Gridar API';
-	documentationUrl = 'https://blog-dashboard-ebon.vercel.app/docs/api';
+	documentationUrl = 'https://www.gridar.app/docs/api';
 
 	properties: INodeProperties[] = [
 		{
@@ -19,7 +19,7 @@ export class GridarApi implements ICredentialType {
 			default: '',
 			required: true,
 			description:
-				'Personal API token from Account -> API keys (looks like btb_xxxx). Generated at https://blog-dashboard-ebon.vercel.app/account/api-keys',
+				'Personal API token from Account -> API keys (looks like btb_xxxx). Generated at https://www.gridar.app/account/api-keys',
 		},
 		{
 			displayName: 'API Base URL',

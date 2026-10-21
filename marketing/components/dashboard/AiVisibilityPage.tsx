@@ -4,12 +4,12 @@
  * AiVisibility - track how a site is mentioned across LLM responses
  * (ChatGPT, Perplexity, Gemini, SearchGPT, Claude).
  *
- * V1 wires the new /v1/sites/<id>/ai-visibility/* endpoints. The backend run
- * endpoint currently fabricates plausible mocked results so the dashboard UX
- * can be validated without burning external LLM API budget. Real LLM calls
- * land in V2.
+ * Aucun moteur IA n'est encore interroge depuis le tableau de bord : le
+ * lancement repond 501 et le resume renvoie `available: false` avec une note.
+ * La page l'affiche et desactive les boutons de lancement. Les prompts et
+ * leurs suggestions restent reels.
  */
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,9 +20,7 @@ import {
   RefreshCw,
   Brain,
   Quote,
-  ExternalLink,
   Globe,
-  AlertCircle,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -74,50 +72,6 @@ import {
   type AiVisibilityPrompt,
   type AiVisibilityPromptSuggestion,
 } from "@/lib/api-client";
-
-// Mock sparklines so the hero strip isn't empty before the user runs any check.
-// Real values will land once the backend tracks daily snapshots (V2).
-function mockSparkline(seed: number, len = 12): number[] {
-  const out: number[] = [];
-  let v = seed;
-  for (let i = 0; i < len; i++) {
-    v = Math.max(0, v + Math.round((Math.random() - 0.45) * 8));
-    out.push(v);
-  }
-  return out;
-}
-
-function Sparkline({ data, color }: { data: number[]; color: string }) {
-  if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const range = Math.max(1, max - min);
-  const points = data
-    .map((v, i) => {
-      const x = (i / (data.length - 1)) * 100;
-      const y = 100 - ((v - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      className="h-8 w-full opacity-70"
-      aria-hidden
-    >
-      <polyline
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
-}
 
 function ScoreGauge({ score }: { score: number }) {
   // Half-circle SVG gauge, emerald -> amber -> red bands.
@@ -296,16 +250,8 @@ export default function AiVisibilityPage() {
   const summary = summaryQuery.data;
   const prompts = promptsQuery.data?.results ?? [];
 
-  // Mock sparklines (V1 - until daily snapshots ship).
-  const sparkScore = useMemo(() => mockSparkline(summary?.score ?? 30), [summary]);
-  const sparkMentions = useMemo(
-    () => mockSparkline(summary?.total_mentions ?? 5),
-    [summary],
-  );
-  const sparkPages = useMemo(
-    () => mockSparkline(summary?.cited_pages_count ?? 3),
-    [summary],
-  );
+  // Mesure indisponible tant que le serveur le dit (501 au lancement).
+  const unavailable = summary?.available === false;
 
   return (
     <div>
@@ -333,10 +279,12 @@ export default function AiVisibilityPage() {
           <Button
             onClick={() => runAllMutation.mutate()}
             disabled={
+              unavailable ||
               runAllMutation.isPending ||
               prompts.length === 0 ||
               promptsQuery.isLoading
             }
+            title={unavailable ? summary?.note ?? undefined : undefined}
             className="h-auto min-h-9 whitespace-normal"
           >
             {runAllMutation.isPending ? (
@@ -348,6 +296,15 @@ export default function AiVisibilityPage() {
           </Button>
         </div>
       </div>
+
+      {unavailable && summary?.note && (
+        <div
+          role="status"
+          className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
+          {summary.note}
+        </div>
+      )}
 
       {/* Hero strip - 3 KPI */}
       {summaryQuery.isLoading ? (
@@ -374,7 +331,6 @@ export default function AiVisibilityPage() {
                   vs 7 derniers jours
                 </div>
                 <div className="w-full max-w-[120px]">
-                  <Sparkline data={sparkScore} color="rgb(16 185 129)" />
                 </div>
               </div>
             </CardContent>
@@ -393,7 +349,6 @@ export default function AiVisibilityPage() {
                 {summary.total_mentions}
               </div>
               <div className="mt-2">
-                <Sparkline data={sparkMentions} color="rgb(20 184 166)" />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 sur {summary.total_checks} checks lances
@@ -412,7 +367,6 @@ export default function AiVisibilityPage() {
                 {summary.cited_pages_count}
               </div>
               <div className="mt-2">
-                <Sparkline data={sparkPages} color="rgb(59 130 246)" />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 URLs uniques retrouvees dans les reponses
@@ -590,8 +544,8 @@ export default function AiVisibilityPage() {
         <CardHeader>
           <CardTitle className="text-base">Prompts trackes</CardTitle>
           <CardDescription>
-            Chaque prompt est teste sur les 5 moteurs IA. Les resultats sont
-            mockes en V1 le temps que les APIs LLM soient connectees.
+            Les prompts que tu suis ici serviront a la mesure. Aucun moteur IA
+            n'est encore interroge depuis le tableau de bord.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -680,8 +634,9 @@ export default function AiVisibilityPage() {
                           size="sm"
                           onClick={() => runSingleMutation.mutate(p.id)}
                           disabled={
-                            runSingleMutation.isPending &&
-                            runSingleMutation.variables === p.id
+                            unavailable ||
+                            (runSingleMutation.isPending &&
+                              runSingleMutation.variables === p.id)
                           }
                         >
                           {runSingleMutation.isPending &&
@@ -702,16 +657,6 @@ export default function AiVisibilityPage() {
         </CardContent>
       </Card>
 
-      {/* V1 disclaimer */}
-      <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground p-3 rounded-lg bg-muted/30 border border-border/40">
-        <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-        <p>
-          V1 : les checks sont generes localement avec des resultats mockes
-          plausibles. La connexion aux vraies APIs (ChatGPT, Perplexity, Gemini,
-          SearchGPT, Claude) arrive en V2.{" "}
-          <ExternalLink className="inline h-3 w-3" />
-        </p>
-      </div>
     </div>
   );
 }

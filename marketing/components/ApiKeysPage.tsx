@@ -201,8 +201,8 @@ export function ApiKeysPage() {
               </Button>
             </form>
             <p className="text-xs text-muted-foreground mt-2">
-              Réservé aux plans Pro (60 req/h) et Agence (600 req/h). Plan
-              gratuit bloqué.
+              Réservé aux plans Pro (30 req/h) et Agence (200 req/h). Plans
+              Essai et Solo bloqués.
             </p>
           </CardContent>
         </Card>

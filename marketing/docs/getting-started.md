@@ -1,70 +1,88 @@
 # Démarrage rapide
 
-De zéro à premier article publié en 5 minutes.
+Du compte créé au premier article sur ton site, en six étapes.
 
 ## 1. Créer un compte
 
-Va sur l'app, clique **Se connecter** → **Créer un compte**. Email + mot de passe, c'est tout.
+Va sur [gridar.app](https://www.gridar.app) et clique **Commencer** (ou **Connexion**). Entre ton email, clique **Continuer** :
 
-À l'arrivée, tu atterris sur `/sites` avec une page d'accueil "Connecte ton premier site pour le débloquer". Le mockup grayscale en arrière-plan, c'est ton dashboard une fois actif.
+- Email inconnu : l'écran **Créer ton compte** te demande un mot de passe (8 caractères minimum) et sa confirmation. Clique **Créer mon compte**.
+- Tu peux aussi passer par **Continuer avec Google** ou **Continuer avec GitHub**.
+
+Tu arrives sur `/sites`. Sans site, l'écran affiche "Connecte ton premier site pour le débloquer" par-dessus un aperçu grisé du dashboard.
 
 ## 2. Connecter ton site
 
-4 boutons en haut, choisis selon ta stack :
+Quatre boutons sous l'aperçu, choisis selon ta stack :
 
-| Tu utilises | Choisis | Ce qu'on fait |
+| Tu utilises | Bouton | Ce que fait Gridar |
 |---|---|---|
-| WordPress | **WordPress** | Publie via REST API + ton Application Password. Articles à `tonsite.ca/blog/article` |
-| Shopify | **Shopify** | Publie dans `/blogs/news/` via Admin API. Custom-app token (5 min de setup chez Shopify) |
-| Webflow | **Webflow** | Publie dans une CMS Collection (généralement "Blog Posts"). Site Token Webflow |
-| Site custom (React, Vue, Astro, ...) ou aucune des options | **Blog clé-en-main** | On t'héberge le blog à `blog.tondomaine.com` (sous-domaine, 1 CNAME) |
+| WordPress | **WordPress** | Publie via l'API REST avec un Application Password |
+| Shopify | **Shopify** | Publie dans un blog de ta boutique via l'Admin API (token de custom app) |
+| Webflow | **Webflow** | Publie dans une CMS Collection via l'API CMS (Site API Token) |
+| Aucun CMS, ou tu veux qu'on héberge | **Blog clé-en-main** | Crée un site hébergé par Gridar, servi sur ton sous-domaine (`blog.tondomaine.com`, 1 CNAME) |
+
+Tu as un site React ou Next.js et tu veux les articles sous `tonsite.com/blog` ? Utilise le lien **Mode externe (React/Next.js)** en bas de `/sites`.
 
 Détails par mode : [WordPress](connect/wordpress.md) · [Shopify](connect/shopify.md) · [Webflow](connect/webflow.md) · [Hébergé](connect/hosted.md) · [Externe](connect/external.md)
 
-**Au moment du connect**, on scanne automatiquement le branding de ton domaine (logo, couleur, fonts) - preview live dans le dialog avant de cliquer "Connecter". Tu peux décocher si tu veux configurer manuellement après.
+Pour WordPress, Shopify et Webflow, le dialog scanne le branding de ton domaine (logo, couleurs, polices) et l'affiche dans un encart **Branding détecté**. Décoche **Appliquer** si tu préfères le régler après. Le dialog **Blog clé-en-main** ne scanne rien : lance le scan depuis **Paramètres → Branding → Scanner**.
 
-## 3. Générer ton premier article
+Le nombre de sites dépend de ton plan : voir [Connecter ton site](connect/README.md).
 
-Une fois connecté, tu arrives sur le dashboard du site. Dans la sidebar, clique **Générer un article**.
+## 3. Vérifier que le contenu peut atteindre ton site
 
-Champs minimaux :
-- **Sujet** : ce que tu veux qu'on couvre. Ex : "Comment choisir un CRM pour PME au Québec en 2026".
-- **Langue** : FR par défaut (ou EN/ES selon ce que tu as activé sur le site).
-- **Longueur** : Court (~600 mots), Moyen (~1500 mots), Long (~2500 mots).
-- **Type** : Guide, Tutoriel, Actualité, Comparaison, Histoire, Local.
+Gridar refuse de générer quand rien ne relie le site à une page en ligne. En haut de **Générer un article** :
 
-Optionnel mais recommandé : commence par **Brief de contenu** au-dessus du formulaire - ça génère un plan stratégique (intent, outline, FAQ, entités) qui se branche automatiquement dans ton article.
+- Bandeau rouge **Aucun chemin de livraison** : le bouton devient **Livraison à configurer** et reste grisé. Branche un CMS, active le domaine du blog public (mode hébergé), ajoute une base externe, passe en mode agent ou crée un token API (mode externe). Le bouton **Configurer la livraison** t'amène dans **Paramètres → Intégrations**.
+- Bandeau orange **Livraison non confirmée** : ton compte a un token API, donc ton site lit peut-être les articles via l'API, mais Gridar ne peut pas le vérifier. La génération reste possible.
 
-Clique **Générer**. Sous le capot :
-1. Recherche SERP sur Serper pour le sujet
-2. Analyse + sélection du sujet final
-3. Anti-cannibalisation (refuse si trop similaire à un article existant)
-4. Rédaction Claude avec ton lexique FR-CA, ton EEAT, ton schema
-5. Maillage interne automatique vers tes articles existants
-6. Audit SEO inline + corrections automatiques
-7. Publication directe dans ton CMS
+Un site WordPress, Shopify ou Webflow connecté passe ce contrôle d'office. Détails : [Connecter ton site](connect/README.md).
 
-Compte ~90 secondes. Le résultat apparaît à droite.
+## 4. Générer ton premier article
 
-## 4. Confirmer la publication
+Dans la sidebar, clique **Générer un article**. Si tu comptes générer via l'API ou le MCP, remplis d'abord **Paramètres → Auteur (EEAT) → Bio** : sans bio, ces canaux refusent la génération.
 
-L'article est maintenant visible sur **ton domaine** (pas le nôtre). URL exacte selon le mode :
-- WordPress : `tonsite.ca/2026/05/article-slug/` (selon ton permalink)
-- Shopify : `taboutique.com/blogs/news/article-slug`
-- Webflow : `tonsite.com/blog/article-slug`
-- Hébergé : `blog.tondomaine.com/article-slug`
+Le formulaire **Paramètres** :
 
-Va sur l'URL → ton article est en ligne, indexable par Google.
+- **Sujet (optionnel)** : vide = Gridar choisit un sujet.
+- **Titre forcé (optionnel)** : le titre exact. Un titre forcé désactive le contrôle anti-doublon.
+- **Méthode de recherche** : Serper ou Gemini.
+- **Type d'article** : Actualité / Opinion, Tutoriel, Comparaison, Guide, Review, Récit personnel, Annuaire local.
+- **Longueur** : Court (800-1200 mots), Moyen (1500-2000 mots), Long (2500-3500 mots).
+- **Langue** : seulement les langues activées dans **Paramètres → Langues**.
+- **Mots-clés SEO (optionnel)** : séparés par des virgules.
+- **Aperçu seulement (ne pas publier)** : génère sans rien enregistrer.
 
-## 5. Suivre les positions Google
+Optionnel : au-dessus du formulaire, le panneau **Brief de contenu** → **Générer le brief** → **Utiliser ce brief** injecte un plan (intention, outline, FAQ, entités) dans la génération.
 
-Dashboard → **Suivi des positions** → ajoute 5-10 mots-clés cibles. On crawl la SERP chaque jour pour mesurer où ton site classe sur ces requêtes.
+Clique **Générer**. Compte 1 à 2 minutes. Tu peux quitter la page : le dock en bas à droite suit la génération. Sous le capot : recherche web, choix du sujet, refus si le titre ressemble trop à un article existant, rédaction, images, correction des liens internes cassés, couverture, extrait et tags. Le détail est dans [Générer un article](generate-article.md).
 
-Combine avec **Audit global** (audite tous tes articles d'un coup) et **Content decay** (détecte les articles qui chutent) pour piloter ta stratégie SEO.
+## 5. Retrouver l'article
+
+L'endroit où l'article atterrit dépend du mode :
+
+| Mode | Statut après génération | URL |
+|---|---|---|
+| WordPress | Publié tout de suite | Selon tes permaliens WordPress (ex : `tonsite.ca/2026/10/article-slug/`) |
+| Shopify | Publié tout de suite | `taboutique.com/blogs/<blog>/article-slug` |
+| Webflow | Publié tout de suite | Selon le chemin de ta collection (ex : `tonsite.com/blog/article-slug`) |
+| Hébergé | **Brouillon** | `blog.tondomaine.com/article-slug` une fois publié |
+| Base externe | **Brouillon** dans ta base | Selon ton frontend |
+| Mode agent | Brouillon mis en file pour l'agent | L'URL que l'agent rapporte |
+
+En mode hébergé, ouvre **Articles**, clique **Modifier** sur l'article, puis **Publier**. Le blog public ne montre que les articles publiés.
+
+## 6. Suivre les positions Google
+
+Sidebar → **Suivi des positions** → **Ajouter un mot-clé à suivre**. Le bouton **Snapshot maintenant** relève les positions à la demande. Le plan Essai ne permet de suivre aucun mot-clé : voir [Plans, crédits et quotas](plans-credits.md).
+
+Pour piloter la suite : **Audit global SEO** audite tous tes articles d'un coup, **Détection de déclin** repère ceux qui perdent du terrain. Voir [Outils SEO](seo-tools.md).
 
 ## Étapes suivantes
 
-- Génère 5-10 articles autour d'un thème pour créer un **topic cluster** ([guide](seo-tools.md#topic-clusters))
-- Configure ta page Stripe : profil, mode paiement, [acheter des crédits](plans-credits.md) si ton quota mensuel est insuffisant
-- Branche **Google Search Console** pour des données réelles d'impressions/clics (Site Settings → GSC)
-- Pour de l'automatisation : crée un token API et utilise le [SDK REST](api.md) avec n8n/Zapier/Make
+- Génère plusieurs articles autour d'un même thème pour bâtir un topic cluster ([Outils SEO](seo-tools.md)).
+- Gère ton abonnement et tes crédits depuis le lien **Abonnement** de `/sites` ([Plans, crédits et quotas](plans-credits.md)).
+- Branche Google Search Console : **Paramètres → Search Console** ([guide](gsc.md)).
+- Règle le reste du site : [Référence des paramètres](site-settings.md).
+- Pour automatiser : crée un token sur `/account/api-keys` (lien **API** de `/sites`) et utilise l'[API REST](api.md) ou les [intégrations](integrations.md).

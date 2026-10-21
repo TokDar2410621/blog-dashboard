@@ -1,80 +1,81 @@
 # Connecter Webflow
 
-Pour les sites Webflow ayant une CMS Collection pour les articles. On publie directement dans la collection via l'API CMS v2 - articles visibles immédiatement sur ton site live.
+Pour les sites Webflow qui ont une CMS Collection pour les articles. Gridar écrit dans la collection via l'API CMS v2 et publie l'item sur ton site en ligne.
 
 ## Pré-requis
 
-- Compte Webflow avec un Site auquel tu as accès
-- Une CMS Collection pour les articles (le template "Blog" Webflow en crée une par défaut nommée "Blog Posts")
-- Un champ Rich Text dans la collection pour le corps de l'article (sans ça, on n'a nulle part où mettre le contenu généré)
+- Un compte Webflow avec accès au site
+- Une CMS Collection pour les articles (le template "Blog" de Webflow en crée une, "Blog Posts")
+- Un champ **Rich Text** dans cette collection pour le corps de l'article. Sans lui, Gridar n'a nulle part où mettre le contenu et refuse la connexion
 
 ## Étapes
 
 ### 1. Génère un Site API Token Webflow
 
-1. Webflow → ouvre le projet (Designer ou Editor)
-2. Top-left menu (icône W) → **Project settings**
-3. Onglet **Apps & Integrations**
-4. Section **API access** → **Generate API token**
-5. Nom : `Gridar`
-6. Scopes : coche au minimum `CMS: read and write`
-7. **Generate** → copie le token (long string)
+1. Webflow → ton projet → **Project Settings**
+2. Onglet **Apps & Integrations** → section **API access**
+3. **Generate API token**, avec au minimum les scopes CMS en lecture et écriture
+4. Copie le token
 
 ### 2. Connecte dans Gridar
 
-Sites → **Connecter Webflow**. 3 étapes :
+Sur `/sites`, clique **Webflow**. Le dialog "Connecter ton site Webflow" compte trois étapes.
 
-**Étape 1 - Token**
-Colle le token Webflow → "Vérifier le token". On valide en listant tes Webflow sites.
+**Étape 1 : token**
+Colle le token dans **Site API Token**, puis clique **Vérifier le token**. Gridar liste les sites Webflow accessibles avec ce token.
 
-**Étape 2 - Site**
-Liste de tes sites Webflow auxquels le token a accès. Clique celui où tu veux publier les articles.
+**Étape 2 : site**
+Clique le site où publier. Chaque ligne montre son domaine custom, ou `<nom>.webflow.io` à défaut.
 
-**Étape 3 - Collection**
-Liste de toutes les CMS Collections de ce site. Chaque collection a un badge :
-- 🟢 **Blog** - détecté comme blog standard (a un champ Rich Text), prêt à recevoir des articles
-- 🟠 **Pas de Rich Text** - la collection n'a pas de champ Rich Text, on ne peut pas publier dedans
+**Étape 3 : collection**
+L'encart **Branding détecté** montre le branding lu sur le domaine du site. Décoche **Appliquer** pour le régler plus tard.
 
-Choisis une collection 🟢. Le mapping de champs est auto-détecté :
-- `name` → titre
-- `slug` → URL slug
-- `post-body` (ou premier RichText trouvé) → corps
-- `post-summary` (ou premier PlainText) → excerpt
-- `main-image` (ou premier ImageRef) → cover
+Gridar liste les CMS Collections du site, avec un badge :
 
-Clique **Connecter**.
+- **Blog** : un champ de corps a été trouvé, la collection peut recevoir des articles.
+- **Pas de Rich Text** : aucun champ de corps trouvé, la connexion sera refusée.
 
-### 3. Comportement après publication
+La première collection marquée **Blog** est présélectionnée. Sous chaque collection **Blog**, une ligne "Mapping détecté" indique les champs retenus pour le titre, le corps et l'image. Clique **Connecter** : "Site Webflow connecté", confettis, puis le dashboard du site.
 
-Article généré → `POST /v2/collections/<id>/items/live` (avec `live=true` pour publier sur le site staging immédiatement). URL finale :
-- `tonsite.com/blog/article-slug` (selon le slug de ta collection)
-- Webflow rend l'article via la **page template** que tu as configurée dans Designer (généralement `Blog Posts/Blog Post Template`)
+## Mapping des champs (automatique)
 
-Le contenu Markdown est converti en HTML côté nous puis envoyé tel quel dans le champ Rich Text. Webflow rend ce HTML dans le template.
-
-## Champs Webflow utilisés (mapping automatique)
-
-| Notre champ | Webflow slug standard | Type Webflow attendu |
+| Champ Gridar | Slugs Webflow essayés, dans l'ordre | Sinon |
 |---|---|---|
-| Titre | `name` | PlainText (toujours présent) |
-| Slug | `slug` | PlainText (toujours présent) |
-| Corps | `post-body` (puis fallback RichText) | RichText - **REQUIS** |
-| Excerpt | `post-summary` (puis fallback PlainText) | PlainText (optionnel) |
-| Cover | `main-image` (puis fallback ImageRef) | ImageRef (optionnel) |
+| Titre | `name` | (toujours présent) |
+| Slug | `slug` | (toujours présent) |
+| Corps | `post-body`, `body`, `content`, `article-body`, `rich-text` | Premier champ Rich Text. **Requis** |
+| Extrait | `post-summary`, `summary`, `excerpt`, `description` | Premier champ texte simple (hors `name` et `slug`) |
+| Couverture | `main-image`, `thumbnail-image`, `cover-image`, `featured-image`, `image` | Premier champ Image |
 
-Si ta collection a des slugs différents (ex : `bodyContent` au lieu de `post-body`), notre auto-detect utilise le **type** comme fallback. Si rien ne marche, le mapping peut être édité dans le code via le champ JSON `webflow_field_map` du Site (Site Settings → Advanced).
+Le mapping ne se modifie pas depuis le dashboard. Si un champ est mal choisi, renomme ou ajoute le champ dans Webflow, puis refais la connexion.
+
+## Ce qui se passe à la génération
+
+Gridar envoie un `POST` à `/v2/collections/<id>/items/live` avec `isDraft: false` : l'item est **publié tout de suite** sur ton site en ligne, y compris quand il vient de l'autopilote. Le contenu Markdown est converti en HTML et placé dans le champ Rich Text. Webflow l'affiche via la page template de la collection (souvent `Blog Posts Template`).
+
+URL finale : selon le chemin de ta collection (ex : `tonsite.com/blog/article-slug`).
+
+Pour relire avant publication, coche **Aperçu seulement (ne pas publier)** dans le formulaire de génération : rien n'est envoyé à Webflow.
 
 ## Limites
 
-- **Pas de tags / catégories** : les collections varient trop entre projets. Pour une logique de catégories, utilise un champ Reference dans Webflow et édite manuellement après publication.
-- **Pas de scheduling Webflow-natif** : on publie en `live=true` directement. Si tu veux planifier, génère en draft (statut `draft`) puis publie via Webflow Designer.
-- **API rate limit** : Webflow limite à 60 req/min/token. À ton échelle (quelques articles/jour), c'est large.
+- **Pas de tags ni de catégories** : les collections varient trop d'un projet à l'autre. Pour des catégories, utilise un champ Reference dans Webflow et remplis-le après publication.
+- **Pas de brouillon à la génération** : l'article part en ligne directement. Pas de planification Webflow non plus.
+- **Titre en double possible** : le contenu envoyé commence par le titre en H1. Si ton template affiche déjà le champ `name` en titre, il apparaît deux fois.
+- **Une collection par site Gridar** : connecter une autre collection du même site Webflow crée un second site dans Gridar (et occupe une place de ton plan).
+
+## Changer le token
+
+Refais la connexion depuis `/sites` avec le même site et la même collection : Gridar met à jour le token sur le site existant.
 
 ## Dépannage
 
-| Erreur | Cause | Fix |
+| Message | Cause | Solution |
 |---|---|---|
-| "Token Webflow invalide ou expiré" | Token révoqué ou mal copié | Re-générer dans Webflow Project settings |
-| "Aucun site accessible" | Token sans CMS read/write | Re-créer le token avec scope CMS read+write |
-| "Cette collection n'a pas de champ Rich Text" | Collection vide ou mauvais template | Ouvre Designer → Collection → Add field → Rich Text → choisis cette collection au connect |
-| Article publié mais 404 | Page template manquante | Webflow Designer → Pages → CMS Pages → assure-toi qu'il y a un Template pour la collection. Re-publish le site |
+| "Token Webflow invalide ou expiré." | Token révoqué ou mal copié | Génère un nouveau token dans Project Settings |
+| "Token Webflow trop court - colle bien le Site Token." | Copie tronquée | Recopie le token complet |
+| "Ce token n'a accès à aucun site." | Le token ne voit aucun site | Recrée le token depuis le bon projet, avec les scopes CMS |
+| "Cette collection n'a pas de champ de type RichText pour le corps de l'article..." | Aucun champ Rich Text | Designer → ta collection → ajoute un champ Rich Text, puis reconnecte |
+| "Aucune collection trouvée." | Le site n'a pas de CMS Collection | Designer → CMS → crée une collection |
+| "Limite de sites atteinte (x/y)..." | Ton plan est plein | Supprime un site ou change de plan sur `/billing` |
+| Article publié mais 404 | Pas de page template pour la collection | Designer → Pages → CMS Collection Pages : crée le template, puis republie le site |

@@ -1,64 +1,74 @@
 # Connecter WordPress
 
-Pour les sites WordPress 5.6+. Aucun plugin requis - on utilise l'**Application Passwords** natif de WordPress.
+Pour les sites WordPress 5.6+. Aucun plugin à installer : Gridar utilise les **Application Passwords** natifs de WordPress et l'API REST.
 
 ## Pré-requis
 
 - WordPress 5.6 ou plus récent
-- Accès admin au site (un compte avec rôle Administrator)
-- L'API REST WordPress doit être accessible publiquement à `tonsite.ca/wp-json/` (c'est le défaut, sauf si bloqué par un plugin de sécurité)
+- Un compte administrateur sur le site
+- L'API REST accessible publiquement à `tonsite.ca/wp-json/` (c'est le défaut, sauf si un plugin de sécurité ou ton hébergeur la bloque)
 
 ## Étapes
 
-### 1. Génère un Application Password dans WordPress
+Sur `/sites`, clique **WordPress**. Le dialog "Connecter ton site WordPress" compte trois étapes.
 
-1. Connecte-toi à `tonsite.ca/wp-admin`
-2. Profil (en haut à droite) → scroll jusqu'à **Application Passwords**
-3. Donne un nom : `Gridar`
-4. Clique **Add New Application Password**
-5. WordPress te montre un mot de passe au format `xxxx xxxx xxxx xxxx xxxx xxxx`
-6. **Copie-le immédiatement** - il ne sera plus affiché
+### 1. URL du site
 
-> Tu ne vois pas la section ? Vérifie que tu es en HTTPS (ou ajoute `define('WP_ENVIRONMENT_TYPE', 'local');` dans `wp-config.php` si tu es en HTTP local). Application Passwords est désactivé en HTTP par défaut depuis WP 5.6.
+Entre l'URL (ex : `https://monrestaurant.ca`, sans `/wp-admin`) et valide avec la flèche. Gridar appelle `tonsite.ca/wp-json/` et vérifie que l'API `wp/v2` répond.
 
-### 2. Connecte dans Gridar
+Si c'est bon, l'écran affiche **WordPress détecté !** avec le nom du site et le nombre d'articles publiés. L'encart **Branding détecté** montre le logo, les couleurs et les polices lus sur ton site. Décoche **Appliquer** pour les régler plus tard.
 
-Sites → **Connecter WordPress**. Tu remplis :
+### 2. Génère un Application Password dans WordPress
 
-- **URL du site** : `https://tonsite.ca` (sans `/wp-admin`, sans slash final)
-- **Username** : ton login WP (pas l'email - le slug du compte)
-- **Application Password** : la chaîne avec espaces (copie-colle directement, on enlève les espaces)
+Le dialog te donne un lien direct vers `/wp-admin/profile.php` :
 
-### 3. Ce qu'on fait sous le capot
+1. Descends jusqu'à la section **Application Passwords**.
+2. Donne un nom à l'application. Le dialog suggère `BlogDashboard` ; n'importe quel nom fonctionne (ex : `Gridar`).
+3. Clique **Add New Application Password**.
+4. WordPress affiche un mot de passe au format `xxxx xxxx xxxx xxxx xxxx xxxx`. **Copie-le tout de suite** : il ne sera plus affiché.
 
-1. `GET tonsite.ca/wp-json/` → on confirme que c'est bien WordPress avec REST API active
-2. `GET tonsite.ca/wp-json/wp/v2/users/me` avec ton Application Password → on confirme l'authentification
-3. Scan branding sur `tonsite.ca` → couleur, logo, fonts pré-remplis
-4. Création de la `Site` row, redirection vers son dashboard
+Puis clique **J'ai généré mon Application Password**.
 
-Si tout passe : confetti emerald + tu arrives au dashboard.
+> Tu ne vois pas la section ? Vérifie que ton site est en HTTPS (ou ajoute `define('WP_ENVIRONMENT_TYPE', 'local');` dans `wp-config.php` si tu travailles en HTTP local). WordPress désactive les Application Passwords en HTTP par défaut.
 
-### 4. Comportement après publication
+### 3. Identifiants
 
-Quand tu génères un article via Gridar, on `POST` vers `tonsite.ca/wp-json/wp/v2/posts` avec :
-- Titre, slug, contenu (HTML rendu depuis Markdown)
-- Statut `publish` par défaut
-- Excerpt
-- Tags / catégories si tu les fournis
+- **Username WordPress** : le nom d'utilisateur du compte qui a créé l'Application Password.
+- **Application Password** : colle la chaîne telle quelle, espaces compris.
 
-L'article apparaît immédiatement sur **ton site** à l'URL définie par ton permalink WordPress (généralement `tonsite.ca/2026/05/article-slug/`).
+Clique **Connecter**. Gridar appelle `tonsite.ca/wp-json/wp/v2/users/me` avec ces identifiants. Si ça passe : "Site WordPress connecté !", confettis, et tu arrives sur le dashboard du site.
+
+## Ce qui se passe à la génération
+
+Quand tu génères un article, Gridar envoie un `POST` à `tonsite.ca/wp-json/wp/v2/posts` avec :
+
+- le titre et le slug ;
+- le contenu, converti de Markdown en HTML ;
+- l'extrait (excerpt) ;
+- le statut `publish`.
+
+L'article est **publié tout de suite** sur ton site, à l'URL que définit ton réglage de permaliens (ex : `tonsite.ca/2026/10/article-slug/`). Il n'y a pas d'étape brouillon pour les articles générés, y compris par l'autopilote. Pour relire avant, coche **Aperçu seulement (ne pas publier)** dans le formulaire de génération : rien n'est envoyé à WordPress.
 
 ## Limites du mode WordPress
 
-- **Pas d'images cover automatiques** : le `featured_media` exige un upload séparé en deux étapes (upload media → set as featured). On ne le fait pas pour l'instant. Pour un cover, ajoute une image dans le contenu Markdown.
-- **Lexique FR-CA appliqué au contenu** mais pas aux catégories/tags WordPress (qui restent ce que tu as déjà).
-- **Polylang / WPML** : non supporté - on publie en une seule langue par site. Si tu as un setup multilingue avancé, crée un site Gridar par langue.
+- **Pas d'image à la une** : Gridar n'envoie pas de `featured_media`. Les images générées sont dans le corps de l'article.
+- **Pas de catégories ni de tags** : la génération n'en envoie aucun. Ajoute-les dans WordPress après publication.
+- **Titre en double possible** : le contenu envoyé commence par le titre en H1. Selon ton thème, le titre peut apparaître deux fois en haut de l'article.
+- **Pas de meta description SEO** : Gridar remplit l'extrait WordPress, pas les champs de Yoast ou Rank Math.
+- **Pas de section "À lire aussi"** : ce bloc de liens automatique n'est ajouté qu'en mode hébergé et en base externe.
+- **Polylang / WPML** : non supportés. Gridar publie dans une seule langue par site ; avec un setup multilingue avancé, crée un site Gridar par langue.
+
+## Changer les identifiants
+
+Révoque l'ancien Application Password dans WordPress, crée-en un nouveau, puis refais la connexion depuis `/sites` avec la même URL. Gridar met à jour le site existant au lieu d'en créer un autre.
 
 ## Dépannage
 
-| Erreur | Cause | Fix |
+| Message | Cause | Solution |
 |---|---|---|
-| "Identifiants WordPress invalides" | Mauvais username ou password | Re-vérifie le username (slug, pas email). Re-génère un Application Password. |
-| "Site WordPress non détecté" | REST API désactivée | Ton hébergeur ou un plugin de sécurité bloque `/wp-json/`. Demande à ton hébergeur d'autoriser l'API REST. |
-| "Site injoignable" | Erreur DNS ou HTTP 5xx | URL mal écrite ou ton site est down. Teste `curl https://tonsite.ca/wp-json/` dans un terminal. |
-| Article publié mais 404 | Permalinks pas flushés | WordPress Admin → Réglages → Permalinks → cliquer "Save" (sans rien changer) flush la rewrite table. |
+| "Identifiants WordPress invalides - vérifie l'username + Application Password." | Mauvais nom d'utilisateur ou mot de passe | Vérifie le nom d'utilisateur. Génère un nouvel Application Password |
+| "WP REST API non disponible (HTTP ...)" ou "Ce site n'expose pas wp/v2 - REST API désactivée ?" | L'API REST est bloquée | Ton hébergeur ou un plugin de sécurité bloque `/wp-json/`. Demande qu'il soit autorisé |
+| "Réponse invalide - ce ne semble pas être WordPress." | L'URL ne pointe pas vers un WordPress | Vérifie l'URL (le domaine principal, pas une sous-page) |
+| "Site injoignable : ..." | Erreur DNS, certificat ou site hors ligne | Teste `curl https://tonsite.ca/wp-json/` dans un terminal |
+| "Limite de sites atteinte (x/y)..." | Ton plan est plein | Supprime un site ou change de plan sur `/billing` |
+| Article publié mais 404 | Permaliens pas régénérés | WordPress Admin → Réglages → Permaliens → **Enregistrer** sans rien changer |

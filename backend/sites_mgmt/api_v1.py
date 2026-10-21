@@ -15,9 +15,10 @@ go through the same plan check; the frontend should render an upgrade
 banner when it gets the resulting 403.
 
 Plan-based rate limits enforced at request time:
-  free   → blocked entirely (403)
-  pro    → 60 requests / hour / user
-  agency → 600 requests / hour / user
+  free, solo → blocked entirely (403)
+  pro        → 30 requests / hour / user
+  agency     → 200 requests / hour / user
+(source of truth: PLAN_API_LIMITS below)
 """
 from __future__ import annotations
 
@@ -3204,7 +3205,13 @@ class V1SerpAnalyzeView(BaseV1View):
 # --------------------------------------------------------------------------
 # AI Visibility tracking (2026-06-08)
 # Track how a site is mentioned in LLM responses (ChatGPT / Perplexity /
-# Gemini / SearchGPT / Claude). V1: mocked results to validate the UX.
+# Gemini / SearchGPT / Claude).
+#
+# Aucun moteur IA n'est encore interroge depuis le tableau de bord. La V1
+# fabriquait des reponses ("[Gemini mock] ...") que le score agregeait comme
+# des mesures. Le lancement refuse donc avec 501, et les lignes simulees deja
+# en base sont exclues de tout calcul. La vraie mesure passera par
+# moteurs_ia.py, qui couvre Gemini et OpenAI.
 # --------------------------------------------------------------------------
 
 AI_ENGINE_WEIGHTS = {
@@ -3216,6 +3223,19 @@ AI_ENGINE_WEIGHTS = {
 }
 
 AI_ENGINES = list(AI_ENGINE_WEIGHTS.keys())
+
+AI_VISIBILITY_AVAILABLE = False
+
+AI_VISIBILITY_UNAVAILABLE_MSG = (
+    "La mesure dans les moteurs IA n'est pas encore branchee au tableau de "
+    "bord. L'outil gratuit https://www.gridar.app/tools/ai-visibility-checker "
+    "interroge Gemini et ChatGPT en attendant."
+)
+
+
+def _ai_visibility_measured(qs):
+    """Exclut les resultats fabriques par la simulation V1."""
+    return qs.exclude(response_excerpt__regex=r'^\[[A-Za-z]+ mock\]')
 
 
 def _ai_visibility_compute_score(qs) -> float:
@@ -3245,62 +3265,6 @@ def _ai_visibility_compute_score(qs) -> float:
     return round(weighted * 100.0, 1)
 
 
-def _mock_engine_response(engine: str, prompt_text: str, site) -> dict:
-    """Generate a plausible mocked LLM response for V1 testing.
-
-    Returns dict with is_cited, response_excerpt, citation_url, citation_rank.
-    Cite probability is engine-biased so the breakdown looks realistic.
-    """
-    import random
-    # Engine bias: Perplexity cites sources most often; Claude rarely cites.
-    cite_probability = {
-        'chatgpt': 0.45,
-        'perplexity': 0.65,
-        'gemini': 0.40,
-        'searchgpt': 0.55,
-        'claude': 0.25,
-    }.get(engine, 0.40)
-
-    is_cited = random.random() < cite_probability
-    citation_url = None
-    citation_rank = None
-    domain = (site.domain or '').strip() or 'example.com'
-
-    if is_cited:
-        citation_rank = random.randint(1, 5)
-        path_options = ['', '/blog', '/articles', '/guide', '/about']
-        citation_url = f"https://{domain}{random.choice(path_options)}"
-
-    engine_label = {
-        'chatgpt': 'ChatGPT',
-        'perplexity': 'Perplexity',
-        'gemini': 'Gemini',
-        'searchgpt': 'SearchGPT',
-        'claude': 'Claude',
-    }.get(engine, engine.title())
-
-    if is_cited:
-        excerpt = (
-            f"[{engine_label} mock] Pour repondre a \"{prompt_text[:80]}\", "
-            f"plusieurs ressources peuvent t'aider, notamment {domain} qui "
-            f"propose une approche detaillee du sujet. Voir aussi d'autres "
-            f"references citees en position {citation_rank}."
-        )
-    else:
-        excerpt = (
-            f"[{engine_label} mock] Pour repondre a \"{prompt_text[:80]}\", "
-            f"voici une synthese generale sans citer {domain}. Plusieurs "
-            f"approches existent selon ton contexte."
-        )
-
-    return {
-        'is_cited': is_cited,
-        'response_excerpt': excerpt[:500],
-        'citation_url': citation_url,
-        'citation_rank': citation_rank,
-    }
-
-
 class V1AiVisibilitySummaryView(BaseV1View):
     """GET /api/v1/sites/<id>/ai-visibility/summary/
 
@@ -3314,7 +3278,9 @@ class V1AiVisibilitySummaryView(BaseV1View):
     def get(self, request, site_id):
         site = self.get_user_site(request, site_id)
         prompts_qs = AiVisibilityPrompt.objects.filter(site=site)
-        all_results = AiVisibilityResult.objects.filter(prompt__site=site)
+        all_results = _ai_visibility_measured(
+            AiVisibilityResult.objects.filter(prompt__site=site)
+        )
 
         score = _ai_visibility_compute_score(all_results)
 
@@ -3355,6 +3321,8 @@ class V1AiVisibilitySummaryView(BaseV1View):
             'total_prompts': prompts_qs.count(),
             'breakdown_by_engine': breakdown,
             'delta_7d': delta_7d,
+            'available': AI_VISIBILITY_AVAILABLE,
+            'note': None if AI_VISIBILITY_AVAILABLE else AI_VISIBILITY_UNAVAILABLE_MSG,
         })
 
 
@@ -3370,7 +3338,7 @@ class V1AiVisibilityPromptsView(BaseV1View):
 
         results = []
         for p in prompts:
-            qs = p.results.all()
+            qs = _ai_visibility_measured(p.results.all())
             total_checks = qs.count()
             citation_count = qs.filter(is_cited=True).count()
             engines_mentioning = sorted(
@@ -3432,66 +3400,16 @@ class V1AiVisibilityRunView(BaseV1View):
 
     Trigger a check series for the site's tracked prompts.
 
-    V1 (NO external LLM API calls): create mocked AiVisibilityResult rows
-    for every (prompt, engine) pair so the UI can be validated.
-
-    Body: {prompt_id?: int}
-      - if prompt_id provided, only run checks for that single prompt
-      - else run checks for every tracked prompt on the site
+    Repond 501 tant qu'aucun moteur IA n'est branche : la V1 fabriquait des
+    reponses et les stockait comme des mesures.
     """
     def post(self, request, site_id):
-        site = self.get_user_site(request, site_id)
-        prompt_id = request.data.get('prompt_id')
-
-        if prompt_id is not None:
-            try:
-                prompts = [AiVisibilityPrompt.objects.get(
-                    id=int(prompt_id), site=site
-                )]
-            except (AiVisibilityPrompt.DoesNotExist, ValueError, TypeError):
-                return Response(
-                    {'error': 'Prompt introuvable.'},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        else:
-            prompts = list(AiVisibilityPrompt.objects.filter(site=site))
-
-        if not prompts:
-            return Response(
-                {'error': 'Aucun prompt tracke. Ajoute un prompt avant de lancer un check.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        created_results = []
-        for p in prompts:
-            for engine in AI_ENGINES:
-                mock = _mock_engine_response(engine, p.prompt, site)
-                r = AiVisibilityResult.objects.create(
-                    prompt=p,
-                    engine=engine,
-                    response_excerpt=mock['response_excerpt'],
-                    is_cited=mock['is_cited'],
-                    citation_url=mock['citation_url'],
-                    citation_rank=mock['citation_rank'],
-                )
-                created_results.append({
-                    'id': r.id,
-                    'prompt_id': p.id,
-                    'engine': engine,
-                    'is_cited': r.is_cited,
-                    'citation_url': r.citation_url,
-                    'citation_rank': r.citation_rank,
-                    'checked_at': r.checked_at.isoformat(),
-                })
-
+        self.get_user_site(request, site_id)
         return Response({
-            'checks_run': len(created_results),
-            'prompts_checked': len(prompts),
-            'engines_per_prompt': len(AI_ENGINES),
-            'results': created_results,
-            'mocked': True,
-            'note': 'V1 mock - external LLM APIs not called yet.',
-        }, status=status.HTTP_201_CREATED)
+            'error': AI_VISIBILITY_UNAVAILABLE_MSG,
+            'code': 'ai_visibility_unavailable',
+            'available': False,
+        }, status=status.HTTP_501_NOT_IMPLEMENTED)
 
 
 class V1AiVisibilitySuggestView(BaseV1View):
